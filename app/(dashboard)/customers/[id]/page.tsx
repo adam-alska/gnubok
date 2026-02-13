@@ -1,0 +1,445 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { use } from 'react'
+import Link from 'next/link'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useToast } from '@/components/ui/use-toast'
+import CustomerForm from '@/components/customers/CustomerForm'
+import { CampaignStatusBadge } from '@/components/campaigns/CampaignStatusBadge'
+import {
+  ArrowLeft,
+  Building,
+  Globe,
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Edit2,
+  Trash2,
+  FileText,
+  Loader2,
+  Receipt,
+  Briefcase,
+} from 'lucide-react'
+import type { Customer, CustomerType, CreateCustomerInput, CampaignStatus } from '@/types'
+
+const customerTypeLabels: Record<CustomerType, string> = {
+  individual: 'Privatperson',
+  swedish_business: 'Svenskt foretag',
+  eu_business: 'EU-foretag',
+  non_eu_business: 'Utanfor EU',
+}
+
+const customerTypeIcons: Record<CustomerType, React.ElementType> = {
+  individual: User,
+  swedish_business: Building,
+  eu_business: Globe,
+  non_eu_business: Globe,
+}
+
+interface RelatedCampaign {
+  id: string
+  name: string
+  status: CampaignStatus
+  total_value: number | null
+  currency: string | null
+  publication_date: string | null
+  brand_name: string | null
+}
+
+interface RelatedInvoice {
+  id: string
+  invoice_number: string
+  invoice_date: string
+  due_date: string
+  status: string
+  total: number
+  currency: string
+  payment_status: string
+}
+
+interface CustomerWithRelations extends Customer {
+  campaigns: RelatedCampaign[]
+  invoices: RelatedInvoice[]
+}
+
+export default function CustomerDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = use(params)
+  const router = useRouter()
+  const { toast } = useToast()
+  const [customer, setCustomer] = useState<CustomerWithRelations | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
+
+  useEffect(() => {
+    fetchCustomer()
+  }, [id])
+
+  async function fetchCustomer() {
+    setIsLoading(true)
+    try {
+      const response = await fetch(`/api/customers/${id}`)
+      if (!response.ok) {
+        throw new Error('Not found')
+      }
+      const { data } = await response.json()
+      setCustomer(data)
+    } catch {
+      toast({
+        title: 'Fel',
+        description: 'Kunde inte hitta kunden',
+        variant: 'destructive',
+      })
+      router.push('/customers')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  async function handleUpdate(data: CreateCustomerInput) {
+    setIsUpdating(true)
+    try {
+      const response = await fetch(`/api/customers/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+
+      if (!response.ok) {
+        throw new Error('Update failed')
+      }
+
+      toast({
+        title: 'Kund uppdaterad',
+        description: data.name,
+      })
+      setIsEditOpen(false)
+      fetchCustomer()
+    } catch {
+      toast({
+        title: 'Fel',
+        description: 'Kunde inte uppdatera kunden',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!customer) return
+    if (!confirm(`Ta bort "${customer.name}"? Detta kan inte angras.`)) return
+
+    try {
+      const response = await fetch(`/api/customers/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('Delete failed')
+      }
+
+      toast({
+        title: 'Kund borttagen',
+        description: customer.name,
+      })
+      router.push('/customers')
+    } catch {
+      toast({
+        title: 'Fel',
+        description: 'Kunde inte ta bort kunden',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const formatCurrency = (amount: number | null, currency: string | null) => {
+    if (!amount) return '-'
+    return new Intl.NumberFormat('sv-SE', {
+      style: 'currency',
+      currency: currency || 'SEK',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (!customer) return null
+
+  const Icon = customerTypeIcons[customer.customer_type]
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <Link
+            href="/customers"
+            className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 mb-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Tillbaka till kunder
+          </Link>
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+              <Icon className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">{customer.name}</h1>
+              <Badge variant="secondary">{customerTypeLabels[customer.customer_type]}</Badge>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setIsEditOpen(true)}>
+            <Edit2 className="h-4 w-4 mr-1" />
+            Redigera
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDelete}
+            className="text-destructive hover:text-destructive"
+          >
+            <Trash2 className="h-4 w-4 mr-1" />
+            Ta bort
+          </Button>
+        </div>
+      </div>
+
+      {/* Info cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* Contact */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Kontaktuppgifter</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {customer.email && (
+              <div className="flex items-center gap-2 text-sm">
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                <a href={`mailto:${customer.email}`} className="hover:underline">
+                  {customer.email}
+                </a>
+              </div>
+            )}
+            {customer.phone && (
+              <div className="flex items-center gap-2 text-sm">
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                {customer.phone}
+              </div>
+            )}
+            {(customer.address_line1 || customer.city) && (
+              <div className="flex items-start gap-2 text-sm">
+                <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+                <div>
+                  {customer.address_line1 && <p>{customer.address_line1}</p>}
+                  {customer.address_line2 && <p>{customer.address_line2}</p>}
+                  {(customer.postal_code || customer.city) && (
+                    <p>{[customer.postal_code, customer.city].filter(Boolean).join(' ')}</p>
+                  )}
+                  {customer.country && <p>{customer.country}</p>}
+                </div>
+              </div>
+            )}
+            {!customer.email && !customer.phone && !customer.address_line1 && !customer.city && (
+              <p className="text-sm text-muted-foreground">Inga kontaktuppgifter</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Business details */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Foretagsuppgifter</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {customer.org_number && (
+              <div className="text-sm">
+                <span className="text-muted-foreground">Org.nr: </span>
+                {customer.org_number}
+              </div>
+            )}
+            {customer.vat_number && (
+              <div className="text-sm flex items-center gap-2">
+                <span className="text-muted-foreground">VAT: </span>
+                {customer.vat_number}
+                {customer.vat_number_validated && (
+                  <Badge variant="success" className="text-xs">Verifierad</Badge>
+                )}
+              </div>
+            )}
+            <div className="text-sm">
+              <span className="text-muted-foreground">Betalningsvillkor: </span>
+              {customer.default_payment_terms || 30} dagar
+            </div>
+            {!customer.org_number && !customer.vat_number && (
+              <p className="text-sm text-muted-foreground">Inga foretagsuppgifter</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Summary */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Oversikt</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-2 text-sm">
+              <Briefcase className="h-4 w-4 text-muted-foreground" />
+              <span>{customer.campaigns?.length || 0} samarbeten</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Receipt className="h-4 w-4 text-muted-foreground" />
+              <span>{customer.invoices?.length || 0} fakturor</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Notes */}
+      {customer.notes && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Anteckningar</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{customer.notes}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Related campaigns */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Briefcase className="h-4 w-4" />
+            Samarbeten
+            {customer.campaigns?.length > 0 && (
+              <Badge variant="secondary">{customer.campaigns.length}</Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {customer.campaigns?.length > 0 ? (
+            <div className="space-y-2">
+              {customer.campaigns.map((campaign) => (
+                <Link
+                  key={campaign.id}
+                  href={`/campaigns/${campaign.id}`}
+                  className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                >
+                  <div>
+                    <p className="font-medium">{campaign.name}</p>
+                    {campaign.brand_name && (
+                      <p className="text-sm text-muted-foreground">{campaign.brand_name}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm tabular-nums">
+                      {formatCurrency(campaign.total_value, campaign.currency)}
+                    </span>
+                    <CampaignStatusBadge status={campaign.status} />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Inga samarbeten kopplade till denna kund
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Related invoices */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Receipt className="h-4 w-4" />
+            Fakturor
+            {customer.invoices?.length > 0 && (
+              <Badge variant="secondary">{customer.invoices.length}</Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {customer.invoices?.length > 0 ? (
+            <div className="space-y-2">
+              {customer.invoices.map((invoice) => (
+                <Link
+                  key={invoice.id}
+                  href={`/invoices/${invoice.id}`}
+                  className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                >
+                  <div>
+                    <p className="font-medium">{invoice.invoice_number}</p>
+                    <p className="text-sm text-muted-foreground">{invoice.invoice_date}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm tabular-nums">
+                      {formatCurrency(invoice.total, invoice.currency)}
+                    </span>
+                    <Badge variant={invoice.payment_status === 'paid' ? 'success' : 'secondary'}>
+                      {invoice.payment_status === 'paid' ? 'Betald' : invoice.payment_status === 'overdue' ? 'Forsenad' : 'Obestallt'}
+                    </Badge>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Inga fakturor kopplade till denna kund
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Edit dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Redigera kund</DialogTitle>
+          </DialogHeader>
+          <CustomerForm
+            onSubmit={handleUpdate}
+            isLoading={isUpdating}
+            initialData={{
+              name: customer.name,
+              customer_type: customer.customer_type,
+              email: customer.email || undefined,
+              phone: customer.phone || undefined,
+              address_line1: customer.address_line1 || undefined,
+              address_line2: customer.address_line2 || undefined,
+              postal_code: customer.postal_code || undefined,
+              city: customer.city || undefined,
+              country: customer.country || undefined,
+              org_number: customer.org_number || undefined,
+              vat_number: customer.vat_number || undefined,
+              default_payment_terms: customer.default_payment_terms || undefined,
+              notes: customer.notes || undefined,
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}

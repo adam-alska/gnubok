@@ -1,0 +1,668 @@
+import { Invoice, Deadline, PaymentCalendarDay, Deliverable, Exclusivity, Campaign } from '@/types'
+
+// Swedish day names (Monday first)
+export const SWEDISH_DAYS = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön']
+
+// Swedish month names
+export const SWEDISH_MONTHS = [
+  'Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni',
+  'Juli', 'Augusti', 'September', 'Oktober', 'November', 'December'
+]
+
+// Parse ISO date string to Date object at start of day
+export function parseDate(dateString: string): Date {
+  const [year, month, day] = dateString.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+// Format date as ISO string (YYYY-MM-DD)
+export function formatDateISO(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+// Get start of day
+export function startOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+// Check if date is before another
+export function isBefore(date1: Date, date2: Date): boolean {
+  return startOfDay(date1).getTime() < startOfDay(date2).getTime()
+}
+
+// Check if two dates are the same day
+export function isSameDay(date1: Date, date2: Date): boolean {
+  return (
+    date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth() &&
+    date1.getDate() === date2.getDate()
+  )
+}
+
+// Check if invoice is overdue
+export function isInvoiceOverdue(invoice: Invoice): boolean {
+  if (invoice.status === 'paid' || invoice.status === 'cancelled' || invoice.status === 'credited') {
+    return false
+  }
+  const today = startOfDay(new Date())
+  const dueDate = parseDate(invoice.due_date)
+  return isBefore(dueDate, today)
+}
+
+// Check if deadline is overdue
+export function isDeadlineOverdue(deadline: Deadline): boolean {
+  if (deadline.is_completed) return false
+  const today = startOfDay(new Date())
+  const dueDate = parseDate(deadline.due_date)
+  return isBefore(dueDate, today)
+}
+
+// Get all days in a month as a grid (including padding days from prev/next months)
+export function getMonthGrid(year: number, month: number): Date[][] {
+  const firstDay = new Date(year, month, 1)
+  const lastDay = new Date(year, month + 1, 0)
+
+  // Get day of week (0 = Sunday, 1 = Monday, etc.)
+  // Convert to Monday-first (0 = Monday, 6 = Sunday)
+  let startDayOfWeek = firstDay.getDay() - 1
+  if (startDayOfWeek < 0) startDayOfWeek = 6
+
+  const daysInMonth = lastDay.getDate()
+
+  const weeks: Date[][] = []
+  let currentWeek: Date[] = []
+
+  // Add padding days from previous month
+  const prevMonth = new Date(year, month, 0)
+  const prevMonthDays = prevMonth.getDate()
+  for (let i = startDayOfWeek - 1; i >= 0; i--) {
+    currentWeek.push(new Date(year, month - 1, prevMonthDays - i))
+  }
+
+  // Add days of current month
+  for (let day = 1; day <= daysInMonth; day++) {
+    currentWeek.push(new Date(year, month, day))
+    if (currentWeek.length === 7) {
+      weeks.push(currentWeek)
+      currentWeek = []
+    }
+  }
+
+  // Add padding days from next month
+  if (currentWeek.length > 0) {
+    let nextDay = 1
+    while (currentWeek.length < 7) {
+      currentWeek.push(new Date(year, month + 1, nextDay++))
+    }
+    weeks.push(currentWeek)
+  }
+
+  return weeks
+}
+
+// Group invoices by due date
+export function groupInvoicesByDate(invoices: Invoice[]): Map<string, Invoice[]> {
+  const grouped = new Map<string, Invoice[]>()
+
+  for (const invoice of invoices) {
+    const dateKey = invoice.due_date
+    const existing = grouped.get(dateKey) || []
+    existing.push(invoice)
+    grouped.set(dateKey, existing)
+  }
+
+  return grouped
+}
+
+// Group deadlines by due date
+export function groupDeadlinesByDate(deadlines: Deadline[]): Map<string, Deadline[]> {
+  const grouped = new Map<string, Deadline[]>()
+
+  for (const deadline of deadlines) {
+    const dateKey = deadline.due_date
+    const existing = grouped.get(dateKey) || []
+    existing.push(deadline)
+    grouped.set(dateKey, existing)
+  }
+
+  return grouped
+}
+
+// Create PaymentCalendarDay from invoices for a specific date
+export function createPaymentCalendarDay(date: string, invoices: Invoice[]): PaymentCalendarDay {
+  const dayInvoices = invoices.filter(inv => inv.due_date === date)
+  const overdueCount = dayInvoices.filter(isInvoiceOverdue).length
+  const totalExpected = dayInvoices
+    .filter(inv => inv.status !== 'paid' && inv.status !== 'cancelled' && inv.status !== 'credited')
+    .reduce((sum, inv) => sum + (inv.total_sek || inv.total), 0)
+
+  return {
+    date,
+    invoices: dayInvoices,
+    totalExpected,
+    overdueCount
+  }
+}
+
+// Get invoices for a month
+export function getInvoicesForMonth(invoices: Invoice[], year: number, month: number): Invoice[] {
+  const monthStr = String(month + 1).padStart(2, '0')
+  const prefix = `${year}-${monthStr}`
+
+  return invoices.filter(inv => inv.due_date.startsWith(prefix))
+}
+
+// Get deadlines for a month
+export function getDeadlinesForMonth(deadlines: Deadline[], year: number, month: number): Deadline[] {
+  const monthStr = String(month + 1).padStart(2, '0')
+  const prefix = `${year}-${monthStr}`
+
+  return deadlines.filter(d => d.due_date.startsWith(prefix))
+}
+
+// Calculate summary for a period
+export interface PeriodSummary {
+  totalExpected: number
+  totalOverdue: number
+  totalPaid: number
+  overdueCount: number
+  pendingCount: number
+  paidCount: number
+}
+
+export function calculatePeriodSummary(invoices: Invoice[]): PeriodSummary {
+  let totalExpected = 0
+  let totalOverdue = 0
+  let totalPaid = 0
+  let overdueCount = 0
+  let pendingCount = 0
+  let paidCount = 0
+
+  for (const invoice of invoices) {
+    const amount = invoice.total_sek || invoice.total
+
+    if (invoice.status === 'paid') {
+      totalPaid += amount
+      paidCount++
+    } else if (invoice.status !== 'cancelled' && invoice.status !== 'credited') {
+      totalExpected += amount
+      pendingCount++
+
+      if (isInvoiceOverdue(invoice)) {
+        totalOverdue += amount
+        overdueCount++
+      }
+    }
+  }
+
+  return {
+    totalExpected,
+    totalOverdue,
+    totalPaid,
+    overdueCount,
+    pendingCount,
+    paidCount
+  }
+}
+
+// Get upcoming deadlines (next N days)
+export function getUpcomingDeadlines(deadlines: Deadline[], days: number = 7): Deadline[] {
+  const today = startOfDay(new Date())
+  const endDate = new Date(today)
+  endDate.setDate(endDate.getDate() + days)
+
+  return deadlines
+    .filter(d => {
+      if (d.is_completed) return false
+      const dueDate = parseDate(d.due_date)
+      return dueDate >= today && dueDate <= endDate
+    })
+    .sort((a, b) => a.due_date.localeCompare(b.due_date))
+}
+
+// Swedish deadline type labels (extended for campaigns)
+export const DEADLINE_TYPE_LABELS: Record<string, string> = {
+  delivery: 'Leverans',
+  approval: 'Godkännande',
+  invoicing: 'Fakturering',
+  report: 'Rapport',
+  revision: 'Revision',
+  assets: 'Material',
+  spark_ad: 'Spark Ad',
+  statistics: 'Statistik',
+  other: 'Övrigt'
+}
+
+// Swedish priority labels
+export const PRIORITY_LABELS: Record<string, string> = {
+  critical: 'Kritisk',
+  important: 'Viktig',
+  normal: 'Normal'
+}
+
+// Priority colors for styling
+export const PRIORITY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  critical: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
+  important: { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
+  normal: { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' }
+}
+
+// ============================================================
+// Status-aware deadline functions
+// ============================================================
+
+import type { DeadlineStatus } from '@/types'
+
+// Status labels in Swedish
+export const STATUS_LABELS: Record<DeadlineStatus, string> = {
+  upcoming: 'Kommande',
+  action_needed: 'Åtgärd krävs',
+  in_progress: 'Pågår',
+  submitted: 'Inskickad',
+  confirmed: 'Bekräftad',
+  overdue: 'Försenad'
+}
+
+// Status colors for styling
+export const STATUS_COLORS: Record<DeadlineStatus, { bg: string; text: string; border: string; dot: string }> = {
+  upcoming: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', dot: 'bg-blue-500' },
+  action_needed: { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', dot: 'bg-orange-500' },
+  in_progress: { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200', dot: 'bg-yellow-500' },
+  submitted: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', dot: 'bg-purple-500' },
+  confirmed: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200', dot: 'bg-green-500' },
+  overdue: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', dot: 'bg-red-500' }
+}
+
+// Get deadlines needing attention (action_needed or overdue)
+export function getDeadlinesNeedingAttention(deadlines: Deadline[]): Deadline[] {
+  return deadlines.filter(d =>
+    !d.is_completed &&
+    (d.status === 'action_needed' || d.status === 'overdue')
+  ).sort((a, b) => {
+    // Sort overdue first, then by date
+    if (a.status === 'overdue' && b.status !== 'overdue') return -1
+    if (b.status === 'overdue' && a.status !== 'overdue') return 1
+    return a.due_date.localeCompare(b.due_date)
+  })
+}
+
+// Get tax deadlines only
+export function getTaxDeadlines(deadlines: Deadline[]): Deadline[] {
+  return deadlines.filter(d => d.deadline_type === 'tax')
+}
+
+// Get tax deadlines needing attention
+export function getTaxDeadlinesNeedingAttention(deadlines: Deadline[]): Deadline[] {
+  return getDeadlinesNeedingAttention(deadlines).filter(d => d.deadline_type === 'tax')
+}
+
+// Count deadlines by status
+export function countDeadlinesByStatus(deadlines: Deadline[]): Record<DeadlineStatus, number> {
+  const counts: Record<DeadlineStatus, number> = {
+    upcoming: 0,
+    action_needed: 0,
+    in_progress: 0,
+    submitted: 0,
+    confirmed: 0,
+    overdue: 0
+  }
+
+  for (const d of deadlines) {
+    if (!d.is_completed && d.status) {
+      counts[d.status]++
+    }
+  }
+
+  return counts
+}
+
+// ============================================================
+// Campaign-aware calendar functions
+// ============================================================
+
+// Get deliverables for a month
+export function getDeliverablesForMonth(deliverables: Deliverable[], year: number, month: number): Deliverable[] {
+  const monthStr = String(month + 1).padStart(2, '0')
+  const prefix = `${year}-${monthStr}`
+
+  return deliverables.filter(d => d.due_date?.startsWith(prefix))
+}
+
+// Group deliverables by due date
+export function groupDeliverablesByDate(deliverables: Deliverable[]): Map<string, Deliverable[]> {
+  const grouped = new Map<string, Deliverable[]>()
+
+  for (const deliverable of deliverables) {
+    if (!deliverable.due_date) continue
+    const dateKey = deliverable.due_date
+    const existing = grouped.get(dateKey) || []
+    existing.push(deliverable)
+    grouped.set(dateKey, existing)
+  }
+
+  return grouped
+}
+
+// Check if deliverable is overdue
+export function isDeliverableOverdue(deliverable: Deliverable): boolean {
+  if (['approved', 'published'].includes(deliverable.status)) return false
+  if (!deliverable.due_date) return false
+
+  const today = startOfDay(new Date())
+  const dueDate = parseDate(deliverable.due_date)
+  return isBefore(dueDate, today)
+}
+
+// Get upcoming deliverables
+export function getUpcomingDeliverables(deliverables: Deliverable[], days: number = 7): Deliverable[] {
+  const today = startOfDay(new Date())
+  const endDate = new Date(today)
+  endDate.setDate(endDate.getDate() + days)
+
+  return deliverables
+    .filter(d => {
+      if (['approved', 'published'].includes(d.status)) return false
+      if (!d.due_date) return false
+      const dueDate = parseDate(d.due_date)
+      return dueDate >= today && dueDate <= endDate
+    })
+    .sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''))
+}
+
+// Get exclusivities active on a specific date
+export function getExclusivitiesForDate(exclusivities: Exclusivity[], date: string): Exclusivity[] {
+  return exclusivities.filter(e =>
+    e.start_date <= date && e.end_date >= date
+  )
+}
+
+// Get exclusivities for a month (overlapping with month)
+export function getExclusivitiesForMonth(exclusivities: Exclusivity[], year: number, month: number): Exclusivity[] {
+  const monthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`
+  const lastDay = new Date(year, month + 1, 0).getDate()
+  const monthEnd = `${year}-${String(month + 1).padStart(2, '0')}-${lastDay}`
+
+  return exclusivities.filter(e =>
+    e.start_date <= monthEnd && e.end_date >= monthStart
+  )
+}
+
+// Get campaigns with deliverables in a date range
+export function getCampaignsWithDeliverablesInRange(
+  campaigns: Campaign[],
+  startDate: string,
+  endDate: string
+): Campaign[] {
+  return campaigns.filter(campaign =>
+    campaign.deliverables?.some(d =>
+      d.due_date &&
+      d.due_date >= startDate &&
+      d.due_date <= endDate &&
+      !['approved', 'published'].includes(d.status)
+    )
+  )
+}
+
+// Calculate campaign deliverable summary for a date
+export function getCampaignDaySummary(
+  campaigns: Campaign[],
+  date: string
+): {
+  deliverables: (Deliverable & { campaignName: string })[]
+  totalCount: number
+  overdueCount: number
+} {
+  const deliverables: (Deliverable & { campaignName: string })[] = []
+  let overdueCount = 0
+  const today = formatDateISO(new Date())
+
+  for (const campaign of campaigns) {
+    for (const d of campaign.deliverables || []) {
+      if (d.due_date === date && !['approved', 'published'].includes(d.status)) {
+        deliverables.push({ ...d, campaignName: campaign.name })
+        if (date < today) overdueCount++
+      }
+    }
+  }
+
+  return {
+    deliverables,
+    totalCount: deliverables.length,
+    overdueCount
+  }
+}
+
+// Get all calendar events for a month (unified view)
+export interface CalendarEvent {
+  id: string
+  type: 'invoice' | 'deadline' | 'deliverable' | 'exclusivity_start' | 'exclusivity_end' | 'campaign_start' | 'campaign_end'
+  date: string
+  title: string
+  subtitle?: string
+  status?: string
+  priority?: string
+  isOverdue?: boolean
+  campaignId?: string
+  customerId?: string
+}
+
+export function getCalendarEventsForMonth(
+  invoices: Invoice[],
+  deadlines: Deadline[],
+  campaigns: Campaign[],
+  year: number,
+  month: number
+): CalendarEvent[] {
+  const events: CalendarEvent[] = []
+  const monthStr = String(month + 1).padStart(2, '0')
+  const prefix = `${year}-${monthStr}`
+  const today = formatDateISO(new Date())
+
+  // Invoice due dates
+  for (const inv of invoices) {
+    if (inv.due_date.startsWith(prefix) && !['paid', 'cancelled', 'credited'].includes(inv.status)) {
+      events.push({
+        id: `inv-${inv.id}`,
+        type: 'invoice',
+        date: inv.due_date,
+        title: `Faktura ${inv.invoice_number}`,
+        subtitle: inv.customer?.name,
+        status: inv.status,
+        isOverdue: inv.due_date < today && !['paid', 'cancelled', 'credited'].includes(inv.status),
+        customerId: inv.customer_id
+      })
+    }
+  }
+
+  // Deadlines
+  for (const d of deadlines) {
+    if (d.due_date.startsWith(prefix) && !d.is_completed) {
+      events.push({
+        id: `dl-${d.id}`,
+        type: 'deadline',
+        date: d.due_date,
+        title: d.title,
+        subtitle: d.customer?.name,
+        priority: d.priority,
+        isOverdue: d.due_date < today,
+        campaignId: d.campaign_id || undefined,
+        customerId: d.customer_id || undefined
+      })
+    }
+  }
+
+  // Deliverables from campaigns
+  for (const campaign of campaigns) {
+    // Campaign start/end dates
+    if (campaign.start_date?.startsWith(prefix)) {
+      events.push({
+        id: `camp-start-${campaign.id}`,
+        type: 'campaign_start',
+        date: campaign.start_date,
+        title: `Start: ${campaign.name}`,
+        subtitle: campaign.customer?.name,
+        campaignId: campaign.id,
+        customerId: campaign.customer_id || undefined
+      })
+    }
+
+    if (campaign.end_date?.startsWith(prefix)) {
+      events.push({
+        id: `camp-end-${campaign.id}`,
+        type: 'campaign_end',
+        date: campaign.end_date,
+        title: `Slut: ${campaign.name}`,
+        subtitle: campaign.customer?.name,
+        campaignId: campaign.id,
+        customerId: campaign.customer_id || undefined
+      })
+    }
+
+    // Deliverables
+    for (const d of campaign.deliverables || []) {
+      if (d.due_date?.startsWith(prefix) && !['approved', 'published'].includes(d.status)) {
+        events.push({
+          id: `del-${d.id}`,
+          type: 'deliverable',
+          date: d.due_date,
+          title: d.title,
+          subtitle: campaign.name,
+          status: d.status,
+          isOverdue: d.due_date < today,
+          campaignId: campaign.id,
+          customerId: campaign.customer_id || undefined
+        })
+      }
+    }
+
+    // Exclusivities
+    for (const e of campaign.exclusivities || []) {
+      if (e.start_date.startsWith(prefix)) {
+        events.push({
+          id: `exc-start-${e.id}`,
+          type: 'exclusivity_start',
+          date: e.start_date,
+          title: `Exklusivitet startar`,
+          subtitle: `${campaign.name}: ${e.categories.slice(0, 2).join(', ')}${e.categories.length > 2 ? '...' : ''}`,
+          campaignId: campaign.id
+        })
+      }
+
+      if (e.end_date.startsWith(prefix)) {
+        events.push({
+          id: `exc-end-${e.id}`,
+          type: 'exclusivity_end',
+          date: e.end_date,
+          title: `Exklusivitet slutar`,
+          subtitle: `${campaign.name}: ${e.categories.slice(0, 2).join(', ')}${e.categories.length > 2 ? '...' : ''}`,
+          campaignId: campaign.id
+        })
+      }
+    }
+  }
+
+  // Sort by date
+  events.sort((a, b) => a.date.localeCompare(b.date))
+
+  return events
+}
+
+// Group calendar events by date
+export function groupCalendarEventsByDate(events: CalendarEvent[]): Map<string, CalendarEvent[]> {
+  const grouped = new Map<string, CalendarEvent[]>()
+
+  for (const event of events) {
+    const existing = grouped.get(event.date) || []
+    existing.push(event)
+    grouped.set(event.date, existing)
+  }
+
+  return grouped
+}
+
+// ============================================================
+// Week and Day View Utilities
+// ============================================================
+
+// View mode labels in Swedish
+export const VIEW_MODE_LABELS = {
+  month: 'Månad',
+  week: 'Vecka',
+  day: 'Dag'
+} as const
+
+// Swedish full day names
+export const SWEDISH_DAYS_FULL = ['Måndag', 'Tisdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lördag', 'Söndag']
+
+// Get Monday of the week for a given date (ISO week - Monday first)
+export function getWeekStart(date: Date): Date {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const dayOfWeek = d.getDay()
+  // Convert Sunday (0) to 7 for ISO week calculation
+  const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+  d.setDate(d.getDate() - diff)
+  return d
+}
+
+// Get array of 7 dates for the week containing the given date
+export function getWeekDays(date: Date): Date[] {
+  const weekStart = getWeekStart(date)
+  const days: Date[] = []
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(weekStart)
+    day.setDate(weekStart.getDate() + i)
+    days.push(day)
+  }
+  return days
+}
+
+// Get ISO week number for a date
+export function getWeekNumber(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  // Set to nearest Thursday (current date + 4 - current day number, make Sunday = 7)
+  const dayNum = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+  // Get first day of year
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  // Calculate full weeks to nearest Thursday
+  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+  return weekNo
+}
+
+// Generate hourly time slots
+export function getTimeSlots(startHour: number = 8, endHour: number = 20): string[] {
+  const slots: string[] = []
+  for (let hour = startHour; hour <= endHour; hour++) {
+    slots.push(`${String(hour).padStart(2, '0')}:00`)
+  }
+  return slots
+}
+
+// Get invoices for a date range (inclusive)
+export function getInvoicesForDateRange(invoices: Invoice[], startDate: Date, endDate: Date): Invoice[] {
+  const start = formatDateISO(startDate)
+  const end = formatDateISO(endDate)
+  return invoices.filter(inv => inv.due_date >= start && inv.due_date <= end)
+}
+
+// Get deadlines for a date range (inclusive)
+export function getDeadlinesForDateRange(deadlines: Deadline[], startDate: Date, endDate: Date): Deadline[] {
+  const start = formatDateISO(startDate)
+  const end = formatDateISO(endDate)
+  return deadlines.filter(d => d.due_date >= start && d.due_date <= end)
+}
+
+// Format date for week view header (e.g., "Mån 27")
+export function formatWeekDayHeader(date: Date): string {
+  const dayIndex = date.getDay() === 0 ? 6 : date.getDay() - 1
+  return `${SWEDISH_DAYS[dayIndex]} ${date.getDate()}`
+}
+
+// Format date for day view header (e.g., "Måndag 27 januari 2025")
+export function formatDayViewHeader(date: Date): string {
+  const dayIndex = date.getDay() === 0 ? 6 : date.getDay() - 1
+  return `${SWEDISH_DAYS_FULL[dayIndex]} ${date.getDate()} ${SWEDISH_MONTHS[date.getMonth()].toLowerCase()} ${date.getFullYear()}`
+}

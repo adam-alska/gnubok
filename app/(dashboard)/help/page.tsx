@@ -1,0 +1,428 @@
+'use client'
+
+import { useState, useMemo } from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { HelpLink } from '@/components/ui/info-tooltip'
+import {
+  Search,
+  BookOpen,
+  Receipt,
+  Calculator,
+  Building2,
+  FileText,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+
+interface GlossaryTerm {
+  term: string
+  simpleTerm?: string // Vardagligt alternativ
+  definition: string
+  category: 'skatt' | 'moms' | 'faktura' | 'bokföring' | 'bank' | 'företag'
+  skatteverketUrl?: string
+  relatedTerms?: string[]
+}
+
+const glossaryTerms: GlossaryTerm[] = [
+  // Skatt
+  {
+    term: 'F-skatt',
+    simpleTerm: 'Månatlig skatteinbetalning',
+    definition:
+      'F-skatt (företagsskatt) innebär att du som företagare själv ansvarar för att betala in preliminärskatt och egenavgifter. Du betalar in en fast summa varje månad baserat på din beräknade årsinkomst. Om du betalat för lite under året kan du få restskatt.',
+    category: 'skatt',
+    skatteverketUrl: 'https://www.skatteverket.se/foretag/foretagarguiden/foretagsformer/enskildnaringsverksamhet/fskatt.4.361dc8c15312eff6fd1f8a3.html',
+    relatedTerms: ['Preliminärskatt', 'Restskatt', 'Egenavgifter'],
+  },
+  {
+    term: 'Preliminärskatt',
+    definition:
+      'Skatt som betalas in i förskott under inkomståret, baserat på uppskattad årsinkomst. Din F-skatteinbetalning är en form av preliminärskatt.',
+    category: 'skatt',
+    relatedTerms: ['F-skatt', 'Restskatt'],
+  },
+  {
+    term: 'Egenavgifter',
+    simpleTerm: 'Sociala avgifter',
+    definition:
+      'Som enskild näringsidkare betalar du egenavgifter (ca 28,97%) istället för arbetsgivaravgifter. Avgifterna finansierar socialförsäkringar som pension, sjukpenning och föräldrapenning - saker som anställda får via sin arbetsgivare.',
+    category: 'skatt',
+    skatteverketUrl: 'https://www.skatteverket.se/foretag/foretagarguiden/avgifterochegenavgifter/egenavgifter.4.361dc8c15312eff6fd1e5e7.html',
+    relatedTerms: ['Enskild firma'],
+  },
+  {
+    term: 'Restskatt',
+    definition:
+      'Om du betalat in för lite preliminärskatt under året får du restskatt att betala. Det betyder att din faktiska skatt var högre än vad du betalade in via F-skatten.',
+    category: 'skatt',
+    relatedTerms: ['F-skatt', 'Preliminärskatt'],
+  },
+  {
+    term: 'Schablonavdrag',
+    simpleTerm: 'Enkla avdrag',
+    definition:
+      'Förenklade avdrag där du använder fasta belopp istället för att spara kvitton. Exempel: hemmakontor (2 000 kr/år) eller milersättning (25 kr/mil för bil). Perfekt om du inte vill krångla med att spara alla kvitton.',
+    category: 'skatt',
+    skatteverketUrl: 'https://www.skatteverket.se/privat/skatter/arbeteochinkomst/avdrag.4.6efe6285127ab4f1d25800023187.html',
+    relatedTerms: ['Avdrag', 'Hemmakontor'],
+  },
+  {
+    term: 'NE-bilaga',
+    definition:
+      'En bilaga till din inkomstdeklaration där du redovisar resultatet från din enskilda näringsverksamhet. Appen hjälper dig samla underlaget - du behöver inte förstå alla detaljer.',
+    category: 'skatt',
+    skatteverketUrl: 'https://www.skatteverket.se/privat/deklaration/blanketter/inkomstochfastighetsdeklaration/blankett21.4.6efe6285127ab4f1d25800023142.html',
+    relatedTerms: ['Enskild firma', 'Inkomstdeklaration'],
+  },
+  {
+    term: 'Disponibelt',
+    simpleTerm: 'Ditt att spendera',
+    definition:
+      'Det belopp du kan använda fritt efter att vi räknat bort uppskattad skatt och moms från ditt saldo. Resten bör du "låsa" för framtida skatteinbetalningar.',
+    category: 'skatt',
+  },
+  // Moms
+  {
+    term: 'Moms',
+    simpleTerm: 'Mervärdesskatt',
+    definition:
+      'Mervärdesskatt som läggs på varor och tjänster. Som momsregistrerad lägger du på moms på dina fakturor och drar av moms på dina inköp. Skillnaden betalar eller får du tillbaka från Skatteverket.',
+    category: 'moms',
+    skatteverketUrl: 'https://www.skatteverket.se/foretag/moms.4.65fc817e1077c25b8328000206.html',
+    relatedTerms: ['Momsperiod', 'Ingående moms', 'Utgående moms'],
+  },
+  {
+    term: 'Momsperiod',
+    simpleTerm: 'Hur ofta du rapporterar moms',
+    definition:
+      'Hur ofta du redovisar och betalar moms till Skatteverket. Vanligast är kvartal (4 gånger/år). Osäker? Börja med kvartal - du kan ändra senare. Omsättning under 1 miljon = år möjlig, över 40 miljoner = månad krävs.',
+    category: 'moms',
+    relatedTerms: ['Moms', 'Momsdeklaration'],
+  },
+  {
+    term: 'Omvänd skattskyldighet',
+    simpleTerm: 'Kunden betalar momsen',
+    definition:
+      'När du säljer till företag i andra EU-länder betalar köparen momsen i sitt eget land. Du fakturerar 0% moms och skriver "Omvänd skattskyldighet" eller "Reverse charge" på fakturan.',
+    category: 'moms',
+    skatteverketUrl: 'https://www.skatteverket.se/foretag/moms/saljavarortjanster/omvandskattskyldighetvidsaljandeinomeu.4.7be5268414bea0646940d0e.html',
+    relatedTerms: ['EU-försäljning', 'Momsfri export'],
+  },
+  {
+    term: 'Ingående moms',
+    definition:
+      'Moms du betalar på dina inköp (utgifter). Denna moms får du dra av från din momsredovisning.',
+    category: 'moms',
+    relatedTerms: ['Utgående moms', 'Moms'],
+  },
+  {
+    term: 'Utgående moms',
+    definition:
+      'Moms du tar ut av dina kunder (lägger på fakturan). Denna moms ska du redovisa till Skatteverket.',
+    category: 'moms',
+    relatedTerms: ['Ingående moms', 'Moms'],
+  },
+  // Faktura
+  {
+    term: 'Förfallodag',
+    definition:
+      'Sista dag kunden ska betala fakturan. Vanligast är 30 dagar efter fakturadatum. Efter förfallodagen kan du skicka påminnelse och ta ut dröjsmålsränta.',
+    category: 'faktura',
+    relatedTerms: ['Dröjsmålsränta', 'Påminnelse'],
+  },
+  {
+    term: 'OCR-nummer',
+    definition:
+      'Ett referensnummer som gör det enkelt att matcha inbetalningar med rätt faktura. Genereras automatiskt och bör alltid anges på fakturan.',
+    category: 'faktura',
+  },
+  {
+    term: 'Kreditfaktura',
+    definition:
+      'En "minusfaktura" som du skapar om du behöver korrigera eller makulera en redan skickad faktura. Beloppet blir negativt och kvittar ut originalfakturan.',
+    category: 'faktura',
+    relatedTerms: ['Faktura'],
+  },
+  // Bank
+  {
+    term: 'Clearingnummer',
+    definition:
+      'De första 4-5 siffrorna i ditt bankkonto som identifierar vilken bank och vilket kontor det tillhör. Exempel: 5331 = Avanza, 3300 = Nordea. Ofta separerat från kontonumret med bindestreck.',
+    category: 'bank',
+    relatedTerms: ['IBAN', 'BIC/SWIFT'],
+  },
+  {
+    term: 'IBAN',
+    definition:
+      'Internationellt bankkontonummer som används för utlandsbetalningar. Svenska IBAN börjar med SE följt av 22 siffror. Din bank kan ge dig ditt IBAN.',
+    category: 'bank',
+    relatedTerms: ['BIC/SWIFT', 'Clearingnummer'],
+  },
+  {
+    term: 'BIC/SWIFT',
+    definition:
+      'Bankens internationella identifieringskod, används tillsammans med IBAN för utlandsbetalningar. Exempel: SWEDSESS (Swedbank), NDEASESS (Nordea).',
+    category: 'bank',
+    relatedTerms: ['IBAN'],
+  },
+  // Företag
+  {
+    term: 'Enskild firma',
+    simpleTerm: 'Enskild näringsverksamhet',
+    definition:
+      'Den enklaste företagsformen där du och företaget är samma juridiska person. Du äger allt personligen och ansvarar personligen för skulder. Lättast att starta men du betalar skatt via din privata deklaration.',
+    category: 'företag',
+    skatteverketUrl: 'https://www.skatteverket.se/foretag/foretagarguiden/foretagsformer/enskildnaringsverksamhet.4.361dc8c15312eff6fd1e5dc.html',
+    relatedTerms: ['Aktiebolag', 'Egenavgifter', 'NE-bilaga'],
+  },
+  {
+    term: 'Aktiebolag',
+    simpleTerm: 'AB',
+    definition:
+      'Företagsform där företaget är en egen juridisk person, skild från dig. Kräver 25 000 kr i aktiekapital och mer administration, men ger begränsat personligt ansvar och andra skattemöjligheter.',
+    category: 'företag',
+    skatteverketUrl: 'https://www.skatteverket.se/foretag/foretagarguiden/foretagsformer/aktiebolag.4.361dc8c15312eff6fd18a05.html',
+    relatedTerms: ['Enskild firma', 'Bolagsskatt'],
+  },
+  {
+    term: 'Organisationsnummer',
+    definition:
+      'Ditt företags unika identitetsnummer. För enskild firma är det ditt personnummer + 100 på århundradesiffran (199001011234 blir 199101011234).',
+    category: 'företag',
+  },
+]
+
+const categoryConfig = {
+  skatt: { label: 'Skatt', icon: Calculator, color: 'bg-orange-500/10 text-orange-600' },
+  moms: { label: 'Moms', icon: Receipt, color: 'bg-blue-500/10 text-blue-600' },
+  faktura: { label: 'Faktura', icon: FileText, color: 'bg-green-500/10 text-green-600' },
+  bokföring: { label: 'Bokföring', icon: BookOpen, color: 'bg-purple-500/10 text-purple-600' },
+  bank: { label: 'Bank', icon: Building2, color: 'bg-pink-500/10 text-pink-600' },
+  företag: { label: 'Företag', icon: Building2, color: 'bg-cyan-500/10 text-cyan-600' },
+}
+
+function TermCard({ term, isExpanded, onToggle }: { term: GlossaryTerm; isExpanded: boolean; onToggle: () => void }) {
+  const config = categoryConfig[term.category]
+  const CategoryIcon = config.icon
+
+  return (
+    <Card className={cn('transition-all', isExpanded && 'ring-2 ring-primary/20')}>
+      <CardContent className="pt-4">
+        <button
+          onClick={onToggle}
+          className="w-full text-left"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className={cn('p-2 rounded-lg', config.color)}>
+                <CategoryIcon className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-medium">{term.term}</h3>
+                  {term.simpleTerm && (
+                    <Badge variant="secondary" className="font-normal">
+                      {term.simpleTerm}
+                    </Badge>
+                  )}
+                </div>
+                {!isExpanded && (
+                  <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                    {term.definition}
+                  </p>
+                )}
+              </div>
+            </div>
+            {isExpanded ? (
+              <ChevronUp className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-1" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-1" />
+            )}
+          </div>
+        </button>
+
+        {isExpanded && (
+          <div className="mt-4 pl-11 space-y-3 animate-fade-in">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {term.definition}
+            </p>
+
+            {term.relatedTerms && term.relatedTerms.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-muted-foreground">Relaterat:</span>
+                {term.relatedTerms.map((related) => (
+                  <Badge key={related} variant="outline" className="text-xs">
+                    {related}
+                  </Badge>
+                ))}
+              </div>
+            )}
+
+            {term.skatteverketUrl && (
+              <HelpLink href={term.skatteverketUrl}>
+                Läs mer på Skatteverket
+                <ExternalLink className="h-3 w-3" />
+              </HelpLink>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+export default function HelpPage() {
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [expandedTerms, setExpandedTerms] = useState<Set<string>>(new Set())
+
+  const filteredTerms = useMemo(() => {
+    return glossaryTerms.filter((term) => {
+      // Category filter
+      if (selectedCategory && term.category !== selectedCategory) {
+        return false
+      }
+
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase()
+        return (
+          term.term.toLowerCase().includes(query) ||
+          term.simpleTerm?.toLowerCase().includes(query) ||
+          term.definition.toLowerCase().includes(query) ||
+          term.relatedTerms?.some((r) => r.toLowerCase().includes(query))
+        )
+      }
+
+      return true
+    })
+  }, [searchQuery, selectedCategory])
+
+  const toggleTerm = (termName: string) => {
+    setExpandedTerms((prev) => {
+      const next = new Set(prev)
+      if (next.has(termName)) {
+        next.delete(termName)
+      } else {
+        next.add(termName)
+      }
+      return next
+    })
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Header */}
+      <header>
+        <h1 className="font-display text-3xl font-medium tracking-tight mb-2">Hjälp & Ordlista</h1>
+        <p className="text-muted-foreground">
+          Förklaringar av skatte- och bokföringstermer på ren svenska.
+        </p>
+      </header>
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          type="search"
+          placeholder="Sök efter term..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
+      {/* Category filters */}
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => setSelectedCategory(null)}
+          className={cn(
+            'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+            selectedCategory === null
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-secondary text-muted-foreground hover:text-foreground'
+          )}
+        >
+          Alla
+        </button>
+        {Object.entries(categoryConfig).map(([key, config]) => (
+          <button
+            key={key}
+            onClick={() => setSelectedCategory(selectedCategory === key ? null : key)}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+              selectedCategory === key
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-secondary text-muted-foreground hover:text-foreground'
+            )}
+          >
+            {config.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Terms list */}
+      <div className="space-y-3">
+        {filteredTerms.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Search className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground">
+                Inga termer hittades för "{searchQuery}"
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          filteredTerms.map((term) => (
+            <TermCard
+              key={term.term}
+              term={term}
+              isExpanded={expandedTerms.has(term.term)}
+              onToggle={() => toggleTerm(term.term)}
+            />
+          ))
+        )}
+      </div>
+
+      {/* External resources */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Externa resurser</CardTitle>
+          <CardDescription>Mer hjälp från officiella källor</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <HelpLink
+              href="https://www.skatteverket.se/foretag/foretagarguiden.4.361dc8c15312eff6fd1f87f.html"
+              className="p-3 rounded-lg border border-border hover:border-primary/50 transition-colors block"
+            >
+              <div className="flex items-center gap-2">
+                <ExternalLink className="h-4 w-4" />
+                <span>Skatteverkets företagarguide</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Omfattande guide för nya företagare
+              </p>
+            </HelpLink>
+            <HelpLink
+              href="https://www.verksamt.se/"
+              className="p-3 rounded-lg border border-border hover:border-primary/50 transition-colors block"
+            >
+              <div className="flex items-center gap-2">
+                <ExternalLink className="h-4 w-4" />
+                <span>Verksamt.se</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Starta och driva företag i Sverige
+              </p>
+            </HelpLink>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

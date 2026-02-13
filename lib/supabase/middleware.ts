@@ -1,0 +1,108 @@
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
+
+export async function updateSession(request: NextRequest) {
+  let supabaseResponse = NextResponse.next({
+    request,
+  })
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          )
+          supabaseResponse = NextResponse.next({
+            request,
+          })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
+
+  // IMPORTANT: Avoid writing any logic between createServerClient and
+  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
+  // issues with users being randomly logged out.
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  // Get the pathname
+  const pathname = request.nextUrl.pathname
+
+  // Auth routes - allow access
+  if (pathname.startsWith('/login') || pathname.startsWith('/auth')) {
+    // If user is logged in and trying to access login, redirect to dashboard or onboarding
+    if (user) {
+      // Check if onboarding is complete
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select('onboarding_complete')
+        .eq('user_id', user.id)
+        .single()
+
+      if (!settings?.onboarding_complete) {
+        return NextResponse.redirect(new URL('/onboarding', request.url))
+      }
+
+      return NextResponse.redirect(new URL('/', request.url))
+    }
+    return supabaseResponse
+  }
+
+  // Protected routes - require authentication
+  if (!user) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    return NextResponse.redirect(url)
+  }
+
+  // Onboarding route - only accessible if not complete
+  if (pathname.startsWith('/onboarding')) {
+    const { data: settings } = await supabase
+      .from('company_settings')
+      .select('onboarding_complete')
+      .eq('user_id', user.id)
+      .single()
+
+    // If onboarding is complete, redirect to dashboard
+    if (settings?.onboarding_complete) {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
+
+    return supabaseResponse
+  }
+
+  // Dashboard routes - require completed onboarding
+  const { data: settings } = await supabase
+    .from('company_settings')
+    .select('onboarding_complete, entity_type')
+    .eq('user_id', user.id)
+    .single()
+
+  // If no settings or onboarding not complete, redirect to onboarding
+  if (!settings?.onboarding_complete) {
+    return NextResponse.redirect(new URL('/onboarding', request.url))
+  }
+
+  // Block light users from EF/AB-only routes
+  if (settings.entity_type === 'light') {
+    const lightBlockedPaths = ['/invoices', '/customers', '/bookkeeping', '/import', '/reports', '/deductions']
+    const isBlocked = lightBlockedPaths.some(p => pathname.startsWith(p))
+    if (isBlocked) {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
+  }
+
+  return supabaseResponse
+}

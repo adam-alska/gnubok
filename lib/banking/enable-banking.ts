@@ -1,0 +1,472 @@
+/**
+ * Enable Banking API integration for PSD2 bank connections
+ *
+ * Documentation: https://enablebanking.com/docs/api/reference/
+ *
+ * Flow:
+ * 1. POST /auth → { url, authorization_id }
+ * 2. User redirects to URL, authenticates with bank
+ * 3. Callback receives ?code=XXX&state=YYY
+ * 4. POST /sessions { code } → { session_id, accounts }
+ * 5. GET /accounts/{uid}/balances
+ * 6. GET /accounts/{uid}/transactions
+ */
+
+import { getAuthorizationHeader } from './jwt'
+
+const ENABLE_BANKING_API_URL = 'https://api.enablebanking.com'
+
+// Types
+
+export interface ASPSP {
+  name: string
+  country: string
+  logo?: string
+  bic?: string
+  beta?: boolean
+  max_consent_validity?: number
+  available_auth_methods?: AuthMethod[]
+}
+
+export interface AuthMethod {
+  name: string
+  title?: string
+  psu_types?: ('personal' | 'business')[]
+}
+
+export interface AuthResponse {
+  url: string
+  authorization_id: string
+}
+
+export interface SessionResponse {
+  session_id: string
+  access: {
+    valid_until: string
+  }
+  accounts: AccountInfo[]
+  aspsp: {
+    name: string
+    country: string
+  }
+  psu_type: string
+}
+
+export interface AccountInfo {
+  uid: string
+  account_id?: {
+    iban?: string
+    bban?: string
+    other?: string
+  }
+  name?: string
+  product?: string
+  currency: string
+  identification_hash?: string
+}
+
+export interface Balance {
+  balance_amount: {
+    amount: string
+    currency: string
+  }
+  balance_type: string
+  reference_date?: string
+  last_change_date_time?: string
+}
+
+export interface BalanceResponse {
+  balances: Balance[]
+}
+
+export interface Transaction {
+  entry_reference?: string
+  transaction_id?: string
+  booking_date?: string
+  value_date?: string
+  transaction_amount: {
+    amount: string
+    currency: string
+  }
+  credit_debit_indicator?: 'CRDT' | 'DBIT'  // CRDT = credit (income), DBIT = debit (expense)
+  creditor_name?: string
+  creditor_account?: {
+    iban?: string
+    bban?: string
+  }
+  creditor?: {
+    name?: string
+  }
+  debtor_name?: string
+  debtor_account?: {
+    iban?: string
+    bban?: string
+  }
+  debtor?: {
+    name?: string
+  }
+  remittance_information?: string[]
+  merchant_category_code?: string
+  bank_transaction_code?: string
+  proprietary_bank_transaction_code?: string
+}
+
+export interface TransactionsResponse {
+  transactions: Transaction[]
+  continuation_key?: string
+}
+
+// Legacy types for backward compatibility
+export interface Bank {
+  id: string
+  name: string
+  bic?: string
+  countries: string[]
+  logo_url?: string
+}
+
+export interface BankTransaction {
+  id: string
+  date: string
+  booking_date: string
+  amount: number
+  currency: string
+  description: string
+  counterparty_name?: string
+  counterparty_account?: string
+  reference?: string
+  merchant_category_code?: string
+}
+
+// API Helper
+
+async function authenticatedFetch(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const url = `${ENABLE_BANKING_API_URL}${endpoint}`
+
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Authorization': getAuthorizationHeader(),
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  })
+
+  return response
+}
+
+// API Functions
+
+/**
+ * Get list of supported banks (ASPSPs) for a country
+ */
+export async function getASPSPs(country: string = 'SE'): Promise<ASPSP[]> {
+  const response = await authenticatedFetch(`/aspsps?country=${country}`)
+
+  if (!response.ok) {
+    const error = await response.text()
+    console.error('Failed to fetch ASPSPs:', error)
+    throw new Error('Failed to fetch banks')
+  }
+
+  const data = await response.json()
+  return data.aspsps || []
+}
+
+/**
+ * Get list of supported banks (legacy format for backward compatibility)
+ */
+export async function getSupportedBanks(): Promise<Bank[]> {
+  try {
+    const aspsps = await getASPSPs('SE')
+
+    return aspsps.map((aspsp) => ({
+      id: `${aspsp.name.toLowerCase().replace(/\s+/g, '-')}-se`,
+      name: aspsp.name,
+      bic: aspsp.bic,
+      countries: [aspsp.country],
+      logo_url: aspsp.logo,
+    }))
+  } catch (error) {
+    console.error('Error fetching banks:', error)
+    // Return fallback list
+    return [
+      { id: 'nordea-se', name: 'Nordea', bic: 'NDEASESS', countries: ['SE'] },
+      { id: 'seb-se', name: 'SEB', bic: 'ESSESESS', countries: ['SE'] },
+      { id: 'swedbank-se', name: 'Swedbank', bic: 'SWEDSESS', countries: ['SE'] },
+      { id: 'handelsbanken-se', name: 'Handelsbanken', bic: 'HANDSESS', countries: ['SE'] },
+    ]
+  }
+}
+
+/**
+ * Start bank authorization flow
+ *
+ * @param aspspName - The name of the ASPSP (bank) exactly as returned from /aspsps
+ * @param aspspCountry - The country code (e.g., 'SE')
+ * @param redirectUrl - URL to redirect user after bank authorization
+ * @param state - State parameter returned in callback (e.g., user ID)
+ * @param psuType - Type of user: 'personal' or 'business'
+ */
+export async function startAuthorization(
+  aspspName: string,
+  aspspCountry: string,
+  redirectUrl: string,
+  state: string,
+  psuType: 'personal' | 'business' = 'personal'
+): Promise<AuthResponse> {
+  // Calculate consent validity (90 days)
+  const validUntil = new Date()
+  validUntil.setDate(validUntil.getDate() + 90)
+
+  const requestBody = {
+    access: {
+      valid_until: validUntil.toISOString()
+    },
+    aspsp: {
+      name: aspspName,
+      country: aspspCountry
+    },
+    state,
+    redirect_url: redirectUrl,
+    psu_type: psuType
+  }
+
+  const response = await authenticatedFetch('/auth', {
+    method: 'POST',
+    body: JSON.stringify(requestBody)
+  })
+
+  if (!response.ok) {
+    const error = await response.text()
+    console.error('Failed to start authorization:', error)
+    throw new Error('Failed to start bank connection')
+  }
+
+  return response.json()
+}
+
+/**
+ * Create a session after user completes bank authorization
+ *
+ * @param code - The authorization code from callback
+ */
+export async function createSession(code: string): Promise<SessionResponse> {
+  const response = await authenticatedFetch('/sessions', {
+    method: 'POST',
+    body: JSON.stringify({ code })
+  })
+
+  if (!response.ok) {
+    const error = await response.text()
+    console.error('Failed to create session:', error)
+    throw new Error('Failed to create bank session')
+  }
+
+  return response.json()
+}
+
+/**
+ * Get session details
+ *
+ * @param sessionId - The session ID
+ */
+export async function getSession(sessionId: string): Promise<SessionResponse> {
+  const response = await authenticatedFetch(`/sessions/${sessionId}`)
+
+  if (!response.ok) {
+    throw new Error('Failed to get session')
+  }
+
+  return response.json()
+}
+
+/**
+ * Delete/revoke a session
+ *
+ * @param sessionId - The session ID to revoke
+ */
+export async function deleteSession(sessionId: string): Promise<void> {
+  const response = await authenticatedFetch(`/sessions/${sessionId}`, {
+    method: 'DELETE'
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to revoke session')
+  }
+}
+
+/**
+ * Get account balances
+ *
+ * @param accountUid - The account UID (from session.accounts[].uid)
+ */
+export async function getAccountBalances(accountUid: string): Promise<Balance[]> {
+  const response = await authenticatedFetch(`/accounts/${accountUid}/balances`)
+
+  if (!response.ok) {
+    throw new Error('Failed to get account balances')
+  }
+
+  const data: BalanceResponse = await response.json()
+  return data.balances || []
+}
+
+/**
+ * Get account balance (returns booked balance amount)
+ */
+export async function getAccountBalance(
+  accountUid: string
+): Promise<{ amount: number; date: string }> {
+  const balances = await getAccountBalances(accountUid)
+
+  // Prefer closingBooked, then expected, then first available
+  const balance =
+    balances.find(b => b.balance_type === 'closingBooked') ||
+    balances.find(b => b.balance_type === 'expected') ||
+    balances[0]
+
+  if (!balance) {
+    return { amount: 0, date: new Date().toISOString().split('T')[0] }
+  }
+
+  return {
+    amount: parseFloat(balance.balance_amount.amount),
+    date: balance.reference_date || new Date().toISOString().split('T')[0]
+  }
+}
+
+/**
+ * Get account transactions
+ *
+ * @param accountUid - The account UID
+ * @param dateFrom - Start date (YYYY-MM-DD)
+ * @param dateTo - End date (YYYY-MM-DD)
+ * @param continuationKey - Pagination key from previous response
+ */
+export async function getAccountTransactions(
+  accountUid: string,
+  dateFrom?: string,
+  dateTo?: string,
+  continuationKey?: string
+): Promise<TransactionsResponse> {
+  const params = new URLSearchParams()
+  if (dateFrom) params.set('date_from', dateFrom)
+  if (dateTo) params.set('date_to', dateTo)
+  if (continuationKey) params.set('continuation_key', continuationKey)
+
+  const queryString = params.toString()
+  const endpoint = `/accounts/${accountUid}/transactions${queryString ? `?${queryString}` : ''}`
+
+  const response = await authenticatedFetch(endpoint)
+
+  if (!response.ok) {
+    throw new Error('Failed to get transactions')
+  }
+
+  return response.json()
+}
+
+/**
+ * Get all transactions with pagination
+ */
+export async function getAllTransactions(
+  accountUid: string,
+  dateFrom?: string,
+  dateTo?: string
+): Promise<Transaction[]> {
+  const allTransactions: Transaction[] = []
+  let continuationKey: string | undefined
+
+  do {
+    const response = await getAccountTransactions(
+      accountUid,
+      dateFrom,
+      dateTo,
+      continuationKey
+    )
+
+    allTransactions.push(...response.transactions)
+    continuationKey = response.continuation_key
+  } while (continuationKey)
+
+  return allTransactions
+}
+
+/**
+ * Convert Enable Banking transaction to legacy format
+ */
+export function convertTransaction(tx: Transaction, accountCurrency: string): BankTransaction {
+  const rawAmount = parseFloat(tx.transaction_amount.amount)
+
+  // Use credit_debit_indicator to determine sign
+  // CRDT = credit (money in) = positive
+  // DBIT = debit (money out) = negative
+  const isCredit = tx.credit_debit_indicator === 'CRDT'
+  const amount = isCredit ? Math.abs(rawAmount) : -Math.abs(rawAmount)
+
+  // Get counterparty name from creditor/debtor objects or direct fields
+  const creditorName = tx.creditor?.name || tx.creditor_name
+  const debtorName = tx.debtor?.name || tx.debtor_name
+
+  return {
+    id: tx.entry_reference || tx.transaction_id || `${tx.booking_date}_${rawAmount}`,
+    date: tx.value_date || tx.booking_date || new Date().toISOString().split('T')[0],
+    booking_date: tx.booking_date || tx.value_date || new Date().toISOString().split('T')[0],
+    amount,
+    currency: tx.transaction_amount.currency || accountCurrency,
+    description: tx.remittance_information?.filter(r => r.trim()).join(' ') ||
+                 (isCredit ? debtorName : creditorName) ||
+                 'Unknown',
+    counterparty_name: isCredit ? debtorName : creditorName,
+    counterparty_account: isCredit
+      ? tx.debtor_account?.iban || tx.debtor_account?.bban
+      : tx.creditor_account?.iban || tx.creditor_account?.bban,
+    merchant_category_code: tx.merchant_category_code
+  }
+}
+
+/**
+ * Get transactions in legacy format
+ */
+export async function getTransactions(
+  accountUid: string,
+  fromDate?: string,
+  toDate?: string,
+  accountCurrency: string = 'SEK'
+): Promise<BankTransaction[]> {
+  const transactions = await getAllTransactions(accountUid, fromDate, toDate)
+  return transactions.map(tx => convertTransaction(tx, accountCurrency))
+}
+
+// Utility functions
+
+/**
+ * Check if consent is expiring soon (within 7 days)
+ */
+export function isConsentExpiringSoon(expiresAt: string | null): boolean {
+  if (!expiresAt) return false
+
+  const expiryDate = new Date(expiresAt)
+  const warningDate = new Date()
+  warningDate.setDate(warningDate.getDate() + 7)
+
+  return expiryDate <= warningDate
+}
+
+/**
+ * Get days until consent expires
+ */
+export function getDaysUntilExpiry(expiresAt: string | null): number | null {
+  if (!expiresAt) return null
+
+  const expiryDate = new Date(expiresAt)
+  const now = new Date()
+  const diffTime = expiryDate.getTime() - now.getTime()
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+  return Math.max(0, diffDays)
+}

@@ -1,0 +1,28 @@
+{
+  "crons": [
+    {
+      "path": "/api/tiktok/cron",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/deadlines/status/cron",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/invoices/reminders/cron",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/push/cron",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/tax-deadlines/cron",
+      "schedule": "0 0 2 1 *"
+    },
+    {
+      "path": "/api/banking/sync/cron",
+      "schedule": "0 5 * * *"
+    }
+  ]
+}

@@ -1,0 +1,506 @@
+{
+  "accounts": [
+    {
+      "info": {
+        "psu_status": "OPEN",
+        "uid": "36a097d1-60bc-4a2d-836a-0f3c2a234196",
+        "identification_hashes": [
+          "WwpbCiJhY2NvdW50IiwKImFjY291bnRfaWQiLAoiaWJhbiIKXQpd.CMv8KPVyC9Jb2K/o4iLTHs0/Rm6oBpLZ2Dk94dLUUqY=",
+          "WwpbCiJhY2NvdW50IiwKImFjY291bnRfaWQiLAoiaWJhbiIKXSwKWwoiYWNjb3VudCIsCiJjdXJyZW5jeSIKXQpd.KHox2S2cDHB0qpvDl/UbtAYEOFT0bkKlDBaIbiJbOYs=",
+          "WwpbCiJhc3BzcF9uYW1lIgpdLApbCiJhc3BzcF9jb3VudHJ5IgpdLApbCiJhY2NvdW50IiwKImFjY291bnRfaWQiLAoib3RoZXIiLAoic2NoZW1lX25hbWUiCl0sClsKImFjY291bnQiLAoiYWNjb3VudF9pZCIsCiJvdGhlciIsCiJpZGVudGlmaWNhdGlvbiIKXQpd.YvAsATX9mYjlf4gudQxRshFYi9Qf4mWLmaS4N6XA+do=",
+          "WwpbCiJhc3BzcF9uYW1lIgpdLApbCiJhc3BzcF9jb3VudHJ5IgpdLApbCiJhY2NvdW50IiwKImFjY291bnRfaWQiLAoib3RoZXIiLAoic2NoZW1lX25hbWUiCl0sClsKImFjY291bnQiLAoiYWNjb3VudF9pZCIsCiJvdGhlciIsCiJpZGVudGlmaWNhdGlvbiIKXQpd.11au3gbnyahIaOUJ+34GVhawiFxuqno1YFYMozafKcI=",
+          "WwpbCiJhY2NvdW50IiwKImFjY291bnRfaWQiLAoib3RoZXIiLAoic2NoZW1lX25hbWUiCl0sClsKImFjY291bnQiLAoiYWNjb3VudF9pZCIsCiJvdGhlciIsCiJpZGVudGlmaWNhdGlvbiIKXQpd.wrdjfOu/bFCI1mKxgyNYkwyi0CJuuDlEQIk/L7u0BRU=",
+          "WwpbCiJhY2NvdW50IiwKImFjY291bnRfaWQiLAoib3RoZXIiLAoic2NoZW1lX25hbWUiCl0sClsKImFjY291bnQiLAoiYWNjb3VudF9pZCIsCiJvdGhlciIsCiJpZGVudGlmaWNhdGlvbiIKXQpd.3D+Eg8xEbNOBIaId0JvB4AdJbRAq7H4eSIHjHu1h7SY=",
+          "WwpbCiJhc3BzcF9uYW1lIgpdLApbCiJhc3BzcF9jb3VudHJ5IgpdLApbCiJhY2NvdW50IiwKImFjY291bnRfaWQiLAoib3RoZXIiLAoic2NoZW1lX25hbWUiCl0sClsKImFjY291bnQiLAoiYWNjb3VudF9pZCIsCiJvdGhlciIsCiJpZGVudGlmaWNhdGlvbiIKXQpd.wsxsnRROHXrRPiE0Q2kGZAvwuvKG6ozdZRWVeUiRQtA=",
+          "WwpbCiJhc3BzcF9uYW1lIgpdLApbCiJhc3BzcF9jb3VudHJ5IgpdLApbCiJhY2NvdW50IiwKImFjY291bnRfaWQiLAoib3RoZXIiLAoic2NoZW1lX25hbWUiCl0sClsKImFjY291bnQiLAoiYWNjb3VudF9pZCIsCiJvdGhlciIsCiJpZGVudGlmaWNhdGlvbiIKXQpd.HDktnbN78H+BytoIzLMomebkcAc6VCMoiKhHjF1cLDw=",
+          "WwpbCiJhY2NvdW50IiwKImFjY291bnRfaWQiLAoib3RoZXIiLAoic2NoZW1lX25hbWUiCl0sClsKImFjY291bnQiLAoiYWNjb3VudF9pZCIsCiJvdGhlciIsCiJpZGVudGlmaWNhdGlvbiIKXQpd.cPNpoeUyy8YheNam7y5Jk2cx3iG+qq6yEo1n/BveClU=",
+          "WwpbCiJhY2NvdW50IiwKImFjY291bnRfaWQiLAoib3RoZXIiLAoic2NoZW1lX25hbWUiCl0sClsKImFjY291bnQiLAoiYWNjb3VudF9pZCIsCiJvdGhlciIsCiJpZGVudGlmaWNhdGlvbiIKXQpd.H1mYrXAPxkI6n0ehgmB5mtBIls9OcjXI2ynisJcGaYw=",
+          "WwpbCiJhc3BzcF9uYW1lIgpdLApbCiJhc3BzcF9jb3VudHJ5IgpdLApbCiJhY2NvdW50IiwKInJlc291cmNlX2lkIgpdCl0=.yuDuYREXfxEWdB8C0YwTXDqW5POBjc/3jlmRVVzVa70=",
+          "WwpbCiJhc3BzcF9uYW1lIgpdLApbCiJhc3BzcF9jb3VudHJ5IgpdLApbCiJhY2NvdW50IiwKIm5hbWUiCl0KXQ==.JiZ4C/jjfO9u/6DSSTS8QUjFIvbP24KNkyChx2B0yW4="
+        ],
+        "usage": null,
+        "credit_limit": {
+          "currency": "SEK",
+          "amount": "0.00"
+        },
+        "account_id": {
+          "other": {
+            "issuer": null,
+            "scheme_name": "BBAN",
+            "identification": "99602621638218"
+          },
+          "iban": "SE9795000099602621638218"
+        },
+        "product": "PLUSGIROKONTO FTG",
+        "account_servicer": {
+          "clearing_system_member_id": {
+            "member_id": "9960",
+            "clearing_system_id": "SESBA"
+          },
+          "bic_fi": "NDEASESS",
+          "name": null
+        },
+        "name": "JÖNSSON,ALICE",
+        "currency": "SEK",
+        "identification_hash": "WwpbCiJhY2NvdW50IiwKImFjY291bnRfaWQiLAoiaWJhbiIKXSwKWwoiYWNjb3VudCIsCiJjdXJyZW5jeSIKXQpd.KHox2S2cDHB0qpvDl/UbtAYEOFT0bkKlDBaIbiJbOYs=",
+        "cash_account_type": "CACC",
+        "postal_address": null,
+        "details": null,
+        "all_account_ids": [
+          {
+            "issuer": null,
+            "scheme_name": "PGNR",
+            "identification": "21638218"
+          },
+          {
+            "issuer": null,
+            "scheme_name": "BBAN",
+            "identification": "99602621638218"
+          },
+          {
+            "issuer": null,
+            "scheme_name": "IBAN",
+            "identification": "SE9795000099602621638218"
+          }
+        ]
+      },
+      "transactions": [
+        {
+          "entry_reference": "2025-12-30-16.17.03.380410058H1021638218  EK",
+          "merchant_category_code": null,
+          "transaction_amount": {
+            "currency": "SEK",
+            "amount": "8730.00"
+          },
+          "creditor": null,
+          "creditor_account": null,
+          "creditor_agent": null,
+          "debtor": {
+            "name": "BARCLAYS BANK PLC",
+            "postal_address": null,
+            "organisation_id": null,
+            "private_id": null,
+            "contact_details": null
+          },
+          "debtor_account": null,
+          "debtor_agent": null,
+          "bank_transaction_code": {
+            "description": "Andra",
+            "code": null,
+            "sub_code": null
+          },
+          "credit_debit_indicator": "CRDT",
+          "status": "BOOK",
+          "booking_date": "2025-12-30",
+          "value_date": "2025-12-30",
+          "transaction_date": null,
+          "balance_after_transaction": {
+            "currency": "XXX",
+            "amount": "18730.00"
+          },
+          "reference_number": "",
+          "reference_number_schema": null,
+          "remittance_information": [
+            "",
+            "005 BaByliss\r\nURSPRUNGLIGT BELOPP M M: SEK",
+            "UTLANDSBETALNING"
+          ],
+          "debtor_account_additional_identification": null,
+          "creditor_account_additional_identification": null,
+          "exchange_rate": {
+            "unit_currency": "SEK",
+            "exchange_rate": "1.0000000",
+            "rate_type": null,
+            "contract_identification": null,
+            "instructed_amount": {
+              "currency": "SEK",
+              "amount": "8730.00"
+            }
+          },
+          "note": null,
+          "transaction_id": null
+        },
+        {
+          "entry_reference": "06200021638218000100000000125-12-2900H1   TR",
+          "merchant_category_code": null,
+          "transaction_amount": {
+            "currency": "SEK",
+            "amount": "10000.00"
+          },
+          "creditor": null,
+          "creditor_account": null,
+          "creditor_agent": null,
+          "debtor": {
+            "name": "BG INSÄTTNING 1",
+            "postal_address": null,
+            "organisation_id": null,
+            "private_id": null,
+            "contact_details": null
+          },
+          "debtor_account": null,
+          "debtor_agent": null,
+          "bank_transaction_code": {
+            "description": "BGC LB-betalningar",
+            "code": null,
+            "sub_code": null
+          },
+          "credit_debit_indicator": "CRDT",
+          "status": "BOOK",
+          "booking_date": "2025-12-29",
+          "value_date": "2025-12-30",
+          "transaction_date": null,
+          "balance_after_transaction": {
+            "currency": "XXX",
+            "amount": "10000.00"
+          },
+          "reference_number": "0051385052",
+          "reference_number_schema": null,
+          "remittance_information": [
+            "0051385052",
+            "",
+            "5138-5052"
+          ],
+          "debtor_account_additional_identification": null,
+          "creditor_account_additional_identification": null,
+          "exchange_rate": null,
+          "note": null,
+          "transaction_id": null
+        },
+        {
+          "entry_reference": "06400021638218000100000000126-01-0200H1   TR",
+          "merchant_category_code": null,
+          "transaction_amount": {
+            "currency": "SEK",
+            "amount": "15625.00"
+          },
+          "creditor": null,
+          "creditor_account": null,
+          "creditor_agent": null,
+          "debtor": {
+            "name": "BG INSÄTTNING 1",
+            "postal_address": null,
+            "organisation_id": null,
+            "private_id": null,
+            "contact_details": null
+          },
+          "debtor_account": null,
+          "debtor_agent": null,
+          "bank_transaction_code": {
+            "description": "BGC LB-betalningar",
+            "code": null,
+            "sub_code": null
+          },
+          "credit_debit_indicator": "CRDT",
+          "status": "BOOK",
+          "booking_date": "2026-01-02",
+          "value_date": "2026-01-05",
+          "transaction_date": null,
+          "balance_after_transaction": {
+            "currency": "XXX",
+            "amount": "34355.00"
+          },
+          "reference_number": "0051385052",
+          "reference_number_schema": null,
+          "remittance_information": [
+            "0051385052",
+            "",
+            "5138-5052"
+          ],
+          "debtor_account_additional_identification": null,
+          "creditor_account_additional_identification": null,
+          "exchange_rate": null,
+          "note": null,
+          "transaction_id": null
+        },
+        {
+          "entry_reference": "06600021638218000200000000126-01-0700H1   TR",
+          "merchant_category_code": null,
+          "transaction_amount": {
+            "currency": "SEK",
+            "amount": "1409.85"
+          },
+          "creditor": {
+            "name": "AVGIFTER NORDEA",
+            "postal_address": null,
+            "organisation_id": null,
+            "private_id": null,
+            "contact_details": null
+          },
+          "creditor_account": null,
+          "creditor_agent": null,
+          "debtor": null,
+          "debtor_account": null,
+          "debtor_agent": null,
+          "bank_transaction_code": {
+            "description": "Debitering av avgift",
+            "code": null,
+            "sub_code": null
+          },
+          "credit_debit_indicator": "DBIT",
+          "status": "BOOK",
+          "booking_date": "2026-01-07",
+          "value_date": "2026-01-07",
+          "transaction_date": null,
+          "balance_after_transaction": {
+            "currency": "XXX",
+            "amount": "32945.15"
+          },
+          "reference_number": null,
+          "reference_number_schema": null,
+          "remittance_information": [
+            "",
+            "AVGIFTER NORDEA"
+          ],
+          "debtor_account_additional_identification": null,
+          "creditor_account_additional_identification": null,
+          "exchange_rate": null,
+          "note": null,
+          "transaction_id": null
+        },
+        {
+          "entry_reference": "2026-01-09-16.25.07.272909064H1021638218  EK",
+          "merchant_category_code": null,
+          "transaction_amount": {
+            "currency": "SEK",
+            "amount": "7000.00"
+          },
+          "creditor": null,
+          "creditor_account": null,
+          "creditor_agent": null,
+          "debtor": {
+            "name": "NORDEA BANK ABP",
+            "postal_address": null,
+            "organisation_id": null,
+            "private_id": null,
+            "contact_details": null
+          },
+          "debtor_account": null,
+          "debtor_agent": null,
+          "bank_transaction_code": {
+            "description": "Andra",
+            "code": null,
+            "sub_code": null
+          },
+          "credit_debit_indicator": "CRDT",
+          "status": "BOOK",
+          "booking_date": "2026-01-12",
+          "value_date": "2026-01-12",
+          "transaction_date": null,
+          "balance_after_transaction": {
+            "currency": "XXX",
+            "amount": "39945.15"
+          },
+          "reference_number": "",
+          "reference_number_schema": null,
+          "remittance_information": [
+            "",
+            "/ROC/E20304164B207920 INVOICE 003\r\nURSPRUNGLIGT BELOPP M M: SEK",
+            "UTLANDSBETALNING"
+          ],
+          "debtor_account_additional_identification": null,
+          "creditor_account_additional_identification": null,
+          "exchange_rate": {
+            "unit_currency": "SEK",
+            "exchange_rate": "1.0000000",
+            "rate_type": null,
+            "contract_identification": null,
+            "instructed_amount": {
+              "currency": "SEK",
+              "amount": "7000.00"
+            }
+          },
+          "note": null,
+          "transaction_id": null
+        },
+        {
+          "entry_reference": "07700021638218000400000000126-01-2200H1   TR",
+          "merchant_category_code": null,
+          "transaction_amount": {
+            "currency": "SEK",
+            "amount": "2500.00"
+          },
+          "creditor": {
+            "name": "Uttag",
+            "postal_address": null,
+            "organisation_id": null,
+            "private_id": null,
+            "contact_details": null
+          },
+          "creditor_account": {
+            "iban": null,
+            "other": {
+              "identification": "1411450057",
+              "scheme_name": "BBAN",
+              "issuer": null
+            }
+          },
+          "creditor_agent": null,
+          "debtor": null,
+          "debtor_account": null,
+          "debtor_agent": null,
+          "bank_transaction_code": {
+            "description": "Generell O-Typ från Cello-kassa via INL",
+            "code": null,
+            "sub_code": null
+          },
+          "credit_debit_indicator": "DBIT",
+          "status": "BOOK",
+          "booking_date": "2026-01-22",
+          "value_date": "2026-01-22",
+          "transaction_date": null,
+          "balance_after_transaction": {
+            "currency": "XXX",
+            "amount": "37445.15"
+          },
+          "reference_number": null,
+          "reference_number_schema": null,
+          "remittance_information": [
+            "",
+            "Anslutningsavgift"
+          ],
+          "debtor_account_additional_identification": null,
+          "creditor_account_additional_identification": null,
+          "exchange_rate": null,
+          "note": null,
+          "transaction_id": null
+        },
+        {
+          "entry_reference": "2026-01-26-16.16.34.120637074H1021638218  EK",
+          "merchant_category_code": null,
+          "transaction_amount": {
+            "currency": "SEK",
+            "amount": "313.70"
+          },
+          "creditor": null,
+          "creditor_account": null,
+          "creditor_agent": null,
+          "debtor": {
+            "name": "SPAR NORD BANK A/S",
+            "postal_address": null,
+            "organisation_id": null,
+            "private_id": null,
+            "contact_details": null
+          },
+          "debtor_account": null,
+          "debtor_agent": null,
+          "bank_transaction_code": {
+            "description": "Andra",
+            "code": null,
+            "sub_code": null
+          },
+          "credit_debit_indicator": "CRDT",
+          "status": "BOOK",
+          "booking_date": "2026-01-26",
+          "value_date": "2026-01-26",
+          "transaction_date": null,
+          "balance_after_transaction": {
+            "currency": "XXX",
+            "amount": "37758.85"
+          },
+          "reference_number": "",
+          "reference_number_schema": null,
+          "remittance_information": [
+            "",
+            "2025DEC58 BRANDHEROES\r\nURSPRUNGLIGT BELOPP M M: EUR",
+            "UTLANDSBETALNING"
+          ],
+          "debtor_account_additional_identification": null,
+          "creditor_account_additional_identification": null,
+          "exchange_rate": {
+            "unit_currency": "EUR",
+            "exchange_rate": "10.4567000",
+            "rate_type": null,
+            "contract_identification": null,
+            "instructed_amount": {
+              "currency": "EUR",
+              "amount": "30.00"
+            }
+          },
+          "note": null,
+          "transaction_id": null
+        },
+        {
+          "entry_reference": "08100021638218000600000000126-01-2800H1   TR",
+          "merchant_category_code": null,
+          "transaction_amount": {
+            "currency": "SEK",
+            "amount": "3750.00"
+          },
+          "creditor": null,
+          "creditor_account": null,
+          "creditor_agent": null,
+          "debtor": {
+            "name": "BG INSÄTTNING 1",
+            "postal_address": null,
+            "organisation_id": null,
+            "private_id": null,
+            "contact_details": null
+          },
+          "debtor_account": null,
+          "debtor_agent": null,
+          "bank_transaction_code": {
+            "description": "BGC LB-betalningar",
+            "code": null,
+            "sub_code": null
+          },
+          "credit_debit_indicator": "CRDT",
+          "status": "BOOK",
+          "booking_date": "2026-01-28",
+          "value_date": "2026-01-29",
+          "transaction_date": null,
+          "balance_after_transaction": {
+            "currency": "XXX",
+            "amount": "41508.85"
+          },
+          "reference_number": "0051385052",
+          "reference_number_schema": null,
+          "remittance_information": [
+            "0051385052",
+            "",
+            "5138-5052"
+          ],
+          "debtor_account_additional_identification": null,
+          "creditor_account_additional_identification": null,
+          "exchange_rate": null,
+          "note": null,
+          "transaction_id": null
+        }
+      ],
+      "balances": [
+        {
+          "name": "Available balance",
+          "balance_type": "ITAV",
+          "balance_amount": {
+            "amount": "41508.85",
+            "currency": "SEK"
+          },
+          "last_change_date_time": null,
+          "last_committed_transaction": null,
+          "reference_date": null
+        },
+        {
+          "name": "Booked balance",
+          "balance_type": "ITBD",
+          "balance_amount": {
+            "amount": "41508.85",
+            "currency": "SEK"
+          },
+          "last_change_date_time": null,
+          "last_committed_transaction": null,
+          "reference_date": null
+        }
+      ],
+      "raw_data": {
+        "transactions": [
+          "{\"group_header\":{\"message_identification\":\"35146ffa2df21681\",\"creation_date_time\":\"2026-01-29T21:12:00.246234221Z\",\"http_code\":200},\"response\":{\"transactions\":[{\"transaction_id\":\"08100021638218000600000000126-01-2800H1   TR\",\"currency\":\"SEK\",\"booking_date\":\"2026-01-28\",\"value_date\":\"2026-01-29\",\"type_description\":\"BGC LB-betalningar\",\"narrative\":\"5138-5052\",\"message\":\"\",\"status\":\"billed\",\"reference\":\"0051385052\",\"counterparty_account\":\"\",\"counterparty_name\":\"BG INSÄTTNING 1\",\"balance_after_transaction\":\"41508.85\",\"amount\":\"3750.00\",\"from_account_name\":\"BG INSÄTTNING 1\",\"from_account_country\":\"\",\"transaction_type_code\":\"SE218\"},{\"transaction_id\":\"2026-01-26-16.16.34.120637074H1021638218  EK\",\"currency\":\"SEK\",\"booking_date\":\"2026-01-26\",\"value_date\":\"2026-01-26\",\"type_description\":\"Andra\",\"narrative\":\"UTLANDSBETALNING\",\"message\":\"2025DEC58 BRANDHEROES\\r\\nURSPRUNGLIGT BELOPP M M: EUR\",\"status\":\"billed\",\"reference\":\"\",\"counterparty_account\":\"\",\"counterparty_name\":\"SPAR NORD BANK A/S\",\"payment_date\":\"2026-01-26\",\"original_currency\":\"EUR\",\"original_currency_amount\":\"30.00\",\"currency_rate\":\"10.4567000\",\"balance_after_transaction\":\"37758.85\",\"amount\":\"313.70\",\"from_account_name\":\"SPAR NORD BANK A/S\",\"from_account_country\":\"DK\",\"bank_name\":\"SPAR NORD BANK A/S\",\"bank_address\":\"\",\"bank_code\":\"AALBORG\",\"bank_bic\":\"SPNODK22A\",\"transaction_type_code\":\"SE\"},{\"transaction_id\":\"07700021638218000400000000126-01-2200H1   TR\",\"currency\":\"SEK\",\"booking_date\":\"2026-01-22\",\"value_date\":\"2026-01-22\",\"type_description\":\"Generell O-Typ från Cello-kassa via INL\",\"narrative\":\"Anslutningsavgift\",\"message\":\"\",\"status\":\"billed\",\"counterparty_account\":\"1411450057\",\"counterparty_name\":\"Uttag\",\"balance_after_transaction\":\"37445.15\",\"amount\":\"-2500.00\",\"to_account_name\":\"Uttag\",\"to_account_country\":\"\",\"transaction_type_code\":\"SE976\"},{\"transaction_id\":\"2026-01-09-16.25.07.272909064H1021638218  EK\",\"currency\":\"SEK\",\"booking_date\":\"2026-01-12\",\"value_date\":\"2026-01-12\",\"type_description\":\"Andra\",\"narrative\":\"UTLANDSBETALNING\",\"message\":\"/ROC/E20304164B207920 INVOICE 003\\r\\nURSPRUNGLIGT BELOPP M M: SEK\",\"status\":\"billed\",\"reference\":\"\",\"counterparty_account\":\"\",\"counterparty_name\":\"NORDEA BANK ABP\",\"payment_date\":\"2026-01-12\",\"original_currency\":\"SEK\",\"original_currency_amount\":\"7000.00\",\"currency_rate\":\"1.0000000\",\"balance_after_transaction\":\"39945.15\",\"amount\":\"7000.00\",\"from_account_name\":\"NORDEA BANK ABP\",\"from_account_country\":\"FI\",\"bank_name\":\"NORDEA BANK ABP\",\"bank_address\":\"\",\"bank_code\":\"HELSINKI\",\"bank_bic\":\"NDEAFIHHS\",\"transaction_type_code\":\"SE\"},{\"transaction_id\":\"06600021638218000200000000126-01-0700H1   TR\",\"currency\":\"SEK\",\"booking_date\":\"2026-01-07\",\"value_date\":\"2026-01-07\",\"type_description\":\"Debitering av avgift\",\"narrative\":\"AVGIFTER NORDEA\",\"message\":\"\",\"status\":\"billed\",\"counterparty_account\":\"\",\"counterparty_name\":\"AVGIFTER NORDEA\",\"balance_after_transaction\":\"32945.15\",\"amount\":\"-1409.85\",\"to_account_name\":\"AVGIFTER NORDEA\",\"to_account_country\":\"\",\"transaction_type_code\":\"SE931\"},{\"transaction_id\":\"06400021638218000100000000126-01-0200H1   TR\",\"currency\":\"SEK\",\"booking_date\":\"2026-01-02\",\"value_date\":\"2026-01-05\",\"type_description\":\"BGC LB-betalningar\",\"narrative\":\"5138-5052\",\"message\":\"\",\"status\":\"billed\",\"reference\":\"0051385052\",\"counterparty_account\":\"\",\"counterparty_name\":\"BG INSÄTTNING 1\",\"balance_after_transaction\":\"34355.00\",\"amount\":\"15625.00\",\"from_account_name\":\"BG INSÄTTNING 1\",\"from_account_country\":\"\",\"transaction_type_code\":\"SE218\"},{\"transaction_id\":\"2025-12-30-16.17.03.380410058H1021638218  EK\",\"currency\":\"SEK\",\"booking_date\":\"2025-12-30\",\"value_date\":\"2025-12-30\",\"type_description\":\"Andra\",\"narrative\":\"UTLANDSBETALNING\",\"message\":\"005 BaByliss\\r\\nURSPRUNGLIGT BELOPP M M: SEK\",\"status\":\"billed\",\"reference\":\"\",\"counterparty_account\":\"\",\"counterparty_name\":\"BARCLAYS BANK PLC\",\"payment_date\":\"2025-12-30\",\"original_currency\":\"SEK\",\"original_currency_amount\":\"8730.00\",\"currency_rate\":\"1.0000000\",\"balance_after_transaction\":\"18730.00\",\"amount\":\"8730.00\",\"from_account_name\":\"BARCLAYS BANK PLC\",\"from_account_country\":\"GB\",\"bank_name\":\"BARCLAYS BANK PLC\",\"bank_address\":\"\",\"bank_code\":\"LONDON\",\"bank_bic\":\"BARCGB22V\",\"transaction_type_code\":\"SE\"},{\"transaction_id\":\"06200021638218000100000000125-12-2900H1   TR\",\"currency\":\"SEK\",\"booking_date\":\"2025-12-29\",\"value_date\":\"2025-12-30\",\"type_description\":\"BGC LB-betalningar\",\"narrative\":\"5138-5052\",\"message\":\"\",\"status\":\"billed\",\"reference\":\"0051385052\",\"counterparty_account\":\"\",\"counterparty_name\":\"BG INSÄTTNING 1\",\"balance_after_transaction\":\"10000.00\",\"amount\":\"10000.00\",\"from_account_name\":\"BG INSÄTTNING 1\",\"from_account_country\":\"\",\"transaction_type_code\":\"SE218\"}],\"_links\":[{\"rel\":\"self\",\"href\":\"/v4/accounts/SE21638218-SEK/transactions?from_date=2025-01-29&to_date=2026-01-29\"}]}}"
+        ],
+        "balances": {
+
+        },
+        "details": {
+
+        }
+      }
+    }
+  ]
+}

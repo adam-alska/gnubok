@@ -1,0 +1,152 @@
+import { suggestCategory } from '@/lib/tax/expense-warnings'
+import { getExpenseAccountForCategory } from '@/lib/bookkeeping/category-mapping'
+import type { Transaction, TransactionCategory, MappingRule } from '@/types'
+
+export interface SuggestedCategory {
+  category: TransactionCategory
+  label: string
+  account: string | null
+  confidence: number
+  source: 'mapping_rule' | 'pattern' | 'history'
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  income_services: 'Tjänster',
+  income_products: 'Produkter',
+  income_sponsorship: 'Sponsring',
+  income_affiliate: 'Affiliate',
+  income_other: 'Övriga intäkter',
+  expense_equipment: 'Utrustning',
+  expense_software: 'Programvara',
+  expense_travel: 'Resor',
+  expense_office: 'Kontor',
+  expense_marketing: 'Marknadsföring',
+  expense_professional_services: 'Konsulter',
+  expense_education: 'Utbildning',
+  expense_bank_fees: 'Bankavgift',
+  expense_card_fees: 'Kortavgift',
+  expense_currency_exchange: 'Valutaväxling',
+  expense_other: 'Övrigt',
+}
+
+/**
+ * Get suggested categories for a transaction
+ * Combines mapping rules, pattern matching, and user history
+ */
+export function getSuggestedCategories(
+  transaction: Transaction,
+  mappingRules: MappingRule[],
+  categoryHistory: Record<string, number>
+): SuggestedCategory[] {
+  const suggestions: SuggestedCategory[] = []
+  const seen = new Set<string>()
+
+  // 1. Check mapping rules (highest confidence)
+  for (const rule of mappingRules) {
+    if (!rule.is_active) continue
+
+    let matches = false
+
+    if (rule.merchant_pattern && transaction.merchant_name) {
+      const pattern = new RegExp(rule.merchant_pattern, 'i')
+      if (pattern.test(transaction.merchant_name)) {
+        matches = true
+      }
+    }
+
+    if (rule.description_pattern) {
+      const pattern = new RegExp(rule.description_pattern, 'i')
+      if (pattern.test(transaction.description)) {
+        matches = true
+      }
+    }
+
+    if (rule.mcc_codes && transaction.mcc_code) {
+      if (rule.mcc_codes.includes(transaction.mcc_code)) {
+        matches = true
+      }
+    }
+
+    if (matches && rule.debit_account && !rule.default_private) {
+      // Reverse-lookup: find category from debit account
+      const category = accountToCategory(rule.debit_account, transaction.amount)
+      if (category && !seen.has(category)) {
+        seen.add(category)
+        suggestions.push({
+          category: category as TransactionCategory,
+          label: CATEGORY_LABELS[category] || category,
+          account: rule.debit_account,
+          confidence: rule.confidence_score || 0.8,
+          source: 'mapping_rule',
+        })
+      }
+    }
+  }
+
+  // 2. Pattern matching from expense-warnings
+  const patternMatch = suggestCategory(transaction.description)
+  if (patternMatch && !seen.has(patternMatch)) {
+    seen.add(patternMatch)
+    suggestions.push({
+      category: patternMatch as TransactionCategory,
+      label: CATEGORY_LABELS[patternMatch] || patternMatch,
+      account: getExpenseAccountForCategory(patternMatch as TransactionCategory),
+      confidence: 0.6,
+      source: 'pattern',
+    })
+  }
+
+  // 3. User history (most commonly used categories)
+  const historyEntries = Object.entries(categoryHistory)
+    .sort(([, a], [, b]) => b - a)
+    .filter(([cat]) => !seen.has(cat))
+
+  for (const [cat, count] of historyEntries) {
+    if (suggestions.length >= 4) break
+    // Only suggest relevant direction (expense for negative, income for positive)
+    if (transaction.amount < 0 && !cat.startsWith('expense_')) continue
+    if (transaction.amount > 0 && !cat.startsWith('income_')) continue
+
+    seen.add(cat)
+    suggestions.push({
+      category: cat as TransactionCategory,
+      label: CATEGORY_LABELS[cat] || cat,
+      account: getExpenseAccountForCategory(cat as TransactionCategory),
+      confidence: Math.min(0.5, count / 20),
+      source: 'history',
+    })
+  }
+
+  // Sort by confidence, limit to top 4
+  return suggestions
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, 4)
+}
+
+/**
+ * Reverse-lookup: find category from BAS account number
+ */
+function accountToCategory(account: string, amount: number): string | null {
+  if (amount > 0) {
+    // Income
+    const incomeMap: Record<string, string> = {
+      '3001': 'income_services',
+      '3900': 'income_other',
+    }
+    return incomeMap[account] || 'income_other'
+  }
+
+  // Expense
+  const expenseMap: Record<string, string> = {
+    '5410': 'expense_equipment',
+    '5420': 'expense_software',
+    '5800': 'expense_travel',
+    '5010': 'expense_office',
+    '5910': 'expense_marketing',
+    '6530': 'expense_professional_services',
+    '6570': 'expense_bank_fees',
+    '6991': 'expense_other',
+    '7960': 'expense_currency_exchange',
+  }
+  return expenseMap[account] || null
+}

@@ -1,0 +1,415 @@
+import { createClient } from '@/lib/supabase/server'
+import type {
+  NEDeclaration,
+  NEDeclarationRutor,
+  NEAccountMapping,
+  NEGiftBreakdown,
+  NEGiftItem,
+  FiscalPeriod,
+  JournalEntry,
+  JournalEntryLine,
+  Gift,
+} from '@/types'
+
+/**
+ * NE-bilaga (Enskild Firma / Sole Proprietorship Declaration)
+ *
+ * Maps BAS account balances to NE declaration rutor (R1-R11) for
+ * tax reporting to Skatteverket.
+ *
+ * Account mappings:
+ * R1:  Försäljning med moms (3000-3499 excl 3100)
+ * R2:  Momsfria intäkter (3100, 3900, 3970, 3980) - inkl gåvor utan motprestation
+ * R3:  Bil/bostadsförmån (3200)
+ * R4:  Ränteintäkter (8310-8330)
+ * R5:  Varuinköp (4000-4990)
+ * R6:  Övriga kostnader (5000-6990, 7970) - inkl avdragsgilla gåvor (5460)
+ * R7:  Lönekostnader (7000-7699)
+ * R8:  Räntekostnader (8400-8499)
+ * R9:  Avskrivningar fastighet (7820)
+ * R10: Avskrivningar övrigt (7700-7899 excl 7820)
+ * R11: Årets resultat (calculated)
+ *
+ * Gift handling:
+ * - Gåvor MED motprestation: R1 (momspliktig bytestransaktion)
+ * - Gåvor UTAN motprestation: R2 via konto 3900
+ * - Avdragsgilla gåvor: R6 via konto 5460
+ */
+
+/**
+ * Account mapping configuration for NE declaration
+ */
+export const NE_ACCOUNT_MAPPINGS: NEAccountMapping[] = [
+  {
+    ruta: 'R1',
+    description: 'Försäljning med moms (25%)',
+    accountRanges: [
+      { start: '3000', end: '3499', exclude: ['3100'] },
+    ],
+    isExpense: false,
+  },
+  {
+    ruta: 'R2',
+    description: 'Momsfria intäkter',
+    accountRanges: [
+      { start: '3100', end: '3100' },
+      { start: '3900', end: '3900' }, // Övriga rörelseintäkter (inkl gåvor utan motprestation)
+      { start: '3970', end: '3980' },
+    ],
+    isExpense: false,
+  },
+  {
+    ruta: 'R3',
+    description: 'Bil/bostadsförmån',
+    accountRanges: [
+      { start: '3200', end: '3299' },
+    ],
+    isExpense: false,
+  },
+  {
+    ruta: 'R4',
+    description: 'Ränteintäkter',
+    accountRanges: [
+      { start: '8310', end: '8330' },
+    ],
+    isExpense: false,
+  },
+  {
+    ruta: 'R5',
+    description: 'Varuinköp',
+    accountRanges: [
+      { start: '4000', end: '4990' },
+    ],
+    isExpense: true,
+  },
+  {
+    ruta: 'R6',
+    description: 'Övriga kostnader',
+    accountRanges: [
+      { start: '5000', end: '6990' },
+      { start: '7970', end: '7970' },
+    ],
+    isExpense: true,
+  },
+  {
+    ruta: 'R7',
+    description: 'Lönekostnader',
+    accountRanges: [
+      { start: '7000', end: '7699' },
+    ],
+    isExpense: true,
+  },
+  {
+    ruta: 'R8',
+    description: 'Räntekostnader',
+    accountRanges: [
+      { start: '8400', end: '8499' },
+    ],
+    isExpense: true,
+  },
+  {
+    ruta: 'R9',
+    description: 'Avskrivningar fastighet',
+    accountRanges: [
+      { start: '7820', end: '7820' },
+    ],
+    isExpense: true,
+  },
+  {
+    ruta: 'R10',
+    description: 'Avskrivningar övrigt',
+    accountRanges: [
+      { start: '7700', end: '7899', exclude: ['7820'] },
+    ],
+    isExpense: true,
+  },
+]
+
+/**
+ * Check if an account number falls within a mapping's ranges
+ */
+function isAccountInMapping(accountNumber: string, mapping: NEAccountMapping): boolean {
+  for (const range of mapping.accountRanges) {
+    const num = accountNumber
+    if (num >= range.start && num <= range.end) {
+      // Check exclusions
+      if (range.exclude && range.exclude.includes(num)) {
+        continue
+      }
+      return true
+    }
+  }
+  return false
+}
+
+/**
+ * Round to nearest krona (whole number) for NE declaration
+ */
+function roundToKrona(value: number): number {
+  return Math.round(value)
+}
+
+/**
+ * Generate NE declaration for a fiscal period
+ */
+export async function generateNEDeclaration(
+  userId: string,
+  fiscalPeriodId: string
+): Promise<NEDeclaration> {
+  const supabase = await createClient()
+
+  // Fetch fiscal period
+  const { data: period, error: periodError } = await supabase
+    .from('fiscal_periods')
+    .select('*')
+    .eq('id', fiscalPeriodId)
+    .eq('user_id', userId)
+    .single()
+
+  if (periodError || !period) {
+    throw new Error('Fiscal period not found')
+  }
+
+  // Fetch company settings
+  const { data: settings } = await supabase
+    .from('company_settings')
+    .select('company_name, org_number, entity_type')
+    .eq('user_id', userId)
+    .single()
+
+  // Check if it's enskild firma
+  if (settings?.entity_type !== 'enskild_firma') {
+    throw new Error('NE declaration is only for enskild firma (sole proprietorship)')
+  }
+
+  // Fetch all posted journal entries with lines for this period
+  const { data: entries, error: entriesError } = await supabase
+    .from('journal_entries')
+    .select('*, lines:journal_entry_lines(*)')
+    .eq('user_id', userId)
+    .eq('fiscal_period_id', fiscalPeriodId)
+    .eq('status', 'posted')
+
+  if (entriesError) {
+    throw new Error(`Failed to fetch journal entries: ${entriesError.message}`)
+  }
+
+  // Fetch chart of accounts for account names
+  const { data: accounts } = await supabase
+    .from('chart_of_accounts')
+    .select('account_number, account_name')
+    .eq('user_id', userId)
+
+  const accountNameMap = new Map<string, string>()
+  for (const acc of accounts || []) {
+    accountNameMap.set(acc.account_number, acc.account_name)
+  }
+
+  // Calculate balances per account
+  const accountBalances = new Map<string, number>()
+
+  for (const entry of (entries as JournalEntry[]) || []) {
+    const lines = (entry.lines as JournalEntryLine[]) || []
+    for (const line of lines) {
+      const current = accountBalances.get(line.account_number) || 0
+      // Net amount: debit - credit
+      const netAmount = (Number(line.debit_amount) || 0) - (Number(line.credit_amount) || 0)
+      accountBalances.set(line.account_number, current + netAmount)
+    }
+  }
+
+  // Map account balances to NE rutor
+  const rutor: NEDeclarationRutor = {
+    R1: 0,
+    R2: 0,
+    R3: 0,
+    R4: 0,
+    R5: 0,
+    R6: 0,
+    R7: 0,
+    R8: 0,
+    R9: 0,
+    R10: 0,
+    R11: 0,
+  }
+
+  const breakdown: Record<keyof NEDeclarationRutor, {
+    accounts: Array<{ accountNumber: string; accountName: string; amount: number }>
+    total: number
+  }> = {
+    R1: { accounts: [], total: 0 },
+    R2: { accounts: [], total: 0 },
+    R3: { accounts: [], total: 0 },
+    R4: { accounts: [], total: 0 },
+    R5: { accounts: [], total: 0 },
+    R6: { accounts: [], total: 0 },
+    R7: { accounts: [], total: 0 },
+    R8: { accounts: [], total: 0 },
+    R9: { accounts: [], total: 0 },
+    R10: { accounts: [], total: 0 },
+    R11: { accounts: [], total: 0 },
+  }
+
+  const warnings: string[] = []
+
+  // Process each account balance
+  for (const [accountNumber, balance] of accountBalances) {
+    // Skip zero balances
+    if (Math.abs(balance) < 0.01) continue
+
+    // Find which ruta this account belongs to
+    for (const mapping of NE_ACCOUNT_MAPPINGS) {
+      if (isAccountInMapping(accountNumber, mapping)) {
+        // For revenue accounts (credit normal), negate the balance
+        // For expense accounts (debit normal), use as-is
+        // Net balance is debit - credit, so:
+        // - Revenue accounts have negative net balance (credit > debit)
+        // - Expense accounts have positive net balance (debit > credit)
+        const amount = mapping.isExpense ? balance : -balance
+
+        rutor[mapping.ruta] += amount
+
+        breakdown[mapping.ruta].accounts.push({
+          accountNumber,
+          accountName: accountNameMap.get(accountNumber) || `Konto ${accountNumber}`,
+          amount: roundToKrona(amount),
+        })
+
+        break // Account matched, no need to check other mappings
+      }
+    }
+  }
+
+  // Round all rutor to whole numbers
+  for (const key of Object.keys(rutor) as (keyof NEDeclarationRutor)[]) {
+    if (key !== 'R11') {
+      rutor[key] = roundToKrona(rutor[key])
+      breakdown[key].total = rutor[key]
+    }
+  }
+
+  // Calculate R11 (Årets resultat)
+  // Result = Revenue (R1+R2+R3+R4) - Expenses (R5+R6+R7+R8+R9+R10)
+  const totalRevenue = rutor.R1 + rutor.R2 + rutor.R3 + rutor.R4
+  const totalExpenses = rutor.R5 + rutor.R6 + rutor.R7 + rutor.R8 + rutor.R9 + rutor.R10
+  rutor.R11 = totalRevenue - totalExpenses
+  breakdown.R11.total = rutor.R11
+
+  // Fetch gifts for the period
+  const { data: gifts } = await supabase
+    .from('gifts')
+    .select('*')
+    .eq('user_id', userId)
+    .gte('date', period.period_start)
+    .lte('date', period.period_end)
+
+  // Build gift breakdown
+  let giftBreakdown: NEGiftBreakdown | undefined
+  if (gifts && gifts.length > 0) {
+    const giftItems: NEGiftItem[] = []
+    let r1Total = 0
+    let r2Total = 0
+    let r6Total = 0
+
+    for (const gift of gifts as Gift[]) {
+      const classification = gift.classification
+      if (!classification || !classification.taxable) continue
+
+      const item: NEGiftItem = {
+        id: gift.id,
+        date: gift.date,
+        brandName: gift.brand_name,
+        description: gift.description,
+        marketValue: gift.estimated_value,
+        vatLiable: classification.vatLiable,
+        vatAmount: classification.vatAmount,
+        deductibleAsExpense: classification.deductibleAsExpense,
+        neIncomeRuta: classification.neIncomeRuta,
+        neExpenseRuta: classification.neExpenseRuta,
+      }
+      giftItems.push(item)
+
+      // Accumulate totals based on NE ruta
+      if (classification.neIncomeRuta === 'R1') {
+        r1Total += classification.valueExclVat // Exkl moms för R1
+      } else if (classification.neIncomeRuta === 'R2') {
+        r2Total += gift.estimated_value
+      }
+
+      if (classification.neExpenseRuta === 'R6') {
+        r6Total += gift.estimated_value
+      }
+    }
+
+    if (giftItems.length > 0) {
+      giftBreakdown = {
+        gifts: giftItems,
+        summary: {
+          r1Total: roundToKrona(r1Total),
+          r2Total: roundToKrona(r2Total),
+          r6Total: roundToKrona(r6Total),
+          totalTaxable: roundToKrona(r1Total + r2Total),
+          totalDeductible: roundToKrona(r6Total),
+          netTaxableIncome: roundToKrona(r1Total + r2Total - r6Total),
+        },
+      }
+    }
+  }
+
+  // Add warnings
+  if (!(period as FiscalPeriod).is_closed) {
+    warnings.push('Räkenskapsåret är inte stängt. Siffrorna kan ändras.')
+  }
+
+  if (rutor.R11 === 0 && totalRevenue === 0) {
+    warnings.push('Inga bokförda intäkter eller kostnader hittades för perioden.')
+  }
+
+  // Check for gifts without journal entries
+  if (giftBreakdown && giftBreakdown.gifts.length > 0) {
+    const giftsWithoutEntries = (gifts as Gift[]).filter(
+      (g) => g.classification?.taxable && !g.journal_entry_id
+    )
+    if (giftsWithoutEntries.length > 0) {
+      warnings.push(
+        `${giftsWithoutEntries.length} skattepliktiga gåvor saknar bokföringsverifikation. ` +
+        'Dessa bör bokföras för att inkluderas i NE-bilagan.'
+      )
+    }
+  }
+
+  return {
+    fiscalYear: {
+      id: period.id,
+      name: period.name,
+      start: period.period_start,
+      end: period.period_end,
+      isClosed: period.is_closed,
+    },
+    rutor,
+    breakdown,
+    giftBreakdown,
+    companyInfo: {
+      companyName: settings?.company_name || 'Okänt företag',
+      orgNumber: settings?.org_number || null,
+    },
+    warnings,
+  }
+}
+
+/**
+ * Get totals for display
+ */
+export function getNEDeclarationTotals(declaration: NEDeclaration): {
+  totalRevenue: number
+  totalExpenses: number
+  netResult: number
+} {
+  const { rutor } = declaration
+
+  return {
+    totalRevenue: rutor.R1 + rutor.R2 + rutor.R3 + rutor.R4,
+    totalExpenses: rutor.R5 + rutor.R6 + rutor.R7 + rutor.R8 + rutor.R9 + rutor.R10,
+    netResult: rutor.R11,
+  }
+}
