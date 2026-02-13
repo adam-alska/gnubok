@@ -86,20 +86,20 @@ export function ChatPanel({ className }: ChatPanelProps) {
             <h4 className="font-medium mb-2">Hur kan jag hjälpa dig?</h4>
             <p className="text-sm text-muted-foreground max-w-xs">
               Jag kan svara på frågor om skatt, moms, bokföring och andra
-              ekonomiska frågor för influencers.
+              ekonomiska frågor för företagare.
             </p>
             <div className="mt-6 space-y-2 w-full max-w-xs">
               <SuggestionButton
-                onClick={() => sendMessage('Hur fungerar momsen för YouTube-intäkter?')}
+                onClick={() => sendMessage('Hur fungerar momsen på mina fakturor?')}
                 disabled={isLoading}
               >
-                Hur fungerar momsen för YouTube-intäkter?
+                Hur fungerar momsen på mina fakturor?
               </SuggestionButton>
               <SuggestionButton
-                onClick={() => sendMessage('Vad kan jag dra av som influencer?')}
+                onClick={() => sendMessage('Vad kan jag dra av som företagare?')}
                 disabled={isLoading}
               >
-                Vad kan jag dra av som influencer?
+                Vad kan jag dra av som företagare?
               </SuggestionButton>
               <SuggestionButton
                 onClick={() => sendMessage('När måste jag momsregistrera mig?')}

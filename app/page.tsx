@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import DashboardNav from '@/components/dashboard/DashboardNav'
 import DashboardContent from '@/components/dashboard/DashboardContent'
-import type { Gift, GiftSummary, Deadline, Campaign, ReceiptQueueSummary } from '@/types'
+import type { Deadline, ReceiptQueueSummary } from '@/types'
 
 export default async function RootPage() {
   const supabase = await createClient()
@@ -121,25 +121,6 @@ export default async function RootPage() {
     .or(`due_date.lt.${today},due_date.lte.${nextWeek}`)
     .order('due_date', { ascending: true })
 
-  // Fetch active campaigns with deliverables
-  const { data: campaigns } = await supabase
-    .from('campaigns')
-    .select(`
-      *,
-      customer:customers!campaigns_customer_id_fkey(id, name),
-      deliverables(*)
-    `)
-    .eq('user_id', user.id)
-    .in('status', ['negotiation', 'contracted', 'active'])
-    .order('created_at', { ascending: false })
-
-  // Fetch gift summary for current year
-  const { data: gifts } = await supabase
-    .from('gifts')
-    .select('estimated_value, classification')
-    .eq('user_id', user.id)
-    .gte('date', startOfYear.split('T')[0])
-
   // Fetch receipt queue summary
   const { count: pendingReviewCount } = await supabase
     .from('receipts')
@@ -193,41 +174,6 @@ export default async function RootPage() {
     streak_count: streakCount,
   }
 
-  let giftSummary: GiftSummary | null = null
-  if (gifts && gifts.length > 0) {
-    giftSummary = {
-      year: new Date().getFullYear(),
-      total_count: gifts.length,
-      total_value: 0,
-      taxable_count: 0,
-      taxable_value: 0,
-      tax_free_count: 0,
-      tax_free_value: 0,
-      deductible_count: 0,
-      deductible_value: 0,
-    }
-
-    for (const gift of gifts as Pick<Gift, 'estimated_value' | 'classification'>[]) {
-      const value = Number(gift.estimated_value)
-      const classification = gift.classification
-
-      giftSummary.total_value += value
-
-      if (classification?.taxable) {
-        giftSummary.taxable_count++
-        giftSummary.taxable_value += value
-      } else {
-        giftSummary.tax_free_count++
-        giftSummary.tax_free_value += value
-      }
-
-      if (classification?.deductibleAsExpense) {
-        giftSummary.deductible_count++
-        giftSummary.deductible_value += value
-      }
-    }
-  }
-
   return (
     <div className="min-h-screen bg-background">
       <DashboardNav companyName={settings.company_name || 'Min verksamhet'} entityType={settings.entity_type || 'enskild_firma'} />
@@ -247,9 +193,7 @@ export default async function RootPage() {
               overdueInvoicesCount: overdueCount,
               bankBalance,
               mileageEntries: mileageEntries || [],
-              giftSummary,
               deadlines: (deadlines || []) as Deadline[],
-              campaigns: (campaigns || []) as Campaign[],
               receiptQueue,
             }}
           />

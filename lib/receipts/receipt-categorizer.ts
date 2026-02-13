@@ -35,8 +35,6 @@ const BAS_ACCOUNT_MAPPING: Record<TransactionCategory, string> = {
   // Non-expense categories (for completeness)
   income_services: '3001',
   income_products: '3001',
-  income_sponsorship: '3900',
-  income_affiliate: '3900',
   income_other: '3900',
   private: '2013',
   uncategorized: '6991',
@@ -281,8 +279,6 @@ export const CATEGORY_LABELS: Record<TransactionCategory, string> = {
   expense_other: 'Övrigt',
   income_services: 'Tjänsteintäkt',
   income_products: 'Varuintäkt',
-  income_sponsorship: 'Sponsoring',
-  income_affiliate: 'Affiliate',
   income_other: 'Övrig intäkt',
   private: 'Privat',
   uncategorized: 'Ej kategoriserad',

@@ -32,7 +32,7 @@ self.addEventListener('push', (event) => {
   }
 
   event.waitUntil(
-    self.registration.showNotification(title || 'Influencer Assistant', options)
+    self.registration.showNotification(title || 'Ekonomi', options)
   )
 })
 

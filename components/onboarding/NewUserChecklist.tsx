@@ -36,7 +36,7 @@ interface NewUserChecklistProps {
   className?: string
 }
 
-const CHECKLIST_DISMISSED_KEY = 'influencer_checklist_dismissed'
+const CHECKLIST_DISMISSED_KEY = 'erp_checklist_dismissed'
 
 export default function NewUserChecklist({
   hasCustomers,

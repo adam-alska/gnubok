@@ -7,7 +7,7 @@ import webpush from 'web-push'
 // Configure web-push with VAPID keys
 const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY
-const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:support@influencer-biz.se'
+const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:support@erp-base.se'
 
 if (vapidPublicKey && vapidPrivateKey) {
   webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey)
@@ -187,35 +187,6 @@ export function createInvoicePayload(
     },
     actions: [
       { action: 'view', title: 'Visa faktura' },
-    ],
-  }
-}
-
-/**
- * Create notification payload for campaign deadline
- */
-export function createCampaignDeadlinePayload(
-  campaignName: string,
-  deliverableTitle: string,
-  dueDate: string,
-  daysUntil: number,
-  deadlineId: string
-): NotificationPayload {
-  const urgencyText = daysUntil === 0 ? 'IDAG!' : daysUntil === 1 ? 'imorgon' : `om ${daysUntil} dagar`
-
-  return {
-    title: `🎬 ${campaignName}`,
-    body: `${deliverableTitle} - leverans ${urgencyText}`,
-    icon: '/icons/icon-192.png',
-    badge: '/icons/badge-72.png',
-    tag: `campaign-deadline-${deadlineId}`,
-    data: {
-      url: '/calendar',
-      type: 'campaign_deadline',
-      id: deadlineId,
-    },
-    actions: [
-      { action: 'view', title: 'Visa' },
     ],
   }
 }

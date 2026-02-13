@@ -328,8 +328,6 @@ function getVatRateForCategory(category: string | null): number {
     'uncategorized',
     'income_services',
     'income_products',
-    'income_sponsorship',
-    'income_affiliate',
     'income_other',
   ]
 

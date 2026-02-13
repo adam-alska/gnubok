@@ -95,7 +95,7 @@ export async function sendReminder(
   const daysOverdue = calculateDaysOverdue(invoice.due_date)
 
   // Build action URL (public page for customer response)
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.influencer-biz.se'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.erp-base.se'
   const actionUrl = `${baseUrl}/invoice-action/${actionToken}`
 
   const emailData = {

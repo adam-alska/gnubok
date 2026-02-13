@@ -10,7 +10,6 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
 import CustomerForm from '@/components/customers/CustomerForm'
-import { CampaignStatusBadge } from '@/components/campaigns/CampaignStatusBadge'
 import {
   ArrowLeft,
   Building,
@@ -21,12 +20,10 @@ import {
   MapPin,
   Edit2,
   Trash2,
-  FileText,
   Loader2,
   Receipt,
-  Briefcase,
 } from 'lucide-react'
-import type { Customer, CustomerType, CreateCustomerInput, CampaignStatus } from '@/types'
+import type { Customer, CustomerType, CreateCustomerInput } from '@/types'
 
 const customerTypeLabels: Record<CustomerType, string> = {
   individual: 'Privatperson',
@@ -42,16 +39,6 @@ const customerTypeIcons: Record<CustomerType, React.ElementType> = {
   non_eu_business: Globe,
 }
 
-interface RelatedCampaign {
-  id: string
-  name: string
-  status: CampaignStatus
-  total_value: number | null
-  currency: string | null
-  publication_date: string | null
-  brand_name: string | null
-}
-
 interface RelatedInvoice {
   id: string
   invoice_number: string
@@ -64,7 +51,6 @@ interface RelatedInvoice {
 }
 
 interface CustomerWithRelations extends Customer {
-  campaigns: RelatedCampaign[]
   invoices: RelatedInvoice[]
 }
 
@@ -304,10 +290,6 @@ export default function CustomerDetailPage({
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center gap-2 text-sm">
-              <Briefcase className="h-4 w-4 text-muted-foreground" />
-              <span>{customer.campaigns?.length || 0} samarbeten</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
               <Receipt className="h-4 w-4 text-muted-foreground" />
               <span>{customer.invoices?.length || 0} fakturor</span>
             </div>
@@ -326,49 +308,6 @@ export default function CustomerDetailPage({
           </CardContent>
         </Card>
       )}
-
-      {/* Related campaigns */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Briefcase className="h-4 w-4" />
-            Samarbeten
-            {customer.campaigns?.length > 0 && (
-              <Badge variant="secondary">{customer.campaigns.length}</Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {customer.campaigns?.length > 0 ? (
-            <div className="space-y-2">
-              {customer.campaigns.map((campaign) => (
-                <Link
-                  key={campaign.id}
-                  href={`/campaigns/${campaign.id}`}
-                  className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-                >
-                  <div>
-                    <p className="font-medium">{campaign.name}</p>
-                    {campaign.brand_name && (
-                      <p className="text-sm text-muted-foreground">{campaign.brand_name}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm tabular-nums">
-                      {formatCurrency(campaign.total_value, campaign.currency)}
-                    </span>
-                    <CampaignStatusBadge status={campaign.status} />
-                  </div>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              Inga samarbeten kopplade till denna kund
-            </p>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Related invoices */}
       <Card>

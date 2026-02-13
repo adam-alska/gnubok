@@ -1,4 +1,4 @@
-import { Invoice, Deadline, PaymentCalendarDay, Deliverable, Exclusivity, Campaign } from '@/types'
+import { Invoice, Deadline, PaymentCalendarDay } from '@/types'
 
 // Swedish day names (Monday first)
 export const SWEDISH_DAYS = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön']
@@ -223,16 +223,13 @@ export function getUpcomingDeadlines(deadlines: Deadline[], days: number = 7): D
     .sort((a, b) => a.due_date.localeCompare(b.due_date))
 }
 
-// Swedish deadline type labels (extended for campaigns)
+// Swedish deadline type labels
 export const DEADLINE_TYPE_LABELS: Record<string, string> = {
   delivery: 'Leverans',
   approval: 'Godkännande',
   invoicing: 'Fakturering',
   report: 'Rapport',
   revision: 'Revision',
-  assets: 'Material',
-  spark_ad: 'Spark Ad',
-  statistics: 'Statistik',
   other: 'Övrigt'
 }
 
@@ -319,140 +316,22 @@ export function countDeadlinesByStatus(deadlines: Deadline[]): Record<DeadlineSt
   return counts
 }
 
-// ============================================================
-// Campaign-aware calendar functions
-// ============================================================
-
-// Get deliverables for a month
-export function getDeliverablesForMonth(deliverables: Deliverable[], year: number, month: number): Deliverable[] {
-  const monthStr = String(month + 1).padStart(2, '0')
-  const prefix = `${year}-${monthStr}`
-
-  return deliverables.filter(d => d.due_date?.startsWith(prefix))
-}
-
-// Group deliverables by due date
-export function groupDeliverablesByDate(deliverables: Deliverable[]): Map<string, Deliverable[]> {
-  const grouped = new Map<string, Deliverable[]>()
-
-  for (const deliverable of deliverables) {
-    if (!deliverable.due_date) continue
-    const dateKey = deliverable.due_date
-    const existing = grouped.get(dateKey) || []
-    existing.push(deliverable)
-    grouped.set(dateKey, existing)
-  }
-
-  return grouped
-}
-
-// Check if deliverable is overdue
-export function isDeliverableOverdue(deliverable: Deliverable): boolean {
-  if (['approved', 'published'].includes(deliverable.status)) return false
-  if (!deliverable.due_date) return false
-
-  const today = startOfDay(new Date())
-  const dueDate = parseDate(deliverable.due_date)
-  return isBefore(dueDate, today)
-}
-
-// Get upcoming deliverables
-export function getUpcomingDeliverables(deliverables: Deliverable[], days: number = 7): Deliverable[] {
-  const today = startOfDay(new Date())
-  const endDate = new Date(today)
-  endDate.setDate(endDate.getDate() + days)
-
-  return deliverables
-    .filter(d => {
-      if (['approved', 'published'].includes(d.status)) return false
-      if (!d.due_date) return false
-      const dueDate = parseDate(d.due_date)
-      return dueDate >= today && dueDate <= endDate
-    })
-    .sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''))
-}
-
-// Get exclusivities active on a specific date
-export function getExclusivitiesForDate(exclusivities: Exclusivity[], date: string): Exclusivity[] {
-  return exclusivities.filter(e =>
-    e.start_date <= date && e.end_date >= date
-  )
-}
-
-// Get exclusivities for a month (overlapping with month)
-export function getExclusivitiesForMonth(exclusivities: Exclusivity[], year: number, month: number): Exclusivity[] {
-  const monthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`
-  const lastDay = new Date(year, month + 1, 0).getDate()
-  const monthEnd = `${year}-${String(month + 1).padStart(2, '0')}-${lastDay}`
-
-  return exclusivities.filter(e =>
-    e.start_date <= monthEnd && e.end_date >= monthStart
-  )
-}
-
-// Get campaigns with deliverables in a date range
-export function getCampaignsWithDeliverablesInRange(
-  campaigns: Campaign[],
-  startDate: string,
-  endDate: string
-): Campaign[] {
-  return campaigns.filter(campaign =>
-    campaign.deliverables?.some(d =>
-      d.due_date &&
-      d.due_date >= startDate &&
-      d.due_date <= endDate &&
-      !['approved', 'published'].includes(d.status)
-    )
-  )
-}
-
-// Calculate campaign deliverable summary for a date
-export function getCampaignDaySummary(
-  campaigns: Campaign[],
-  date: string
-): {
-  deliverables: (Deliverable & { campaignName: string })[]
-  totalCount: number
-  overdueCount: number
-} {
-  const deliverables: (Deliverable & { campaignName: string })[] = []
-  let overdueCount = 0
-  const today = formatDateISO(new Date())
-
-  for (const campaign of campaigns) {
-    for (const d of campaign.deliverables || []) {
-      if (d.due_date === date && !['approved', 'published'].includes(d.status)) {
-        deliverables.push({ ...d, campaignName: campaign.name })
-        if (date < today) overdueCount++
-      }
-    }
-  }
-
-  return {
-    deliverables,
-    totalCount: deliverables.length,
-    overdueCount
-  }
-}
-
 // Get all calendar events for a month (unified view)
 export interface CalendarEvent {
   id: string
-  type: 'invoice' | 'deadline' | 'deliverable' | 'exclusivity_start' | 'exclusivity_end' | 'campaign_start' | 'campaign_end'
+  type: 'invoice' | 'deadline'
   date: string
   title: string
   subtitle?: string
   status?: string
   priority?: string
   isOverdue?: boolean
-  campaignId?: string
   customerId?: string
 }
 
 export function getCalendarEventsForMonth(
   invoices: Invoice[],
   deadlines: Deadline[],
-  campaigns: Campaign[],
   year: number,
   month: number
 ): CalendarEvent[] {
@@ -488,79 +367,8 @@ export function getCalendarEventsForMonth(
         subtitle: d.customer?.name,
         priority: d.priority,
         isOverdue: d.due_date < today,
-        campaignId: d.campaign_id || undefined,
         customerId: d.customer_id || undefined
       })
-    }
-  }
-
-  // Deliverables from campaigns
-  for (const campaign of campaigns) {
-    // Campaign start/end dates
-    if (campaign.start_date?.startsWith(prefix)) {
-      events.push({
-        id: `camp-start-${campaign.id}`,
-        type: 'campaign_start',
-        date: campaign.start_date,
-        title: `Start: ${campaign.name}`,
-        subtitle: campaign.customer?.name,
-        campaignId: campaign.id,
-        customerId: campaign.customer_id || undefined
-      })
-    }
-
-    if (campaign.end_date?.startsWith(prefix)) {
-      events.push({
-        id: `camp-end-${campaign.id}`,
-        type: 'campaign_end',
-        date: campaign.end_date,
-        title: `Slut: ${campaign.name}`,
-        subtitle: campaign.customer?.name,
-        campaignId: campaign.id,
-        customerId: campaign.customer_id || undefined
-      })
-    }
-
-    // Deliverables
-    for (const d of campaign.deliverables || []) {
-      if (d.due_date?.startsWith(prefix) && !['approved', 'published'].includes(d.status)) {
-        events.push({
-          id: `del-${d.id}`,
-          type: 'deliverable',
-          date: d.due_date,
-          title: d.title,
-          subtitle: campaign.name,
-          status: d.status,
-          isOverdue: d.due_date < today,
-          campaignId: campaign.id,
-          customerId: campaign.customer_id || undefined
-        })
-      }
-    }
-
-    // Exclusivities
-    for (const e of campaign.exclusivities || []) {
-      if (e.start_date.startsWith(prefix)) {
-        events.push({
-          id: `exc-start-${e.id}`,
-          type: 'exclusivity_start',
-          date: e.start_date,
-          title: `Exklusivitet startar`,
-          subtitle: `${campaign.name}: ${e.categories.slice(0, 2).join(', ')}${e.categories.length > 2 ? '...' : ''}`,
-          campaignId: campaign.id
-        })
-      }
-
-      if (e.end_date.startsWith(prefix)) {
-        events.push({
-          id: `exc-end-${e.id}`,
-          type: 'exclusivity_end',
-          date: e.end_date,
-          title: `Exklusivitet slutar`,
-          subtitle: `${campaign.name}: ${e.categories.slice(0, 2).join(', ')}${e.categories.length > 2 ? '...' : ''}`,
-          campaignId: campaign.id
-        })
-      }
     }
   }
 

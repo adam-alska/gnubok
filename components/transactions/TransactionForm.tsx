@@ -32,8 +32,6 @@ interface TransactionFormProps {
 
 const categories: { value: TransactionCategory; label: string; isIncome?: boolean }[] = [
   { value: 'income_services', label: 'Intäkt: Tjänster', isIncome: true },
-  { value: 'income_sponsorship', label: 'Intäkt: Sponsring', isIncome: true },
-  { value: 'income_affiliate', label: 'Intäkt: Affiliate', isIncome: true },
   { value: 'income_products', label: 'Intäkt: Produkter', isIncome: true },
   { value: 'income_other', label: 'Intäkt: Övrigt', isIncome: true },
   { value: 'expense_equipment', label: 'Kostnad: Utrustning' },

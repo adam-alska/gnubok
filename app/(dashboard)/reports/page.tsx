@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Download, FileText, TrendingUp, Scale, AlertCircle, Receipt, Briefcase, Gift } from 'lucide-react'
+import { Download, FileText, TrendingUp, Scale, AlertCircle, Receipt, Briefcase } from 'lucide-react'
 import type {
   FiscalPeriod,
   TrialBalanceRow,
@@ -1062,80 +1062,6 @@ function NEDeclarationView({ periodId }: { periodId: string }) {
               </table>
             </CardContent>
           </Card>
-
-          {/* Gift breakdown (if any gifts exist) */}
-          {data.giftBreakdown && data.giftBreakdown.gifts.length > 0 && (
-            <Card className="border-amber-200 bg-amber-50/50">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Gift className="h-5 w-5 text-amber-600" />
-                  Gåvor & Förmåner
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Skattepliktiga gåvor som ingår i intäkter/kostnader ovan (via bokföringsverifikationer).
-                </p>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-muted-foreground">
-                      <th className="py-2">Datum</th>
-                      <th className="py-2">Varumärke</th>
-                      <th className="py-2">Beskrivning</th>
-                      <th className="py-2 text-right">Värde</th>
-                      <th className="py-2">NE-ruta</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.giftBreakdown.gifts.map((gift) => (
-                      <tr key={gift.id} className="border-b last:border-0">
-                        <td className="py-2">{gift.date}</td>
-                        <td className="py-2">{gift.brandName}</td>
-                        <td className="py-2 max-w-[200px] truncate">{gift.description}</td>
-                        <td className="py-2 text-right tabular-nums">{formatAmount(gift.marketValue)} kr</td>
-                        <td className="py-2">
-                          <div className="flex gap-1">
-                            {gift.neIncomeRuta && (
-                              <Badge variant="outline" className="font-mono text-xs">
-                                {gift.neIncomeRuta}
-                              </Badge>
-                            )}
-                            {gift.neExpenseRuta && (
-                              <Badge variant="outline" className="font-mono text-xs text-green-600">
-                                {gift.neExpenseRuta}
-                              </Badge>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t-2 font-semibold">
-                      <td colSpan={3} className="py-2">Summa i R1 (med moms)</td>
-                      <td className="py-2 text-right tabular-nums">{formatAmount(data.giftBreakdown.summary.r1Total)} kr</td>
-                      <td></td>
-                    </tr>
-                    <tr className="font-semibold">
-                      <td colSpan={3} className="py-2">Summa i R2 (momsfri)</td>
-                      <td className="py-2 text-right tabular-nums">{formatAmount(data.giftBreakdown.summary.r2Total)} kr</td>
-                      <td></td>
-                    </tr>
-                    <tr className="font-semibold">
-                      <td colSpan={3} className="py-2">Summa avdrag i R6</td>
-                      <td className="py-2 text-right tabular-nums text-green-600">-{formatAmount(data.giftBreakdown.summary.r6Total)} kr</td>
-                      <td></td>
-                    </tr>
-                    <tr className="border-t font-bold">
-                      <td colSpan={3} className="py-2">Netto skatteeffekt</td>
-                      <td className="py-2 text-right tabular-nums">{formatAmount(data.giftBreakdown.summary.netTaxableIncome)} kr</td>
-                      <td></td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Result */}
           <Card className="border-2">

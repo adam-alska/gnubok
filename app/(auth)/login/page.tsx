@@ -89,9 +89,9 @@ export default function LoginPage() {
           <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
             <Sparkles className="h-6 w-6 text-primary" />
           </div>
-          <CardTitle className="text-2xl">Influencer Assistant</CardTitle>
+          <CardTitle className="text-2xl">ERP Base</CardTitle>
           <CardDescription>
-            Logga in med din e-post för att hantera din verksamhet
+            Logga in med din e-post för att hantera din ekonomi
           </CardDescription>
         </CardHeader>
         <CardContent>

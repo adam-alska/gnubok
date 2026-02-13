@@ -102,12 +102,7 @@ export function DeadlineForm({
         notes: formData.notes || null,
         is_completed: initialData?.is_completed || false,
         completed_at: initialData?.completed_at || null,
-        campaign_id: null,
-        deliverable_id: null,
         is_auto_generated: false,
-        date_calculation_type: null,
-        reference_event: null,
-        offset_days: null,
         // New tax deadline fields with defaults for user-created deadlines
         tax_deadline_type: null,
         tax_period: null,

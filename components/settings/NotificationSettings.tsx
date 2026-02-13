@@ -66,7 +66,6 @@ export function NotificationSettings({ onSettingsChange }: NotificationSettingsP
           user_id: user.id,
           tax_deadlines_enabled: true,
           invoice_reminders_enabled: true,
-          campaign_deadlines_enabled: true,
           push_enabled: true,
           email_enabled: true,
           quiet_start: '21:00',
@@ -290,22 +289,6 @@ export function NotificationSettings({ onSettingsChange }: NotificationSettingsP
             />
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="campaign-deadlines">Samarbetsdeadlines</Label>
-              <p className="text-sm text-muted-foreground">
-                Leveranser och andra samarbetsdatum
-              </p>
-            </div>
-            <Switch
-              id="campaign-deadlines"
-              checked={settings.campaign_deadlines_enabled}
-              onCheckedChange={(checked) =>
-                updateSetting('campaign_deadlines_enabled', checked)
-              }
-              disabled={isSaving}
-            />
-          </div>
         </CardContent>
       </Card>
 

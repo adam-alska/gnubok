@@ -132,33 +132,6 @@ export async function POST(
     ? (category || 'uncategorized')
     : 'private'
 
-  // Light mode: skip journal entry creation, just update category
-  if (entityType === 'light') {
-    const { error: updateError } = await supabase
-      .from('transactions')
-      .update({
-        is_business,
-        category: finalCategory,
-      })
-      .eq('id', id)
-
-    if (updateError) {
-      console.error('Failed to update transaction:', updateError)
-      return NextResponse.json(
-        { error: 'Failed to update transaction' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({
-      success: true,
-      journal_entry_created: false,
-      journal_entry_id: null,
-      journal_entry_error: null,
-      category: finalCategory,
-    })
-  }
-
   // Build mapping result from category
   const mappingResult = buildMappingResultFromCategory(
     finalCategory,

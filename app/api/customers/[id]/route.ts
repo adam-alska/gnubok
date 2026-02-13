@@ -31,18 +31,10 @@ export async function GET(
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Fetch related campaigns
-  const { data: campaigns } = await supabase
-    .from('campaigns')
-    .select('id, name, status, total_value, currency, publication_date, brand_name')
-    .eq('customer_id', id)
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-
   // Fetch related invoices
   const { data: invoices } = await supabase
     .from('invoices')
-    .select('id, invoice_number, invoice_date, due_date, status, total, currency, payment_status')
+    .select('id, invoice_number, invoice_date, due_date, status, total, currency')
     .eq('customer_id', id)
     .eq('user_id', user.id)
     .order('invoice_date', { ascending: false })
@@ -50,7 +42,6 @@ export async function GET(
   return NextResponse.json({
     data: {
       ...data,
-      campaigns: campaigns || [],
       invoices: invoices || [],
     },
   })

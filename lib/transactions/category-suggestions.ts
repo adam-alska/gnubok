@@ -13,8 +13,6 @@ export interface SuggestedCategory {
 const CATEGORY_LABELS: Record<string, string> = {
   income_services: 'Tjänster',
   income_products: 'Produkter',
-  income_sponsorship: 'Sponsring',
-  income_affiliate: 'Affiliate',
   income_other: 'Övriga intäkter',
   expense_equipment: 'Utrustning',
   expense_software: 'Programvara',

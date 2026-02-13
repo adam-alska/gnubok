@@ -81,7 +81,6 @@ export async function POST(request: Request) {
         user_id: user.id,
         tax_deadlines_enabled: true,
         invoice_reminders_enabled: true,
-        campaign_deadlines_enabled: true,
         push_enabled: true,
         email_enabled: true,
         quiet_start: '21:00',

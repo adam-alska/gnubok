@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, ArrowRight, Building2, User, Users, Check } from 'lucide-react'
+import { Loader2, ArrowRight, Building2, User, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { EntityType } from '@/types'
 
@@ -32,12 +32,6 @@ const entityOptions: {
     label: 'Aktiebolag',
     description: 'Du har ett registrerat AB med organisationsnummer',
     icon: Building2,
-  },
-  {
-    value: 'light',
-    label: 'Egenanställd',
-    description: 'Du arbetar via egenanställningsföretag som Frilans Finans, Cool Company eller Gigapay',
-    icon: Users,
   },
 ]
 

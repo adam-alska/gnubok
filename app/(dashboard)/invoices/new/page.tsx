@@ -48,7 +48,6 @@ export default function NewInvoicePage() {
   const { toast } = useToast()
   const supabase = createClient()
   const searchParams = useSearchParams()
-  const campaignId = searchParams.get('campaign_id')
   const preselectedCustomerId = searchParams.get('customer_id')
 
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -125,40 +124,6 @@ export default function NewInvoicePage() {
     }
     setIsLoading(false)
   }
-
-  useEffect(() => {
-    if (!campaignId || customers.length === 0) return
-
-    async function fetchCampaign() {
-      const response = await fetch(`/api/campaigns/${campaignId}`)
-      if (!response.ok) return
-      const { data: campaign } = await response.json()
-
-      if (campaign.customer_id) {
-        setValue('customer_id', campaign.customer_id)
-      } else if (preselectedCustomerId) {
-        setValue('customer_id', preselectedCustomerId)
-      }
-
-      if (campaign.currency) {
-        setValue('currency', campaign.currency)
-      }
-
-      if (campaign.total_value) {
-        setValue('items.0.description', campaign.name || '')
-        setValue('items.0.quantity', 1)
-        setValue('items.0.unit', 'st')
-        setValue('items.0.unit_price', campaign.total_value)
-      }
-
-      // Calculate due date from publication_date + payment_terms
-      const paymentTerms = campaign.payment_terms || 30
-      const baseDate = campaign.publication_date ? new Date(campaign.publication_date) : new Date()
-      setValue('due_date', format(addDays(baseDate, paymentTerms), 'yyyy-MM-dd'))
-    }
-
-    fetchCampaign()
-  }, [campaignId, customers, setValue])
 
   const subtotal = watchItems.reduce((sum, item) => {
     return sum + (item.quantity || 0) * (item.unit_price || 0)

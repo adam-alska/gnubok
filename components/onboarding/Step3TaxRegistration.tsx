@@ -159,7 +159,7 @@ export default function Step3TaxRegistration({
                     <div className="space-y-2">
                       <p className="font-medium">Behöver jag momsregistrera mig?</p>
                       <p>Ja, om din omsättning överstiger 80 000 kr per år. Med moms lägger du på 25% extra på dina fakturor, men får också dra av moms på dina inköp.</p>
-                      <p className="text-xs text-muted-foreground">Som influencer med sponsorintäkter är du troligen momsregistrerad.</p>
+                      <p className="text-xs text-muted-foreground">Om din omsättning överstiger 80 000 kr per år behöver du momsregistrera dig.</p>
                     </div>
                   }
                   side="right"

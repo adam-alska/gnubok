@@ -1,7 +1,7 @@
 {
-  "name": "Influencer Assistant",
-  "short_name": "InfluencerAI",
-  "description": "Ekonomihantering för svenska influencers",
+  "name": "ERP Base",
+  "short_name": "ERPBase",
+  "description": "Ekonomihantering",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

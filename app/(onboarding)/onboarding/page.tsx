@@ -14,21 +14,11 @@ import Step2CompanyDetails from '@/components/onboarding/Step2CompanyDetails'
 import Step3TaxRegistration from '@/components/onboarding/Step3TaxRegistration'
 import Step4PreliminaryTax from '@/components/onboarding/Step4PreliminaryTax'
 import Step6ConnectBank from '@/components/onboarding/Step6ConnectBank'
-import Step2LightPersonalInfo from '@/components/onboarding/Step2LightPersonalInfo'
-import Step3LightTaxProfile from '@/components/onboarding/Step3LightTaxProfile'
-
-const EF_AB_STEP_TITLES = [
+const STEP_TITLES = [
   'Verksamhetsform',
   'Företagsuppgifter',
   'Skatteregistrering',
   'F-skatt',
-  'Anslut bank',
-]
-
-const LIGHT_STEP_TITLES = [
-  'Verksamhetsform',
-  'Dina uppgifter',
-  'Skatteprofil',
   'Anslut bank',
 ]
 
@@ -51,9 +41,8 @@ function OnboardingPageContent() {
   const [currentStep, setCurrentStep] = useState(1)
   const [settings, setSettings] = useState<Partial<CompanySettings>>({})
 
-  const isLight = settings.entity_type === 'light'
-  const totalSteps = isLight ? 4 : 5
-  const stepTitles = isLight ? LIGHT_STEP_TITLES : EF_AB_STEP_TITLES
+  const totalSteps = 5
+  const stepTitles = STEP_TITLES
 
   // Load existing settings on mount
   useEffect(() => {
@@ -138,15 +127,12 @@ function OnboardingPageContent() {
   }
 
   const handleNext = async (stepData: Partial<CompanySettings>) => {
-    const entityType = stepData.entity_type || settings.entity_type
-    const isLightMode = entityType === 'light'
-    const stepsTotal = isLightMode ? 4 : 5
     const nextStep = currentStep + 1
     const success = await saveSettings(stepData, nextStep)
 
     if (success) {
-      // After step 1 (entity type selection): seed chart of accounts (skip for light)
-      if (currentStep === 1 && stepData.entity_type && stepData.entity_type !== 'light') {
+      // After step 1 (entity type selection): seed chart of accounts
+      if (currentStep === 1 && stepData.entity_type) {
         try {
           const { data: { user } } = await supabase.auth.getUser()
           if (user) {
@@ -160,8 +146,8 @@ function OnboardingPageContent() {
         }
       }
 
-      // After step 3 (tax registration for EF/AB): create initial fiscal period (skip for light)
-      if (currentStep === 3 && !isLightMode) {
+      // After step 3 (tax registration): create initial fiscal period
+      if (currentStep === 3) {
         try {
           const { data: { user } } = await supabase.auth.getUser()
           if (user) {
@@ -195,8 +181,8 @@ function OnboardingPageContent() {
         }
       }
 
-      if (nextStep > stepsTotal) {
-        await saveSettings({ onboarding_complete: true }, stepsTotal)
+      if (nextStep > totalSteps) {
+        await saveSettings({ onboarding_complete: true }, totalSteps)
         router.push('/')
       } else {
         setCurrentStep(nextStep)
@@ -241,78 +227,7 @@ function OnboardingPageContent() {
 
   const progressPercent = ((currentStep - 1) / (totalSteps - 1)) * 100
 
-  // Render light mode steps
-  const renderLightSteps = () => (
-    <>
-      {currentStep === 1 && (
-        <Step1EntityType
-          initialData={{ entity_type: settings.entity_type as EntityType }}
-          onNext={(data) => handleNext(data)}
-          isSaving={isSaving}
-        />
-      )}
-
-      {currentStep === 2 && (
-        <Step2LightPersonalInfo
-          initialData={{
-            company_name: settings.company_name ?? undefined,
-          }}
-          onNext={(data) => handleNext(data)}
-          onBack={handleBack}
-          isSaving={isSaving}
-        />
-      )}
-
-      {currentStep === 3 && (
-        <Step3LightTaxProfile
-          initialData={{
-            municipality_code: settings.municipality_code ?? undefined,
-            municipal_tax_rate: settings.municipal_tax_rate ?? undefined,
-            church_tax: settings.church_tax ?? undefined,
-            church_tax_rate: settings.church_tax_rate ?? undefined,
-            church_parish_code: settings.church_parish_code ?? undefined,
-            umbrella_provider: settings.umbrella_provider ?? undefined,
-            umbrella_fee_percent: settings.umbrella_fee_percent ?? undefined,
-            umbrella_pension_percent: settings.umbrella_pension_percent ?? undefined,
-            umbrella_fee_custom: settings.umbrella_fee_custom ?? undefined,
-          }}
-          onNext={(data) => handleNext(data as Partial<CompanySettings>)}
-          onBack={handleBack}
-          isSaving={isSaving}
-        />
-      )}
-
-      {currentStep === 4 && (
-        <Step6ConnectBank
-          initialData={{
-            bank_name: settings.bank_name ?? undefined,
-            clearing_number: settings.clearing_number ?? undefined,
-            account_number: settings.account_number ?? undefined,
-            iban: settings.iban ?? undefined,
-            bic: settings.bic ?? undefined,
-          }}
-          onComplete={async (data) => {
-            if (data) {
-              await saveSettings({ ...data, onboarding_complete: true })
-            } else {
-              await saveSettings({ onboarding_complete: true })
-            }
-            toast({
-              title: 'Välkommen!',
-              description: 'Din profil är nu redo.',
-            })
-            router.push('/')
-          }}
-          onBack={handleBack}
-          onSkip={handleComplete}
-          isSaving={isSaving}
-        />
-      )}
-    </>
-  )
-
-  // Render EF/AB mode steps
-  const renderEfAbSteps = () => (
+  const renderSteps = () => (
     <>
       {currentStep === 1 && (
         <Step1EntityType
@@ -413,7 +328,7 @@ function OnboardingPageContent() {
 
       {/* Content */}
       <div className="max-w-2xl mx-auto px-4 py-8">
-        {isLight ? renderLightSteps() : renderEfAbSteps()}
+        {renderSteps()}
       </div>
     </div>
   )

@@ -4,27 +4,23 @@
  */
 
 import { createEvents, type EventAttributes, type DateArray } from 'ics'
-import type { Deadline, Invoice, Campaign, Exclusivity } from '@/types'
+import type { Deadline, Invoice } from '@/types'
 
 export interface FeedOptions {
   includeTaxDeadlines: boolean
   includeInvoices: boolean
-  includeCampaigns: boolean
-  includeExclusivity: boolean
 }
 
 export interface CalendarData {
   deadlines: Deadline[]
   invoices: Invoice[]
-  campaigns: Campaign[]
-  exclusivities: Exclusivity[]
 }
 
 /**
  * Generate a stable UID for calendar events
  * This ensures updates to events are recognized by calendar apps
  */
-function getEventUID(type: string, id: string, domain: string = 'influencer-biz.se'): string {
+function getEventUID(type: string, id: string, domain: string = 'erp-base.se'): string {
   return `${type}-${id}@${domain}`
 }
 
@@ -140,94 +136,6 @@ function formatInvoiceDescription(invoice: Invoice): string {
 }
 
 /**
- * Generate campaign deliverable events
- */
-function generateCampaignEvents(campaigns: Campaign[]): EventAttributes[] {
-  const events: EventAttributes[] = []
-
-  for (const campaign of campaigns) {
-    // Add deliverable deadlines
-    for (const deliverable of campaign.deliverables || []) {
-      if (!deliverable.due_date) continue
-
-      const event: EventAttributes = {
-        uid: getEventUID('deliverable', deliverable.id),
-        title: `${campaign.name} - ${deliverable.title}`,
-        start: dateToArray(deliverable.due_date),
-        duration: { days: 1 },
-        description: formatDeliverableDescription(campaign, deliverable),
-        categories: ['Kampanj', 'Leverans'],
-        status: deliverable.status === 'published' ? 'CONFIRMED' : 'TENTATIVE',
-        alarms: createAlarms([1]),
-      }
-
-      events.push(event)
-    }
-  }
-
-  return events
-}
-
-/**
- * Format deliverable description for calendar
- */
-function formatDeliverableDescription(
-  campaign: Campaign,
-  deliverable: { title: string; platform: string; description?: string | null }
-): string {
-  const lines: string[] = []
-
-  lines.push(`Kampanj: ${campaign.name}`)
-  lines.push(`Plattform: ${deliverable.platform}`)
-  if (deliverable.description) {
-    lines.push(`\n${deliverable.description}`)
-  }
-
-  return lines.join('\n')
-}
-
-/**
- * Generate exclusivity period events (as all-day spans)
- */
-function generateExclusivityEvents(exclusivities: Exclusivity[]): EventAttributes[] {
-  return exclusivities.map((exclusivity) => {
-    const campaignName = exclusivity.campaign?.name || 'Kampanj'
-
-    const event: EventAttributes = {
-      uid: getEventUID('exclusivity', exclusivity.id),
-      title: `Exklusivitet: ${campaignName}`,
-      start: dateToArray(exclusivity.start_date),
-      end: dateToArray(exclusivity.end_date),
-      description: formatExclusivityDescription(exclusivity),
-      categories: ['Exklusivitet'],
-      status: 'CONFIRMED',
-      // No alarms for exclusivity periods
-    }
-
-    return event
-  })
-}
-
-/**
- * Format exclusivity description for calendar
- */
-function formatExclusivityDescription(exclusivity: Exclusivity): string {
-  const lines: string[] = []
-
-  if (exclusivity.categories.length > 0) {
-    lines.push(`Kategorier: ${exclusivity.categories.join(', ')}`)
-  }
-  if (exclusivity.excluded_brands.length > 0) {
-    lines.push(`Uteslutna varumärken: ${exclusivity.excluded_brands.join(', ')}`)
-  }
-  if (exclusivity.notes) {
-    lines.push(`\n${exclusivity.notes}`)
-  }
-
-  return lines.join('\n')
-}
-
-/**
  * Generate complete calendar feed
  */
 export function generateCalendarFeed(
@@ -239,23 +147,14 @@ export function generateCalendarFeed(
   if (options.includeTaxDeadlines) {
     const taxDeadlines = data.deadlines.filter((d) => d.deadline_type === 'tax')
     events.push(...generateDeadlineEvents(taxDeadlines))
-  }
 
-  if (options.includeCampaigns) {
-    // Include non-tax deadlines related to campaigns
-    const campaignDeadlines = data.deadlines.filter(
-      (d) => d.deadline_type !== 'tax' && (d.campaign_id || d.deliverable_id)
-    )
-    events.push(...generateDeadlineEvents(campaignDeadlines))
-    events.push(...generateCampaignEvents(data.campaigns))
+    // Include non-tax deadlines too
+    const otherDeadlines = data.deadlines.filter((d) => d.deadline_type !== 'tax')
+    events.push(...generateDeadlineEvents(otherDeadlines))
   }
 
   if (options.includeInvoices) {
     events.push(...generateInvoiceEvents(data.invoices))
-  }
-
-  if (options.includeExclusivity) {
-    events.push(...generateExclusivityEvents(data.exclusivities))
   }
 
   return new Promise((resolve, reject) => {

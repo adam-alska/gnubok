@@ -39,8 +39,6 @@ const expenseCategories: { value: TransactionCategory; label: string }[] = [
 
 const incomeCategories: { value: TransactionCategory; label: string }[] = [
   { value: 'income_services', label: 'Tjänster' },
-  { value: 'income_sponsorship', label: 'Sponsring' },
-  { value: 'income_affiliate', label: 'Affiliate' },
   { value: 'income_products', label: 'Produkter' },
   { value: 'income_other', label: 'Övrigt' },
 ]

@@ -2,7 +2,7 @@ import { Resend } from 'resend'
 
 // Default sender configuration
 // Using a fixed From address with dynamic Reply-To
-// From: "Företagsnamn via Influencer Biz" <fakturor@influencer-biz.se>
+// From: "Företagsnamn via ERP Base" <fakturor@erp-base.se>
 // Reply-To: user's company email from company_settings
 const DEFAULT_FROM_EMAIL = 'fakturor@arcim.io'
 
@@ -66,8 +66,8 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
 
   // Construct from address with optional name
   const from = fromName
-    ? `${fromName} via Influencer Biz <${DEFAULT_FROM_EMAIL}>`
-    : `Influencer Biz <${DEFAULT_FROM_EMAIL}>`
+    ? `${fromName} via ERP Base <${DEFAULT_FROM_EMAIL}>`
+    : `ERP Base <${DEFAULT_FROM_EMAIL}>`
 
   try {
     const resend = getResendClient()

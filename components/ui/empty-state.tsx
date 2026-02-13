@@ -9,8 +9,6 @@ import {
   Users,
   ArrowLeftRight,
   Camera,
-  Gift,
-  Megaphone,
   Building2,
   FileText,
   Calendar,
@@ -139,32 +137,6 @@ export function EmptyReceipts() {
       description="Ta en bild på ett kvitto för automatisk avläsning och kategorisering. Vi sköter resten!"
       actionLabel="Skanna kvitto"
       actionHref="/receipts/scan"
-    />
-  )
-}
-
-export function EmptyGifts() {
-  return (
-    <EmptyState
-      icon={Gift}
-      title="Inga gåvor registrerade"
-      description="Fått produkter från varumärken? Registrera dem här för korrekt skattehantering."
-      actionLabel="Registrera gåva"
-      actionHref="/gifts/new"
-    />
-  )
-}
-
-export function EmptyCampaigns() {
-  return (
-    <EmptyState
-      icon={Megaphone}
-      title="Inga samarbeten"
-      description="Skapa samarbeten för att hålla koll på innehåll, deadlines och fakturering."
-      actionLabel="Skapa samarbete"
-      actionHref="/campaigns/new"
-      secondaryActionLabel="Importera avtal"
-      secondaryActionHref="/campaigns/import"
     />
   )
 }

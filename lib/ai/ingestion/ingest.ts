@@ -1,7 +1,7 @@
 /**
  * Knowledge Base Ingestion Script
  *
- * Loads markdown files from dev_docs/influencer_ai_info/,
+ * Loads markdown files from dev_docs/ai_knowledge_base/,
  * chunks them by sections, generates embeddings, and stores in Supabase.
  *
  * Run with: npx tsx lib/ai/ingestion/ingest.ts
@@ -17,7 +17,7 @@ import * as path from 'path'
 import * as crypto from 'crypto'
 
 // Configuration
-const DOCS_DIR = path.join(process.cwd(), 'dev_docs', 'influencer_ai_info')
+const DOCS_DIR = path.join(process.cwd(), 'dev_docs', 'ai_knowledge_base')
 const CHUNK_SIZE = 1000
 const CHUNK_OVERLAP = 200
 const EMBEDDING_MODEL = 'text-embedding-ada-002'

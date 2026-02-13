@@ -14,8 +14,6 @@ import {
 import { getSchablonavdragSummary } from '@/lib/tax/schablonavdrag'
 import FSkattWarningCard from '@/components/dashboard/FSkattWarningCard'
 import { UpcomingDeadlinesWidget } from '@/components/calendar/UpcomingDeadlinesWidget'
-import { CampaignsWidget } from '@/components/campaigns/CampaignsWidget'
-import { TikTokStatsWidget } from '@/components/tiktok'
 import NewUserChecklist from '@/components/onboarding/NewUserChecklist'
 import {
   TrendingUp,
@@ -23,15 +21,13 @@ import {
   Receipt,
   ArrowLeftRight,
   ChevronDown,
-  Gift,
   ArrowRight,
-  Megaphone,
   Camera,
   HelpCircle,
   Users,
   FileText,
 } from 'lucide-react'
-import type { CompanySettings, EntityType, MileageEntry, SchablonavdragSettings, GiftSummary, Deadline, Campaign, TikTokStatsSummary, ReceiptQueueSummary, OnboardingProgress } from '@/types'
+import type { CompanySettings, EntityType, MileageEntry, SchablonavdragSettings, Deadline, ReceiptQueueSummary, OnboardingProgress } from '@/types'
 
 interface DashboardContentProps {
   firstName?: string | null
@@ -48,55 +44,14 @@ interface DashboardContentProps {
     overdueInvoicesCount: number
     bankBalance: number | null
     mileageEntries: MileageEntry[]
-    giftSummary: GiftSummary | null
     deadlines: Deadline[]
-    campaigns: Campaign[]
     receiptQueue: ReceiptQueueSummary | null
   }
   onboardingProgress?: OnboardingProgress
 }
 
 export default function DashboardContent({ firstName, settings, summary, onboardingProgress }: DashboardContentProps) {
-  const [tiktokStats, setTiktokStats] = useState<TikTokStatsSummary | null>(null)
-  const [isTiktokSyncing, setIsTiktokSyncing] = useState(false)
   const [showAllAlerts, setShowAllAlerts] = useState(false)
-
-  useEffect(() => {
-    fetchTikTokStats()
-  }, [])
-
-  const fetchTikTokStats = async () => {
-    try {
-      const response = await fetch('/api/tiktok/stats')
-      const data = await response.json()
-      if (data.summary) {
-        setTiktokStats(data.summary)
-      }
-    } catch (error) {
-      // TikTok not connected or error - that's fine
-    }
-  }
-
-  const handleTikTokSync = async () => {
-    setIsTiktokSyncing(true)
-    try {
-      const accountsResponse = await fetch('/api/tiktok/accounts')
-      const accountsData = await accountsResponse.json()
-      const activeAccount = accountsData.accounts?.find((a: { status: string }) => a.status === 'active')
-
-      if (activeAccount) {
-        await fetch('/api/tiktok/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ account_id: activeAccount.id, sync_type: 'full' }),
-        })
-        await fetchTikTokStats()
-      }
-    } catch (error) {
-      console.error('TikTok sync failed:', error)
-    }
-    setIsTiktokSyncing(false)
-  }
 
   const entityType = (settings?.entity_type as EntityType) || 'enskild_firma'
   const preliminaryTaxMonthly = settings?.preliminary_tax_monthly || 0
@@ -111,11 +66,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
     currentMonth
   )
 
-  const giftTaxableValue = summary.giftSummary?.taxable_value || 0
-  const giftDeductibleValue = summary.giftSummary?.deductible_value || 0
-  const netGiftTaxableIncome = giftTaxableValue - giftDeductibleValue
-
-  const totalTaxableIncome = summary.ytd.net + netGiftTaxableIncome
+  const totalTaxableIncome = summary.ytd.net
 
   const taxEstimate =
     entityType === 'enskild_firma'
@@ -242,36 +193,6 @@ export default function DashboardContent({ firstName, settings, summary, onboard
     )
   }
 
-  if (summary.giftSummary && summary.giftSummary.total_count > 0) {
-    alertItems.push(
-      <Link key="gifts" href="/gifts" className="group">
-        <Card className="h-full border-l-4 border-l-accent hover:border-primary/30 transition-colors">
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-accent/10">
-                  <Gift className="h-4 w-4 text-accent" />
-                </div>
-                <div>
-                  <p className="font-medium text-sm">Gåvor & Förmåner</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    {summary.giftSummary.total_count} produkter
-                  </p>
-                  {summary.giftSummary.taxable_count > 0 && (
-                    <Badge variant="destructive" className="mt-1.5">
-                      {formatCurrency(summary.giftSummary.taxable_value)} skattepliktig
-                    </Badge>
-                  )}
-                </div>
-              </div>
-              <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all" />
-            </div>
-          </CardContent>
-        </Card>
-      </Link>
-    )
-  }
-
   const MAX_VISIBLE_ALERTS = 3
   const visibleAlerts = showAllAlerts ? alertItems : alertItems.slice(0, MAX_VISIBLE_ALERTS)
   const hasMoreAlerts = alertItems.length > MAX_VISIBLE_ALERTS
@@ -280,7 +201,6 @@ export default function DashboardContent({ firstName, settings, summary, onboard
   const quickActions = [
     { href: '/invoices/new', icon: Receipt, label: 'Ny faktura', desc: 'Skapa och skicka', accent: true },
     { href: '/receipts/scan', icon: Camera, label: 'Skanna kvitto', desc: 'Fotografera & spara' },
-    { href: '/campaigns/new', icon: Megaphone, label: 'Nytt samarbete', desc: 'Spåra innehåll' },
     { href: '/customers', icon: Users, label: 'Ny kund', desc: 'Lägg till kunduppgifter' },
     { href: '/transactions', icon: ArrowLeftRight, label: 'Transaktioner', desc: 'Kategorisera' },
   ]
@@ -403,24 +323,6 @@ export default function DashboardContent({ firstName, settings, summary, onboard
           onAdjustClick={() => { window.location.href = '/settings' }}
         />
       </section>
-
-      {/* TikTok stats widget */}
-      {tiktokStats && (
-        <section className="mb-8">
-          <TikTokStatsWidget
-            stats={tiktokStats}
-            onSync={handleTikTokSync}
-            isSyncing={isTiktokSyncing}
-          />
-        </section>
-      )}
-
-      {/* Active campaigns */}
-      {summary.campaigns && summary.campaigns.length > 0 && (
-        <section className="mb-8">
-          <CampaignsWidget campaigns={summary.campaigns} />
-        </section>
-      )}
 
       {/* Alerts section - with urgency indicators and limit */}
       {alertItems.length > 0 && (

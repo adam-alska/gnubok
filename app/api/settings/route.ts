@@ -53,8 +53,8 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Check if tax-relevant fields changed and regenerate deadlines (skip for light mode)
-  if (data.entity_type !== 'light' && oldSettings && didTaxFieldsChange(oldSettings, data)) {
+  // Check if tax-relevant fields changed and regenerate deadlines
+  if (oldSettings && didTaxFieldsChange(oldSettings, data)) {
     try {
       await regenerateTaxDeadlinesForUser(supabase, user.id, {
         entity_type: data.entity_type,

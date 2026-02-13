@@ -16,18 +16,14 @@ import {
   Settings,
   LogOut,
   Calculator,
-  Gift,
   Upload,
   Calendar,
-  Megaphone,
-  FileUp,
   Camera,
   Menu,
   X,
   HelpCircle,
   ChevronDown,
   ChevronUp,
-  Wallet,
 } from 'lucide-react'
 import type { EntityType } from '@/types'
 
@@ -48,19 +44,14 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/', label: 'Översikt', icon: LayoutDashboard, group: 'main' },
   { href: '/calendar', label: 'Kalender', icon: Calendar, group: 'main' },
-  { href: '/campaigns', label: 'Samarbeten', icon: Megaphone, group: 'main' },
-  { href: '/campaigns/import', label: 'Importera avtal', icon: FileUp, group: 'main' },
-  { href: '/analytics', label: 'Analytics', icon: BarChart3, group: 'main' },
-  { href: '/shadow-ledger', label: 'Utbetalningar', icon: Wallet, group: 'finans', modes: ['light'] },
-  { href: '/invoices', label: 'Fakturor', icon: Receipt, group: 'finans', modes: ['enskild_firma', 'aktiebolag'] },
-  { href: '/customers', label: 'Kunder', icon: Users, group: 'finans', modes: ['enskild_firma', 'aktiebolag'] },
+  { href: '/invoices', label: 'Fakturor', icon: Receipt, group: 'finans' },
+  { href: '/customers', label: 'Kunder', icon: Users, group: 'finans' },
   { href: '/transactions', label: 'Transaktioner', icon: ArrowLeftRight, group: 'finans' },
   { href: '/receipts', label: 'Kvitton', icon: Camera, group: 'finans' },
-  { href: '/gifts', label: 'Gåvor', icon: Gift, group: 'finans' },
-  { href: '/deductions', label: 'Avdrag', icon: Calculator, group: 'finans', modes: ['enskild_firma', 'aktiebolag'] },
-  { href: '/bookkeeping', label: 'Bokföring', icon: BookOpen, group: 'finans', modes: ['enskild_firma', 'aktiebolag'] },
-  { href: '/import', label: 'Importera', icon: Upload, group: 'övrigt', modes: ['enskild_firma', 'aktiebolag'] },
-  { href: '/reports', label: 'Rapporter', icon: BarChart3, group: 'övrigt', modes: ['enskild_firma', 'aktiebolag'] },
+  { href: '/deductions', label: 'Avdrag', icon: Calculator, group: 'finans' },
+  { href: '/bookkeeping', label: 'Bokföring', icon: BookOpen, group: 'finans' },
+  { href: '/import', label: 'Importera', icon: Upload, group: 'övrigt' },
+  { href: '/reports', label: 'Rapporter', icon: BarChart3, group: 'övrigt' },
   { href: '/help', label: 'Hjälp', icon: HelpCircle, group: 'övrigt' },
   { href: '/settings', label: 'Inställningar', icon: Settings, group: 'övrigt' },
 ]
@@ -101,20 +92,12 @@ export default function DashboardNav({ companyName, entityType }: DashboardNavPr
   const finansItems = filteredItems.filter(i => i.group === 'finans')
   const övrigtItems = filteredItems.filter(i => i.group === 'övrigt')
 
-  // Mobile nav items - light mode shows Utbetalningar instead of Fakturor
-  const mobileNavItems = entityType === 'light'
-    ? [
-        { href: '/', label: 'Översikt', icon: LayoutDashboard },
-        { href: '/campaigns', label: 'Samarbeten', icon: Megaphone },
-        { href: '/receipts/scan', label: 'Skanna', icon: Camera, isScan: true },
-        { href: '/shadow-ledger', label: 'Utbetalningar', icon: Wallet },
-      ]
-    : [
-        { href: '/', label: 'Översikt', icon: LayoutDashboard },
-        { href: '/campaigns', label: 'Samarbeten', icon: Megaphone },
-        { href: '/receipts/scan', label: 'Skanna', icon: Camera, isScan: true },
-        { href: '/invoices', label: 'Fakturor', icon: Receipt },
-      ]
+  const mobileNavItems = [
+    { href: '/', label: 'Översikt', icon: LayoutDashboard },
+    { href: '/invoices', label: 'Fakturor', icon: Receipt },
+    { href: '/receipts/scan', label: 'Skanna', icon: Camera, isScan: true },
+    { href: '/transactions', label: 'Transaktioner', icon: ArrowLeftRight },
+  ]
 
   return (
     <>
@@ -128,7 +111,7 @@ export default function DashboardNav({ companyName, entityType }: DashboardNavPr
                 {companyName}
               </h1>
               <p className="text-xs text-muted-foreground mt-0.5 tracking-wide uppercase">
-                {entityType === 'light' ? 'Egenanställd' : 'Ekonomi'}
+                Ekonomi
               </p>
             </div>
 

@@ -3,12 +3,9 @@ import type {
   NEDeclaration,
   NEDeclarationRutor,
   NEAccountMapping,
-  NEGiftBreakdown,
-  NEGiftItem,
   FiscalPeriod,
   JournalEntry,
   JournalEntryLine,
-  Gift,
 } from '@/types'
 
 /**
@@ -295,67 +292,6 @@ export async function generateNEDeclaration(
   rutor.R11 = totalRevenue - totalExpenses
   breakdown.R11.total = rutor.R11
 
-  // Fetch gifts for the period
-  const { data: gifts } = await supabase
-    .from('gifts')
-    .select('*')
-    .eq('user_id', userId)
-    .gte('date', period.period_start)
-    .lte('date', period.period_end)
-
-  // Build gift breakdown
-  let giftBreakdown: NEGiftBreakdown | undefined
-  if (gifts && gifts.length > 0) {
-    const giftItems: NEGiftItem[] = []
-    let r1Total = 0
-    let r2Total = 0
-    let r6Total = 0
-
-    for (const gift of gifts as Gift[]) {
-      const classification = gift.classification
-      if (!classification || !classification.taxable) continue
-
-      const item: NEGiftItem = {
-        id: gift.id,
-        date: gift.date,
-        brandName: gift.brand_name,
-        description: gift.description,
-        marketValue: gift.estimated_value,
-        vatLiable: classification.vatLiable,
-        vatAmount: classification.vatAmount,
-        deductibleAsExpense: classification.deductibleAsExpense,
-        neIncomeRuta: classification.neIncomeRuta,
-        neExpenseRuta: classification.neExpenseRuta,
-      }
-      giftItems.push(item)
-
-      // Accumulate totals based on NE ruta
-      if (classification.neIncomeRuta === 'R1') {
-        r1Total += classification.valueExclVat // Exkl moms för R1
-      } else if (classification.neIncomeRuta === 'R2') {
-        r2Total += gift.estimated_value
-      }
-
-      if (classification.neExpenseRuta === 'R6') {
-        r6Total += gift.estimated_value
-      }
-    }
-
-    if (giftItems.length > 0) {
-      giftBreakdown = {
-        gifts: giftItems,
-        summary: {
-          r1Total: roundToKrona(r1Total),
-          r2Total: roundToKrona(r2Total),
-          r6Total: roundToKrona(r6Total),
-          totalTaxable: roundToKrona(r1Total + r2Total),
-          totalDeductible: roundToKrona(r6Total),
-          netTaxableIncome: roundToKrona(r1Total + r2Total - r6Total),
-        },
-      }
-    }
-  }
-
   // Add warnings
   if (!(period as FiscalPeriod).is_closed) {
     warnings.push('Räkenskapsåret är inte stängt. Siffrorna kan ändras.')
@@ -363,19 +299,6 @@ export async function generateNEDeclaration(
 
   if (rutor.R11 === 0 && totalRevenue === 0) {
     warnings.push('Inga bokförda intäkter eller kostnader hittades för perioden.')
-  }
-
-  // Check for gifts without journal entries
-  if (giftBreakdown && giftBreakdown.gifts.length > 0) {
-    const giftsWithoutEntries = (gifts as Gift[]).filter(
-      (g) => g.classification?.taxable && !g.journal_entry_id
-    )
-    if (giftsWithoutEntries.length > 0) {
-      warnings.push(
-        `${giftsWithoutEntries.length} skattepliktiga gåvor saknar bokföringsverifikation. ` +
-        'Dessa bör bokföras för att inkluderas i NE-bilagan.'
-      )
-    }
   }
 
   return {
@@ -388,7 +311,6 @@ export async function generateNEDeclaration(
     },
     rutor,
     breakdown,
-    giftBreakdown,
     companyInfo: {
       companyName: settings?.company_name || 'Okänt företag',
       orgNumber: settings?.org_number || null,

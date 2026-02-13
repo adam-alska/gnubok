@@ -61,9 +61,9 @@ export async function GET(
   const endStr = endDate.toISOString().split('T')[0]
 
   // Fetch relevant data based on feed options
-  const [deadlinesResult, invoicesResult, campaignsResult, exclusivitiesResult] = await Promise.all([
+  const [deadlinesResult, invoicesResult] = await Promise.all([
     // Deadlines
-    (feed.include_tax_deadlines || feed.include_campaigns)
+    feed.include_tax_deadlines
       ? supabase
           .from('deadlines')
           .select('*')
@@ -83,25 +83,6 @@ export async function GET(
           .lte('due_date', endStr)
           .order('due_date')
       : { data: [] },
-
-    // Campaigns with deliverables
-    feed.include_campaigns
-      ? supabase
-          .from('campaigns')
-          .select('*, deliverables(*)')
-          .eq('user_id', feed.user_id)
-          .in('status', ['active', 'contracted', 'delivered'])
-      : { data: [] },
-
-    // Exclusivities
-    feed.include_exclusivity
-      ? supabase
-          .from('exclusivities')
-          .select('*, campaign:campaigns(name)')
-          .eq('user_id', feed.user_id)
-          .gte('end_date', startStr)
-          .lte('start_date', endStr)
-      : { data: [] },
   ])
 
   try {
@@ -109,21 +90,17 @@ export async function GET(
       {
         deadlines: deadlinesResult.data || [],
         invoices: invoicesResult.data || [],
-        campaigns: campaignsResult.data || [],
-        exclusivities: exclusivitiesResult.data || [],
       },
       {
         includeTaxDeadlines: feed.include_tax_deadlines,
         includeInvoices: feed.include_invoices,
-        includeCampaigns: feed.include_campaigns,
-        includeExclusivity: feed.include_exclusivity,
       }
     )
 
     return new NextResponse(icsContent, {
       headers: {
         'Content-Type': 'text/calendar; charset=utf-8',
-        'Content-Disposition': 'attachment; filename="influencer-biz.ics"',
+        'Content-Disposition': 'attachment; filename="erp-base.ics"',
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0',

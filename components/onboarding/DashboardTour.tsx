@@ -24,7 +24,7 @@ interface TourStep {
   position?: 'top' | 'bottom' | 'center'
 }
 
-const TOUR_COMPLETED_KEY = 'influencer_dashboard_tour_completed'
+const TOUR_COMPLETED_KEY = 'erp_dashboard_tour_completed'
 
 const tourSteps: TourStep[] = [
   {

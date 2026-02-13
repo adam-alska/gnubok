@@ -3,13 +3,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Flame, Receipt, CreditCard, Camera, Package, ArrowRight } from 'lucide-react'
+import { Flame, Receipt, CreditCard, Camera, ArrowRight } from 'lucide-react'
 import type { ReceiptQueueSummary } from '@/types'
 
 interface ReceiptDashboardProps {
   summary: ReceiptQueueSummary
   onScanReceipt: () => void
-  onRegisterProduct: () => void
   onViewReceiptQueue: () => void
   onViewTransactionQueue: () => void
 }
@@ -17,7 +16,6 @@ interface ReceiptDashboardProps {
 export default function ReceiptDashboard({
   summary,
   onScanReceipt,
-  onRegisterProduct,
   onViewReceiptQueue,
   onViewTransactionQueue,
 }: ReceiptDashboardProps) {
@@ -29,7 +27,7 @@ export default function ReceiptDashboard({
   return (
     <div className="space-y-4">
       {/* Quick actions */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3">
         <Button
           variant="default"
           className="h-auto py-4 flex-col gap-2"
@@ -37,14 +35,6 @@ export default function ReceiptDashboard({
         >
           <Camera className="h-6 w-6" />
           <span>Skanna kvitto</span>
-        </Button>
-        <Button
-          variant="outline"
-          className="h-auto py-4 flex-col gap-2"
-          onClick={onRegisterProduct}
-        >
-          <Package className="h-6 w-6" />
-          <span>Logga produkt</span>
         </Button>
       </div>
 

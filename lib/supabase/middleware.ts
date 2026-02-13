@@ -86,22 +86,13 @@ export async function updateSession(request: NextRequest) {
   // Dashboard routes - require completed onboarding
   const { data: settings } = await supabase
     .from('company_settings')
-    .select('onboarding_complete, entity_type')
+    .select('onboarding_complete')
     .eq('user_id', user.id)
     .single()
 
   // If no settings or onboarding not complete, redirect to onboarding
   if (!settings?.onboarding_complete) {
     return NextResponse.redirect(new URL('/onboarding', request.url))
-  }
-
-  // Block light users from EF/AB-only routes
-  if (settings.entity_type === 'light') {
-    const lightBlockedPaths = ['/invoices', '/customers', '/bookkeeping', '/import', '/reports', '/deductions']
-    const isBlocked = lightBlockedPaths.some(p => pathname.startsWith(p))
-    if (isBlocked) {
-      return NextResponse.redirect(new URL('/', request.url))
-    }
   }
 
   return supabaseResponse

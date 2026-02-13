@@ -1,16 +1,10 @@
 // Entity types
-export type EntityType = 'enskild_firma' | 'aktiebolag' | 'light'
-
-// Shadow Ledger types (Light mode)
-export type ShadowLedgerEntryType = 'payout' | 'gift' | 'expense' | 'hobby_income' | 'hobby_expense'
-export type ShadowLedgerSource = 'manual' | 'email_parser' | 'gigapay_sync' | 'bank_match'
+export type EntityType = 'enskild_firma' | 'aktiebolag'
 
 // Transaction categories
 export type TransactionCategory =
   | 'income_services'
   | 'income_products'
-  | 'income_sponsorship'
-  | 'income_affiliate'
   | 'income_other'
   | 'expense_equipment'
   | 'expense_software'
@@ -106,17 +100,6 @@ export interface CompanySettings {
   // Onboarding
   onboarding_step: number
   onboarding_complete: boolean
-
-  // Light mode fields
-  municipal_tax_rate: number | null
-  municipality_code: string | null
-  church_tax: boolean
-  church_tax_rate: number | null
-  church_parish_code: string | null
-  umbrella_provider: string | null
-  umbrella_fee_percent: number | null
-  umbrella_pension_percent: number | null
-  umbrella_fee_custom: boolean
 
   // Timestamps
   created_at: string
@@ -231,10 +214,6 @@ export interface Customer {
   // Payment
   default_payment_terms: number  // Days
 
-  // Campaign-related (new)
-  customer_category: CustomerCategory | null
-  average_payment_days: number | null
-
   // Notes
   notes: string | null
 
@@ -297,19 +276,12 @@ export interface Invoice {
   paid_at: string | null
   paid_amount: number | null
 
-  // Campaign linking (new)
-  campaign_id: string | null
-  payment_status: PaymentStatus | null
-  expected_payment_date: string | null
-  actual_payment_date: string | null
-
   created_at: string
   updated_at: string
 
   // Relations (populated when fetched)
   customer?: Customer
   items?: InvoiceItem[]
-  campaign?: Campaign
 }
 
 // Invoice Item
@@ -531,7 +503,6 @@ export type JournalEntrySourceType =
   | 'salary_payment'
   | 'opening_balance'
   | 'year_end'
-  | 'gift'
 
 // Journal entry status
 export type JournalEntryStatus = 'draft' | 'posted' | 'reversed'
@@ -880,550 +851,6 @@ export interface OnboardingStepData {
 }
 
 // ============================================================
-// Gift/Benefit Types (Förmånshantering)
-// ============================================================
-
-// Booking type determines how the gift affects bookkeeping
-export type GiftBookingType = 'income' | 'income_and_expense' | 'tax_free'
-
-// NE-bilaga ruta for income
-export type NEIncomeRuta = 'R1' | 'R2'
-
-// NE-bilaga ruta for expenses
-export type NEExpenseRuta = 'R6'
-
-// Classification result from the decision tree
-export interface GiftClassification {
-  taxable: boolean
-  marketValue: number
-  deductibleAsExpense: boolean
-  bookingType: GiftBookingType
-  reasoning: string
-  // VAT handling (moms)
-  vatLiable: boolean              // Ska moms redovisas? (bytestransaktion vid motprestation)
-  vatAmount: number               // Momsbelopp (25% av värde exkl moms)
-  valueExclVat: number            // Värde exkl moms (för bokföring)
-  // NE-bilaga mapping
-  neIncomeRuta: NEIncomeRuta | null   // R1 (momspliktig) eller R2 (momsfri)
-  neExpenseRuta: NEExpenseRuta | null // R6 om avdragsgill
-}
-
-// Input for classifying a gift
-export interface GiftInput {
-  estimatedValue: number
-  hasMotprestation: boolean  // Required post/video/mention?
-  usedInBusiness: boolean    // Used as props/equipment?
-  usedPrivately: boolean     // Personal use?
-  isSimplePromoItem: boolean // Pen, mug, basic merch?
-}
-
-// Gift record stored in database
-export interface Gift {
-  id: string
-  user_id: string
-  date: string
-  brand_name: string
-  description: string
-  estimated_value: number
-
-  // Decision tree inputs
-  has_motprestation: boolean
-  used_in_business: boolean
-  used_privately: boolean
-  is_simple_promo: boolean
-
-  // Classification result
-  classification: GiftClassification
-
-  // Bookkeeping link
-  journal_entry_id: string | null
-
-  // Light mode / extended fields
-  returned: boolean
-  campaign_id: string | null
-  image_url: string | null
-
-  created_at: string
-  updated_at: string
-}
-
-// Input for creating a gift
-export interface CreateGiftInput {
-  date: string
-  brand_name: string
-  description: string
-  estimated_value: number
-  has_motprestation: boolean
-  used_in_business: boolean
-  used_privately: boolean
-  is_simple_promo?: boolean
-}
-
-// Gift summary for a year (used in dashboard and reports)
-export interface GiftSummary {
-  year: number
-  total_count: number
-  total_value: number
-  taxable_count: number
-  taxable_value: number
-  tax_free_count: number
-  tax_free_value: number
-  deductible_count: number
-  deductible_value: number
-}
-
-// ============================================================
-// Shadow Ledger & Light Mode Types
-// ============================================================
-
-export interface ShadowLedgerEntry {
-  id: string
-  user_id: string
-  date: string
-  type: ShadowLedgerEntryType
-  source: ShadowLedgerSource
-  provider: string | null
-
-  // Gross-to-net breakdown
-  gross_amount: number
-  platform_fee: number
-  service_fee: number
-  pension_deduction: number
-  social_fees: number
-  income_tax_withheld: number
-  net_amount: number
-
-  // Currency
-  currency: string
-  amount_sek: number | null
-  exchange_rate: number | null
-
-  // Linking
-  description: string | null
-  bank_transaction_id: string | null
-  gift_id: string | null
-  campaign_id: string | null
-  metadata: Record<string, unknown>
-
-  // Virtual tax debt
-  virtual_tax_debt: number
-
-  created_at: string
-  updated_at: string
-}
-
-export interface CreateShadowLedgerEntryInput {
-  date: string
-  type: ShadowLedgerEntryType
-  source?: ShadowLedgerSource
-  provider?: string
-  gross_amount: number
-  platform_fee?: number
-  service_fee?: number
-  pension_deduction?: number
-  social_fees?: number
-  income_tax_withheld?: number
-  net_amount: number
-  currency?: string
-  description?: string
-  bank_transaction_id?: string
-  gift_id?: string
-  campaign_id?: string
-  metadata?: Record<string, unknown>
-}
-
-export interface ShadowLedgerSummary {
-  year: number
-  total_gross: number
-  total_net: number
-  total_fees: number
-  total_tax_withheld: number
-  total_pension: number
-  total_social_fees: number
-  total_platform_fees: number
-  virtual_tax_debt: number
-  entry_count: number
-  by_type: Record<ShadowLedgerEntryType, { count: number; gross: number; net: number }>
-}
-
-export interface LightTaxEstimate {
-  taxable_gift_value: number
-  municipal_tax_rate: number
-  church_tax_rate: number
-  gift_tax: number
-  hobby_tax: number
-  total_virtual_debt: number
-  safe_to_spend: number
-  safe_to_spend_percent: number
-  safe_to_spend_level: 'green' | 'yellow' | 'red'
-}
-
-export interface MunicipalityRate {
-  id: number
-  municipality_code: string
-  municipality_name: string
-  parish_code: string | null
-  parish_name: string | null
-  municipality_rate: number | null
-  county_rate: number | null
-  burial_fee: number | null
-  total_rate: number
-  church_rate: number | null
-  year: number
-}
-
-export interface UmbrellaProviderDefault {
-  id: string
-  display_name: string
-  default_fee_percent: number | null
-  pension_percent: number | null
-  pension_age_min: number | null
-  pension_age_max: number | null
-  notes: string | null
-}
-
-// ============================================================
-// Campaign & Contract Types
-// ============================================================
-
-// Campaign status
-export type CampaignStatus =
-  | 'negotiation'  // Under förhandling
-  | 'contracted'   // Avtal signerat, ej startat
-  | 'active'       // Pågående
-  | 'delivered'    // Alla leverabler klara
-  | 'invoiced'     // Faktura skickad
-  | 'completed'    // Avslutat och betalt
-  | 'cancelled'    // Avbrutet
-
-// Campaign type
-export type CampaignType =
-  | 'influencer'   // Standard influencer-kampanj
-  | 'ugc'          // Endast UGC-material
-  | 'ambassador'   // Långsiktigt ambassadörskap
-
-// Deliverable type
-export type DeliverableType =
-  | 'video'        // Video (YouTube, TikTok-video)
-  | 'image'        // Stillbild/foto
-  | 'story'        // Instagram/TikTok story
-  | 'reel'         // Instagram/TikTok reel
-  | 'post'         // Inlägg i flöde
-  | 'raw_material' // Råmaterial för varumärkets användning
-
-// Deliverable status
-export type DeliverableStatus =
-  | 'pending'      // Inte påbörjat
-  | 'in_progress'  // Under arbete
-  | 'submitted'    // Inskickat för granskning
-  | 'revision'     // Behöver ändringar
-  | 'approved'     // Godkänt av varumärke
-  | 'published'    // Publicerat/live
-
-// Platform type
-export type PlatformType =
-  | 'instagram'
-  | 'tiktok'
-  | 'youtube'
-  | 'blog'
-  | 'podcast'
-  | 'other'
-
-// Customer category (for campaigns)
-export type CustomerCategory = 'brand' | 'agency' | 'platform'
-
-// Payment status (for invoices)
-export type PaymentStatus = 'pending' | 'paid' | 'overdue' | 'partial'
-
-// Date calculation type (for relative dates)
-export type DateCalculationType = 'absolute' | 'relative'
-
-// Reference event for relative dates
-export type ReferenceEvent = 'publication' | 'delivery' | 'approval' | 'contract'
-
-// Billing frequency
-export type BillingFrequency = 'upfront' | 'on_delivery' | 'monthly' | 'split'
-
-// Contract extraction status
-export type ExtractionStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'skipped'
-
-// Campaign record
-export interface Campaign {
-  id: string
-  user_id: string
-  customer_id: string | null
-  end_customer_id: string | null
-
-  name: string
-  description: string | null
-  status: CampaignStatus
-  campaign_type: CampaignType
-
-  total_value: number | null
-  currency: string
-  vat_included: boolean
-  payment_terms: number | null
-  billing_frequency: BillingFrequency | null
-
-  start_date: string | null
-  end_date: string | null
-  publication_date: string | null
-  draft_deadline: string | null
-  brand_name: string | null
-  contract_signed_at: string | null
-
-  notes: string | null
-  created_at: string
-  updated_at: string
-
-  // Relations (populated when fetched)
-  customer?: Customer
-  end_customer?: Customer
-  deliverables?: Deliverable[]
-  exclusivities?: Exclusivity[]
-  contracts?: Contract[]
-  invoices?: Invoice[]
-  briefings?: Briefing[]
-}
-
-// Deliverable record
-export interface Deliverable {
-  id: string
-  campaign_id: string
-  user_id: string
-
-  title: string
-  deliverable_type: DeliverableType
-  platform: PlatformType
-  account_handle: string | null
-
-  quantity: number
-  description: string | null
-  specifications: Record<string, unknown>
-
-  due_date: string | null
-  status: DeliverableStatus
-  submitted_at: string | null
-  approved_at: string | null
-  published_at: string | null
-
-  notes: string | null
-  created_at: string
-  updated_at: string
-
-  // Relations
-  campaign?: Campaign
-}
-
-// Exclusivity record
-export interface Exclusivity {
-  id: string
-  campaign_id: string
-  user_id: string
-
-  categories: string[]
-  excluded_brands: string[]
-
-  start_date: string
-  end_date: string
-
-  start_calculation_type: DateCalculationType
-  end_calculation_type: DateCalculationType
-  start_reference: ReferenceEvent | null
-  end_reference: ReferenceEvent | null
-  start_offset_days: number | null
-  end_offset_days: number | null
-
-  notes: string | null
-  created_at: string
-  updated_at: string
-
-  // Relations
-  campaign?: Campaign
-}
-
-// Contract record
-export interface Contract {
-  id: string
-  campaign_id: string
-  user_id: string
-
-  filename: string
-  file_path: string
-  file_size: number | null
-  mime_type: string | null
-
-  extracted_data: Record<string, unknown>
-  extraction_status: ExtractionStatus
-
-  signing_date: string | null
-  is_primary: boolean
-
-  notes: string | null
-  uploaded_at: string
-  created_at: string
-  updated_at: string
-
-  // Relations
-  campaign?: Campaign
-}
-
-// Input types for creating campaigns
-export interface CreateCampaignInput {
-  customer_id?: string
-  end_customer_id?: string
-  name: string
-  description?: string
-  campaign_type?: CampaignType
-  total_value?: number
-  currency?: string
-  vat_included?: boolean
-  payment_terms?: number
-  billing_frequency?: BillingFrequency
-  start_date?: string
-  end_date?: string
-  publication_date?: string
-  draft_deadline?: string
-  brand_name?: string
-  notes?: string
-}
-
-// Input types for creating deliverables
-export interface CreateDeliverableInput {
-  campaign_id: string
-  title: string
-  deliverable_type: DeliverableType
-  platform: PlatformType
-  account_handle?: string
-  quantity?: number
-  description?: string
-  specifications?: Record<string, unknown>
-  due_date?: string
-  notes?: string
-}
-
-// Input types for creating exclusivities
-export interface CreateExclusivityInput {
-  campaign_id: string
-  categories: string[]
-  excluded_brands?: string[]
-  start_date: string
-  end_date: string
-  start_calculation_type?: DateCalculationType
-  end_calculation_type?: DateCalculationType
-  start_reference?: ReferenceEvent
-  end_reference?: ReferenceEvent
-  start_offset_days?: number
-  end_offset_days?: number
-  notes?: string
-}
-
-// Input types for uploading contracts
-export interface CreateContractInput {
-  campaign_id: string
-  filename: string
-  file_path: string
-  file_size?: number
-  mime_type?: string
-  signing_date?: string
-  is_primary?: boolean
-  notes?: string
-}
-
-// Exclusivity conflict detection
-export interface ExclusivityConflict {
-  existingExclusivity: Exclusivity
-  conflictingCampaign: Campaign
-  overlappingCategories: string[]
-  overlapStart: string
-  overlapEnd: string
-}
-
-// Workload analysis
-export interface WorkloadAnalysis {
-  date: string
-  deliverables: Deliverable[]
-  totalDeliverables: number
-  byPlatform: Record<PlatformType, number>
-  byType: Record<DeliverableType, number>
-  workloadLevel: 'light' | 'normal' | 'heavy' | 'overloaded'
-}
-
-// Campaign summary for dashboard
-export interface CampaignSummary {
-  totalCampaigns: number
-  activeCampaigns: number
-  totalValue: number
-  byStatus: Record<CampaignStatus, number>
-  upcomingDeliverables: Deliverable[]
-  activeExclusivities: Exclusivity[]
-}
-
-// Swedish labels for enums
-export const CAMPAIGN_STATUS_LABELS: Record<CampaignStatus, string> = {
-  negotiation: 'Förhandling',
-  contracted: 'Avtalat',
-  active: 'Pågående',
-  delivered: 'Levererat',
-  invoiced: 'Fakturerat',
-  completed: 'Avslutat',
-  cancelled: 'Avbrutet'
-}
-
-export const CAMPAIGN_TYPE_LABELS: Record<CampaignType, string> = {
-  influencer: 'Influencer-samarbete',
-  ugc: 'UGC',
-  ambassador: 'Ambassadör'
-}
-
-export const DELIVERABLE_TYPE_LABELS: Record<DeliverableType, string> = {
-  video: 'Video',
-  image: 'Bild',
-  story: 'Story',
-  reel: 'Reel',
-  post: 'Inlägg',
-  raw_material: 'Råmaterial'
-}
-
-export const DELIVERABLE_STATUS_LABELS: Record<DeliverableStatus, string> = {
-  pending: 'Väntar',
-  in_progress: 'Pågår',
-  submitted: 'Inskickat',
-  revision: 'Revision',
-  approved: 'Godkänt',
-  published: 'Publicerat'
-}
-
-export const PLATFORM_LABELS: Record<PlatformType, string> = {
-  instagram: 'Instagram',
-  tiktok: 'TikTok',
-  youtube: 'YouTube',
-  blog: 'Blogg',
-  podcast: 'Podcast',
-  other: 'Övrigt'
-}
-
-export const CUSTOMER_CATEGORY_LABELS: Record<CustomerCategory, string> = {
-  brand: 'Varumärke',
-  agency: 'Byrå',
-  platform: 'Plattform'
-}
-
-export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
-  pending: 'Väntar',
-  paid: 'Betald',
-  overdue: 'Försenad',
-  partial: 'Delbetalad'
-}
-
-export const BILLING_FREQUENCY_LABELS: Record<BillingFrequency, string> = {
-  upfront: 'I förskott',
-  on_delivery: 'Vid leverans',
-  monthly: 'Månadsvis',
-  split: 'Delbetalning'
-}
-
-// ============================================================
 // Calendar & Deadline Types
 // ============================================================
 
@@ -1463,11 +890,11 @@ export type DeadlineStatus =
 // Deadline source
 export type DeadlineSource = 'system' | 'user'
 
-// Deadline types (extended for campaigns and tax)
-export type DeadlineType = 'delivery' | 'approval' | 'invoicing' | 'report' | 'revision' | 'assets' | 'spark_ad' | 'statistics' | 'tax' | 'other'
+// Deadline types
+export type DeadlineType = 'delivery' | 'invoicing' | 'report' | 'tax' | 'other'
 export type DeadlinePriority = 'critical' | 'important' | 'normal'
 
-// Deadline record (extended for campaigns and tax)
+// Deadline record
 export interface Deadline {
   id: string
   user_id: string
@@ -1479,12 +906,7 @@ export interface Deadline {
   is_completed: boolean
   completed_at: string | null
   customer_id: string | null
-  campaign_id: string | null
-  deliverable_id: string | null
   is_auto_generated: boolean
-  date_calculation_type: DateCalculationType | null
-  reference_event: ReferenceEvent | null
-  offset_days: number | null
   notes: string | null
   created_at: string
   updated_at: string
@@ -1501,8 +923,6 @@ export interface Deadline {
 
   // Relations
   customer?: Customer
-  campaign?: Campaign
-  deliverable?: Deliverable
 }
 
 // Input for creating a deadline
@@ -1545,7 +965,6 @@ export interface NotificationSettings {
   user_id: string
   tax_deadlines_enabled: boolean
   invoice_reminders_enabled: boolean
-  campaign_deadlines_enabled: boolean
   quiet_start: string // time format "HH:MM"
   quiet_end: string   // time format "HH:MM"
   email_enabled: boolean
@@ -1555,7 +974,7 @@ export interface NotificationSettings {
 }
 
 // Notification type for logging
-export type NotificationType = 'tax_deadline' | 'invoice_due' | 'invoice_overdue' | 'campaign_deadline'
+export type NotificationType = 'tax_deadline' | 'invoice_due' | 'invoice_overdue'
 
 // Notification log entry
 export interface NotificationLog {
@@ -1580,8 +999,6 @@ export interface CalendarFeed {
   is_active: boolean
   include_tax_deadlines: boolean
   include_invoices: boolean
-  include_campaigns: boolean
-  include_exclusivity: boolean
   last_accessed_at: string | null
   access_count: number
   created_at: string
@@ -1592,8 +1009,6 @@ export interface CalendarFeed {
 export interface UpdateCalendarFeedInput {
   include_tax_deadlines?: boolean
   include_invoices?: boolean
-  include_campaigns?: boolean
-  include_exclusivity?: boolean
 }
 
 // Swedish labels for deadline status
@@ -1661,377 +1076,6 @@ export interface SIEAccountMapping {
   match_type: 'exact' | 'name' | 'class' | 'manual'
   created_at: string
   updated_at: string
-}
-
-// ============================================================
-// Contract Extraction Types (AI-driven)
-// ============================================================
-
-// Confidence level for extracted fields
-export type ConfidenceLevel = 'high' | 'medium' | 'low' | 'missing'
-
-// Extracted party (brand or agency) from contract
-export interface ExtractedParty {
-  name: string
-  orgNumber: string | null
-  email: string | null
-  contactPerson: string | null
-}
-
-// Extracted deliverable from contract
-export interface ExtractedDeliverable {
-  type: DeliverableType
-  quantity: number
-  platform: PlatformType | null
-  account: string | null
-  dueDate: string | null
-  description: string | null
-}
-
-// Extracted deadline from contract
-export interface ExtractedDeadline {
-  description: string
-  type: DeadlineType
-  absoluteDate: string | null
-  isRelative: boolean
-  referenceEvent: ReferenceEvent | null
-  offsetDays: number | null
-}
-
-// Complete extraction result from AI analysis
-export interface ContractExtractionResult {
-  parties: {
-    brand: ExtractedParty | null
-    agency: ExtractedParty | null
-  }
-  financials: {
-    amount: number | null
-    currency: string
-    vatIncluded: boolean | null
-    paymentTerms: number | null
-    billingFrequency: BillingFrequency | null
-  }
-  deliverables: ExtractedDeliverable[]
-  period: {
-    startDate: string | null
-    endDate: string | null
-    publicationDate: string | null
-    draftDeadline: string | null
-  }
-  exclusivity: {
-    categories: string[]
-    excludedBrands: string[]
-    prePeriodDays: number | null
-    postPeriodDays: number | null
-    postReference: ReferenceEvent | null
-  }
-  deadlines: ExtractedDeadline[]
-  rights: {
-    usageType: 'organic' | 'paid' | 'both' | null
-    usagePeriodMonths: number | null
-    ownership: 'influencer' | 'client' | null
-  }
-  campaignName: string | null
-  signingDate: string | null
-  confidence: Record<string, ConfidenceLevel>
-}
-
-// Customer matching result
-export type CustomerMatchType = 'exact' | 'probable' | 'none'
-
-export interface CustomerMatchResult {
-  matchType: CustomerMatchType
-  customer: Customer | null
-  confidence: number
-  matchedOn: ('org_number' | 'name' | 'email')[]
-  suggestedNewCustomer?: Partial<CreateCustomerInput>
-}
-
-// Contract import wizard state
-export interface ContractImportState {
-  step: number
-  contractId: string | null
-  extractionResult: ContractExtractionResult | null
-  extractionStatus: ExtractionStatus
-  customerMatch: {
-    brand: CustomerMatchResult | null
-    agency: CustomerMatchResult | null
-  }
-  selectedCustomerId: string | null
-  selectedAgencyId: string | null
-  editedData: Partial<ContractExtractionResult>
-  exclusivityConflicts: ExclusivityConflict[]
-}
-
-// Labels for confidence levels
-export const CONFIDENCE_LABELS: Record<ConfidenceLevel, string> = {
-  high: 'Hög säkerhet',
-  medium: 'Medel säkerhet',
-  low: 'Låg säkerhet',
-  missing: 'Saknas'
-}
-
-// Labels for extraction status
-export const EXTRACTION_STATUS_LABELS: Record<ExtractionStatus, string> = {
-  pending: 'Väntar',
-  processing: 'Analyserar',
-  completed: 'Klar',
-  failed: 'Misslyckades',
-  skipped: 'Hoppade över'
-}
-
-// ============================================================
-// TikTok Integration Types
-// ============================================================
-
-// TikTok account status
-export type TikTokAccountStatus = 'active' | 'expired' | 'revoked' | 'error'
-
-// TikTok sync type
-export type TikTokSyncType = 'stats' | 'videos' | 'full' | 'token_refresh'
-
-// TikTok sync status
-export type TikTokSyncStatus = 'started' | 'success' | 'partial' | 'failed'
-
-// TikTok account record
-export interface TikTokAccount {
-  id: string
-  user_id: string
-
-  // TikTok user info
-  tiktok_user_id: string
-  username: string
-  display_name: string | null
-  avatar_url: string | null
-
-  // Token expiration (encrypted tokens not exposed to frontend)
-  token_expires_at: string
-  refresh_token_expires_at: string
-
-  // Account status
-  status: TikTokAccountStatus
-
-  // Sync tracking
-  last_synced_at: string | null
-  last_stats_sync_at: string | null
-  last_video_sync_at: string | null
-
-  // Error tracking
-  last_error: string | null
-  error_count: number
-
-  // Timestamps
-  created_at: string
-  updated_at: string
-}
-
-// TikTok daily stats record
-export interface TikTokDailyStats {
-  id: string
-  tiktok_account_id: string
-  user_id: string
-
-  // Date of snapshot
-  stats_date: string
-
-  // Follower metrics
-  follower_count: number
-  following_count: number
-
-  // Content metrics
-  likes_count: number
-  video_count: number
-
-  // Calculated change
-  follower_change: number | null
-
-  // Timestamps
-  created_at: string
-}
-
-// TikTok video record
-export interface TikTokVideo {
-  id: string
-  tiktok_account_id: string
-  user_id: string
-
-  // TikTok video identification
-  tiktok_video_id: string
-
-  // Video metadata
-  title: string | null
-  share_url: string | null
-  cover_image_url: string | null
-
-  // Performance metrics
-  view_count: number
-  like_count: number
-  comment_count: number
-  share_count: number
-
-  // Video duration in seconds
-  duration: number | null
-
-  // Publication date
-  published_at: string | null
-
-  // Campaign/deliverable linking
-  campaign_id: string | null
-  deliverable_id: string | null
-
-  // Timestamps
-  created_at: string
-  updated_at: string
-
-  // Relations
-  campaign?: Campaign
-  deliverable?: Deliverable
-}
-
-// TikTok sync log record
-export interface TikTokSyncLog {
-  id: string
-  tiktok_account_id: string
-  user_id: string
-
-  // Sync type
-  sync_type: TikTokSyncType
-
-  // Sync result
-  status: TikTokSyncStatus
-
-  // Details
-  stats_synced: boolean
-  videos_synced: number
-  new_videos: number
-
-  // Error info
-  error_message: string | null
-  error_code: string | null
-
-  // Duration
-  started_at: string
-  completed_at: string | null
-
-  // Timestamps
-  created_at: string
-}
-
-// TikTok OAuth state (for CSRF protection)
-export interface TikTokOAuthState {
-  user_id: string
-  redirect_url: string
-  created_at: number
-}
-
-// TikTok API response types
-export interface TikTokUserInfo {
-  open_id: string
-  union_id: string
-  avatar_url: string
-  avatar_url_100: string
-  avatar_large_url: string
-  display_name: string
-  bio_description: string
-  profile_deep_link: string
-  is_verified: boolean
-  follower_count: number
-  following_count: number
-  likes_count: number
-  video_count: number
-}
-
-export interface TikTokVideoInfo {
-  id: string
-  title: string
-  video_description: string
-  duration: number
-  cover_image_url: string
-  share_url: string
-  embed_link: string
-  create_time: number
-  like_count: number
-  comment_count: number
-  share_count: number
-  view_count: number
-}
-
-// TikTok engagement metrics
-export interface TikTokEngagementMetrics {
-  views: number
-  likes: number
-  comments: number
-  shares: number
-  engagementRate: number
-  averageViewDuration?: number
-}
-
-// TikTok campaign ROI
-export interface TikTokCampaignROI {
-  campaignId: string
-  campaignName: string
-  totalCost: number
-  totalViews: number
-  totalEngagements: number
-  costPerView: number
-  costPerEngagement: number
-  videos: TikTokVideo[]
-}
-
-// TikTok follower growth
-export interface TikTokFollowerGrowth {
-  period: '7d' | '30d' | '90d' | '1y'
-  startCount: number
-  endCount: number
-  change: number
-  changePercent: number
-  dailyAverage: number
-}
-
-// TikTok stats summary for dashboard
-export interface TikTokStatsSummary {
-  currentFollowers: number
-  followerChange7d: number
-  followerChange30d: number
-  totalLikes: number
-  totalVideos: number
-  recentVideos: TikTokVideo[]
-  engagementRate: number
-  lastSynced: string | null
-}
-
-// Input types for TikTok operations
-export interface LinkVideoToCampaignInput {
-  video_id: string
-  campaign_id?: string
-  deliverable_id?: string
-}
-
-export interface TikTokSyncInput {
-  account_id: string
-  sync_type?: TikTokSyncType
-}
-
-// TikTok status labels
-export const TIKTOK_STATUS_LABELS: Record<TikTokAccountStatus, string> = {
-  active: 'Aktiv',
-  expired: 'Utgången',
-  revoked: 'Återkallad',
-  error: 'Fel'
-}
-
-export const TIKTOK_SYNC_TYPE_LABELS: Record<TikTokSyncType, string> = {
-  stats: 'Statistik',
-  videos: 'Videor',
-  full: 'Fullständig',
-  token_refresh: 'Token-förnyelse'
-}
-
-export const TIKTOK_SYNC_STATUS_LABELS: Record<TikTokSyncStatus, string> = {
-  started: 'Startad',
-  success: 'Lyckad',
-  partial: 'Delvis',
-  failed: 'Misslyckad'
 }
 
 // ============================================================
@@ -2190,19 +1234,6 @@ export interface ReceiptQueueSummary {
   streak_count: number
 }
 
-// Product registration (gift without receipt)
-export interface ProductRegistration {
-  image_url: string
-  estimated_value: number
-  brand_name: string
-  description: string
-  // Gift classification inputs
-  has_motprestation: boolean
-  used_in_business: boolean
-  used_privately: boolean
-  is_simple_promo: boolean
-}
-
 // Camera quality feedback
 export interface CameraQualityFeedback {
   lightingOk: boolean
@@ -2219,67 +1250,6 @@ export const RECEIPT_STATUS_LABELS: Record<ReceiptStatus, string> = {
   extracted: 'Extraherat',
   confirmed: 'Bekräftat',
   error: 'Fel'
-}
-
-// ============================================================
-// Briefing Types (Campaign Briefing Materials)
-// ============================================================
-
-// Briefing type
-export type BriefingType = 'pdf' | 'link' | 'text'
-
-// Briefing record
-export interface Briefing {
-  id: string
-  campaign_id: string
-  user_id: string
-
-  briefing_type: BriefingType
-  title: string
-
-  // Content based on type:
-  // For 'pdf': file path in Supabase Storage
-  // For 'link': URL to external resource
-  // For 'text': null (use text_content instead)
-  content: string | null
-
-  // For 'text' type: the actual text content
-  text_content: string | null
-
-  // PDF metadata (only for 'pdf' type)
-  filename: string | null
-  file_size: number | null
-  mime_type: string | null
-
-  // Optional notes
-  notes: string | null
-
-  // Timestamps
-  created_at: string
-  updated_at: string
-
-  // Relations
-  campaign?: Campaign
-}
-
-// Input for creating a briefing
-export interface CreateBriefingInput {
-  campaign_id: string
-  briefing_type: BriefingType
-  title: string
-  content?: string // File path or URL
-  text_content?: string // For text type
-  filename?: string
-  file_size?: number
-  mime_type?: string
-  notes?: string
-}
-
-// Swedish labels for briefing types
-export const BRIEFING_TYPE_LABELS: Record<BriefingType, string> = {
-  pdf: 'PDF-dokument',
-  link: 'Länk',
-  text: 'Text'
 }
 
 // ============================================================
@@ -2384,33 +1354,6 @@ export interface NEAccountMapping {
   isExpense: boolean  // true = debit normal, false = credit normal
 }
 
-// Gift item for NE declaration
-export interface NEGiftItem {
-  id: string
-  date: string
-  brandName: string
-  description: string
-  marketValue: number
-  vatLiable: boolean
-  vatAmount: number
-  deductibleAsExpense: boolean
-  neIncomeRuta: NEIncomeRuta | null
-  neExpenseRuta: NEExpenseRuta | null
-}
-
-// Gift breakdown for NE declaration
-export interface NEGiftBreakdown {
-  gifts: NEGiftItem[]
-  summary: {
-    r1Total: number  // Gåvor med moms (motprestation)
-    r2Total: number  // Gåvor utan moms
-    r6Total: number  // Avdragsgilla gåvor
-    totalTaxable: number
-    totalDeductible: number
-    netTaxableIncome: number
-  }
-}
-
 // NE declaration response
 export interface NEDeclaration {
   fiscalYear: {
@@ -2430,8 +1373,6 @@ export interface NEDeclaration {
     }>
     total: number
   }>
-  // Gift breakdown (included in rutor via journal entries)
-  giftBreakdown?: NEGiftBreakdown
   // Company info for SRU
   companyInfo: {
     companyName: string

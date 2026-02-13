@@ -8,14 +8,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/components/ui/use-toast'
 import { formatDate } from '@/lib/utils'
@@ -29,13 +21,11 @@ import {
   RefreshCw,
   Trash2,
   LogOut,
-  Share2,
   Bell,
   Calendar,
 } from 'lucide-react'
-import type { CompanySettings, BankConnection, TikTokAccount } from '@/types'
+import type { CompanySettings, BankConnection } from '@/types'
 import { BankSelector, type Bank } from '@/components/banking/BankSelector'
-import { TikTokConnectButton, TikTokAccountCard } from '@/components/tiktok'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import { CalendarFeedSettings } from '@/components/settings/CalendarFeedSettings'
 
@@ -49,19 +39,8 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [settings, setSettings] = useState<CompanySettings | null>(null)
   const [bankConnections, setBankConnections] = useState<BankConnection[]>([])
-  const [tiktokAccounts, setTiktokAccounts] = useState<TikTokAccount[]>([])
   const [isSyncing, setIsSyncing] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
-
-  // Light mode specific state
-  const [municipalityCode, setMunicipalityCode] = useState('')
-  const [municipalTaxRate, setMunicipalTaxRate] = useState('')
-  const [churchTax, setChurchTax] = useState(false)
-  const [churchTaxRate, setChurchTaxRate] = useState('')
-  const [umbrellaProvider, setUmbrellaProvider] = useState('')
-  const [umbrellaFeePercent, setUmbrellaFeePercent] = useState('')
-  const [umbrellaPensionPercent, setUmbrellaPensionPercent] = useState('')
-  const [umbrellaFeeCustom, setUmbrellaFeeCustom] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -69,8 +48,6 @@ export default function SettingsPage() {
     // Handle callback messages
     const bankConnected = searchParams.get('bank_connected')
     const bankError = searchParams.get('bank_error')
-    const tiktokConnected = searchParams.get('tiktok_connected')
-    const tiktokError = searchParams.get('tiktok_error')
 
     if (bankConnected === 'true') {
       toast({
@@ -84,23 +61,6 @@ export default function SettingsPage() {
       toast({
         title: 'Anslutning misslyckades',
         description: decodeURIComponent(bankError),
-        variant: 'destructive',
-      })
-      router.replace('/settings')
-    }
-
-    if (tiktokConnected === 'true') {
-      toast({
-        title: 'TikTok anslutet!',
-        description: 'Ditt TikTok-konto är nu kopplat.',
-      })
-      router.replace('/settings')
-    }
-
-    if (tiktokError) {
-      toast({
-        title: 'TikTok-anslutning misslyckades',
-        description: decodeURIComponent(tiktokError),
         variant: 'destructive',
       })
       router.replace('/settings')
@@ -125,18 +85,6 @@ export default function SettingsPage() {
 
     setSettings(settingsData)
 
-    // Initialize light mode fields from fetched settings
-    if (settingsData) {
-      setMunicipalityCode(settingsData.municipality_code || '')
-      setMunicipalTaxRate(settingsData.municipal_tax_rate?.toString() || '')
-      setChurchTax(settingsData.church_tax || false)
-      setChurchTaxRate(settingsData.church_tax_rate?.toString() || '')
-      setUmbrellaProvider(settingsData.umbrella_provider || '')
-      setUmbrellaFeePercent(settingsData.umbrella_fee_percent?.toString() || '')
-      setUmbrellaPensionPercent(settingsData.umbrella_pension_percent?.toString() || '')
-      setUmbrellaFeeCustom(settingsData.umbrella_fee_custom || false)
-    }
-
     // Fetch bank connections
     const { data: connections } = await supabase
       .from('bank_connections')
@@ -145,15 +93,6 @@ export default function SettingsPage() {
       .order('created_at', { ascending: false })
 
     setBankConnections(connections || [])
-
-    // Fetch TikTok accounts
-    try {
-      const tiktokResponse = await fetch('/api/tiktok/accounts')
-      const tiktokData = await tiktokResponse.json()
-      setTiktokAccounts(tiktokData.accounts || [])
-    } catch (error) {
-      console.error('Failed to fetch TikTok accounts:', error)
-    }
 
     setIsLoading(false)
   }
@@ -165,34 +104,17 @@ export default function SettingsPage() {
     setIsSaving(true)
 
     const formData = new FormData(e.currentTarget)
-    const isLight = settings.entity_type === 'light'
 
-    let updates: Record<string, unknown>
-
-    if (isLight) {
-      updates = {
-        company_name: formData.get('company_name') as string,
-        municipality_code: municipalityCode || null,
-        municipal_tax_rate: parseFloat(municipalTaxRate) || null,
-        church_tax: churchTax,
-        church_tax_rate: churchTax ? (parseFloat(churchTaxRate) || null) : null,
-        umbrella_provider: umbrellaProvider || null,
-        umbrella_fee_percent: parseFloat(umbrellaFeePercent) || null,
-        umbrella_pension_percent: parseFloat(umbrellaPensionPercent) || null,
-        umbrella_fee_custom: umbrellaFeeCustom,
-      }
-    } else {
-      updates = {
-        company_name: formData.get('company_name') as string,
-        org_number: formData.get('org_number') as string,
-        address_line1: formData.get('address_line1') as string,
-        postal_code: formData.get('postal_code') as string,
-        city: formData.get('city') as string,
-        bank_name: formData.get('bank_name') as string,
-        clearing_number: formData.get('clearing_number') as string,
-        account_number: formData.get('account_number') as string,
-        preliminary_tax_monthly: parseFloat(formData.get('preliminary_tax_monthly') as string) || null,
-      }
+    const updates: Record<string, unknown> = {
+      company_name: formData.get('company_name') as string,
+      org_number: formData.get('org_number') as string,
+      address_line1: formData.get('address_line1') as string,
+      postal_code: formData.get('postal_code') as string,
+      city: formData.get('city') as string,
+      bank_name: formData.get('bank_name') as string,
+      clearing_number: formData.get('clearing_number') as string,
+      account_number: formData.get('account_number') as string,
+      preliminary_tax_monthly: parseFloat(formData.get('preliminary_tax_monthly') as string) || null,
     }
 
     try {
@@ -340,10 +262,6 @@ export default function SettingsPage() {
             <CreditCard className="mr-2 h-4 w-4" />
             Bank
           </TabsTrigger>
-          <TabsTrigger value="social">
-            <Share2 className="mr-2 h-4 w-4" />
-            Sociala medier
-          </TabsTrigger>
           <TabsTrigger value="notifications">
             <Bell className="mr-2 h-4 w-4" />
             Aviseringar
@@ -360,190 +278,6 @@ export default function SettingsPage() {
 
         {/* Company settings */}
         <TabsContent value="company">
-          {settings?.entity_type === 'light' ? (
-            /* ---- Light mode: Personuppgifter ---- */
-            <form onSubmit={handleSaveSettings}>
-              <div className="space-y-6">
-                {/* Personal details */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Personuppgifter</CardTitle>
-                    <CardDescription>
-                      Ditt namn som visas i appen
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="company_name">Namn</Label>
-                      <Input
-                        id="company_name"
-                        name="company_name"
-                        defaultValue={settings?.company_name || ''}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Tax settings for light mode */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Skatteinställningar</CardTitle>
-                    <CardDescription>
-                      Kommunalskatt och kyrkoskatt som används för att beräkna din skatteskuld
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Municipality section */}
-                    <div className="space-y-4">
-                      <h3 className="font-medium">Kommun</h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="municipality_code">Kommun</Label>
-                          <Input
-                            id="municipality_code"
-                            placeholder="T.ex. Stockholm"
-                            value={municipalityCode}
-                            onChange={(e) => setMunicipalityCode(e.target.value)}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Ange din kommun för att beräkna kommunalskatt
-                          </p>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="municipal_tax_rate">Total kommunalskatt (%)</Label>
-                          <Input
-                            id="municipal_tax_rate"
-                            type="number"
-                            step="0.01"
-                            placeholder="T.ex. 32.38"
-                            value={municipalTaxRate}
-                            onChange={(e) => setMunicipalTaxRate(e.target.value)}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Kommunalskatt + landstingsskatt + begravningsavgift
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Church tax section */}
-                    <div className="pt-4 border-t space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-medium">Kyrkoavgift</h3>
-                          <p className="text-sm text-muted-foreground">
-                            Aktivera om du betalar kyrkoavgift
-                          </p>
-                        </div>
-                        <Switch
-                          checked={churchTax}
-                          onCheckedChange={setChurchTax}
-                        />
-                      </div>
-                      {churchTax && (
-                        <div className="space-y-2">
-                          <Label htmlFor="church_tax_rate">Kyrkoavgift (%)</Label>
-                          <Input
-                            id="church_tax_rate"
-                            type="number"
-                            step="0.01"
-                            placeholder="T.ex. 1.00"
-                            value={churchTaxRate}
-                            onChange={(e) => setChurchTaxRate(e.target.value)}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Umbrella provider section */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Egenanställningsföretag</CardTitle>
-                    <CardDescription>
-                      Välj ditt egenanställningsföretag för att beräkna avgifter automatiskt
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Leverantör</Label>
-                      <Select
-                        value={umbrellaProvider}
-                        onValueChange={setUmbrellaProvider}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Välj leverantör" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="frilans_finans">Frilans Finans</SelectItem>
-                          <SelectItem value="cool_company">Cool Company</SelectItem>
-                          <SelectItem value="gigapay">Gigapay</SelectItem>
-                          <SelectItem value="other">Annan</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {umbrellaProvider && (
-                      <>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="umbrella_fee_percent">Serviceavgift (%)</Label>
-                            <Input
-                              id="umbrella_fee_percent"
-                              type="number"
-                              step="0.01"
-                              placeholder="T.ex. 6.00"
-                              value={umbrellaFeePercent}
-                              onChange={(e) => setUmbrellaFeePercent(e.target.value)}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="umbrella_pension_percent">Pensionsavsättning (%)</Label>
-                            <Input
-                              id="umbrella_pension_percent"
-                              type="number"
-                              step="0.01"
-                              placeholder="T.ex. 4.50"
-                              value={umbrellaPensionPercent}
-                              onChange={(e) => setUmbrellaPensionPercent(e.target.value)}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between pt-2">
-                          <div>
-                            <Label>Anpassa avgifter</Label>
-                            <p className="text-sm text-muted-foreground">
-                              Åsidosätt standardavgifter med egna värden
-                            </p>
-                          </div>
-                          <Switch
-                            checked={umbrellaFeeCustom}
-                            onCheckedChange={setUmbrellaFeeCustom}
-                          />
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <div className="flex justify-end">
-                  <Button type="submit" disabled={isSaving}>
-                    {isSaving ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Sparar...
-                      </>
-                    ) : (
-                      'Spara ändringar'
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </form>
-          ) : (
-            /* ---- EF/AB mode: Företagsuppgifter (existing) ---- */
             <form onSubmit={handleSaveSettings}>
               <Card>
                 <CardHeader>
@@ -660,7 +394,6 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
             </form>
-          )}
         </TabsContent>
 
         {/* Banking settings */}
@@ -749,47 +482,6 @@ export default function SettingsPage() {
               </p>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        {/* Social media settings */}
-        <TabsContent value="social" className="space-y-6">
-          {/* Connected TikTok accounts */}
-          {tiktokAccounts.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Kopplade konton</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {tiktokAccounts.map((account) => (
-                  <TikTokAccountCard
-                    key={account.id}
-                    account={account}
-                    onDisconnect={fetchData}
-                    onSync={fetchData}
-                  />
-                ))}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Connect TikTok */}
-          {!tiktokAccounts.some(a => a.status === 'active') && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Anslut TikTok</CardTitle>
-                <CardDescription>
-                  Koppla ditt TikTok-konto för att se statistik och analysera kampanjprestanda
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <TikTokConnectButton />
-                <p className="text-sm text-muted-foreground mt-4">
-                  Vi använder TikToks officiella API och begär endast läsrättigheter för statistik.
-                  Vi kan aldrig posta eller ändra något på ditt konto.
-                </p>
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
 
         {/* Notification settings */}

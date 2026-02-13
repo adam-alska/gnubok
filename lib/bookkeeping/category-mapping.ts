@@ -33,7 +33,6 @@ const BANK_ACCOUNT = '1930'
 const PRIVATE_ACCOUNTS: Record<EntityType, string> = {
   enskild_firma: '2013',  // Övriga egna uttag
   aktiebolag: '2893',     // Skuld till aktieägare/delägare
-  light: '2013',          // Not used in practice (light skips journal entries)
 }
 
 /**
@@ -79,8 +78,6 @@ export function getCategoryAccountMapping(
   const incomeMapping: Record<string, string> = {
     income_services: '3001', // Försäljning tjänster 25%
     income_products: '3001', // Försäljning varor 25%
-    income_sponsorship: '3900', // Övriga rörelseintäkter
-    income_affiliate: '3900', // Övriga rörelseintäkter
     income_other: '3900', // Övriga rörelseintäkter
   }
 
@@ -176,8 +173,6 @@ export function buildMappingResultFromCategory(
   const categoryLabels: Record<TransactionCategory, string> = {
     income_services: 'Tjänsteförsäljning',
     income_products: 'Varuförsäljning',
-    income_sponsorship: 'Sponsorintäkt',
-    income_affiliate: 'Affiliateintäkt',
     income_other: 'Övrig intäkt',
     expense_equipment: 'Förbrukningsinventarier',
     expense_software: 'Programvara',

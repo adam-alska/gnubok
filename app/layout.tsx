@@ -22,13 +22,13 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Influencer Assistant",
-  description: "Ekonomihantering för svenska influencers",
+  title: "ERP Base",
+  description: "Ekonomihantering",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Influencer Assistant",
+    title: "ERP Base",
   },
 };
 

@@ -54,7 +54,7 @@ export function generateSRUFile(declaration: NEDeclaration): SRUFile {
   // File header
   records.push({ fieldCode: 'PRODUKT', value: 'KONTROLLUPPGIFTER' })
   records.push({ fieldCode: 'SESSION', value: '1' })
-  records.push({ fieldCode: 'PROGRAMNAMN', value: 'InfluencerBiz' })
+  records.push({ fieldCode: 'PROGRAMNAMN', value: 'ERPBase' })
   records.push({ fieldCode: 'PROGRAMVERSION', value: '1.0' })
   records.push({
     fieldCode: 'SKAPAT',

@@ -332,39 +332,6 @@ export function CalendarFeedSettings() {
             />
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="include-campaigns">Samarbeten</Label>
-              <p className="text-sm text-muted-foreground">
-                Leveransdatum och deadlines
-              </p>
-            </div>
-            <Switch
-              id="include-campaigns"
-              checked={feed.include_campaigns}
-              onCheckedChange={(checked) =>
-                updateFeed('include_campaigns', checked)
-              }
-              disabled={isSaving}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="include-exclusivity">Exklusivitetsperioder</Label>
-              <p className="text-sm text-muted-foreground">
-                Visar när du har exklusivitetsavtal
-              </p>
-            </div>
-            <Switch
-              id="include-exclusivity"
-              checked={feed.include_exclusivity}
-              onCheckedChange={(checked) =>
-                updateFeed('include_exclusivity', checked)
-              }
-              disabled={isSaving}
-            />
-          </div>
         </CardContent>
       </Card>
     </div>

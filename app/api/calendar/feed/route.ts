@@ -27,7 +27,7 @@ export async function GET() {
   }
 
   // Generate the feed URL
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.influencer-biz.se'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.erp-base.se'
 
   if (feed) {
     return NextResponse.json({
@@ -79,8 +79,6 @@ export async function POST() {
       is_active: true,
       include_tax_deadlines: true,
       include_invoices: true,
-      include_campaigns: true,
-      include_exclusivity: false, // Avstängt som standard
     })
     .select()
     .single()
@@ -89,7 +87,7 @@ export async function POST() {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.influencer-biz.se'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.erp-base.se'
 
   return NextResponse.json({
     data: {
@@ -126,7 +124,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.influencer-biz.se'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.erp-base.se'
 
   return NextResponse.json({
     data: {
@@ -166,7 +164,7 @@ export async function DELETE() {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.influencer-biz.se'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.erp-base.se'
 
   return NextResponse.json({
     data: {

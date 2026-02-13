@@ -1,6 +1,6 @@
 /**
  * Static configuration of all Swedish tax deadlines (Skatteverket)
- * Based on dev_docs/influencer_ai_info/07-kalender-deadlines.md
+ * Based on Skatteverket's official deadline schedule
  */
 
 import type { TaxDeadlineType, EntityType, MomsPeriod } from '@/types'

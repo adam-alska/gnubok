@@ -52,7 +52,7 @@ export async function generateSIEExport(
   lines.push('#FLAGGA 0')
   lines.push('#FORMAT PC8')
   lines.push('#SIETYP 4')
-  lines.push(`#PROGRAM "${options.program_name || 'InfluencerBiz'}" "1.0"`)
+  lines.push(`#PROGRAM "${options.program_name || 'ERPBase'}" "1.0"`)
   lines.push(`#GEN ${formatSIEDate(now)}`)
 
   if (options.org_number) {

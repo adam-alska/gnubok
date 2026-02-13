@@ -8,23 +8,20 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Camera,
-  Package,
   Receipt,
   Check,
   Clock,
   AlertCircle,
   ArrowRight,
-  ExternalLink,
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import ReceiptDashboard from '@/components/receipts/ReceiptDashboard'
 import ReceiptReviewView from '@/components/receipts/ReceiptReviewView'
 import TransactionMatcher from '@/components/receipts/TransactionMatcher'
-import ProductCapture from '@/components/receipts/ProductCapture'
 import type { Receipt as ReceiptType, ReceiptLineItem, ReceiptQueueSummary, ConfirmLineItemInput } from '@/types'
 
-type ViewMode = 'dashboard' | 'list' | 'review' | 'match' | 'product'
+type ViewMode = 'dashboard' | 'list' | 'review' | 'match'
 type ListFilter = 'all' | 'pending' | 'confirmed'
 
 export default function ReceiptsPage() {
@@ -81,11 +78,6 @@ export default function ReceiptsPage() {
   // Handle scan receipt
   const handleScanReceipt = () => {
     router.push('/receipts/scan')
-  }
-
-  // Handle register product
-  const handleRegisterProduct = () => {
-    setViewMode('product')
   }
 
   // Handle view receipt queue
@@ -150,12 +142,6 @@ export default function ReceiptsPage() {
     }
   }
 
-  // Handle product capture complete
-  const handleProductComplete = () => {
-    setViewMode('dashboard')
-    fetchData()
-  }
-
   // Render receipt review view
   if (viewMode === 'review' && selectedReceipt) {
     return (
@@ -185,16 +171,6 @@ export default function ReceiptsPage() {
           setSelectedReceipt(null)
           setViewMode('dashboard')
         }}
-      />
-    )
-  }
-
-  // Render product capture
-  if (viewMode === 'product') {
-    return (
-      <ProductCapture
-        onComplete={handleProductComplete}
-        onCancel={() => setViewMode('dashboard')}
       />
     )
   }
@@ -236,7 +212,6 @@ export default function ReceiptsPage() {
             <ReceiptDashboard
               summary={summary}
               onScanReceipt={handleScanReceipt}
-              onRegisterProduct={handleRegisterProduct}
               onViewReceiptQueue={handleViewReceiptQueue}
               onViewTransactionQueue={handleViewTransactionQueue}
             />

@@ -78,7 +78,7 @@ export default function Step2CompanyDetails({
               </Label>
               <Input
                 id="company_name"
-                placeholder={isAB ? 'AB Företaget' : 'Alices Influencer-verksamhet'}
+                placeholder={isAB ? 'AB Företaget' : 'Alices Konsultverksamhet'}
                 {...register('company_name')}
               />
               {errors.company_name && (
