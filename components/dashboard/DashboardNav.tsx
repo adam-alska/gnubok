@@ -24,6 +24,7 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronUp,
+  Building2,
 } from 'lucide-react'
 import type { EntityType } from '@/types'
 
@@ -50,6 +51,7 @@ const navItems: NavItem[] = [
   { href: '/receipts', label: 'Kvitton', icon: Camera, group: 'finans' },
   { href: '/deductions', label: 'Avdrag', icon: Calculator, group: 'finans' },
   { href: '/bookkeeping', label: 'Bokföring', icon: BookOpen, group: 'finans' },
+  { href: '/modules', label: 'Företagsmoduler', icon: Building2, group: 'moduler' },
   { href: '/import', label: 'Importera', icon: Upload, group: 'övrigt' },
   { href: '/reports', label: 'Rapporter', icon: BarChart3, group: 'övrigt' },
   { href: '/help', label: 'Hjälp', icon: HelpCircle, group: 'övrigt' },
@@ -59,6 +61,7 @@ const navItems: NavItem[] = [
 const groupLabels: Record<string, string> = {
   main: 'Huvudmeny',
   finans: 'Finans',
+  moduler: 'Företagsmoduler',
   övrigt: 'Övrigt',
 }
 
@@ -90,6 +93,7 @@ export default function DashboardNav({ companyName, entityType }: DashboardNavPr
 
   const mainItems = filteredItems.filter(i => i.group === 'main')
   const finansItems = filteredItems.filter(i => i.group === 'finans')
+  const modulerItems = filteredItems.filter(i => i.group === 'moduler')
   const övrigtItems = filteredItems.filter(i => i.group === 'övrigt')
 
   const mobileNavItems = [
@@ -158,6 +162,40 @@ export default function DashboardNav({ companyName, entityType }: DashboardNavPr
                 </p>
                 <div className="space-y-0.5">
                   {finansItems.map((item) => {
+                    const Icon = item.icon
+                    const active = isActive(item.href)
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          'group flex items-center px-3 py-2 text-sm transition-all duration-200 rounded-lg',
+                          active
+                            ? 'bg-primary/10 text-primary font-medium'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+                        )}
+                      >
+                        <Icon className={cn(
+                          "mr-3 h-4 w-4 flex-shrink-0",
+                          active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                        )} />
+                        {item.label}
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Separator */}
+              <div className="border-t border-border/40 mx-3 mb-4" />
+
+              {/* Moduler group */}
+              <div className="mb-4">
+                <p className="px-3 mb-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                  {groupLabels.moduler}
+                </p>
+                <div className="space-y-0.5">
+                  {modulerItems.map((item) => {
                     const Icon = item.icon
                     const active = isActive(item.href)
                     return (
@@ -365,6 +403,33 @@ export default function DashboardNav({ companyName, entityType }: DashboardNavPr
                   Finans
                 </p>
                 {finansItems.map((item) => {
+                  const Icon = item.icon
+                  const active = isActive(item.href)
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={closeMobileMenu}
+                      className={cn(
+                        'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
+                        active
+                          ? 'bg-primary/10 text-primary font-medium'
+                          : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+                      )}
+                    >
+                      <Icon className="h-5 w-5" />
+                      {item.label}
+                    </Link>
+                  )
+                })}
+              </div>
+
+              {/* Moduler section */}
+              <div className="mb-4">
+                <p className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Företagsmoduler
+                </p>
+                {modulerItems.map((item) => {
                   const Icon = item.icon
                   const active = isActive(item.href)
                   return (
