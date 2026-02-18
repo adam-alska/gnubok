@@ -1,6 +1,17 @@
 -- Migration 10: Module Toggles
 -- Per-user module enable/disable state
 
+-- Ensure the updated_at trigger function exists
+create or replace function public.update_updated_at_column()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
 -- =============================================================================
 -- 1. module_toggles
 -- =============================================================================

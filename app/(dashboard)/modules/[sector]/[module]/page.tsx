@@ -4,6 +4,7 @@ import { ArrowLeft, BookOpen, BarChart3, FileDown, Cog } from 'lucide-react'
 import { getModuleBySlug, CATEGORY_LABELS, type ModuleCategory } from '@/lib/modules-data'
 import { Badge } from '@/components/ui/badge'
 import { ModuleToggle } from '@/components/modules/ModuleToggle'
+import { ModuleConfigLoader } from '@/components/modules/ModuleConfigLoader'
 
 const CATEGORY_META: Record<ModuleCategory, {
   icon: typeof BookOpen
@@ -140,6 +141,11 @@ export default async function ModuleDetailPage({
 
       {/* Toggle */}
       <ModuleToggle sectorSlug={sectorSlug} moduleSlug={moduleSlug} />
+
+      {/* Config panel for bokföring modules */}
+      {mod.cat === 'bokforing' && (
+        <ModuleConfigLoader sectorSlug={sectorSlug} moduleSlug={moduleSlug} />
+      )}
     </div>
   )
 }

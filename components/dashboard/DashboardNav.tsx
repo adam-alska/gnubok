@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -25,8 +25,16 @@ import {
   ChevronDown,
   ChevronUp,
   Building2,
+  Cog,
+  FileDown,
 } from 'lucide-react'
 import type { EntityType } from '@/types'
+import { getModuleBySlug, getSectorBySlug, type ModuleCategory } from '@/lib/modules-data'
+
+interface EnabledModule {
+  sector_slug: string
+  module_slug: string
+}
 
 interface DashboardNavProps {
   companyName: string
@@ -65,12 +73,88 @@ const groupLabels: Record<string, string> = {
   övrigt: 'Övrigt',
 }
 
+const CATEGORY_ICON: Record<ModuleCategory, typeof BarChart3> = {
+  rapport: BarChart3,
+  import: FileDown,
+  operativ: Cog,
+  bokforing: BookOpen,
+}
+
+const CATEGORY_ORDER: Record<ModuleCategory, number> = {
+  rapport: 0,
+  import: 1,
+  operativ: 2,
+  bokforing: 3,
+}
+
 export default function DashboardNav({ companyName, entityType }: DashboardNavProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isOvrigtExpanded, setIsOvrigtExpanded] = useState(false)
+  const [enabledModules, setEnabledModules] = useState<EnabledModule[]>([])
+  const [expandedSectors, setExpandedSectors] = useState<Record<string, boolean>>({})
+
+  // Fetch enabled modules client-side
+  const fetchModules = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data } = await supabase
+      .from('module_toggles')
+      .select('sector_slug, module_slug')
+      .eq('user_id', user.id)
+      .eq('enabled', true)
+
+    setEnabledModules(
+      (data ?? []).map(t => ({ sector_slug: t.sector_slug, module_slug: t.module_slug }))
+    )
+  }, [supabase])
+
+  useEffect(() => {
+    fetchModules()
+  }, [fetchModules])
+
+  // Listen for toggle changes from ModuleToggle
+  useEffect(() => {
+    const handler = () => fetchModules()
+    window.addEventListener('module-toggle-changed', handler)
+    return () => window.removeEventListener('module-toggle-changed', handler)
+  }, [fetchModules])
+
+  // Group enabled modules by sector for sidebar
+  const sectorGroups = useMemo(() => {
+    const groups = new Map<string, { name: string; icon: typeof LayoutDashboard; modules: { href: string; label: string; icon: typeof LayoutDashboard; cat: ModuleCategory }[] }>()
+
+    for (const em of enabledModules) {
+      const result = getModuleBySlug(em.sector_slug, em.module_slug)
+      if (!result) continue
+
+      if (!groups.has(em.sector_slug)) {
+        const sector = getSectorBySlug(em.sector_slug)
+        if (!sector) continue
+        groups.set(em.sector_slug, { name: sector.name, icon: sector.icon, modules: [] })
+      }
+
+      groups.get(em.sector_slug)!.modules.push({
+        href: `/m/${em.sector_slug}/${em.module_slug}`,
+        label: result.module.name,
+        icon: CATEGORY_ICON[result.module.cat],
+        cat: result.module.cat,
+      })
+    }
+
+    for (const group of groups.values()) {
+      group.modules.sort((a, b) => CATEGORY_ORDER[a.cat] - CATEGORY_ORDER[b.cat])
+    }
+
+    return Array.from(groups.entries())
+  }, [enabledModules])
+
+  const toggleSector = (slug: string) => {
+    setExpandedSectors(prev => ({ ...prev, [slug]: !(prev[slug] ?? true) }))
+  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -189,7 +273,67 @@ export default function DashboardNav({ companyName, entityType }: DashboardNavPr
               {/* Separator */}
               <div className="border-t border-border/40 mx-3 mb-4" />
 
-              {/* Moduler group */}
+              {/* Dina moduler - sector groups with enabled modules */}
+              {sectorGroups.length > 0 && (
+                <div className="mb-4">
+                  <p className="px-3 mb-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Dina moduler
+                  </p>
+                  {sectorGroups.map(([sectorSlug, group]) => {
+                    const SectorIcon = group.icon
+                    const expanded = expandedSectors[sectorSlug] ?? true
+                    return (
+                      <div key={sectorSlug} className="mb-2">
+                        <button
+                          onClick={() => toggleSector(sectorSlug)}
+                          className="w-full flex items-center justify-between px-3 py-1 text-[11px] font-medium text-muted-foreground/70 tracking-wider hover:text-foreground transition-colors"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <SectorIcon className="h-3 w-3" />
+                            {group.name}
+                          </span>
+                          {expanded ? (
+                            <ChevronUp className="h-3 w-3" />
+                          ) : (
+                            <ChevronDown className="h-3 w-3" />
+                          )}
+                        </button>
+                        {expanded && (
+                          <div className="space-y-0.5 animate-fade-in">
+                            {group.modules.map((item) => {
+                              const Icon = item.icon
+                              const active = isActive(item.href)
+                              return (
+                                <Link
+                                  key={item.href}
+                                  href={item.href}
+                                  className={cn(
+                                    'group flex items-center px-3 py-2 text-sm transition-all duration-200 rounded-lg',
+                                    active
+                                      ? 'bg-primary/10 text-primary font-medium'
+                                      : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+                                  )}
+                                >
+                                  <Icon className={cn(
+                                    "mr-3 h-4 w-4 flex-shrink-0",
+                                    active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                                  )} />
+                                  <span className="truncate">{item.label}</span>
+                                </Link>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Separator */}
+              <div className="border-t border-border/40 mx-3 mb-4" />
+
+              {/* Moduler group - browse/manage modules */}
               <div className="mb-4">
                 <p className="px-3 mb-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
                   {groupLabels.moduler}
@@ -423,6 +567,61 @@ export default function DashboardNav({ companyName, entityType }: DashboardNavPr
                   )
                 })}
               </div>
+
+              {/* Dina moduler - sector groups */}
+              {sectorGroups.length > 0 && (
+                <div className="mb-4">
+                  <p className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Dina moduler
+                  </p>
+                  {sectorGroups.map(([sectorSlug, group]) => {
+                    const SectorIcon = group.icon
+                    const expanded = expandedSectors[sectorSlug] ?? true
+                    return (
+                      <div key={sectorSlug} className="mb-2">
+                        <button
+                          onClick={() => toggleSector(sectorSlug)}
+                          className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-medium text-muted-foreground/70 tracking-wider hover:text-foreground transition-colors"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <SectorIcon className="h-3.5 w-3.5" />
+                            {group.name}
+                          </span>
+                          {expanded ? (
+                            <ChevronUp className="h-3 w-3" />
+                          ) : (
+                            <ChevronDown className="h-3 w-3" />
+                          )}
+                        </button>
+                        {expanded && (
+                          <div className="animate-fade-in">
+                            {group.modules.map((item) => {
+                              const Icon = item.icon
+                              const active = isActive(item.href)
+                              return (
+                                <Link
+                                  key={item.href}
+                                  href={item.href}
+                                  onClick={closeMobileMenu}
+                                  className={cn(
+                                    'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
+                                    active
+                                      ? 'bg-primary/10 text-primary font-medium'
+                                      : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+                                  )}
+                                >
+                                  <Icon className="h-5 w-5" />
+                                  <span className="truncate">{item.label}</span>
+                                </Link>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
 
               {/* Moduler section */}
               <div className="mb-4">

@@ -57,6 +57,9 @@ export function ModuleToggle({ sectorSlug, moduleSlug }: ModuleToggleProps) {
           },
           { onConflict: 'user_id,sector_slug,module_slug' }
         )
+
+      // Notify sidebar to refresh its module list
+      window.dispatchEvent(new Event('module-toggle-changed'))
     })
   }
 
