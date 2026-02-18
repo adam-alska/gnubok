@@ -1,34 +1,6 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
-
-/* Force light mode */
-html, :root {
-  color-scheme: light only !important;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: 40 30% 97% !important;
-    --foreground: 30 10% 15% !important;
-    --card: 40 40% 99% !important;
-    --card-foreground: 30 10% 15% !important;
-    --popover: 40 40% 99% !important;
-    --popover-foreground: 30 10% 15% !important;
-    --primary: 28 40% 35% !important;
-    --primary-foreground: 40 40% 99% !important;
-    --secondary: 35 25% 93% !important;
-    --secondary-foreground: 30 10% 15% !important;
-    --muted: 35 15% 91% !important;
-    --muted-foreground: 30 8% 45% !important;
-    --accent: 18 45% 55% !important;
-    --accent-foreground: 40 40% 99% !important;
-    --destructive: 0 45% 55% !important;
-    --destructive-foreground: 40 40% 99% !important;
-    --border: 35 20% 88% !important;
-    --input: 35 20% 88% !important;
-    --ring: 28 40% 35% !important;
-  }
-}
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   /* Nordic Warmth Color Palette */
@@ -94,6 +66,37 @@ html, :root {
   --duration-fast: 150ms;
   --duration-base: 300ms;
   --duration-slow: 500ms;
+
+  /* Dark mode overrides — nested to prevent Turbopack tree-shaking */
+  &.dark {
+    color-scheme: dark;
+    --background: 30 15% 10%;
+    --foreground: 40 20% 90%;
+    --card: 30 12% 13%;
+    --card-foreground: 40 20% 90%;
+    --popover: 30 12% 13%;
+    --popover-foreground: 40 20% 90%;
+    --primary: 28 35% 55%;
+    --primary-foreground: 40 40% 99%;
+    --secondary: 35 12% 18%;
+    --secondary-foreground: 40 20% 90%;
+    --muted: 30 8% 18%;
+    --muted-foreground: 30 10% 60%;
+    --accent: 18 50% 58%;
+    --accent-foreground: 40 40% 99%;
+    --destructive: 0 50% 58%;
+    --destructive-foreground: 40 40% 99%;
+    --border: 30 10% 22%;
+    --input: 30 10% 22%;
+    --ring: 28 35% 55%;
+    --success: 150 35% 50%;
+    --success-foreground: 40 40% 99%;
+    --warning: 38 65% 50%;
+    --warning-foreground: 30 10% 15%;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
+    --shadow-lg: 0 12px 40px rgba(0,0,0,0.4);
+  }
 }
 
 @theme inline {

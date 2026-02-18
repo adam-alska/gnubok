@@ -23,11 +23,13 @@ import {
   LogOut,
   Bell,
   Calendar,
+  Sun,
 } from 'lucide-react'
 import type { CompanySettings, BankConnection } from '@/types'
 import { BankSelector, type Bank } from '@/components/banking/BankSelector'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import { CalendarFeedSettings } from '@/components/settings/CalendarFeedSettings'
+import { AppearanceSettings } from '@/components/settings/AppearanceSettings'
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -270,6 +272,10 @@ export default function SettingsPage() {
             <Calendar className="mr-2 h-4 w-4" />
             Kalender
           </TabsTrigger>
+          <TabsTrigger value="appearance">
+            <Sun className="mr-2 h-4 w-4" />
+            Utseende
+          </TabsTrigger>
           <TabsTrigger value="account">
             <User className="mr-2 h-4 w-4" />
             Konto
@@ -492,6 +498,11 @@ export default function SettingsPage() {
         {/* Calendar feed settings */}
         <TabsContent value="calendar">
           <CalendarFeedSettings />
+        </TabsContent>
+
+        {/* Appearance settings */}
+        <TabsContent value="appearance">
+          <AppearanceSettings />
         </TabsContent>
 
         {/* Account settings */}
