@@ -1,12 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import type { CreateInvoiceInput, Invoice } from '@/types'
+import { eventBus } from '@/lib/events'
+import { ensureInitialized } from '@/lib/init'
+import type { CreateInvoiceInput, Invoice, CreditNote } from '@/types'
 import { getVatRules, calculateVat, calculateTotal } from '@/lib/invoice/vat-rules'
 import { fetchExchangeRate, convertToSEK } from '@/lib/currency/riksbanken'
 import {
   createInvoiceJournalEntry,
   createCreditNoteJournalEntry,
 } from '@/lib/bookkeeping/invoice-entries'
+
+ensureInitialized()
 
 interface CreateCreditNoteInput {
   credited_invoice_id: string
@@ -189,6 +193,11 @@ export async function POST(request: Request) {
       console.error('Failed to create invoice journal entry:', err)
       // Don't fail the invoice creation
     }
+
+    await eventBus.emit({
+      type: 'invoice.created',
+      payload: { invoice: completeInvoice as Invoice, userId: user.id },
+    })
   }
 
   return NextResponse.json({ data: completeInvoice })
@@ -316,6 +325,11 @@ async function createCreditNote(
     } catch (err) {
       console.error('Failed to create credit note journal entry:', err)
     }
+
+    await eventBus.emit({
+      type: 'credit_note.created',
+      payload: { creditNote: completeCreditNote as CreditNote, userId },
+    })
   }
 
   return NextResponse.json({ data: completeCreditNote })

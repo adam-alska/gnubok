@@ -1,0 +1,178 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { eventBus } from '@/lib/events/bus'
+import { makeFiscalPeriod } from '@/tests/helpers'
+
+// ============================================================
+// Mock — separate client (no .then) from query builder (thenable)
+// ============================================================
+
+let resultIdx: number
+let results: Array<{ data?: unknown; error?: unknown; count?: number | null }>
+
+function makeBuilder() {
+  const b: Record<string, unknown> = {}
+  for (const m of ['select', 'eq', 'insert', 'update', 'delete', 'lte', 'gte', 'in', 'not', 'or', 'order', 'limit', 'is']) {
+    b[m] = vi.fn().mockReturnValue(b)
+  }
+  b.single = vi.fn().mockImplementation(async () => results[resultIdx++] ?? { data: null, error: null })
+  b.maybeSingle = vi.fn().mockImplementation(async () => results[resultIdx++] ?? { data: null, error: null })
+  // Thenable for chains awaited without .single()
+  b.then = (resolve: (v: unknown) => void) => resolve(results[resultIdx++] ?? { data: null, error: null })
+  return b
+}
+
+function makeClient() {
+  // Client has NO .then — won't be consumed by `await createClient()`
+  return {
+    from: vi.fn().mockImplementation(() => makeBuilder()),
+    rpc: vi.fn().mockImplementation(async () => results[resultIdx++] ?? { data: null, error: null }),
+  }
+}
+
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: vi.fn(async () => makeClient()),
+}))
+
+import { lockPeriod, closePeriod, createNextPeriod } from '../period-service'
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  eventBus.clear()
+  resultIdx = 0
+  results = []
+})
+
+describe('lockPeriod', () => {
+  it('sets locked_at and emits period.locked', async () => {
+    const period = makeFiscalPeriod({ id: 'fp-1', locked_at: null, is_closed: false })
+    const lockedPeriod = { ...period, locked_at: '2024-12-31T23:59:59Z' }
+
+    results = [
+      { data: period, error: null },       // fetch
+      { data: lockedPeriod, error: null },  // update
+    ]
+
+    const handler = vi.fn()
+    eventBus.on('period.locked', handler)
+
+    const result = await lockPeriod('user-1', 'fp-1')
+
+    expect(result.locked_at).toBeTruthy()
+    expect(handler).toHaveBeenCalledOnce()
+  })
+
+  it('rejects already-locked period', async () => {
+    const period = makeFiscalPeriod({
+      id: 'fp-1',
+      locked_at: '2024-06-01T00:00:00Z',
+      is_closed: false,
+    })
+
+    results = [{ data: period, error: null }]
+
+    await expect(lockPeriod('user-1', 'fp-1')).rejects.toThrow('already locked')
+  })
+})
+
+describe('closePeriod', () => {
+  it('requires period is locked and has closing_entry_id', async () => {
+    const period = makeFiscalPeriod({
+      id: 'fp-1',
+      locked_at: '2024-12-31T23:59:59Z',
+      is_closed: false,
+      closing_entry_id: 'ce-1',
+    })
+    const closedPeriod = { ...period, is_closed: true, closed_at: '2024-12-31T23:59:59Z' }
+
+    results = [
+      { data: period, error: null },
+      { data: closedPeriod, error: null },
+    ]
+
+    const result = await closePeriod('user-1', 'fp-1')
+    expect(result.is_closed).toBe(true)
+  })
+
+  it('rejects if not locked', async () => {
+    const period = makeFiscalPeriod({
+      id: 'fp-1',
+      locked_at: null,
+      is_closed: false,
+      closing_entry_id: 'ce-1',
+    })
+
+    results = [{ data: period, error: null }]
+
+    await expect(closePeriod('user-1', 'fp-1')).rejects.toThrow('must be locked')
+  })
+
+  it('rejects if no closing_entry_id', async () => {
+    const period = makeFiscalPeriod({
+      id: 'fp-1',
+      locked_at: '2024-12-31T23:59:59Z',
+      is_closed: false,
+      closing_entry_id: null,
+    })
+
+    results = [{ data: period, error: null }]
+
+    await expect(closePeriod('user-1', 'fp-1')).rejects.toThrow(
+      'Year-end closing must be executed'
+    )
+  })
+})
+
+describe('createNextPeriod', () => {
+  it('calculates correct dates for standard (Jan-Dec) fiscal year', async () => {
+    const current = makeFiscalPeriod({
+      id: 'fp-2024',
+      period_start: '2024-01-01',
+      period_end: '2024-12-31',
+    })
+
+    const nextPeriod = makeFiscalPeriod({
+      id: 'fp-2025',
+      name: 'FY 2025',
+      period_start: '2025-01-01',
+      period_end: '2025-12-31',
+      previous_period_id: 'fp-2024',
+    })
+
+    results = [
+      { data: current, error: null },      // fetch current
+      { data: null, error: null },          // check if next exists (maybeSingle)
+      { data: nextPeriod, error: null },    // insert
+    ]
+
+    const result = await createNextPeriod('user-1', 'fp-2024')
+    expect(result.period_start).toBe('2025-01-01')
+    expect(result.period_end).toBe('2025-12-31')
+    expect(result.previous_period_id).toBe('fp-2024')
+  })
+
+  it('calculates correct dates for broken (Jul-Jun) fiscal year', async () => {
+    const current = makeFiscalPeriod({
+      id: 'fp-2024',
+      period_start: '2023-07-01',
+      period_end: '2024-06-30',
+    })
+
+    const nextPeriod = makeFiscalPeriod({
+      id: 'fp-2025',
+      name: 'FY 2024/2025',
+      period_start: '2024-07-01',
+      period_end: '2025-06-30',
+      previous_period_id: 'fp-2024',
+    })
+
+    results = [
+      { data: current, error: null },
+      { data: null, error: null },
+      { data: nextPeriod, error: null },
+    ]
+
+    const result = await createNextPeriod('user-1', 'fp-2024')
+    expect(result.period_start).toBe('2024-07-01')
+    expect(result.period_end).toBe('2025-06-30')
+  })
+})

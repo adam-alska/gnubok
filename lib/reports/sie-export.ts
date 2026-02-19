@@ -45,6 +45,21 @@ export async function generateSIEExport(
     .eq('status', 'posted')
     .order('voucher_number')
 
+  // Fetch cost centers and projects for dimension records
+  const { data: costCenters } = await supabase
+    .from('cost_centers')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .order('code')
+
+  const { data: projects } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .order('code')
+
   const lines: string[] = []
   const now = new Date()
 
@@ -66,10 +81,34 @@ export async function generateSIEExport(
   // Use date strings directly to avoid timezone conversion issues
   lines.push(`#RAR 0 ${dateStringToSIE(period.period_start)} ${dateStringToSIE(period.period_end)}`)
 
+  // === Dimension definitions ===
+  // SIE standard: dimension 1 = kostnadsställe, dimension 6 = projekt
+  const hasCostCenters = costCenters && costCenters.length > 0
+  const hasProjects = projects && projects.length > 0
+
+  if (hasCostCenters) {
+    lines.push('#DIM 1 "Kostnadsställe"')
+  }
+  if (hasProjects) {
+    lines.push('#DIM 6 "Projekt"')
+  }
+
+  // === Dimension objects (#OBJEKT) ===
+  for (const cc of costCenters || []) {
+    lines.push(`#OBJEKT 1 "${escapeQuotes(cc.code)}" "${escapeQuotes(cc.name)}"`)
+  }
+  for (const proj of projects || []) {
+    lines.push(`#OBJEKT 6 "${escapeQuotes(proj.code)}" "${escapeQuotes(proj.name)}"`)
+  }
+
   // === Chart of accounts ===
   for (const account of (accounts as BASAccount[]) || []) {
     lines.push(`#KONTO ${account.account_number} "${escapeQuotes(account.account_name)}"`)
-    // SRU codes could be added here if available
+
+    // #SRU records from chart_of_accounts.sru_code
+    if (account.sru_code) {
+      lines.push(`#SRU ${account.account_number} ${account.sru_code}`)
+    }
   }
 
   // === Opening balances (IB) ===
@@ -96,7 +135,17 @@ export async function generateSIEExport(
         ? ` "${escapeQuotes(line.line_description)}"`
         : ''
 
-      lines.push(`\t#TRANS ${line.account_number} {} ${formatAmount(amount)} ${entryDate}${lineDesc}`)
+      // Build dimension object list for #TRANS line
+      const dimParts: string[] = []
+      if (line.cost_center) {
+        dimParts.push(`1 "${escapeQuotes(line.cost_center)}"`)
+      }
+      if (line.project) {
+        dimParts.push(`6 "${escapeQuotes(line.project)}"`)
+      }
+      const objList = dimParts.length > 0 ? `{${dimParts.join(' ')}}` : '{}'
+
+      lines.push(`\t#TRANS ${line.account_number} ${objList} ${formatAmount(amount)} ${entryDate}${lineDesc}`)
     }
 
     lines.push('}')

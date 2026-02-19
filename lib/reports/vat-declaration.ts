@@ -6,6 +6,7 @@ import type {
   Invoice,
   Transaction,
   Receipt,
+  TaxCode,
 } from '@/types'
 
 /**
@@ -417,5 +418,127 @@ export function formatPeriodLabel(
       return `Helår ${year}`
     default:
       return `${year}`
+  }
+}
+
+// ============================================================
+// Tax-code-driven VAT declaration (new approach)
+// ============================================================
+
+/**
+ * Calculate VAT declaration using tax codes from journal entry lines.
+ *
+ * This is the new, tax-code-driven approach that sums journal_entry_lines
+ * grouped by tax_code, then maps via the tax_codes table to moms boxes.
+ * Falls back to the legacy invoice/transaction/receipt approach for
+ * lines without tax codes.
+ */
+export async function calculateVatDeclarationFromTaxCodes(
+  userId: string,
+  periodType: VatPeriodType,
+  year: number,
+  period: number
+): Promise<VatDeclaration> {
+  const supabase = await createClient()
+  const { start, end } = calculatePeriodDates(periodType, year, period)
+
+  // Fetch tax codes for this user (including system codes)
+  const { data: taxCodesData } = await supabase
+    .from('tax_codes')
+    .select('*')
+    .or(`user_id.eq.${userId},user_id.is.null`)
+
+  const taxCodes = (taxCodesData as TaxCode[]) || []
+  const taxCodeMap = new Map<string, TaxCode>()
+  for (const tc of taxCodes) {
+    if (!taxCodeMap.has(tc.code) || tc.user_id) {
+      taxCodeMap.set(tc.code, tc)
+    }
+  }
+
+  // Fetch posted journal entry lines with tax_code in the period
+  const { data: lines } = await supabase
+    .from('journal_entry_lines')
+    .select(`
+      tax_code,
+      debit_amount,
+      credit_amount,
+      journal_entry_id,
+      journal_entries!inner (
+        user_id,
+        entry_date,
+        status
+      )
+    `)
+    .not('tax_code', 'is', null)
+    .eq('journal_entries.user_id', userId)
+    .eq('journal_entries.status', 'posted')
+    .gte('journal_entries.entry_date', start)
+    .lte('journal_entries.entry_date', end)
+
+  // Aggregate amounts by moms box
+  const boxTotals = new Map<string, number>()
+
+  for (const line of lines || []) {
+    if (!line.tax_code) continue
+
+    const taxCode = taxCodeMap.get(line.tax_code)
+    if (!taxCode) continue
+
+    const amount = Math.abs(Number(line.debit_amount || 0) - Number(line.credit_amount || 0))
+
+    // Map to all relevant boxes
+    for (const box of [...taxCode.moms_basis_boxes, ...taxCode.moms_tax_boxes, ...taxCode.moms_input_boxes]) {
+      const current = boxTotals.get(box) || 0
+      boxTotals.set(box, current + amount)
+    }
+  }
+
+  // Build rutor from box totals
+  const rutor: VatDeclarationRutor = {
+    ruta05: round(boxTotals.get('05') || 0),
+    ruta06: round(boxTotals.get('06') || 0),
+    ruta07: round(boxTotals.get('07') || 0),
+    ruta10: round(boxTotals.get('10') || 0),
+    ruta11: round(boxTotals.get('11') || 0),
+    ruta12: round(boxTotals.get('12') || 0),
+    ruta39: round(boxTotals.get('39') || 0),
+    ruta40: round(boxTotals.get('40') || 0),
+    ruta48: round(boxTotals.get('48') || 0),
+    ruta49: 0,
+  }
+
+  const totalOutputVat = round(rutor.ruta05 + rutor.ruta06 + rutor.ruta07)
+  rutor.ruta49 = round(totalOutputVat - rutor.ruta48)
+
+  return {
+    period: {
+      type: periodType,
+      year,
+      period,
+      start,
+      end,
+    },
+    rutor,
+    invoiceCount: 0,
+    transactionCount: (lines || []).length,
+    breakdown: {
+      invoices: {
+        ruta05: 0,
+        ruta06: 0,
+        ruta07: 0,
+        ruta10: 0,
+        ruta11: 0,
+        ruta12: 0,
+        ruta39: 0,
+        ruta40: 0,
+      },
+      transactions: {
+        ruta48: 0,
+      },
+      receipts: {
+        ruta48: 0,
+      },
+    },
   }
 }

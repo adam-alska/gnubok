@@ -2,6 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { analyzeReceipt } from '@/lib/receipts/receipt-analyzer'
 import { processLineItems } from '@/lib/receipts/receipt-categorizer'
+import { eventBus } from '@/lib/events/bus'
+import { ensureInitialized } from '@/lib/init'
+
+ensureInitialized()
 
 /**
  * POST /api/receipts/upload
@@ -156,6 +160,17 @@ export async function POST(request: Request) {
           },
         })
       }
+
+      // Emit receipt.extracted event
+      await eventBus.emit({
+        type: 'receipt.extracted',
+        payload: {
+          receipt: completeReceipt,
+          documentId: null,
+          confidence: extraction.confidence,
+          userId: user.id,
+        },
+      })
 
       return NextResponse.json({ data: completeReceipt })
     } catch (analysisError) {

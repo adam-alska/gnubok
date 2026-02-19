@@ -1,7 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { findTransactionMatches } from '@/lib/receipts/receipt-matcher'
+import { eventBus } from '@/lib/events/bus'
+import { ensureInitialized } from '@/lib/init'
 import type { Receipt, Transaction } from '@/types'
+
+ensureInitialized()
 
 /**
  * POST /api/receipts/[id]/match
@@ -100,7 +104,7 @@ export async function PATCH(
   // Verify receipt ownership
   const { data: receipt, error: receiptError } = await supabase
     .from('receipts')
-    .select('id')
+    .select('*, line_items:receipt_line_items(*)')
     .eq('id', id)
     .eq('user_id', user.id)
     .single()
@@ -112,7 +116,7 @@ export async function PATCH(
   // Verify transaction ownership
   const { data: transaction, error: txError } = await supabase
     .from('transactions')
-    .select('id')
+    .select('*')
     .eq('id', transaction_id)
     .eq('user_id', user.id)
     .single()
@@ -144,6 +148,18 @@ export async function PATCH(
   if (updateTxError) {
     console.error('Transaction update error:', updateTxError)
   }
+
+  // Emit receipt.matched event
+  await eventBus.emit({
+    type: 'receipt.matched',
+    payload: {
+      receipt: receipt as unknown as Receipt,
+      transaction: transaction as Transaction,
+      confidence: match_confidence || 0,
+      autoMatched: false,
+      userId: user.id,
+    },
+  })
 
   return NextResponse.json({
     data: {

@@ -1,9 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { eventBus } from '@/lib/events'
+import { ensureInitialized } from '@/lib/init'
 import { buildMappingResultFromCategory } from '@/lib/bookkeeping/category-mapping'
 import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-entries'
 import { saveUserMappingRule } from '@/lib/bookkeeping/mapping-engine'
 import type { Transaction, TransactionCategory, EntityType } from '@/types'
+
+ensureInitialized()
 
 interface CategorizeRequest {
   is_business: boolean
@@ -198,6 +202,16 @@ export async function POST(
       { status: 500 }
     )
   }
+
+  await eventBus.emit({
+    type: 'transaction.categorized',
+    payload: {
+      transaction: transaction as Transaction,
+      account: mappingResult.debit_account,
+      taxCode: mappingResult.vat_lines[0]?.account_number || '',
+      userId: user.id,
+    },
+  })
 
   return NextResponse.json({
     success: true,

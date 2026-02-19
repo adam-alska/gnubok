@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { eventBus } from '@/lib/events'
+import { ensureInitialized } from '@/lib/init'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { InvoicePDF } from '@/lib/invoice/pdf-template'
 import { sendEmail, isResendConfigured } from '@/lib/email/resend'
@@ -9,6 +11,8 @@ import {
   generateInvoiceEmailSubject
 } from '@/lib/email/invoice-templates'
 import type { Invoice, InvoiceItem, Customer, CompanySettings } from '@/types'
+
+ensureInitialized()
 
 export async function POST(
   request: Request,
@@ -153,6 +157,11 @@ export async function POST(
       console.error('Failed to update invoice status:', updateError)
       // Don't fail the request - the email was sent successfully
     }
+
+    await eventBus.emit({
+      type: 'invoice.sent',
+      payload: { invoice: invoice as Invoice, userId: user.id },
+    })
 
     return NextResponse.json({
       success: true,

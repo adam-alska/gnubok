@@ -7,7 +7,7 @@ export interface SuggestedCategory {
   label: string
   account: string | null
   confidence: number
-  source: 'mapping_rule' | 'pattern' | 'history'
+  source: 'mapping_rule' | 'pattern' | 'history' | 'ai'
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -147,4 +147,33 @@ function accountToCategory(account: string, amount: number): string | null {
     '7960': 'expense_currency_exchange',
   }
   return expenseMap[account] || null
+}
+
+/**
+ * Merge AI-generated suggestions into existing suggestion list.
+ * Deduplicates by category, preserving the higher-confidence entry.
+ */
+export function mergeAiSuggestions(
+  existing: SuggestedCategory[],
+  aiSuggestions: { category: string; basAccount: string; confidence: number; reasoning: string }[]
+): SuggestedCategory[] {
+  const seen = new Set<string>(existing.map((s) => s.category))
+  const merged = [...existing]
+
+  for (const ai of aiSuggestions) {
+    if (seen.has(ai.category)) continue
+    seen.add(ai.category)
+
+    merged.push({
+      category: ai.category as TransactionCategory,
+      label: CATEGORY_LABELS[ai.category] || ai.category,
+      account: ai.basAccount || null,
+      confidence: ai.confidence,
+      source: 'ai',
+    })
+  }
+
+  return merged
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, 5)
 }

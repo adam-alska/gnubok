@@ -1,21 +1,32 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
 import JournalEntryList from '@/components/bookkeeping/JournalEntryList'
 import JournalEntryForm from '@/components/bookkeeping/JournalEntryForm'
 import ChartOfAccounts from '@/components/bookkeeping/ChartOfAccounts'
+import { Lock } from 'lucide-react'
 
 export default function BookkeepingPage() {
   const [refreshKey, setRefreshKey] = useState(0)
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Bokföring</h1>
-        <p className="text-muted-foreground">
-          Verifikationer, kontoplan och manuella bokföringsorder
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Bokföring</h1>
+          <p className="text-muted-foreground">
+            Verifikationer, kontoplan och manuella bokföringsorder
+          </p>
+        </div>
+        <Button variant="outline" asChild>
+          <Link href="/bookkeeping/year-end">
+            <Lock className="mr-2 h-4 w-4" />
+            Årsbokslut
+          </Link>
+        </Button>
       </div>
 
       <Tabs defaultValue="journal">

@@ -503,6 +503,10 @@ export type JournalEntrySourceType =
   | 'salary_payment'
   | 'opening_balance'
   | 'year_end'
+  | 'storno'
+  | 'correction'
+  | 'import'
+  | 'system'
 
 // Journal entry status
 export type JournalEntryStatus = 'draft' | 'posted' | 'reversed'
@@ -530,6 +534,7 @@ export interface BASAccount {
   is_system_account: boolean
   default_vat_code: string | null
   description: string | null
+  sru_code: string | null
   sort_order: number
   created_at: string
   updated_at: string
@@ -544,7 +549,12 @@ export interface FiscalPeriod {
   period_end: string
   is_closed: boolean
   closed_at: string | null
+  locked_at: string | null
+  retention_expires_at: string | null
   opening_balances_set: boolean
+  closing_entry_id: string | null
+  opening_balance_entry_id: string | null
+  previous_period_id: string | null
   created_at: string
   updated_at: string
 }
@@ -561,6 +571,10 @@ export interface JournalEntry {
   source_type: JournalEntrySourceType
   source_id: string | null
   status: JournalEntryStatus
+  committed_at: string | null
+  reversed_by_id: string | null
+  reverses_id: string | null
+  correction_of_id: string | null
   attachment_urls: string[] | null
   created_at: string
   updated_at: string
@@ -580,6 +594,9 @@ export interface JournalEntryLine {
   amount_in_currency: number | null
   exchange_rate: number | null
   line_description: string | null
+  tax_code: string | null
+  cost_center: string | null
+  project: string | null
   sort_order: number
   created_at: string
 }
@@ -725,6 +742,9 @@ export interface CreateJournalEntryLineInput {
   currency?: string
   amount_in_currency?: number
   exchange_rate?: number
+  tax_code?: string
+  cost_center?: string
+  project?: string
 }
 
 export interface CreateFiscalPeriodInput {
@@ -1420,6 +1440,225 @@ export const VAT_RUTA_LABELS: Record<keyof VatDeclarationRutor, string> = {
   ruta40: 'Export utanför EU',
   ruta48: 'Ingående moms att dra av',
   ruta49: 'Moms att betala/återfå'
+}
+
+// ============================================================
+// Event Payload Placeholder Types
+// ============================================================
+
+/** Credit note is an invoice with a credited_invoice_id */
+export interface CreditNote extends Invoice {
+  credited_invoice_id: string
+}
+
+/** CAMT.053 bank statement (placeholder — CAMT parsing not yet implemented) */
+export interface CAMT053Statement {
+  messageId: string
+  statements: unknown[]
+}
+
+/** CAMT.054 payment notification (placeholder — CAMT parsing not yet implemented) */
+export interface CAMT054Notification {
+  messageId: string
+  notifications: unknown[]
+}
+
+/** Security event payload for audit events */
+export interface AuditSecurityEvent {
+  eventType: string
+  description: string
+  metadata: Record<string, unknown>
+}
+
+/** Generic key-value store record for extensions */
+export interface ExtensionDataRecord {
+  id: string
+  user_id: string
+  extension_id: string
+  key: string
+  value: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+// ============================================================
+// Tax Code Types
+// ============================================================
+
+// Tax code identifiers (standard Swedish codes)
+export type TaxCodeId =
+  | 'MP1' | 'MP2' | 'MP3'       // Output VAT 25%, 12%, 6%
+  | 'MPI' | 'MPI12' | 'MPI6'    // Input VAT 25%, 12%, 6%
+  | 'IV'                          // Intra-EU acquisition
+  | 'EUS'                         // EU sale (reverse charge)
+  | 'IP'                          // Import
+  | 'EXP'                         // Export outside EU
+  | 'OSS'                         // One Stop Shop
+  | 'NONE'                        // VAT exempt
+
+export interface TaxCode {
+  id: string
+  user_id: string | null
+  code: string
+  description: string
+  rate: number
+  moms_basis_boxes: string[]
+  moms_tax_boxes: string[]
+  moms_input_boxes: string[]
+  is_output_vat: boolean
+  is_reverse_charge: boolean
+  is_eu: boolean
+  is_export: boolean
+  is_oss: boolean
+  is_system: boolean
+  created_at: string
+  updated_at: string
+}
+
+// ============================================================
+// Document Archive Types
+// ============================================================
+
+export type DocumentUploadSource =
+  | 'camera'
+  | 'file_upload'
+  | 'email'
+  | 'e_invoice'
+  | 'scan'
+  | 'api'
+  | 'system'
+
+export interface DocumentAttachment {
+  id: string
+  user_id: string
+  storage_path: string
+  file_name: string
+  file_size_bytes: number | null
+  mime_type: string | null
+  sha256_hash: string
+  version: number
+  original_id: string | null
+  superseded_by_id: string | null
+  is_current_version: boolean
+  uploaded_by: string | null
+  upload_source: DocumentUploadSource | null
+  digitization_date: string | null
+  journal_entry_id: string | null
+  journal_entry_line_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateDocumentAttachmentInput {
+  storage_path: string
+  file_name: string
+  file_size_bytes?: number
+  mime_type?: string
+  sha256_hash: string
+  upload_source?: DocumentUploadSource
+  journal_entry_id?: string
+  journal_entry_line_id?: string
+}
+
+// ============================================================
+// Audit Log Types
+// ============================================================
+
+export type AuditAction =
+  | 'INSERT'
+  | 'UPDATE'
+  | 'DELETE'
+  | 'COMMIT'
+  | 'REVERSE'
+  | 'CORRECT'
+  | 'LOCK_PERIOD'
+  | 'CLOSE_PERIOD'
+  | 'DOCUMENT_DELETE_BLOCKED'
+  | 'RETENTION_BLOCK'
+  | 'SECURITY_EVENT'
+
+export interface AuditLogEntry {
+  id: string
+  user_id: string
+  action: AuditAction
+  table_name: string | null
+  record_id: string | null
+  actor_id: string | null
+  old_state: Record<string, unknown> | null
+  new_state: Record<string, unknown> | null
+  description: string | null
+  created_at: string
+}
+
+// ============================================================
+// Dimension Types (Kostnadsställen & Projekt)
+// ============================================================
+
+export interface CostCenter {
+  id: string
+  user_id: string
+  code: string
+  name: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface Project {
+  id: string
+  user_id: string
+  code: string
+  name: string
+  is_active: boolean
+  start_date: string | null
+  end_date: string | null
+  created_at: string
+  updated_at: string
+}
+
+// ============================================================
+// Voucher Gap Detection
+// ============================================================
+
+export interface VoucherGap {
+  gap_start: number
+  gap_end: number
+}
+
+// ============================================================
+// Year-End Closing Types (Årsbokslut)
+// ============================================================
+
+export interface YearEndValidation {
+  ready: boolean
+  errors: string[]
+  warnings: string[]
+  draftCount: number
+  voucherGaps: VoucherGap[]
+  trialBalanceBalanced: boolean
+}
+
+export interface YearEndPreview {
+  netResult: number
+  closingAccount: string
+  closingAccountName: string
+  closingLines: CreateJournalEntryLineInput[]
+  resultAccountSummary: { account_number: string; account_name: string; amount: number }[]
+}
+
+export interface YearEndResult {
+  closingEntry: JournalEntry
+  nextPeriod: FiscalPeriod
+  openingBalanceEntry: JournalEntry
+}
+
+export interface PeriodStatus {
+  is_locked: boolean
+  is_closed: boolean
+  has_closing_entry: boolean
+  has_opening_balances: boolean
+  draft_count: number
+  next_period_exists: boolean
 }
 
 // ============================================================

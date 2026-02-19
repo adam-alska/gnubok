@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { getSuggestedCategories, type SuggestedCategory } from '@/lib/transactions/category-suggestions'
+import { getSuggestedCategories, mergeAiSuggestions, type SuggestedCategory } from '@/lib/transactions/category-suggestions'
 import type { Transaction, TransactionCategory } from '@/types'
 
 /**
@@ -61,15 +61,40 @@ export async function POST(request: Request) {
     }
   }
 
+  // Fetch pre-computed AI suggestions for these transactions
+  const aiKeys = ids.map((id: string) => `suggestion:${id}`)
+  const { data: aiRecords } = await supabase
+    .from('extension_data')
+    .select('key, value')
+    .eq('user_id', user.id)
+    .eq('extension_id', 'ai-categorization')
+    .in('key', aiKeys)
+
+  const aiSuggestionsMap: Record<string, { category: string; basAccount: string; confidence: number; reasoning: string }> = {}
+  if (aiRecords) {
+    for (const record of aiRecords) {
+      const txId = record.key.replace('suggestion:', '')
+      aiSuggestionsMap[txId] = record.value as { category: string; basAccount: string; confidence: number; reasoning: string }
+    }
+  }
+
   // Generate suggestions for each transaction
   const suggestions: Record<string, SuggestedCategory[]> = {}
 
   for (const tx of transactions) {
-    suggestions[tx.id] = getSuggestedCategories(
+    let result = getSuggestedCategories(
       tx as Transaction,
       mappingRules || [],
       categoryHistory
     )
+
+    // Merge AI suggestions if available
+    const aiSuggestion = aiSuggestionsMap[tx.id]
+    if (aiSuggestion) {
+      result = mergeAiSuggestions(result, [aiSuggestion])
+    }
+
+    suggestions[tx.id] = result
   }
 
   return NextResponse.json({ suggestions })

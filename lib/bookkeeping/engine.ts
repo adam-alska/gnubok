@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { eventBus } from '@/lib/events'
 import type {
   CreateJournalEntryInput,
   CreateJournalEntryLineInput,
@@ -30,6 +31,7 @@ export function validateBalance(lines: CreateJournalEntryLineInput[]): {
 
 /**
  * Get the next voucher number for a user/period/series
+ * Uses the concurrent-safe INSERT ON CONFLICT implementation in the database
  */
 export async function getNextVoucherNumber(
   userId: string,
@@ -105,8 +107,167 @@ export async function findFiscalPeriod(
 }
 
 /**
+ * Build line insert objects from input lines, resolving account IDs and
+ * including tax_code, cost_center, project dimensions
+ */
+function buildLineInserts(
+  entryId: string,
+  lines: CreateJournalEntryLineInput[],
+  accountIdMap: Map<string, string>
+) {
+  return lines.map((line, index) => ({
+    journal_entry_id: entryId,
+    account_number: line.account_number,
+    account_id: accountIdMap.get(line.account_number) || null,
+    debit_amount: Math.round((line.debit_amount || 0) * 100) / 100,
+    credit_amount: Math.round((line.credit_amount || 0) * 100) / 100,
+    currency: line.currency || 'SEK',
+    amount_in_currency: line.amount_in_currency ? Math.round(line.amount_in_currency * 100) / 100 : null,
+    exchange_rate: line.exchange_rate || null,
+    line_description: line.line_description || null,
+    tax_code: line.tax_code || null,
+    cost_center: line.cost_center || null,
+    project: line.project || null,
+    sort_order: index,
+  }))
+}
+
+/**
+ * Create a draft journal entry with lines (no voucher number assigned yet)
+ * The entry stays in 'draft' status until commitEntry() is called.
+ */
+export async function createDraftEntry(
+  userId: string,
+  input: CreateJournalEntryInput
+): Promise<JournalEntry> {
+  // Validate balance
+  const balance = validateBalance(input.lines)
+  if (!balance.valid) {
+    throw new Error(
+      `Journal entry is not balanced: debits (${balance.totalDebit}) != credits (${balance.totalCredit})`
+    )
+  }
+
+  const supabase = await createClient()
+
+  // Resolve account IDs
+  const accountIdMap = await resolveAccountIds(supabase, userId, input.lines)
+
+  // Insert journal entry header as draft (voucher_number = 0, will be assigned on commit)
+  const { data: entry, error: entryError } = await supabase
+    .from('journal_entries')
+    .insert({
+      user_id: userId,
+      fiscal_period_id: input.fiscal_period_id,
+      voucher_number: 0,
+      voucher_series: input.voucher_series || 'A',
+      entry_date: input.entry_date,
+      description: input.description,
+      source_type: input.source_type,
+      source_id: input.source_id || null,
+      status: 'draft',
+    })
+    .select()
+    .single()
+
+  if (entryError || !entry) {
+    throw new Error(`Failed to create draft journal entry: ${entryError?.message}`)
+  }
+
+  // Insert journal entry lines with dimensions
+  const lineInserts = buildLineInserts(entry.id, input.lines, accountIdMap)
+
+  const { error: linesError } = await supabase
+    .from('journal_entry_lines')
+    .insert(lineInserts)
+
+  if (linesError) {
+    await supabase.from('journal_entries').delete().eq('id', entry.id)
+    throw new Error(`Failed to create journal entry lines: ${linesError.message}`)
+  }
+
+  // Fetch complete entry with lines
+  const { data: completeEntry } = await supabase
+    .from('journal_entries')
+    .select('*, lines:journal_entry_lines(*)')
+    .eq('id', entry.id)
+    .single()
+
+  const result = completeEntry as JournalEntry
+
+  await eventBus.emit({
+    type: 'journal_entry.drafted',
+    payload: { entry: result, userId },
+  })
+
+  return result
+}
+
+/**
+ * Commit a draft entry: assigns voucher number and transitions to 'posted'
+ * Triggers balance validation and sets committed_at via DB triggers
+ */
+export async function commitEntry(
+  userId: string,
+  entryId: string
+): Promise<JournalEntry> {
+  const supabase = await createClient()
+
+  // Fetch the draft entry
+  const { data: entry, error: fetchError } = await supabase
+    .from('journal_entries')
+    .select('*')
+    .eq('id', entryId)
+    .eq('user_id', userId)
+    .eq('status', 'draft')
+    .single()
+
+  if (fetchError || !entry) {
+    throw new Error('Draft journal entry not found')
+  }
+
+  // Assign voucher number
+  const voucherNumber = await getNextVoucherNumber(
+    userId,
+    entry.fiscal_period_id,
+    entry.voucher_series || 'A'
+  )
+
+  // Update to posted with voucher number
+  // DB triggers will: validate balance, set committed_at, write audit log
+  const { error: postError } = await supabase
+    .from('journal_entries')
+    .update({
+      voucher_number: voucherNumber,
+      status: 'posted',
+    })
+    .eq('id', entryId)
+
+  if (postError) {
+    throw new Error(`Failed to commit journal entry: ${postError.message}`)
+  }
+
+  // Fetch complete posted entry with lines
+  const { data: completeEntry } = await supabase
+    .from('journal_entries')
+    .select('*, lines:journal_entry_lines(*)')
+    .eq('id', entryId)
+    .single()
+
+  const result = completeEntry as JournalEntry
+
+  await eventBus.emit({
+    type: 'journal_entry.committed',
+    payload: { entry: result, userId },
+  })
+
+  return result
+}
+
+/**
  * Create a journal entry with lines (verifikation)
- * Validates balance, resolves account IDs, assigns voucher number, inserts atomically
+ * Convenience wrapper: creates draft + commits in one step.
+ * Validates balance, resolves account IDs, assigns voucher number, inserts atomically.
  */
 export async function createJournalEntry(
   userId: string,
@@ -153,19 +314,8 @@ export async function createJournalEntry(
     throw new Error(`Failed to create journal entry: ${entryError?.message}`)
   }
 
-  // Insert journal entry lines (round amounts to 2 decimal places to avoid floating point issues)
-  const lineInserts = input.lines.map((line, index) => ({
-    journal_entry_id: entry.id,
-    account_number: line.account_number,
-    account_id: accountIdMap.get(line.account_number) || null,
-    debit_amount: Math.round((line.debit_amount || 0) * 100) / 100,
-    credit_amount: Math.round((line.credit_amount || 0) * 100) / 100,
-    currency: line.currency || 'SEK',
-    amount_in_currency: line.amount_in_currency ? Math.round(line.amount_in_currency * 100) / 100 : null,
-    exchange_rate: line.exchange_rate || null,
-    line_description: line.line_description || null,
-    sort_order: index,
-  }))
+  // Insert journal entry lines with dimensions
+  const lineInserts = buildLineInserts(entry.id, input.lines, accountIdMap)
 
   const { error: linesError } = await supabase
     .from('journal_entry_lines')
@@ -177,7 +327,7 @@ export async function createJournalEntry(
     throw new Error(`Failed to create journal entry lines: ${linesError.message}`)
   }
 
-  // Post the entry (triggers balance validation in DB)
+  // Post the entry (triggers balance validation + committed_at in DB)
   const { data: postedEntry, error: postError } = await supabase
     .from('journal_entries')
     .update({ status: 'posted' })
@@ -199,11 +349,19 @@ export async function createJournalEntry(
     .eq('id', entry.id)
     .single()
 
-  return completeEntry as JournalEntry
+  const result = completeEntry as JournalEntry
+
+  await eventBus.emit({
+    type: 'journal_entry.committed',
+    payload: { entry: result, userId },
+  })
+
+  return result
 }
 
 /**
  * Create a reversal entry for an existing journal entry
+ * Sets reversed_by_id/reverses_id links for compliance tracking
  */
 export async function reverseEntry(
   userId: string,
@@ -229,7 +387,7 @@ export async function reverseEntry(
 
   const lines = (original.lines as JournalEntryLine[]) || []
 
-  // Create reversed lines (swap debit and credit)
+  // Create reversed lines (swap debit and credit, preserve dimensions)
   const reversedLines: CreateJournalEntryLineInput[] = lines.map((line) => ({
     account_number: line.account_number,
     debit_amount: line.credit_amount,
@@ -240,24 +398,89 @@ export async function reverseEntry(
       ? -line.amount_in_currency
       : undefined,
     exchange_rate: line.exchange_rate || undefined,
+    tax_code: line.tax_code || undefined,
+    cost_center: line.cost_center || undefined,
+    project: line.project || undefined,
   }))
 
-  // Create reversal entry
-  const reversalEntry = await createJournalEntry(userId, {
-    fiscal_period_id: original.fiscal_period_id,
-    entry_date: new Date().toISOString().split('T')[0],
-    description: `Makulering: ${original.description}`,
-    source_type: original.source_type,
-    source_id: original.source_id,
-    voucher_series: original.voucher_series,
-    lines: reversedLines,
-  })
+  // Get voucher number for the reversal
+  const voucherNumber = await getNextVoucherNumber(
+    userId,
+    original.fiscal_period_id,
+    original.voucher_series || 'A'
+  )
 
-  // Mark original as reversed
+  // Resolve account IDs
+  const accountIdMap = await resolveAccountIds(supabase, userId, reversedLines)
+
+  // Create reversal entry with reverses_id link
+  const { data: reversalEntry, error: reversalError } = await supabase
+    .from('journal_entries')
+    .insert({
+      user_id: userId,
+      fiscal_period_id: original.fiscal_period_id,
+      voucher_number: voucherNumber,
+      voucher_series: original.voucher_series || 'A',
+      entry_date: new Date().toISOString().split('T')[0],
+      description: `Makulering: ${original.description}`,
+      source_type: 'storno',
+      source_id: original.source_id || null,
+      reverses_id: entryId,
+      status: 'draft',
+    })
+    .select()
+    .single()
+
+  if (reversalError || !reversalEntry) {
+    throw new Error(`Failed to create reversal entry: ${reversalError?.message}`)
+  }
+
+  // Insert reversal lines with dimensions
+  const lineInserts = buildLineInserts(reversalEntry.id, reversedLines, accountIdMap)
+
+  const { error: linesError } = await supabase
+    .from('journal_entry_lines')
+    .insert(lineInserts)
+
+  if (linesError) {
+    await supabase.from('journal_entries').delete().eq('id', reversalEntry.id)
+    throw new Error(`Failed to create reversal lines: ${linesError.message}`)
+  }
+
+  // Post the reversal entry
+  const { error: postError } = await supabase
+    .from('journal_entries')
+    .update({ status: 'posted' })
+    .eq('id', reversalEntry.id)
+
+  if (postError) {
+    await supabase.from('journal_entry_lines').delete().eq('journal_entry_id', reversalEntry.id)
+    await supabase.from('journal_entries').delete().eq('id', reversalEntry.id)
+    throw new Error(`Failed to post reversal entry: ${postError.message}`)
+  }
+
+  // Mark original as reversed with reversed_by_id link
   await supabase
     .from('journal_entries')
-    .update({ status: 'reversed' })
+    .update({
+      status: 'reversed',
+      reversed_by_id: reversalEntry.id,
+    })
     .eq('id', entryId)
 
-  return reversalEntry
+  // Fetch complete reversal entry with lines
+  const { data: completeEntry } = await supabase
+    .from('journal_entries')
+    .select('*, lines:journal_entry_lines(*)')
+    .eq('id', reversalEntry.id)
+    .single()
+
+  const result = completeEntry as JournalEntry
+
+  await eventBus.emit({
+    type: 'journal_entry.committed',
+    payload: { entry: result, userId },
+  })
+
+  return result
 }

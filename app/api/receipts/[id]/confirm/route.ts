@@ -1,6 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import type { ConfirmReceiptInput } from '@/types'
+import { eventBus } from '@/lib/events/bus'
+import { ensureInitialized } from '@/lib/init'
+import type { ConfirmReceiptInput, Receipt, ReceiptLineItem } from '@/types'
+
+ensureInitialized()
 
 /**
  * POST /api/receipts/[id]/confirm
@@ -103,6 +107,29 @@ export async function POST(
     console.error('Receipt update error:', updateError)
     return NextResponse.json({ error: 'Failed to update receipt' }, { status: 500 })
   }
+
+  // Calculate business/private totals from line items
+  const lineItems = ((updatedReceipt as unknown as Receipt).line_items || []) as ReceiptLineItem[]
+  let businessTotal = 0
+  let privateTotal = 0
+  for (const item of lineItems) {
+    if (item.is_business === true) {
+      businessTotal += item.line_total
+    } else if (item.is_business === false) {
+      privateTotal += item.line_total
+    }
+  }
+
+  // Emit receipt.confirmed event
+  await eventBus.emit({
+    type: 'receipt.confirmed',
+    payload: {
+      receipt: updatedReceipt as unknown as Receipt,
+      businessTotal: Math.round(businessTotal * 100) / 100,
+      privateTotal: Math.round(privateTotal * 100) / 100,
+      userId: user.id,
+    },
+  })
 
   return NextResponse.json({ data: updatedReceipt })
 }

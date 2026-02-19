@@ -1,6 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { eventBus } from '@/lib/events'
+import { ensureInitialized } from '@/lib/init'
 import { syncAccountTransactions } from '@/lib/banking/sync-transactions'
+import type { Transaction } from '@/types'
+
+ensureInitialized()
 
 interface StoredAccount {
   uid: string
@@ -63,18 +68,38 @@ export async function POST(request: Request) {
     }
 
     // Update connection with new account balances and sync timestamp
+    const syncedAt = new Date().toISOString()
     await supabase
       .from('bank_connections')
       .update({
         accounts,
-        last_synced_at: new Date().toISOString(),
+        last_synced_at: syncedAt,
       })
       .eq('id', connection.id)
+
+    // Emit event with newly synced transactions
+    if (totalImported > 0) {
+      const { data: syncedTransactions } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('bank_connection_id', connection.id)
+        .gte('created_at', fromDate)
+        .order('created_at', { ascending: false })
+        .limit(totalImported)
+
+      if (syncedTransactions && syncedTransactions.length > 0) {
+        await eventBus.emit({
+          type: 'transaction.synced',
+          payload: { transactions: syncedTransactions as Transaction[], userId: user.id },
+        })
+      }
+    }
 
     return NextResponse.json({
       imported: totalImported,
       duplicates: totalDuplicates,
-      last_synced_at: new Date().toISOString(),
+      last_synced_at: syncedAt,
     })
   } catch (error) {
     console.error('Sync error:', error)
