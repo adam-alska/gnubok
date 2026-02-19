@@ -230,7 +230,7 @@ export function FouAvdragWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
         actions={
           <Button onClick={openNew}>
             <Plus className="mr-2 h-4 w-4" />
-            Lagg till anstalld
+            Lägg till anställd
           </Button>
         }
       >
@@ -242,10 +242,10 @@ export function FouAvdragWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
           <div className="space-y-6">
             {/* KPI summary */}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <KPICard label="Antal anstalda i FoU" value={String(employees.length)} unit="st" />
+              <KPICard label="Antal anställda i FoU" value={String(employees.length)} unit="st" />
               <KPICard label="Genomsnittlig FoU-andel" value={fmtPct(totals.avgRndShare)} unit="%" />
-              <KPICard label="Manadsavdrag" value={fmt(totals.totalMonthlyReduction)} unit="kr" />
-              <KPICard label="Arsavdrag (beraknat)" value={fmt(totals.totalYearlyReduction)} unit="kr" />
+              <KPICard label="Månadsavdrag" value={fmt(totals.totalMonthlyReduction)} unit="kr" />
+              <KPICard label="Årsavdrag (beräknat)" value={fmt(totals.totalYearlyReduction)} unit="kr" />
             </div>
 
             {/* Info card */}
@@ -253,12 +253,12 @@ export function FouAvdragWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
               <CardHeader>
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Calculator className="h-4 w-4" />
-                  Berakningsmodell
+                  Beräkningsmodell
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground space-y-2">
-                <p>FoU-avdraget ger en reduktion av arbetsgivaravgifterna for anstalda som arbetar med forskning och utveckling.</p>
-                <p>Aktuell reduktionssats: <span className="font-semibold text-foreground">{(RND_REDUCTION_RATE * 100).toFixed(0)}%</span> av FoU-lonekostnaden.</p>
+                <p>FoU-avdraget ger en reduktion av arbetsgivaravgifterna för anställda som arbetar med forskning och utveckling.</p>
+                <p>Aktuell reduktionssats: <span className="font-semibold text-foreground">{(RND_REDUCTION_RATE * 100).toFixed(0)}%</span> av FoU-lönekostnaden.</p>
                 <p>Normala arbetsgivaravgifter: <span className="font-semibold text-foreground">{(EMPLOYER_CONTRIBUTION_RATE * 100).toFixed(2)}%</span>.</p>
               </CardContent>
             </Card>
@@ -269,9 +269,9 @@ export function FouAvdragWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
             {employees.length === 0 ? (
               <EmptyModuleState
                 icon={FlaskConical}
-                title="Inga anstalda registrerade"
-                description="Lagg till anstalda som arbetar med FoU for att berakna avdrag."
-                actionLabel="Lagg till anstalld"
+                title="Inga anställda registrerade"
+                description="Lägg till anställda som arbetar med FoU för att beräkna avdrag."
+                actionLabel="Lägg till anställd"
                 onAction={openNew}
               />
             ) : (
@@ -280,14 +280,14 @@ export function FouAvdragWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
                   <TableHeader>
                     <TableRow className="bg-muted/50">
                       <TableHead className="font-medium">Namn</TableHead>
-                      <TableHead className="font-medium text-right">Manadsloen</TableHead>
+                      <TableHead className="font-medium text-right">Månadslön</TableHead>
                       <TableHead className="font-medium text-right">Tot timmar</TableHead>
                       <TableHead className="font-medium text-right">FoU timmar</TableHead>
                       <TableHead className="font-medium text-right">FoU-andel</TableHead>
-                      <TableHead className="font-medium text-right">FoU-lon</TableHead>
-                      <TableHead className="font-medium text-right">Manadsavdrag</TableHead>
-                      <TableHead className="font-medium text-right">Arsavdrag</TableHead>
-                      <TableHead className="font-medium text-right">Atgarder</TableHead>
+                      <TableHead className="font-medium text-right">FoU-lön</TableHead>
+                      <TableHead className="font-medium text-right">Månadsavdrag</TableHead>
+                      <TableHead className="font-medium text-right">Årsavdrag</TableHead>
+                      <TableHead className="font-medium text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -342,9 +342,9 @@ export function FouAvdragWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Redigera anstalld' : 'Ny anstalld'}</DialogTitle>
+            <DialogTitle>{editing ? 'Redigera anställd' : 'Ny anställd'}</DialogTitle>
             <DialogDescription>
-              {editing ? 'Uppdatera uppgifterna nedan.' : 'Fyll i uppgifterna for den anstallda.'}
+              {editing ? 'Uppdatera uppgifterna nedan.' : 'Fyll i uppgifterna för den anställda.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
@@ -354,15 +354,15 @@ export function FouAvdragWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">
-                <Label>Manadsloen (kr)</Label>
+                <Label>Månadslön (kr)</Label>
                 <Input type="number" min={0} value={form.monthlySalary} onChange={(e) => setForm((f) => ({ ...f, monthlySalary: Number(e.target.value) }))} />
               </div>
               <div className="grid gap-2">
-                <Label>Tot timmar/man</Label>
+                <Label>Tot timmar/mån</Label>
                 <Input type="number" min={0} value={form.totalHoursPerMonth} onChange={(e) => setForm((f) => ({ ...f, totalHoursPerMonth: Number(e.target.value) }))} />
               </div>
               <div className="grid gap-2">
-                <Label>FoU timmar/man</Label>
+                <Label>FoU timmar/mån</Label>
                 <Input type="number" min={0} value={form.rndHoursPerMonth} onChange={(e) => setForm((f) => ({ ...f, rndHoursPerMonth: Number(e.target.value) }))} />
               </div>
             </div>
@@ -370,7 +370,7 @@ export function FouAvdragWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Avbryt</Button>
             <Button onClick={handleSave} disabled={!form.name.trim()}>
-              {editing ? 'Uppdatera' : 'Lagg till'}
+              {editing ? 'Uppdatera' : 'Lägg till'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -380,9 +380,9 @@ export function FouAvdragWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Ta bort anstalld</DialogTitle>
+            <DialogTitle>Ta bort anställd</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort {toDelete?.name}? Denna atgard kan inte angras.
+              Är du säker på att du vill ta bort {toDelete?.name}? Denna åtgärd kan inte ångras.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

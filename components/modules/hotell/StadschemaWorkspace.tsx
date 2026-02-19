@@ -69,20 +69,20 @@ interface StaffMember {
 
 const STATUS_MAP: Record<CleaningStatus, { label: string; color: string; icon: string }> = {
   smutsigt: { label: 'Smutsigt', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', icon: 'red' },
-  stadas: { label: 'Stadas', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400', icon: 'amber' },
+  stadas: { label: 'Städas', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400', icon: 'amber' },
   rent: { label: 'Rent', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400', icon: 'green' },
   inspekterat: { label: 'Inspekterat', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', icon: 'blue' },
 }
 
 const DEFAULT_CHECKLIST = [
-  { task: 'Byte av sanglinne', done: false },
+  { task: 'Byte av sänglinne', done: false },
   { task: 'Byte av handdukar', done: false },
   { task: 'Dammsugning', done: false },
   { task: 'Golvtorkning', done: false },
   { task: 'Badrum rengjort', done: false },
   { task: 'Minibar kontrollerad', done: false },
-  { task: 'Pappersmaterial fyllt pa', done: false },
-  { task: 'Fonster putsade', done: false },
+  { task: 'Pappersmaterial fyllt på', done: false },
+  { task: 'Fönster putsade', done: false },
 ]
 
 const DEFAULT_ROOMS: RoomCleaning[] = [
@@ -289,7 +289,7 @@ export function StadschemaWorkspace({ module: mod, sectorSlug, settingsHref }: M
         actions={
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => setStaffDialogOpen(true)}>Personal</Button>
-            <Button variant="outline" size="sm" onClick={resetAllRooms}>Aterstall alla</Button>
+            <Button variant="outline" size="sm" onClick={resetAllRooms}>Återställ alla</Button>
           </div>
         }
       >
@@ -318,7 +318,7 @@ export function StadschemaWorkspace({ module: mod, sectorSlug, settingsHref }: M
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Sok rum eller personal..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
+                <Input placeholder="Sök rum eller personal..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
               </div>
               <Select value={filterStatus} onValueChange={val => setFilterStatus(val as CleaningStatus | 'all')}>
                 <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filtrera status" /></SelectTrigger>
@@ -341,7 +341,7 @@ export function StadschemaWorkspace({ module: mod, sectorSlug, settingsHref }: M
                     <TableHead className="font-medium">Tilldelad</TableHead>
                     <TableHead className="font-medium text-center">Prioritet</TableHead>
                     <TableHead className="font-medium text-center">Checklista</TableHead>
-                    <TableHead className="font-medium text-right">Atgarder</TableHead>
+                    <TableHead className="font-medium text-right">Åtgärder</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -374,7 +374,7 @@ export function StadschemaWorkspace({ module: mod, sectorSlug, settingsHref }: M
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
                             {room.status === 'smutsigt' && (
-                              <Button variant="ghost" size="icon" onClick={() => updateRoomStatus(room.roomNumber, 'stadas')} title="Borja stada">
+                              <Button variant="ghost" size="icon" onClick={() => updateRoomStatus(room.roomNumber, 'stadas')} title="Börja städa">
                                 <Sparkles className="h-4 w-4 text-amber-600" />
                               </Button>
                             )}
@@ -405,7 +405,7 @@ export function StadschemaWorkspace({ module: mod, sectorSlug, settingsHref }: M
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Checklista - Rum {selectedRoom?.roomNumber}</DialogTitle>
-            <DialogDescription>Bocka av uppgifter allt eftersom de utfors.</DialogDescription>
+            <DialogDescription>Bocka av uppgifter allt eftersom de utförs.</DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2">
             {selectedRoom?.checklist.map((item, idx) => (
@@ -421,7 +421,7 @@ export function StadschemaWorkspace({ module: mod, sectorSlug, settingsHref }: M
             ))}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setChecklistDialogOpen(false)}>Stang</Button>
+            <Button variant="outline" onClick={() => setChecklistDialogOpen(false)}>Stäng</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -430,8 +430,8 @@ export function StadschemaWorkspace({ module: mod, sectorSlug, settingsHref }: M
       <Dialog open={staffDialogOpen} onOpenChange={setStaffDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Hantera stadpersonal</DialogTitle>
-            <DialogDescription>Lagg till eller ta bort personal som kan tilldelas rum.</DialogDescription>
+            <DialogTitle>Hantera städpersonal</DialogTitle>
+            <DialogDescription>Lägg till eller ta bort personal som kan tilldelas rum.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="flex items-end gap-2">
@@ -439,7 +439,7 @@ export function StadschemaWorkspace({ module: mod, sectorSlug, settingsHref }: M
                 <Label className="text-xs">Nytt namn</Label>
                 <Input value={staffName} onChange={e => setStaffName(e.target.value)} placeholder="Namn" className="h-9" />
               </div>
-              <Button size="sm" onClick={addStaffMember} disabled={!staffName.trim()}>Lagg till</Button>
+              <Button size="sm" onClick={addStaffMember} disabled={!staffName.trim()}>Lägg till</Button>
             </div>
             {staff.map(s => (
               <div key={s.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/30">
@@ -449,7 +449,7 @@ export function StadschemaWorkspace({ module: mod, sectorSlug, settingsHref }: M
             ))}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setStaffDialogOpen(false)}>Stang</Button>
+            <Button variant="outline" onClick={() => setStaffDialogOpen(false)}>Stäng</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -82,21 +82,21 @@ const PRODUCT_CATEGORIES: ProductCategory[] = [
 const VAT_RATES = [0, 6, 12, 25]
 
 const DEFAULT_ACCOUNTS: Account[] = [
-  { number: '3001', name: 'Forsaljning livsmedel 12%', type: 'Intakt', category: 'Livsmedel', vatRate: 12 },
-  { number: '3002', name: 'Forsaljning dryck 12%', type: 'Intakt', category: 'Dryck', vatRate: 12 },
-  { number: '3003', name: 'Forsaljning frukt & gront 12%', type: 'Intakt', category: 'Frukt & Gront', vatRate: 12 },
-  { number: '3004', name: 'Forsaljning mejeri 12%', type: 'Intakt', category: 'Mejeri', vatRate: 12 },
-  { number: '3005', name: 'Forsaljning kott & chark 12%', type: 'Intakt', category: 'Kott & Chark', vatRate: 12 },
-  { number: '3010', name: 'Forsaljning non-food 25%', type: 'Intakt', category: 'Non-food', vatRate: 25 },
-  { number: '4010', name: 'Inkop livsmedel', type: 'Kostnad', category: 'Livsmedel', vatRate: 12 },
-  { number: '4020', name: 'Inkop dryck', type: 'Kostnad', category: 'Dryck', vatRate: 12 },
-  { number: '4030', name: 'Inkop frukt & gront', type: 'Kostnad', category: 'Frukt & Gront', vatRate: 12 },
-  { number: '4040', name: 'Inkop mejeri', type: 'Kostnad', category: 'Mejeri', vatRate: 12 },
-  { number: '4050', name: 'Inkop kott & chark', type: 'Kostnad', category: 'Kott & Chark', vatRate: 12 },
-  { number: '4060', name: 'Inkop non-food', type: 'Kostnad', category: 'Non-food', vatRate: 25 },
+  { number: '3001', name: 'Försäljning livsmedel 12%', type: 'Intakt', category: 'Livsmedel', vatRate: 12 },
+  { number: '3002', name: 'Försäljning dryck 12%', type: 'Intakt', category: 'Dryck', vatRate: 12 },
+  { number: '3003', name: 'Försäljning frukt & grönt 12%', type: 'Intakt', category: 'Frukt & Gront', vatRate: 12 },
+  { number: '3004', name: 'Försäljning mejeri 12%', type: 'Intakt', category: 'Mejeri', vatRate: 12 },
+  { number: '3005', name: 'Försäljning kött & chark 12%', type: 'Intakt', category: 'Kott & Chark', vatRate: 12 },
+  { number: '3010', name: 'Försäljning non-food 25%', type: 'Intakt', category: 'Non-food', vatRate: 25 },
+  { number: '4010', name: 'Inköp livsmedel', type: 'Kostnad', category: 'Livsmedel', vatRate: 12 },
+  { number: '4020', name: 'Inköp dryck', type: 'Kostnad', category: 'Dryck', vatRate: 12 },
+  { number: '4030', name: 'Inköp frukt & grönt', type: 'Kostnad', category: 'Frukt & Gront', vatRate: 12 },
+  { number: '4040', name: 'Inköp mejeri', type: 'Kostnad', category: 'Mejeri', vatRate: 12 },
+  { number: '4050', name: 'Inköp kött & chark', type: 'Kostnad', category: 'Kott & Chark', vatRate: 12 },
+  { number: '4060', name: 'Inköp non-food', type: 'Kostnad', category: 'Non-food', vatRate: 25 },
   { number: '1400', name: 'Lager', type: 'Tillgang', category: 'Ovrigt', vatRate: 0 },
   { number: '5010', name: 'Lokalkostnader', type: 'Kostnad', category: 'Lokal', vatRate: 25 },
-  { number: '7010', name: 'Loner', type: 'Kostnad', category: 'Personal', vatRate: 0 },
+  { number: '7010', name: 'Löner', type: 'Kostnad', category: 'Personal', vatRate: 0 },
   { number: '7510', name: 'Sociala avgifter', type: 'Kostnad', category: 'Personal', vatRate: 0 },
 ]
 
@@ -318,7 +318,7 @@ export function DetaljhandelskontoplanWorkspace({ module: mod, sectorSlug, setti
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Sok konto (nummer, namn, kategori)..."
+                  placeholder="Sök konto (nummer, namn, kategori)..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
@@ -352,8 +352,8 @@ export function DetaljhandelskontoplanWorkspace({ module: mod, sectorSlug, setti
                 title="Inga konton hittades"
                 description={
                   searchQuery || filterType !== 'all'
-                    ? 'Inga konton matchar dina sokkriterier. Prova att andra filter.'
-                    : 'Lagg till konton for att bygga upp din kontoplan.'
+                    ? 'Inga konton matchar dina sökkriterier. Prova att ändra filter.'
+                    : 'Lägg till konton för att bygga upp din kontoplan.'
                 }
                 actionLabel={!searchQuery && filterType === 'all' ? 'Nytt konto' : undefined}
                 onAction={!searchQuery && filterType === 'all' ? openNewAccount : undefined}
@@ -368,7 +368,7 @@ export function DetaljhandelskontoplanWorkspace({ module: mod, sectorSlug, setti
                       <TableHead className="font-medium">Typ</TableHead>
                       <TableHead className="font-medium">Kategori</TableHead>
                       <TableHead className="font-medium">Moms</TableHead>
-                      <TableHead className="font-medium text-right">Atgarder</TableHead>
+                      <TableHead className="font-medium text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -425,7 +425,7 @@ export function DetaljhandelskontoplanWorkspace({ module: mod, sectorSlug, setti
             <DialogDescription>
               {editingAccount
                 ? 'Uppdatera kontots uppgifter nedan.'
-                : 'Fyll i uppgifterna for det nya kontot.'}
+                : 'Fyll i uppgifterna för det nya kontot.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -448,7 +448,7 @@ export function DetaljhandelskontoplanWorkspace({ module: mod, sectorSlug, setti
                   id="acct-name"
                   value={accountForm.name}
                   onChange={(e) => setAccountForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="Inkop livsmedel"
+                  placeholder="Inköp livsmedel"
                 />
               </div>
             </div>
@@ -461,7 +461,7 @@ export function DetaljhandelskontoplanWorkspace({ module: mod, sectorSlug, setti
                   onValueChange={(val) => setAccountForm((f) => ({ ...f, type: val as AccountType }))}
                 >
                   <SelectTrigger id="acct-type">
-                    <SelectValue placeholder="Valj typ" />
+                    <SelectValue placeholder="Välj typ" />
                   </SelectTrigger>
                   <SelectContent>
                     {ACCOUNT_TYPES.map((t) => (
@@ -477,7 +477,7 @@ export function DetaljhandelskontoplanWorkspace({ module: mod, sectorSlug, setti
                   onValueChange={(val) => setAccountForm((f) => ({ ...f, category: val as ProductCategory }))}
                 >
                   <SelectTrigger id="acct-category">
-                    <SelectValue placeholder="Valj kategori" />
+                    <SelectValue placeholder="Välj kategori" />
                   </SelectTrigger>
                   <SelectContent>
                     {PRODUCT_CATEGORIES.map((c) => (
@@ -524,9 +524,9 @@ export function DetaljhandelskontoplanWorkspace({ module: mod, sectorSlug, setti
           <DialogHeader>
             <DialogTitle>Ta bort konto</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort konto{' '}
+              Är du säker på att du vill ta bort konto{' '}
               <span className="font-mono font-semibold">{accountToDelete?.number}</span>{' '}
-              ({accountToDelete?.name})? Denna atgard kan inte angras.
+              ({accountToDelete?.name})? Denna åtgärd kan inte ångras.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

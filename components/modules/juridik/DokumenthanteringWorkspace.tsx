@@ -310,7 +310,7 @@ export function DokumenthanteringWorkspace({ module: mod, sectorSlug, settingsHr
       >
         <Tabs defaultValue="oversikt" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="oversikt">Oversikt</TabsTrigger>
+            <TabsTrigger value="oversikt">Översikt</TabsTrigger>
             <TabsTrigger value="dokument">Dokument</TabsTrigger>
             <TabsTrigger value="mallar">Mallbibliotek</TabsTrigger>
           </TabsList>
@@ -325,7 +325,7 @@ export function DokumenthanteringWorkspace({ module: mod, sectorSlug, settingsHr
               <EmptyModuleState
                 icon={FileText}
                 title="Inga dokument"
-                description="Skapa dokument per arende med versionering och e-signering."
+                description="Skapa dokument per ärende med versionering och e-signering."
                 actionLabel="Nytt dokument"
                 onAction={openNewDoc}
               />
@@ -352,7 +352,7 @@ export function DokumenthanteringWorkspace({ module: mod, sectorSlug, settingsHr
                   <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Sok dokument..."
+                      placeholder="Sök dokument..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9"
@@ -400,12 +400,12 @@ export function DokumenthanteringWorkspace({ module: mod, sectorSlug, settingsHr
                       <TableHeader>
                         <TableRow className="bg-muted/50">
                           <TableHead className="font-medium">Titel</TableHead>
-                          <TableHead className="font-medium">Arende</TableHead>
+                          <TableHead className="font-medium">Ärende</TableHead>
                           <TableHead className="font-medium">Kategori</TableHead>
                           <TableHead className="font-medium">Status</TableHead>
                           <TableHead className="font-medium text-right">Ver.</TableHead>
-                          <TableHead className="font-medium">Andrad</TableHead>
-                          <TableHead className="font-medium text-right">Atgarder</TableHead>
+                          <TableHead className="font-medium">Ändrad</TableHead>
+                          <TableHead className="font-medium text-right">Åtgärder</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -469,7 +469,7 @@ export function DokumenthanteringWorkspace({ module: mod, sectorSlug, settingsHr
                       <EmptyModuleState
                         icon={FileText}
                         title="Inga mallar"
-                        description="Skapa dokument med kategorin 'Mall' for att bygga upp mallbiblioteket."
+                        description="Skapa dokument med kategorin 'Mall' för att bygga upp mallbiblioteket."
                         actionLabel="Ny mall"
                         onAction={openNewDoc}
                       />
@@ -521,7 +521,7 @@ export function DokumenthanteringWorkspace({ module: mod, sectorSlug, settingsHr
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="doc-case">Arende</Label>
+                <Label htmlFor="doc-case">Ärende</Label>
                 <Input id="doc-case" value={form.caseRef} onChange={(e) => setForm((f) => ({ ...f, caseRef: e.target.value }))} placeholder="2024-001" />
               </div>
               <div className="grid gap-2">
@@ -553,7 +553,7 @@ export function DokumenthanteringWorkspace({ module: mod, sectorSlug, settingsHr
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="doc-author">Forfattare</Label>
+                <Label htmlFor="doc-author">Författare</Label>
                 <Input id="doc-author" value={form.author} onChange={(e) => setForm((f) => ({ ...f, author: e.target.value }))} placeholder="Namn" />
               </div>
             </div>
@@ -588,7 +588,7 @@ export function DokumenthanteringWorkspace({ module: mod, sectorSlug, settingsHr
           <DialogHeader>
             <DialogTitle>Ta bort dokument</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort{' '}
+              Är du säker på att du vill ta bort{' '}
               <span className="font-semibold">{docToDelete?.title}</span>?
             </DialogDescription>
           </DialogHeader>

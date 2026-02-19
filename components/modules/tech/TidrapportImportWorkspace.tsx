@@ -361,7 +361,7 @@ export function TidrapportImportWorkspace({ module: mod, sectorSlug, settingsHre
                 <CardHeader>
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Upload className="h-4 w-4" />
-                    Steg 1: Valj kalla och ladda upp CSV
+                    Steg 1: Välj källa och ladda upp CSV
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -380,7 +380,7 @@ export function TidrapportImportWorkspace({ module: mod, sectorSlug, settingsHre
                     <Label>CSV-fil</Label>
                     <Input type="file" accept=".csv" onChange={handleFileUpload} className="max-w-sm" />
                     <p className="text-xs text-muted-foreground">
-                      Exportera tidrapporter fran {SOURCE_LABELS[source]} som CSV och ladda upp har.
+                      Exportera tidrapporter från {SOURCE_LABELS[source]} som CSV och ladda upp här.
                     </p>
                   </div>
                 </CardContent>
@@ -397,7 +397,7 @@ export function TidrapportImportWorkspace({ module: mod, sectorSlug, settingsHre
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="text-xs text-muted-foreground">Mappa CSV-kolumner till ratt falt. Hittade {csvHeaders.length} kolumner och {rawCsvRows.length} rader.</p>
+                  <p className="text-xs text-muted-foreground">Mappa CSV-kolumner till rätt fält. Hittade {csvHeaders.length} kolumner och {rawCsvRows.length} rader.</p>
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     {(Object.keys(mapping) as (keyof ColumnMapping)[]).map((field) => (
                       <div key={field} className="grid gap-1.5">
@@ -413,7 +413,7 @@ export function TidrapportImportWorkspace({ module: mod, sectorSlug, settingsHre
                   </div>
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={() => setImportStep('upload')}>Tillbaka</Button>
-                    <Button size="sm" onClick={generatePreview}>Forhandsvisa</Button>
+                    <Button size="sm" onClick={generatePreview}>Förhandsvisa</Button>
                   </div>
                 </CardContent>
               </Card>
@@ -425,7 +425,7 @@ export function TidrapportImportWorkspace({ module: mod, sectorSlug, settingsHre
                 <CardHeader>
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Check className="h-4 w-4" />
-                    Steg 3: Forhandsvisa och importera ({previewData.length} rader)
+                    Steg 3: Förhandsvisa och importera ({previewData.length} rader)
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -434,7 +434,7 @@ export function TidrapportImportWorkspace({ module: mod, sectorSlug, settingsHre
                       <TableHeader>
                         <TableRow className="bg-muted/50">
                           <TableHead className="font-medium">Datum</TableHead>
-                          <TableHead className="font-medium">Anstalld</TableHead>
+                          <TableHead className="font-medium">Anställd</TableHead>
                           <TableHead className="font-medium">Projekt</TableHead>
                           <TableHead className="font-medium">Kund</TableHead>
                           <TableHead className="font-medium text-right">Timmar</TableHead>
@@ -503,7 +503,7 @@ export function TidrapportImportWorkspace({ module: mod, sectorSlug, settingsHre
               <EmptyModuleState
                 icon={FileUp}
                 title="Ingen importhistorik"
-                description="Importera tidrapporter for att se historiken har."
+                description="Importera tidrapporter för att se historiken här."
               />
             ) : (
               <div className="rounded-xl border border-border overflow-hidden">
@@ -511,7 +511,7 @@ export function TidrapportImportWorkspace({ module: mod, sectorSlug, settingsHre
                   <TableHeader>
                     <TableRow className="bg-muted/50">
                       <TableHead className="font-medium">Datum</TableHead>
-                      <TableHead className="font-medium">Kalla</TableHead>
+                      <TableHead className="font-medium">Källa</TableHead>
                       <TableHead className="font-medium">Filnamn</TableHead>
                       <TableHead className="font-medium text-right">Rader</TableHead>
                       <TableHead className="font-medium">Status</TableHead>

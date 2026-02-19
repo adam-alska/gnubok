@@ -33,8 +33,14 @@ CREATE INDEX IF NOT EXISTS idx_journal_entry_lines_account ON journal_entry_line
 -- Receipt queries
 CREATE INDEX IF NOT EXISTS idx_receipts_user_status ON receipts(user_id, status);
 
--- Module toggle queries
-CREATE INDEX IF NOT EXISTS idx_module_toggles_user_enabled ON module_toggles(user_id, enabled);
+-- Module toggle queries (table created in a later migration if needed)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'module_toggles') THEN
+    CREATE INDEX IF NOT EXISTS idx_module_toggles_user_enabled ON module_toggles(user_id, enabled);
+  END IF;
+END
+$$;
 
 -- =============================================================================
 -- 2. Atomic Invoice Creation RPC Function

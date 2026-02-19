@@ -124,7 +124,7 @@ export default function CustomerDetailPage({
 
   async function handleDelete() {
     if (!customer) return
-    if (!confirm(`Ta bort "${customer.name}"? Detta kan inte angras.`)) return
+    if (!confirm(`Ta bort "${customer.name}"? Detta kan inte ångras.`)) return
 
     try {
       const response = await fetch(`/api/customers/${id}`, {
@@ -255,7 +255,7 @@ export default function CustomerDetailPage({
         {/* Business details */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Foretagsuppgifter</CardTitle>
+            <CardTitle className="text-base">Företagsuppgifter</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {customer.org_number && (

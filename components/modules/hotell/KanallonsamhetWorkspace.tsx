@@ -182,7 +182,7 @@ export function KanallonsamhetWorkspace({ module: mod, sectorSlug, settingsHref 
     if (directProfit > 0 && totalProfit > 0) {
       const directShare = (directProfit / totalProfit) * 100
       if (directShare < 30) {
-        recs.push('Direktbokningar star for under 30% av vinsten. Overdag att investera i egen hemsida och marknadsdforing for att oka direktbokningar.')
+        recs.push('Direktbokningar står för under 30% av vinsten. Överväg att investera i egen hemsida och marknadsföring för att öka direktbokningar.')
       }
     }
 
@@ -192,7 +192,7 @@ export function KanallonsamhetWorkspace({ module: mod, sectorSlug, settingsHref 
       if (s.gross > 0) {
         const margin = (s.profit / s.gross) * 100
         if (margin < 10) {
-          recs.push(`${ch} har en vinstmarginal under 10% (${fmtPct(margin)}%). Overdag prishokning eller omforhandling av provision.`)
+          recs.push(`${ch} har en vinstmarginal under 10% (${fmtPct(margin)}%). Överväg prishöjning eller omförhandling av provision.`)
         }
       }
     }
@@ -204,15 +204,15 @@ export function KanallonsamhetWorkspace({ module: mod, sectorSlug, settingsHref 
       const exAcq = expedia.gross > 0 ? expedia.totalCost / expedia.bookings : 0
       if (bcAcq > 0 && exAcq > 0) {
         if (bcAcq > exAcq * 1.3) {
-          recs.push(`Booking.com har hogre forvarvskostand per bokning (${fmt(Math.round(bcAcq))} kr) an Expedia (${fmt(Math.round(exAcq))} kr). Overdag att flytta volymer.`)
+          recs.push(`Booking.com har högre förvärvskostnad per bokning (${fmt(Math.round(bcAcq))} kr) än Expedia (${fmt(Math.round(exAcq))} kr). Överväg att flytta volymer.`)
         } else if (exAcq > bcAcq * 1.3) {
-          recs.push(`Expedia har hogre forvarvskostand per bokning (${fmt(Math.round(exAcq))} kr) an Booking.com (${fmt(Math.round(bcAcq))} kr). Overdag att flytta volymer.`)
+          recs.push(`Expedia har högre förvärvskostnad per bokning (${fmt(Math.round(exAcq))} kr) än Booking.com (${fmt(Math.round(bcAcq))} kr). Överväg att flytta volymer.`)
         }
       }
     }
 
     if (recs.length === 0) {
-      recs.push('Lagg till data for fler kanaler for att fa rekommendationer om kanalstrategi.')
+      recs.push('Lägg till data för fler kanaler för att få rekommendationer om kanalstrategi.')
     }
 
     return recs
@@ -302,14 +302,14 @@ export function KanallonsamhetWorkspace({ module: mod, sectorSlug, settingsHref 
         ) : (
           <Tabs defaultValue="jamforelse" className="space-y-6">
             <TabsList>
-              <TabsTrigger value="jamforelse">Kanalsammanstallning</TabsTrigger>
+              <TabsTrigger value="jamforelse">Kanalsammanställning</TabsTrigger>
               <TabsTrigger value="data">Detaljdata</TabsTrigger>
               <TabsTrigger value="rekommendationer">Rekommendationer</TabsTrigger>
             </TabsList>
 
             <TabsContent value="jamforelse" className="space-y-6">
               {entries.length === 0 ? (
-                <EmptyModuleState icon={Globe} title="Ingen kanaldata" description="Lagg till data per kanal for att jamfora lonsamhet." actionLabel="Lagg till" onAction={openNew} />
+                <EmptyModuleState icon={Globe} title="Ingen kanaldata" description="Lägg till data per kanal för att jämföra lönsamhet." actionLabel="Lägg till" onAction={openNew} />
               ) : (
                 <div className="rounded-xl border border-border overflow-hidden">
                   <Table>
@@ -374,20 +374,20 @@ export function KanallonsamhetWorkspace({ module: mod, sectorSlug, settingsHref 
             <TabsContent value="data" className="space-y-6">
               {saving && <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Sparar...</div>}
               {entries.length === 0 ? (
-                <EmptyModuleState icon={Globe} title="Ingen data" description="Lagg till kanaldata." actionLabel="Lagg till" onAction={openNew} />
+                <EmptyModuleState icon={Globe} title="Ingen data" description="Lägg till kanaldata." actionLabel="Lägg till" onAction={openNew} />
               ) : (
                 <div className="rounded-xl border border-border overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50">
-                        <TableHead className="font-medium">Manad</TableHead>
+                        <TableHead className="font-medium">Månad</TableHead>
                         <TableHead className="font-medium">Kanal</TableHead>
                         <TableHead className="font-medium text-right">Bokningar</TableHead>
                         <TableHead className="font-medium text-right">Brutto</TableHead>
                         <TableHead className="font-medium text-right">Prov. %</TableHead>
                         <TableHead className="font-medium text-right">Vinst</TableHead>
                         <TableHead className="font-medium text-right">Marginal</TableHead>
-                        <TableHead className="font-medium text-right">Atgarder</TableHead>
+                        <TableHead className="font-medium text-right">Åtgärder</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -433,12 +433,12 @@ export function KanallonsamhetWorkspace({ module: mod, sectorSlug, settingsHref 
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editingEntry ? 'Redigera kanalpost' : 'Ny kanalpost'}</DialogTitle>
-            <DialogDescription>Registrera intakter och kostnader per kanal.</DialogDescription>
+            <DialogDescription>Registrera intäkter och kostnader per kanal.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Manad *</Label>
+                <Label>Månad *</Label>
                 <Input type="month" value={form.month} onChange={e => setForm(f => ({ ...f, month: e.target.value }))} />
               </div>
               <div className="grid gap-2">
@@ -489,7 +489,7 @@ export function KanallonsamhetWorkspace({ module: mod, sectorSlug, settingsHref 
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Ta bort kanalpost</DialogTitle>
-            <DialogDescription>Ar du saker pa att du vill ta bort denna post?</DialogDescription>
+            <DialogDescription>Är du säker på att du vill ta bort denna post?</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button>

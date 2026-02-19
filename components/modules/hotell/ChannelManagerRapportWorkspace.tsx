@@ -256,7 +256,7 @@ export function ChannelManagerRapportWorkspace({ module: mod, sectorSlug, settin
         <Tabs defaultValue="import" className="space-y-6">
           <TabsList>
             <TabsTrigger value="import">Importera</TabsTrigger>
-            <TabsTrigger value="sammanstallning">Sammanstallning</TabsTrigger>
+            <TabsTrigger value="sammanstallning">Sammanställning</TabsTrigger>
             <TabsTrigger value="historik">Historik</TabsTrigger>
           </TabsList>
 
@@ -265,8 +265,8 @@ export function ChannelManagerRapportWorkspace({ module: mod, sectorSlug, settin
               <ImportDropzone
                 accept=".csv,.txt"
                 onFileSelect={handleFileSelect}
-                label="Dra och slapp en provisionsrapport (CSV)"
-                description="Filen tolkas automatiskt. Stod for Booking.com, Expedia m.fl."
+                label="Dra och släpp en provisionsrapport (CSV)"
+                description="Filen tolkas automatiskt. Stöd för Booking.com, Expedia m.fl."
               />
             )}
 
@@ -283,7 +283,7 @@ export function ChannelManagerRapportWorkspace({ module: mod, sectorSlug, settin
               <div className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">Forhandsvisning - {fileName} ({parsedRows.length} rader)</CardTitle>
+                    <CardTitle className="text-base">Förhandsvisning - {fileName} ({parsedRows.length} rader)</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="rounded-lg border border-border overflow-x-auto">
@@ -292,7 +292,7 @@ export function ChannelManagerRapportWorkspace({ module: mod, sectorSlug, settin
                           <TableRow className="bg-muted/50">
                             <TableHead className="font-medium">Ref</TableHead>
                             <TableHead className="font-medium">Kanal</TableHead>
-                            <TableHead className="font-medium">Gast</TableHead>
+                            <TableHead className="font-medium">Gäst</TableHead>
                             <TableHead className="font-medium text-right">Brutto</TableHead>
                             <TableHead className="font-medium text-right">Provision</TableHead>
                             <TableHead className="font-medium text-right">Netto</TableHead>
@@ -337,7 +337,7 @@ export function ChannelManagerRapportWorkspace({ module: mod, sectorSlug, settin
 
           <TabsContent value="sammanstallning" className="space-y-6">
             {commissionRows.length === 0 ? (
-              <EmptyModuleState icon={Globe} title="Ingen provisionsdata" description="Importera en rapport for att se sammanstallning." />
+              <EmptyModuleState icon={Globe} title="Ingen provisionsdata" description="Importera en rapport för att se sammanställning." />
             ) : (
               <>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -374,7 +374,7 @@ export function ChannelManagerRapportWorkspace({ module: mod, sectorSlug, settin
                     <TableBody>
                       {Object.entries(summary.byChannel).sort((a, b) => b[1].commission - a[1].commission).map(([channel, s]) => (
                         <TableRow key={channel}>
-                          <TableCell className="font-medium">{channel || 'Okand'}</TableCell>
+                          <TableCell className="font-medium">{channel || 'Okänd'}</TableCell>
                           <TableCell className="text-right">{s.count}</TableCell>
                           <TableCell className="text-right font-mono">{fmt(s.gross)}</TableCell>
                           <TableCell className="text-right font-mono">{fmt(s.commission)}</TableCell>
@@ -397,7 +397,7 @@ export function ChannelManagerRapportWorkspace({ module: mod, sectorSlug, settin
 
           <TabsContent value="historik" className="space-y-4">
             {importHistory.length === 0 ? (
-              <EmptyModuleState icon={FileSpreadsheet} title="Ingen importhistorik" description="Importera rapporter for att se historik." />
+              <EmptyModuleState icon={FileSpreadsheet} title="Ingen importhistorik" description="Importera rapporter för att se historik." />
             ) : (
               <div className="rounded-xl border border-border overflow-hidden">
                 <Table>
@@ -407,7 +407,7 @@ export function ChannelManagerRapportWorkspace({ module: mod, sectorSlug, settin
                       <TableHead className="font-medium">Datum</TableHead>
                       <TableHead className="font-medium text-right">Rader</TableHead>
                       <TableHead className="font-medium text-right">Total provision</TableHead>
-                      <TableHead className="font-medium text-right">Atgarder</TableHead>
+                      <TableHead className="font-medium text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

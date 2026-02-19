@@ -54,13 +54,13 @@ const ROLES = [
   { value: 'kassapersonal', label: 'Kassapersonal' },
   { value: 'lagerarbetare', label: 'Lagerarbetare' },
   { value: 'chark', label: 'Charkpersonal' },
-  { value: 'saljare', label: 'Saljare' },
+  { value: 'saljare', label: 'Säljare' },
   { value: 'deltid', label: 'Deltid/Extra' },
 ]
 
 const STATUSES: Array<{ value: ShiftEntry['status']; label: string }> = [
   { value: 'planerad', label: 'Planerad' },
-  { value: 'genomford', label: 'Genomford' },
+  { value: 'genomford', label: 'Genomförd' },
   { value: 'sjuk', label: 'Sjuk' },
   { value: 'ledig', label: 'Ledig' },
 ]
@@ -248,7 +248,7 @@ export function ButiksdriftSchemaWorkspace({ module: mod, sectorSlug, settingsHr
         <Tabs defaultValue="schema" className="space-y-6">
           <TabsList>
             <TabsTrigger value="schema"><CalendarDays className="mr-1.5 h-3.5 w-3.5" />Schema</TabsTrigger>
-            <TabsTrigger value="budget"><Clock className="mr-1.5 h-3.5 w-3.5" />Budgetjamforelse</TabsTrigger>
+            <TabsTrigger value="budget"><Clock className="mr-1.5 h-3.5 w-3.5" />Budgetjämförelse</TabsTrigger>
           </TabsList>
 
           <TabsContent value="schema" className="space-y-6">
@@ -258,7 +258,7 @@ export function ButiksdriftSchemaWorkspace({ module: mod, sectorSlug, settingsHr
               <>
                 <div className="flex items-center gap-4">
                   <Select value={selectedWeek} onValueChange={setSelectedWeek}>
-                    <SelectTrigger className="w-[200px]"><SelectValue placeholder="Valj vecka" /></SelectTrigger>
+                    <SelectTrigger className="w-[200px]"><SelectValue placeholder="Välj vecka" /></SelectTrigger>
                     <SelectContent>{availableWeeks.map(w => <SelectItem key={w} value={w}>{w}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
@@ -270,12 +270,12 @@ export function ButiksdriftSchemaWorkspace({ module: mod, sectorSlug, settingsHr
                   {currentBudget && (
                     <KPICard label="Budget" value={fmtDec(currentBudget.budgetHours)} unit="h"
                       trend={totalHoursThisWeek <= currentBudget.budgetHours ? 'up' : 'down'}
-                      trendLabel={totalHoursThisWeek <= currentBudget.budgetHours ? 'Under budget' : 'Over budget'} />
+                      trendLabel={totalHoursThisWeek <= currentBudget.budgetHours ? 'Under budget' : 'Över budget'} />
                   )}
                 </div>
 
                 {weekShifts.length === 0 ? (
-                  <EmptyModuleState icon={CalendarDays} title="Inga pass" description="Lagg till personalpass for denna vecka." actionLabel="Nytt pass" onAction={openNewShift} />
+                  <EmptyModuleState icon={CalendarDays} title="Inga pass" description="Lägg till personalpass för denna vecka." actionLabel="Nytt pass" onAction={openNewShift} />
                 ) : (
                   <div className="rounded-xl border border-border overflow-hidden">
                     <Table>
@@ -288,7 +288,7 @@ export function ButiksdriftSchemaWorkspace({ module: mod, sectorSlug, settingsHr
                           <TableHead className="font-medium text-right">Rast (min)</TableHead>
                           <TableHead className="font-medium text-right">Timmar</TableHead>
                           <TableHead className="font-medium">Status</TableHead>
-                          <TableHead className="font-medium text-right">Atgarder</TableHead>
+                          <TableHead className="font-medium text-right">Åtgärder</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -324,12 +324,12 @@ export function ButiksdriftSchemaWorkspace({ module: mod, sectorSlug, settingsHr
 
           <TabsContent value="budget" className="space-y-6">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Jamnfor schemalagda timmar mot personalbudget per vecka.</p>
-              <Button variant="outline" onClick={() => { setBudgetForm({ weekNumber: selectedWeek, budgetHours: 0, budgetCostKr: 0 }); setBudgetDialogOpen(true) }}><Plus className="mr-2 h-4 w-4" />Satt budget</Button>
+              <p className="text-sm text-muted-foreground">Jämför schemalagda timmar mot personalbudget per vecka.</p>
+              <Button variant="outline" onClick={() => { setBudgetForm({ weekNumber: selectedWeek, budgetHours: 0, budgetCostKr: 0 }); setBudgetDialogOpen(true) }}><Plus className="mr-2 h-4 w-4" />Sätt budget</Button>
             </div>
 
             {budgets.length === 0 ? (
-              <EmptyModuleState icon={Clock} title="Ingen budget" description="Satt en veckobudget for att jamfora mot faktiska timmar." actionLabel="Satt budget" onAction={() => { setBudgetForm({ weekNumber: selectedWeek, budgetHours: 0, budgetCostKr: 0 }); setBudgetDialogOpen(true) }} />
+              <EmptyModuleState icon={Clock} title="Ingen budget" description="Sätt en veckobudget för att jämföra mot faktiska timmar." actionLabel="Sätt budget" onAction={() => { setBudgetForm({ weekNumber: selectedWeek, budgetHours: 0, budgetCostKr: 0 }); setBudgetDialogOpen(true) }} />
             ) : (
               <div className="rounded-xl border border-border overflow-hidden">
                 <Table>
@@ -358,7 +358,7 @@ export function ButiksdriftSchemaWorkspace({ module: mod, sectorSlug, settingsHr
                           </TableCell>
                           <TableCell className="text-right tabular-nums">{fmt(b.budgetCostKr)} kr</TableCell>
                           <TableCell>
-                            <StatusBadge label={diff <= 0 ? 'Under budget' : 'Over budget'} variant={diff <= 0 ? 'success' : 'danger'} />
+                            <StatusBadge label={diff <= 0 ? 'Under budget' : 'Över budget'} variant={diff <= 0 ? 'success' : 'danger'} />
                           </TableCell>
                         </TableRow>
                       )
@@ -374,10 +374,10 @@ export function ButiksdriftSchemaWorkspace({ module: mod, sectorSlug, settingsHr
 
       <Dialog open={shiftDialogOpen} onOpenChange={setShiftDialogOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>{editingShift ? 'Redigera pass' : 'Nytt pass'}</DialogTitle><DialogDescription>{editingShift ? 'Uppdatera passinformation.' : 'Schemalagga ett nytt personalpass.'}</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{editingShift ? 'Redigera pass' : 'Nytt pass'}</DialogTitle><DialogDescription>{editingShift ? 'Uppdatera passinformation.' : 'Schemalägg ett nytt personalpass.'}</DialogDescription></DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2"><Label>Personal *</Label><Input value={shiftForm.staffName} onChange={(e) => setShiftForm(f => ({ ...f, staffName: e.target.value }))} placeholder="Fornamn Efternamn" /></div>
+              <div className="grid gap-2"><Label>Personal *</Label><Input value={shiftForm.staffName} onChange={(e) => setShiftForm(f => ({ ...f, staffName: e.target.value }))} placeholder="Förnamn Efternamn" /></div>
               <div className="grid gap-2"><Label>Roll</Label><Select value={shiftForm.role} onValueChange={(v) => setShiftForm(f => ({ ...f, role: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{ROLES.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}</SelectContent></Select></div>
             </div>
             <div className="grid grid-cols-3 gap-4">
@@ -389,15 +389,15 @@ export function ButiksdriftSchemaWorkspace({ module: mod, sectorSlug, settingsHr
               <div className="grid gap-2"><Label>Rast (min)</Label><Input type="number" min={0} value={shiftForm.breakMinutes} onChange={(e) => setShiftForm(f => ({ ...f, breakMinutes: Number(e.target.value) || 0 }))} /></div>
               <div className="grid gap-2"><Label>Status</Label><Select value={shiftForm.status} onValueChange={(v) => setShiftForm(f => ({ ...f, status: v as ShiftEntry['status'] }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent></Select></div>
             </div>
-            <p className="text-xs text-muted-foreground">Beraknade timmar: <strong>{fmtDec(calcHours(shiftForm.startTime, shiftForm.endTime, shiftForm.breakMinutes))}h</strong></p>
+            <p className="text-xs text-muted-foreground">Beräknade timmar: <strong>{fmtDec(calcHours(shiftForm.startTime, shiftForm.endTime, shiftForm.breakMinutes))}h</strong></p>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setShiftDialogOpen(false)}>Avbryt</Button><Button onClick={handleSaveShift} disabled={!shiftForm.staffName.trim()}>{editingShift ? 'Uppdatera' : 'Lagg till'}</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setShiftDialogOpen(false)}>Avbryt</Button><Button onClick={handleSaveShift} disabled={!shiftForm.staffName.trim()}>{editingShift ? 'Uppdatera' : 'Lägg till'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={budgetDialogOpen} onOpenChange={setBudgetDialogOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Satt veckobudget</DialogTitle><DialogDescription>Ange personalbudget for veckan.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Sätt veckobudget</DialogTitle><DialogDescription>Ange personalbudget för veckan.</DialogDescription></DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2"><Label>Vecka</Label><Input value={budgetForm.weekNumber} onChange={(e) => setBudgetForm(f => ({ ...f, weekNumber: e.target.value }))} placeholder="2024-V05" /></div>
             <div className="grid grid-cols-2 gap-4">
@@ -411,7 +411,7 @@ export function ButiksdriftSchemaWorkspace({ module: mod, sectorSlug, settingsHr
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Ta bort pass</DialogTitle><DialogDescription>Ar du saker pa att du vill ta bort detta pass for {shiftToDelete?.staffName}?</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Ta bort pass</DialogTitle><DialogDescription>Är du säker på att du vill ta bort detta pass för {shiftToDelete?.staffName}?</DialogDescription></DialogHeader>
           <DialogFooter><Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button><Button variant="destructive" onClick={handleDeleteShift}><Trash2 className="mr-2 h-4 w-4" />Ta bort</Button></DialogFooter>
         </DialogContent>
       </Dialog>

@@ -204,28 +204,28 @@ export function BruttomarginalPerVarugruppWorkspace({ module: mod, sectorSlug, s
         ) : (
           <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <KPICard label="Snittmarginal" value={fmtPct(avgMargin)} unit="%" trend={avgMargin >= 25 ? 'up' : avgMargin >= 15 ? 'neutral' : 'down'} trendLabel={avgMargin >= 25 ? 'Bra' : avgMargin >= 15 ? 'OK' : 'Lag'} />
-              <KPICard label="Total forsaljning" value={fmt(totalRevenue)} unit="kr" />
-              <KPICard label="Total inkopskostnad" value={fmt(totalCost)} unit="kr" />
-              <KPICard label="Basta varugrupp" value={bestGroup} />
+              <KPICard label="Snittmarginal" value={fmtPct(avgMargin)} unit="%" trend={avgMargin >= 25 ? 'up' : avgMargin >= 15 ? 'neutral' : 'down'} trendLabel={avgMargin >= 25 ? 'Bra' : avgMargin >= 15 ? 'OK' : 'Låg'} />
+              <KPICard label="Total försäljning" value={fmt(totalRevenue)} unit="kr" />
+              <KPICard label="Total inköpskostnad" value={fmt(totalCost)} unit="kr" />
+              <KPICard label="Bästa varugrupp" value={bestGroup} />
             </div>
 
             {data.length === 0 ? (
-              <EmptyModuleState icon={BarChart3} title="Inga varugrupper" description="Lagg till varugrupper for att se bruttomarginal per kategori." actionLabel="Ny varugrupp" onAction={openNewItem} />
+              <EmptyModuleState icon={BarChart3} title="Inga varugrupper" description="Lägg till varugrupper för att se bruttomarginal per kategori." actionLabel="Ny varugrupp" onAction={openNewItem} />
             ) : (
               <div className="rounded-xl border border-border overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50">
                       <TableHead className="font-medium">Varugrupp</TableHead>
-                      <TableHead className="font-medium text-right">Inkop (kr)</TableHead>
-                      <TableHead className="font-medium text-right">Forsaljning (kr)</TableHead>
+                      <TableHead className="font-medium text-right">Inköp (kr)</TableHead>
+                      <TableHead className="font-medium text-right">Försäljning (kr)</TableHead>
                       <TableHead className="font-medium text-right">Bruttomarginal</TableHead>
                       <TableHead className="font-medium text-right">Marginal %</TableHead>
                       <TableHead className="font-medium text-right">Kampanjpris</TableHead>
                       <TableHead className="font-medium text-right">Kampanjmarginal</TableHead>
                       <TableHead className="font-medium">Period</TableHead>
-                      <TableHead className="font-medium text-right">Atgarder</TableHead>
+                      <TableHead className="font-medium text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -271,7 +271,7 @@ export function BruttomarginalPerVarugruppWorkspace({ module: mod, sectorSlug, s
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editingItem ? 'Redigera varugrupp' : 'Ny varugrupp'}</DialogTitle>
-            <DialogDescription>{editingItem ? 'Uppdatera marginaldata.' : 'Ange inkops- och forsaljningspris for varugruppen.'}</DialogDescription>
+            <DialogDescription>{editingItem ? 'Uppdatera marginaldata.' : 'Ange inköps- och försäljningspris för varugruppen.'}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
@@ -283,11 +283,11 @@ export function BruttomarginalPerVarugruppWorkspace({ module: mod, sectorSlug, s
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Inkopspris (kr) *</Label>
+                <Label>Inköpspris (kr) *</Label>
                 <Input type="number" min={0} step="0.01" value={form.purchasePrice} onChange={(e) => setForm(f => ({ ...f, purchasePrice: Number(e.target.value) || 0 }))} />
               </div>
               <div className="grid gap-2">
-                <Label>Forsaljningspris (kr) *</Label>
+                <Label>Försäljningspris (kr) *</Label>
                 <Input type="number" min={0} step="0.01" value={form.sellingPrice} onChange={(e) => setForm(f => ({ ...f, sellingPrice: Number(e.target.value) || 0 }))} />
               </div>
             </div>
@@ -303,20 +303,20 @@ export function BruttomarginalPerVarugruppWorkspace({ module: mod, sectorSlug, s
             </div>
             {form.sellingPrice > 0 && (
               <p className="text-xs text-muted-foreground">
-                Beraknad marginal: <strong>{fmtPct((form.sellingPrice - form.purchasePrice) / form.sellingPrice * 100)}%</strong>
+                Beräknad marginal: <strong>{fmtPct((form.sellingPrice - form.purchasePrice) / form.sellingPrice * 100)}%</strong>
               </p>
             )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Avbryt</Button>
-            <Button onClick={handleSaveItem} disabled={form.sellingPrice <= 0}>{editingItem ? 'Uppdatera' : 'Lagg till'}</Button>
+            <Button onClick={handleSaveItem} disabled={form.sellingPrice <= 0}>{editingItem ? 'Uppdatera' : 'Lägg till'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Ta bort varugrupp</DialogTitle><DialogDescription>Ar du saker pa att du vill ta bort {itemToDelete?.group}?</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Ta bort varugrupp</DialogTitle><DialogDescription>Är du säker på att du vill ta bort {itemToDelete?.group}?</DialogDescription></DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button>
             <Button variant="destructive" onClick={handleDeleteItem}><Trash2 className="mr-2 h-4 w-4" />Ta bort</Button>

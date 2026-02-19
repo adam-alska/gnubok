@@ -260,7 +260,7 @@ export function NattrevisionWorkspace({ module: mod, sectorSlug, settingsHref }:
                   value={searchDate}
                   onChange={e => setSearchDate(e.target.value)}
                   className="pl-9"
-                  placeholder="Filtrera manad"
+                  placeholder="Filtrera månad"
                 />
               </div>
               {saving && (
@@ -275,7 +275,7 @@ export function NattrevisionWorkspace({ module: mod, sectorSlug, settingsHref }:
               <EmptyModuleState
                 icon={Moon}
                 title="Inga nattrevisioner"
-                description="Skapa en nattrevision for att registrera dagens intakter och avstamning."
+                description="Skapa en nattrevision för att registrera dagens intäkter och avstämning."
                 actionLabel="Ny nattrevision"
                 onAction={openNew}
               />
@@ -293,7 +293,7 @@ export function NattrevisionWorkspace({ module: mod, sectorSlug, settingsHref }:
                       <TableHead className="font-medium text-right">Kassadiff</TableHead>
                       <TableHead className="font-medium text-center">No-show</TableHead>
                       <TableHead className="font-medium text-center">Verifierad</TableHead>
-                      <TableHead className="font-medium text-right">Atgarder</TableHead>
+                      <TableHead className="font-medium text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -344,7 +344,7 @@ export function NattrevisionWorkspace({ module: mod, sectorSlug, settingsHref }:
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingRecord ? 'Redigera nattrevision' : 'Ny nattrevision'}</DialogTitle>
-            <DialogDescription>Registrera dagens intakter per kategori och avstam kassan.</DialogDescription>
+            <DialogDescription>Registrera dagens intäkter per kategori och avstäm kassan.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2 max-h-[60vh] overflow-y-auto">
             <div className="grid gap-2">
@@ -371,7 +371,7 @@ export function NattrevisionWorkspace({ module: mod, sectorSlug, settingsHref }:
                 <Input type="number" min={0} step="0.01" value={form.spaRevenue || ''} onChange={e => setForm(f => ({ ...f, spaRevenue: parseFloat(e.target.value) || 0 }))} />
               </div>
               <div className="grid gap-2">
-                <Label>Ovrigt (kr)</Label>
+                <Label>Övrigt (kr)</Label>
                 <Input type="number" min={0} step="0.01" value={form.otherRevenue || ''} onChange={e => setForm(f => ({ ...f, otherRevenue: parseFloat(e.target.value) || 0 }))} />
               </div>
               <div className="grid gap-2">
@@ -380,14 +380,14 @@ export function NattrevisionWorkspace({ module: mod, sectorSlug, settingsHref }:
               </div>
             </div>
             <Separator />
-            <h4 className="text-sm font-semibold">Kassaavstamning</h4>
+            <h4 className="text-sm font-semibold">Kassaavstämning</h4>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Kassa (faktisk, kr)</Label>
                 <Input type="number" step="0.01" value={form.cashOnHand || ''} onChange={e => setForm(f => ({ ...f, cashOnHand: parseFloat(e.target.value) || 0 }))} />
               </div>
               <div className="grid gap-2">
-                <Label>Kassa (forvantad, kr)</Label>
+                <Label>Kassa (förväntad, kr)</Label>
                 <Input type="number" step="0.01" value={form.cashExpected || ''} onChange={e => setForm(f => ({ ...f, cashExpected: parseFloat(e.target.value) || 0 }))} />
               </div>
             </div>
@@ -431,7 +431,7 @@ export function NattrevisionWorkspace({ module: mod, sectorSlug, settingsHref }:
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Ta bort nattrevision</DialogTitle>
-            <DialogDescription>Ar du saker pa att du vill ta bort nattrevisionen for {recordToDelete?.date}?</DialogDescription>
+            <DialogDescription>Är du säker på att du vill ta bort nattrevisionen för {recordToDelete?.date}?</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button>

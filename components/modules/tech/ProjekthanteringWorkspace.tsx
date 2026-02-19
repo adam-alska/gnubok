@@ -108,7 +108,7 @@ const DEFAULT_PROJECTS: Project[] = [
   {
     id: '2', name: 'Mobilapp Beta', client: 'Beta Corp', status: 'Planering', priority: 'Medium',
     startDate: '2024-07-01', endDate: '2024-12-31', budget: 400000, spent: 0,
-    description: 'Ny mobilapp for kundportal.',
+    description: 'Ny mobilapp för kundportal.',
     milestones: [
       { id: 'm5', name: 'Kravspecifikation', dueDate: '2024-07-31', completed: false },
       { id: 'm6', name: 'Prototyp', dueDate: '2024-09-30', completed: false },
@@ -117,7 +117,7 @@ const DEFAULT_PROJECTS: Project[] = [
   {
     id: '3', name: 'IT-drift migration', client: 'Gamma Gruppen', status: 'Klart', priority: 'Kritisk',
     startDate: '2024-01-15', endDate: '2024-04-30', budget: 200000, spent: 185000,
-    description: 'Migrering av servermiljo till moln.',
+    description: 'Migrering av servermiljö till moln.',
     milestones: [
       { id: 'm7', name: 'Planering klar', dueDate: '2024-02-01', completed: true },
       { id: 'm8', name: 'Migration klar', dueDate: '2024-04-30', completed: true },
@@ -335,15 +335,15 @@ export function ProjekthanteringWorkspace({ module: mod, sectorSlug, settingsHre
             <TabsList>
               <TabsTrigger value="board">Projektboard</TabsTrigger>
               <TabsTrigger value="milestones">Milstolpar</TabsTrigger>
-              <TabsTrigger value="budget">Budgetuppfoljning</TabsTrigger>
+              <TabsTrigger value="budget">Budgetuppföljning</TabsTrigger>
             </TabsList>
 
             <TabsContent value="board" className="space-y-6">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <KPICard label="Aktiva projekt" value={String(kpis.activeCount)} unit="st" />
                 <KPICard label="Total budget" value={fmt(kpis.totalBudget)} unit="kr" />
-                <KPICard label="Budget anvant" value={fmtPct(kpis.budgetUsed)} unit="%" trend={kpis.budgetUsed > 90 ? 'down' : 'up'} />
-                <KPICard label="Forsenade milstolpar" value={String(kpis.overdue)} unit="st" trend={kpis.overdue > 0 ? 'down' : 'up'} />
+                <KPICard label="Budget använt" value={fmtPct(kpis.budgetUsed)} unit="%" trend={kpis.budgetUsed > 90 ? 'down' : 'up'} />
+                <KPICard label="Försenade milstolpar" value={String(kpis.overdue)} unit="st" trend={kpis.overdue > 0 ? 'down' : 'up'} />
               </div>
 
               {/* Board */}
@@ -425,7 +425,7 @@ export function ProjekthanteringWorkspace({ module: mod, sectorSlug, settingsHre
                               <span className={cn('flex-1', ms.completed && 'line-through text-muted-foreground')}>{ms.name}</span>
                               <span className={cn('text-xs', overdue ? 'text-red-500 font-medium' : 'text-muted-foreground')}>
                                 {ms.dueDate}
-                                {overdue && ' (forsenad)'}
+                                {overdue && ' (försenad)'}
                               </span>
                             </div>
                           )
@@ -445,9 +445,9 @@ export function ProjekthanteringWorkspace({ module: mod, sectorSlug, settingsHre
                       <TableHead className="font-medium">Projekt</TableHead>
                       <TableHead className="font-medium">Kund</TableHead>
                       <TableHead className="font-medium text-right">Budget</TableHead>
-                      <TableHead className="font-medium text-right">Forbrukat</TableHead>
-                      <TableHead className="font-medium text-right">Aterstående</TableHead>
-                      <TableHead className="font-medium text-right">Anvant %</TableHead>
+                      <TableHead className="font-medium text-right">Förbrukat</TableHead>
+                      <TableHead className="font-medium text-right">Återstående</TableHead>
+                      <TableHead className="font-medium text-right">Använt %</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -520,7 +520,7 @@ export function ProjekthanteringWorkspace({ module: mod, sectorSlug, settingsHre
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2"><Label>Budget (kr)</Label><Input type="number" min={0} value={form.budget} onChange={(e) => setForm((f) => ({ ...f, budget: Number(e.target.value) }))} /></div>
-              <div className="grid gap-2"><Label>Forbrukat (kr)</Label><Input type="number" min={0} value={form.spent} onChange={(e) => setForm((f) => ({ ...f, spent: Number(e.target.value) }))} /></div>
+              <div className="grid gap-2"><Label>Förbrukat (kr)</Label><Input type="number" min={0} value={form.spent} onChange={(e) => setForm((f) => ({ ...f, spent: Number(e.target.value) }))} /></div>
             </div>
             <div className="grid gap-2"><Label>Beskrivning</Label><Textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} rows={2} /></div>
           </div>
@@ -536,7 +536,7 @@ export function ProjekthanteringWorkspace({ module: mod, sectorSlug, settingsHre
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Ta bort projekt</DialogTitle>
-            <DialogDescription>Ar du saker pa att du vill ta bort &quot;{toDelete?.name}&quot;?</DialogDescription>
+            <DialogDescription>Är du säker på att du vill ta bort &quot;{toDelete?.name}&quot;?</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button>
@@ -550,7 +550,7 @@ export function ProjekthanteringWorkspace({ module: mod, sectorSlug, settingsHre
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Ny milstolpe</DialogTitle>
-            <DialogDescription>Lagg till en milstolpe for {milestoneProject?.name}.</DialogDescription>
+            <DialogDescription>Lägg till en milstolpe för {milestoneProject?.name}.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2"><Label>Namn *</Label><Input value={msForm.name} onChange={(e) => setMsForm((f) => ({ ...f, name: e.target.value }))} placeholder="Design klar" /></div>
@@ -558,7 +558,7 @@ export function ProjekthanteringWorkspace({ module: mod, sectorSlug, settingsHre
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setMilestoneDialogOpen(false)}>Avbryt</Button>
-            <Button onClick={handleAddMilestone} disabled={!msForm.name.trim()}>Lagg till</Button>
+            <Button onClick={handleAddMilestone} disabled={!msForm.name.trim()}>Lägg till</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

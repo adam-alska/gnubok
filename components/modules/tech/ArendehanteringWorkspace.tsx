@@ -98,32 +98,32 @@ const SLA_TARGETS: Record<SlaLevel, Record<TicketPriority, number>> = {
 
 const DEFAULT_TICKETS: Ticket[] = [
   {
-    id: '1', ticketNumber: 'TKT-001', title: 'Inloggningsproblem produktionsmiljo',
-    description: 'Anvandare kan inte logga in sedan senaste deploy.',
+    id: '1', ticketNumber: 'TKT-001', title: 'Inloggningsproblem produktionsmiljö',
+    description: 'Användare kan inte logga in sedan senaste deploy.',
     status: 'Pagaende', priority: 'Kritisk', sla: 'Enterprise', assignedTo: 'Erik Lindberg',
     client: 'Acme AB', createdDate: '2024-06-17T08:30:00', dueDate: '2024-06-17T09:30:00', resolvedDate: '',
   },
   {
     id: '2', ticketNumber: 'TKT-002', title: 'Rapport exporterar fel data',
-    description: 'Manadsrapporten visar forsta manadens data nar man valjer andra.',
+    description: 'Månadsrapporten visar första månadens data när man väljer andra.',
     status: 'Nytt', priority: 'Hog', sla: 'Premium', assignedTo: '',
     client: 'Beta Corp', createdDate: '2024-06-17T10:15:00', dueDate: '2024-06-17T14:15:00', resolvedDate: '',
   },
   {
-    id: '3', ticketNumber: 'TKT-003', title: 'Onskemal: Dark mode',
-    description: 'Kunden vill ha stod for morkt tema.',
+    id: '3', ticketNumber: 'TKT-003', title: 'Önskemål: Dark mode',
+    description: 'Kunden vill ha stöd för mörkt tema.',
     status: 'Vantar', priority: 'Lag', sla: 'Standard', assignedTo: 'Maria Karlsson',
     client: 'Gamma Gruppen', createdDate: '2024-06-15T14:00:00', dueDate: '2024-06-17T14:00:00', resolvedDate: '',
   },
   {
     id: '4', ticketNumber: 'TKT-004', title: 'API-integration timeout',
-    description: 'Betalningsgateway ger timeout vid stora order.',
+    description: 'Betalningsgateway ger timeout vid stora ordrar.',
     status: 'Lost', priority: 'Hog', sla: 'Enterprise', assignedTo: 'Erik Lindberg',
     client: 'Acme AB', createdDate: '2024-06-14T09:00:00', dueDate: '2024-06-14T11:00:00', resolvedDate: '2024-06-14T10:45:00',
   },
   {
-    id: '5', ticketNumber: 'TKT-005', title: 'Anvandare raderade av misstag',
-    description: 'Aterhamta anvandarkonto som raderades.',
+    id: '5', ticketNumber: 'TKT-005', title: 'Användare raderade av misstag',
+    description: 'Återhämta användarkonto som raderades.',
     status: 'Stangt', priority: 'Medium', sla: 'Premium', assignedTo: 'Anna Svensson',
     client: 'Beta Corp', createdDate: '2024-06-12T11:30:00', dueDate: '2024-06-12T19:30:00', resolvedDate: '2024-06-12T15:00:00',
   },
@@ -341,7 +341,7 @@ export function ArendehanteringWorkspace({ module: mod, sectorSlug, settingsHref
         actions={
           <Button onClick={openNew}>
             <Plus className="mr-2 h-4 w-4" />
-            Nytt arende
+            Nytt ärende
           </Button>
         }
       >
@@ -352,17 +352,17 @@ export function ArendehanteringWorkspace({ module: mod, sectorSlug, settingsHref
         ) : (
           <Tabs defaultValue="ko" className="space-y-6">
             <TabsList>
-              <TabsTrigger value="ko">Arendeko</TabsTrigger>
+              <TabsTrigger value="ko">Ärendekö</TabsTrigger>
               <TabsTrigger value="board">Statusboard</TabsTrigger>
-              <TabsTrigger value="sla">SLA-uppfoljning</TabsTrigger>
+              <TabsTrigger value="sla">SLA-uppföljning</TabsTrigger>
             </TabsList>
 
             <TabsContent value="ko" className="space-y-6">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                <KPICard label="Oppna arenden" value={String(kpis.openCount)} unit="st" />
-                <KPICard label="Losta arenden" value={String(kpis.resolvedCount)} unit="st" />
-                <KPICard label="Kritiska oppna" value={String(kpis.criticalOpen)} unit="st" trend={kpis.criticalOpen > 0 ? 'down' : 'up'} />
-                <KPICard label="Snitttid losning" value={kpis.avgResolutionHours.toFixed(1)} unit="tim" />
+                <KPICard label="Öppna ärenden" value={String(kpis.openCount)} unit="st" />
+                <KPICard label="Lösta ärenden" value={String(kpis.resolvedCount)} unit="st" />
+                <KPICard label="Kritiska öppna" value={String(kpis.criticalOpen)} unit="st" trend={kpis.criticalOpen > 0 ? 'down' : 'up'} />
+                <KPICard label="Snitttid lösning" value={kpis.avgResolutionHours.toFixed(1)} unit="tim" />
                 <KPICard label="SLA-uppfyllnad" value={fmtPct(kpis.slaCompliance)} unit="%" trend={kpis.slaCompliance >= 90 ? 'up' : 'down'} />
               </div>
 
@@ -370,7 +370,7 @@ export function ArendehanteringWorkspace({ module: mod, sectorSlug, settingsHref
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                 <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Sok arende..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
+                  <Input placeholder="Sök ärende..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
                 </div>
                 <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as TicketStatus | 'all')}>
                   <SelectTrigger className="w-[160px]"><SelectValue placeholder="Status" /></SelectTrigger>
@@ -392,9 +392,9 @@ export function ArendehanteringWorkspace({ module: mod, sectorSlug, settingsHref
               {filteredTickets.length === 0 ? (
                 <EmptyModuleState
                   icon={TicketCheck}
-                  title="Inga arenden"
-                  description="Skapa arenden for att borja hantera support och incidenter."
-                  actionLabel="Nytt arende"
+                  title="Inga ärenden"
+                  description="Skapa ärenden för att börja hantera support och incidenter."
+                  actionLabel="Nytt ärende"
                   onAction={openNew}
                 />
               ) : (
@@ -409,7 +409,7 @@ export function ArendehanteringWorkspace({ module: mod, sectorSlug, settingsHref
                         <TableHead className="font-medium">Status</TableHead>
                         <TableHead className="font-medium">SLA</TableHead>
                         <TableHead className="font-medium">Tilldelad</TableHead>
-                        <TableHead className="font-medium text-right">Atgarder</TableHead>
+                        <TableHead className="font-medium text-right">Åtgärder</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -448,7 +448,7 @@ export function ArendehanteringWorkspace({ module: mod, sectorSlug, settingsHref
                       <span className="text-xs text-muted-foreground">{col.tickets.length}</span>
                     </div>
                     {col.tickets.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">Inga arenden</div>
+                      <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">Inga ärenden</div>
                     ) : (
                       col.tickets.map((t) => (
                         <Card key={t.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => openEdit(t)}>
@@ -472,17 +472,17 @@ export function ArendehanteringWorkspace({ module: mod, sectorSlug, settingsHref
             <TabsContent value="sla" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm">SLA-malsvar (timmar)</CardTitle>
+                  <CardTitle className="text-sm">SLA-målsvar (timmar)</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="rounded-xl border border-border overflow-hidden">
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-muted/50">
-                          <TableHead className="font-medium">Niva</TableHead>
-                          <TableHead className="font-medium text-right">Lag</TableHead>
+                          <TableHead className="font-medium">Nivå</TableHead>
+                          <TableHead className="font-medium text-right">Låg</TableHead>
                           <TableHead className="font-medium text-right">Medium</TableHead>
-                          <TableHead className="font-medium text-right">Hog</TableHead>
+                          <TableHead className="font-medium text-right">Hög</TableHead>
                           <TableHead className="font-medium text-right">Kritisk</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -504,11 +504,11 @@ export function ArendehanteringWorkspace({ module: mod, sectorSlug, settingsHref
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm">Losta arenden - SLA-resultat</CardTitle>
+                  <CardTitle className="text-sm">Lösta ärenden - SLA-resultat</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {tickets.filter((t) => t.resolvedDate).length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Inga losta arenden att analysera.</p>
+                    <p className="text-sm text-muted-foreground">Inga lösta ärenden att analysera.</p>
                   ) : (
                     <div className="rounded-xl border border-border overflow-hidden">
                       <Table>
@@ -518,7 +518,7 @@ export function ArendehanteringWorkspace({ module: mod, sectorSlug, settingsHref
                             <TableHead className="font-medium">Titel</TableHead>
                             <TableHead className="font-medium">SLA</TableHead>
                             <TableHead className="font-medium">Prioritet</TableHead>
-                            <TableHead className="font-medium text-right">Mal (tim)</TableHead>
+                            <TableHead className="font-medium text-right">Mål (tim)</TableHead>
                             <TableHead className="font-medium text-right">Faktisk (tim)</TableHead>
                             <TableHead className="font-medium">Resultat</TableHead>
                           </TableRow>
@@ -561,12 +561,12 @@ export function ArendehanteringWorkspace({ module: mod, sectorSlug, settingsHref
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Redigera arende' : 'Nytt arende'}</DialogTitle>
-            <DialogDescription>{editing ? 'Uppdatera arendets uppgifter.' : 'Skapa ett nytt supportarende.'}</DialogDescription>
+            <DialogTitle>{editing ? 'Redigera ärende' : 'Nytt ärende'}</DialogTitle>
+            <DialogDescription>{editing ? 'Uppdatera ärendets uppgifter.' : 'Skapa ett nytt supportärende.'}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2"><Label>Arendenummer</Label><Input value={form.ticketNumber} disabled className="bg-muted" /></div>
+              <div className="grid gap-2"><Label>Ärendenummer</Label><Input value={form.ticketNumber} disabled className="bg-muted" /></div>
               <div className="grid gap-2"><Label>Kund *</Label><Input value={form.client} onChange={(e) => setForm((f) => ({ ...f, client: e.target.value }))} placeholder="Acme AB" /></div>
             </div>
             <div className="grid gap-2"><Label>Titel *</Label><Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Beskriv problemet kort..." /></div>
@@ -587,7 +587,7 @@ export function ArendehanteringWorkspace({ module: mod, sectorSlug, settingsHref
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label>SLA-niva</Label>
+                <Label>SLA-nivå</Label>
                 <Select value={form.sla} onValueChange={(v) => setForm((f) => ({ ...f, sla: v as SlaLevel }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{SLA_LEVELS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
@@ -607,8 +607,8 @@ export function ArendehanteringWorkspace({ module: mod, sectorSlug, settingsHref
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Ta bort arende</DialogTitle>
-            <DialogDescription>Ar du saker pa att du vill ta bort {toDelete?.ticketNumber}?</DialogDescription>
+            <DialogTitle>Ta bort ärende</DialogTitle>
+            <DialogDescription>Är du säker på att du vill ta bort {toDelete?.ticketNumber}?</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button>

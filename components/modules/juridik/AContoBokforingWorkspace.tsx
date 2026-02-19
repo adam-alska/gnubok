@@ -252,7 +252,7 @@ export function AContoBokforingWorkspace({ module: mod, sectorSlug, settingsHref
       >
         <Tabs defaultValue="oversikt" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="oversikt">Oversikt</TabsTrigger>
+            <TabsTrigger value="oversikt">Översikt</TabsTrigger>
             <TabsTrigger value="fakturor">Fakturor</TabsTrigger>
             <TabsTrigger value="slutavrakning">Slutavrakning</TabsTrigger>
           </TabsList>
@@ -267,7 +267,7 @@ export function AContoBokforingWorkspace({ module: mod, sectorSlug, settingsHref
               <EmptyModuleState
                 icon={Receipt}
                 title="Inga a conto-fakturor"
-                description="Skapa a conto-fakturor for forskottsbetalning pa konto 2420."
+                description="Skapa a conto-fakturor för förskottsbetalning på konto 2420."
                 actionLabel="Ny a conto-faktura"
                 onAction={openNewEntry}
               />
@@ -276,17 +276,17 @@ export function AContoBokforingWorkspace({ module: mod, sectorSlug, settingsHref
                 <KPICard label="Totalt fakturerat" value={fmt(summary.totalInvoiced)} unit="kr" />
                 <KPICard label="Totalt betalt" value={fmt(summary.totalPaid)} unit="kr" />
                 <KPICard
-                  label="Utstaende (2420)"
+                  label="Utestående (2420)"
                   value={fmt(summary.totalOutstanding)}
                   unit="kr"
                   trend={summary.totalOutstanding > 0 ? 'neutral' : 'up'}
                 />
                 <KPICard label="Slutavraknade" value={String(summary.settled)} />
                 <KPICard
-                  label="Forfalda"
+                  label="Förfallna"
                   value={String(summary.overdue)}
                   trend={summary.overdue > 0 ? 'down' : 'up'}
-                  trendLabel={summary.overdue > 0 ? 'Krav atgard' : 'OK'}
+                  trendLabel={summary.overdue > 0 ? 'Kräver åtgärd' : 'OK'}
                 />
               </div>
             )}
@@ -333,12 +333,12 @@ export function AContoBokforingWorkspace({ module: mod, sectorSlug, settingsHref
                         <TableRow className="bg-muted/50">
                           <TableHead className="font-medium">Fakturanr</TableHead>
                           <TableHead className="font-medium">Klient</TableHead>
-                          <TableHead className="font-medium">Arende</TableHead>
+                          <TableHead className="font-medium">Ärende</TableHead>
                           <TableHead className="font-medium text-right">Belopp (kr)</TableHead>
                           <TableHead className="font-medium text-right">Betalt (kr)</TableHead>
                           <TableHead className="font-medium">Status</TableHead>
-                          <TableHead className="font-medium">Forfall</TableHead>
-                          <TableHead className="font-medium text-right">Atgarder</TableHead>
+                          <TableHead className="font-medium">Förfall</TableHead>
+                          <TableHead className="font-medium text-right">Åtgärder</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -389,7 +389,7 @@ export function AContoBokforingWorkspace({ module: mod, sectorSlug, settingsHref
             ) : (
               <>
                 <p className="text-sm text-muted-foreground">
-                  Markera betalda a conto-fakturor som slutavraknade for att stanga forskottet mot konto 2420.
+                  Markera betalda a conto-fakturor som slutavräknade för att stänga förskottet mot konto 2420.
                 </p>
                 <div className="rounded-xl border border-border overflow-hidden">
                   <Table>
@@ -399,7 +399,7 @@ export function AContoBokforingWorkspace({ module: mod, sectorSlug, settingsHref
                         <TableHead className="font-medium">Klient</TableHead>
                         <TableHead className="font-medium text-right">Belopp (kr)</TableHead>
                         <TableHead className="font-medium">Status</TableHead>
-                        <TableHead className="font-medium text-right">Atgard</TableHead>
+                        <TableHead className="font-medium text-right">Åtgärd</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -417,7 +417,7 @@ export function AContoBokforingWorkspace({ module: mod, sectorSlug, settingsHref
                             {entry.status === 'Betald' && (
                               <Button variant="outline" size="sm" onClick={() => handleSettlement(entry)}>
                                 <CheckCircle className="mr-2 h-4 w-4" />
-                                Slutavrakna
+                                Slutavräkna
                               </Button>
                             )}
                           </TableCell>
@@ -440,7 +440,7 @@ export function AContoBokforingWorkspace({ module: mod, sectorSlug, settingsHref
             <DialogDescription>
               {editingEntry
                 ? 'Uppdatera fakturauppgifterna nedan.'
-                : 'Skapa en ny forskottsfaktura som bokfors pa konto 2420.'}
+                : 'Skapa en ny förskottsfaktura som bokförs på konto 2420.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -455,7 +455,7 @@ export function AContoBokforingWorkspace({ module: mod, sectorSlug, settingsHref
                 <Input id="ac-client" value={form.clientName} onChange={(e) => setForm((f) => ({ ...f, clientName: e.target.value }))} placeholder="Klient AB" />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="ac-case">Arende</Label>
+                <Label htmlFor="ac-case">Ärende</Label>
                 <Input id="ac-case" value={form.caseRef} onChange={(e) => setForm((f) => ({ ...f, caseRef: e.target.value }))} placeholder="2024-001" />
               </div>
             </div>
@@ -488,7 +488,7 @@ export function AContoBokforingWorkspace({ module: mod, sectorSlug, settingsHref
                 <Input id="ac-invdate" type="date" value={form.invoiceDate} onChange={(e) => setForm((f) => ({ ...f, invoiceDate: e.target.value }))} />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="ac-due">Forfallodatum</Label>
+                <Label htmlFor="ac-due">Förfallodatum</Label>
                 <Input id="ac-due" type="date" value={form.dueDate} onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))} />
               </div>
             </div>
@@ -514,7 +514,7 @@ export function AContoBokforingWorkspace({ module: mod, sectorSlug, settingsHref
           <DialogHeader>
             <DialogTitle>Ta bort a conto-faktura</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort faktura{' '}
+              Är du säker på att du vill ta bort faktura{' '}
               <span className="font-mono font-semibold">{entryToDelete?.invoiceNumber}</span>?
             </DialogDescription>
           </DialogHeader>

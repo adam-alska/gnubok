@@ -55,15 +55,15 @@ interface ImportRecord {
 }
 
 const TARGET_FIELDS = [
-  { value: 'skip', label: '-- Hoppa over --' },
+  { value: 'skip', label: '-- Hoppa över --' },
   { value: 'date', label: 'Datum' },
   { value: 'bookingRef', label: 'Bokningsreferens' },
-  { value: 'guestName', label: 'Gastnamn' },
+  { value: 'guestName', label: 'Gästnamn' },
   { value: 'roomNumber', label: 'Rumsnummer' },
   { value: 'roomType', label: 'Rumstyp' },
   { value: 'checkin', label: 'Incheckning' },
   { value: 'checkout', label: 'Utcheckning' },
-  { value: 'nights', label: 'Natter' },
+  { value: 'nights', label: 'Nätter' },
   { value: 'rate', label: 'Rumspris' },
   { value: 'totalAmount', label: 'Totalbelopp' },
   { value: 'channel', label: 'Kanal' },
@@ -234,7 +234,7 @@ export function PmsImportWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
       setImportHistory(updatedHistory)
       await saveHistory(updatedHistory)
 
-      setImportResult({ success: true, message: `${mappedRows.length} rader importerades fran ${fileName}.` })
+      setImportResult({ success: true, message: `${mappedRows.length} rader importerades från ${fileName}.` })
       setCsvHeaders([])
       setCsvRows([])
       setMappings([])
@@ -291,8 +291,8 @@ export function PmsImportWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
               <ImportDropzone
                 accept=".csv,.txt"
                 onFileSelect={handleFileSelect}
-                label="Dra och slapp en CSV-fil fran PMS"
-                description="eller klicka for att valja fil (CSV)"
+                label="Dra och släpp en CSV-fil från PMS"
+                description="eller klicka för att välja fil (CSV)"
               />
             )}
 
@@ -314,7 +314,7 @@ export function PmsImportWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
                     <CardTitle className="text-base">Kolumnmappning - {fileName}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <p className="text-sm text-muted-foreground">Mappa CSV-kolumner till ratt falt. Kolumner markerade &quot;Hoppa over&quot; importeras inte.</p>
+                    <p className="text-sm text-muted-foreground">Mappa CSV-kolumner till rätt fält. Kolumner markerade &quot;Hoppa över&quot; importeras inte.</p>
                     <div className="space-y-3">
                       {mappings.map(mp => (
                         <div key={mp.csvColumn} className="flex items-center gap-3">
@@ -336,7 +336,7 @@ export function PmsImportWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
                 {previewRows.length > 0 && (
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-base">Forhandsvisning ({csvRows.length} rader totalt, visar 5)</CardTitle>
+                      <CardTitle className="text-base">Förhandsvisning ({csvRows.length} rader totalt, visar 5)</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="rounded-lg border border-border overflow-x-auto">
@@ -379,7 +379,7 @@ export function PmsImportWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
 
           <TabsContent value="historik" className="space-y-4">
             {importHistory.length === 0 ? (
-              <EmptyModuleState icon={FileSpreadsheet} title="Ingen importhistorik" description="Importera en CSV-fil for att se historik har." />
+              <EmptyModuleState icon={FileSpreadsheet} title="Ingen importhistorik" description="Importera en CSV-fil för att se historik här." />
             ) : (
               <div className="rounded-xl border border-border overflow-hidden">
                 <Table>
@@ -389,7 +389,7 @@ export function PmsImportWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
                       <TableHead className="font-medium">Datum</TableHead>
                       <TableHead className="font-medium text-right">Rader</TableHead>
                       <TableHead className="font-medium">Status</TableHead>
-                      <TableHead className="font-medium text-right">Atgarder</TableHead>
+                      <TableHead className="font-medium text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

@@ -264,7 +264,7 @@ export function AdrWorkspace({ module: mod, sectorSlug, settingsHref }: ModuleWo
               {/* KPI */}
               <div className="grid gap-4 sm:grid-cols-3">
                 <KPICard label="Overall ADR" value={fmtDec(overallAdr)} unit="kr" />
-                <KPICard label="Totalt salda rum" value={fmt(entries.reduce((s, e) => s + e.roomsSold, 0))} unit="st" />
+                <KPICard label="Totalt sålda rum" value={fmt(entries.reduce((s, e) => s + e.roomsSold, 0))} unit="st" />
                 <KPICard label="Total rumsintakt" value={fmt(entries.reduce((s, e) => s + e.revenue, 0))} unit="kr" />
               </div>
 
@@ -285,9 +285,9 @@ export function AdrWorkspace({ module: mod, sectorSlug, settingsHref }: ModuleWo
                   </SelectContent>
                 </Select>
                 <Select value={filterSeason} onValueChange={val => setFilterSeason(val as Season | 'all')}>
-                  <SelectTrigger className="w-[160px]"><SelectValue placeholder="Sasong" /></SelectTrigger>
+                  <SelectTrigger className="w-[160px]"><SelectValue placeholder="Säsong" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Alla sasonger</SelectItem>
+                    <SelectItem value="all">Alla säsonger</SelectItem>
                     {SEASONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -295,20 +295,20 @@ export function AdrWorkspace({ module: mod, sectorSlug, settingsHref }: ModuleWo
               </div>
 
               {filteredEntries.length === 0 ? (
-                <EmptyModuleState icon={BedDouble} title="Ingen ADR-data" description="Lagg till data for att analysera Average Daily Rate." actionLabel="Lagg till" onAction={openNew} />
+                <EmptyModuleState icon={BedDouble} title="Ingen ADR-data" description="Lägg till data för att analysera Average Daily Rate." actionLabel="Lägg till" onAction={openNew} />
               ) : (
                 <div className="rounded-xl border border-border overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50">
-                        <TableHead className="font-medium">Manad</TableHead>
+                        <TableHead className="font-medium">Månad</TableHead>
                         <TableHead className="font-medium">Rumstyp</TableHead>
                         <TableHead className="font-medium">Kanal</TableHead>
-                        <TableHead className="font-medium">Sasong</TableHead>
-                        <TableHead className="font-medium text-right">Salda</TableHead>
+                        <TableHead className="font-medium">Säsong</TableHead>
+                        <TableHead className="font-medium text-right">Sålda</TableHead>
                         <TableHead className="font-medium text-right">Intakt</TableHead>
                         <TableHead className="font-medium text-right">ADR</TableHead>
-                        <TableHead className="font-medium text-right">Atgarder</TableHead>
+                        <TableHead className="font-medium text-right">Åtgärder</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -341,7 +341,7 @@ export function AdrWorkspace({ module: mod, sectorSlug, settingsHref }: ModuleWo
                   <TableHeader>
                     <TableRow className="bg-muted/50">
                       <TableHead className="font-medium">Rumstyp</TableHead>
-                      <TableHead className="font-medium text-right">Salda rum</TableHead>
+                      <TableHead className="font-medium text-right">Sålda rum</TableHead>
                       <TableHead className="font-medium text-right">Intakt (kr)</TableHead>
                       <TableHead className="font-medium text-right">ADR (kr)</TableHead>
                     </TableRow>
@@ -366,7 +366,7 @@ export function AdrWorkspace({ module: mod, sectorSlug, settingsHref }: ModuleWo
                   <TableHeader>
                     <TableRow className="bg-muted/50">
                       <TableHead className="font-medium">Kanal</TableHead>
-                      <TableHead className="font-medium text-right">Salda rum</TableHead>
+                      <TableHead className="font-medium text-right">Sålda rum</TableHead>
                       <TableHead className="font-medium text-right">Intakt (kr)</TableHead>
                       <TableHead className="font-medium text-right">ADR (kr)</TableHead>
                     </TableRow>
@@ -393,11 +393,11 @@ export function AdrWorkspace({ module: mod, sectorSlug, settingsHref }: ModuleWo
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editingEntry ? 'Redigera ADR-post' : 'Ny ADR-post'}</DialogTitle>
-            <DialogDescription>Registrera rumstyp, kanal, sasong och forsaljningsdata.</DialogDescription>
+            <DialogDescription>Registrera rumstyp, kanal, säsong och försäljningsdata.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
-              <Label>Manad *</Label>
+              <Label>Månad *</Label>
               <Input type="month" value={form.month} onChange={e => setForm(f => ({ ...f, month: e.target.value }))} />
             </div>
             <div className="grid grid-cols-3 gap-4">
@@ -416,7 +416,7 @@ export function AdrWorkspace({ module: mod, sectorSlug, settingsHref }: ModuleWo
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label>Sasong</Label>
+                <Label>Säsong</Label>
                 <Select value={form.season} onValueChange={val => setForm(f => ({ ...f, season: val as Season }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{SEASONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
@@ -425,7 +425,7 @@ export function AdrWorkspace({ module: mod, sectorSlug, settingsHref }: ModuleWo
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Rum salda *</Label>
+                <Label>Rum sålda *</Label>
                 <Input type="number" min={0} value={form.roomsSold || ''} onChange={e => setForm(f => ({ ...f, roomsSold: parseInt(e.target.value) || 0 }))} />
               </div>
               <div className="grid gap-2">
@@ -452,7 +452,7 @@ export function AdrWorkspace({ module: mod, sectorSlug, settingsHref }: ModuleWo
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Ta bort ADR-post</DialogTitle>
-            <DialogDescription>Ar du saker pa att du vill ta bort denna post?</DialogDescription>
+            <DialogDescription>Är du säker på att du vill ta bort denna post?</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button>

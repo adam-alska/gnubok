@@ -67,9 +67,9 @@ interface Deposit {
 
 const STATUS_MAP: Record<DepositStatus, { label: string; color: string }> = {
   registrerad: { label: 'Registrerad', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
-  intaktford: { label: 'Intaktford', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' },
+  intaktford: { label: 'Intäktförd', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' },
   avbokad: { label: 'Avbokad', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' },
-  aterbetald: { label: 'Aterbetald', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' },
+  aterbetald: { label: 'Återbetald', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' },
 }
 
 function generateId() {
@@ -239,7 +239,7 @@ export function ForskottsbetalningWorkspace({ module: mod, sectorSlug, settingsH
         actions={
           <Button onClick={openNew}>
             <Plus className="mr-2 h-4 w-4" />
-            Ny forskottsbetalning
+            Ny förskottsbetalning
           </Button>
         }
       >
@@ -253,7 +253,7 @@ export function ForskottsbetalningWorkspace({ module: mod, sectorSlug, settingsH
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Oppna forskott (konto 2420)</CardTitle>
+                  <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Öppna förskott (konto 2420)</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <span className="text-2xl font-semibold tracking-tight">{fmt(summary.total)}</span>
@@ -262,7 +262,7 @@ export function ForskottsbetalningWorkspace({ module: mod, sectorSlug, settingsH
               </Card>
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Intaktforda</CardTitle>
+                  <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Intäktförda</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <span className="text-2xl font-semibold tracking-tight">{fmt(summary.recognized)}</span>
@@ -271,7 +271,7 @@ export function ForskottsbetalningWorkspace({ module: mod, sectorSlug, settingsH
               </Card>
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Avbokade / Aterbetalda</CardTitle>
+                  <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Avbokade / Återbetalda</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <span className="text-2xl font-semibold tracking-tight">{fmt(summary.cancelled)}</span>
@@ -293,7 +293,7 @@ export function ForskottsbetalningWorkspace({ module: mod, sectorSlug, settingsH
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Sok gast eller bokningsref..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
+                <Input placeholder="Sök gäst eller bokningsref..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
               </div>
               <Select value={filterStatus} onValueChange={val => setFilterStatus(val as DepositStatus | 'all')}>
                 <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filtrera status" /></SelectTrigger>
@@ -315,9 +315,9 @@ export function ForskottsbetalningWorkspace({ module: mod, sectorSlug, settingsH
             {filteredDeposits.length === 0 ? (
               <EmptyModuleState
                 icon={Wallet}
-                title="Inga forskottsbetalningar"
-                description="Registrera forsta forskottsbetalningen for att borja spara."
-                actionLabel="Ny forskottsbetalning"
+                title="Inga förskottsbetalningar"
+                description="Registrera första förskottsbetalningen för att börja spåra."
+                actionLabel="Ny förskottsbetalning"
                 onAction={openNew}
               />
             ) : (
@@ -325,13 +325,13 @@ export function ForskottsbetalningWorkspace({ module: mod, sectorSlug, settingsH
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50">
-                      <TableHead className="font-medium">Gast</TableHead>
+                      <TableHead className="font-medium">Gäst</TableHead>
                       <TableHead className="font-medium">Bokningsref</TableHead>
                       <TableHead className="font-medium text-right">Belopp</TableHead>
                       <TableHead className="font-medium">Inbetalad</TableHead>
                       <TableHead className="font-medium">Incheckning</TableHead>
                       <TableHead className="font-medium">Status</TableHead>
-                      <TableHead className="font-medium text-right">Atgarder</TableHead>
+                      <TableHead className="font-medium text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -351,7 +351,7 @@ export function ForskottsbetalningWorkspace({ module: mod, sectorSlug, settingsH
                           <div className="flex items-center justify-end gap-1">
                             {dep.status === 'registrerad' && (
                               <>
-                                <Button variant="ghost" size="icon" onClick={() => handleStatusChange(dep.id, 'intaktford')} title="Intaktfor vid incheckning">
+                                <Button variant="ghost" size="icon" onClick={() => handleStatusChange(dep.id, 'intaktford')} title="Intäktför vid incheckning">
                                   <CheckCircle className="h-4 w-4 text-emerald-600" />
                                 </Button>
                                 <Button variant="ghost" size="icon" onClick={() => handleStatusChange(dep.id, 'avbokad')} title="Markera avbokad">
@@ -360,7 +360,7 @@ export function ForskottsbetalningWorkspace({ module: mod, sectorSlug, settingsH
                               </>
                             )}
                             {dep.status === 'avbokad' && (
-                              <Button variant="ghost" size="icon" onClick={() => handleStatusChange(dep.id, 'aterbetald')} title="Markera aterbetald">
+                              <Button variant="ghost" size="icon" onClick={() => handleStatusChange(dep.id, 'aterbetald')} title="Markera återbetald">
                                 <Wallet className="h-4 w-4 text-red-600" />
                               </Button>
                             )}
@@ -386,13 +386,13 @@ export function ForskottsbetalningWorkspace({ module: mod, sectorSlug, settingsH
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingDeposit ? 'Redigera forskottsbetalning' : 'Ny forskottsbetalning'}</DialogTitle>
-            <DialogDescription>Registrera en forskottsbetalning pa konto 2420.</DialogDescription>
+            <DialogTitle>{editingDeposit ? 'Redigera förskottsbetalning' : 'Ny förskottsbetalning'}</DialogTitle>
+            <DialogDescription>Registrera en förskottsbetalning på konto 2420.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Gastnamn *</Label>
+                <Label>Gästnamn *</Label>
                 <Input value={form.guestName} onChange={e => setForm(f => ({ ...f, guestName: e.target.value }))} placeholder="Anna Andersson" />
               </div>
               <div className="grid gap-2">
@@ -449,9 +449,9 @@ export function ForskottsbetalningWorkspace({ module: mod, sectorSlug, settingsH
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Ta bort forskottsbetalning</DialogTitle>
+            <DialogTitle>Ta bort förskottsbetalning</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort forskottsbetalningen for {depositToDelete?.guestName}?
+              Är du säker på att du vill ta bort förskottsbetalningen för {depositToDelete?.guestName}?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

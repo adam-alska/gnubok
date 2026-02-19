@@ -73,12 +73,12 @@ interface SendLogEntry {
 }
 
 const MESSAGE_TYPES: { value: MessageType; label: string }[] = [
-  { value: 'bekraftelse', label: 'Bokningsbekraftelse' },
+  { value: 'bekraftelse', label: 'Bokningsbekräftelse' },
   { value: 'incheckning', label: 'Incheckningsinformation' },
-  { value: 'utcheckning', label: 'Utcheckningspaminnelse' },
-  { value: 'recensionspaminnelse', label: 'Recensionspaminnelse' },
+  { value: 'utcheckning', label: 'Utcheckningspåminnelse' },
+  { value: 'recensionspaminnelse', label: 'Recensionspåminnelse' },
   { value: 'kampanj', label: 'Kampanj / Erbjudande' },
-  { value: 'ovrigt', label: 'Ovrigt' },
+  { value: 'ovrigt', label: 'Övrigt' },
 ]
 
 const TYPE_COLORS: Record<MessageType, string> = {
@@ -94,33 +94,33 @@ const DEFAULT_TEMPLATES: MessageTemplate[] = [
   {
     id: '1',
     type: 'bekraftelse',
-    name: 'Bokningsbekraftelse',
-    subject: 'Bokningsbekraftelse - {{hotelName}}',
-    body: 'Hej {{guestName}},\n\nTack for din bokning!\n\nIncheckning: {{checkinDate}}\nUtcheckning: {{checkoutDate}}\nRumstyp: {{roomType}}\n\nVi ser fram emot ditt besok!\n\nMed vanlig halsning,\n{{hotelName}}',
+    name: 'Bokningsbekräftelse',
+    subject: 'Bokningsbekräftelse - {{hotelName}}',
+    body: 'Hej {{guestName}},\n\nTack för din bokning!\n\nIncheckning: {{checkinDate}}\nUtcheckning: {{checkoutDate}}\nRumstyp: {{roomType}}\n\nVi ser fram emot ditt besök!\n\nMed vänlig hälsning,\n{{hotelName}}',
     active: true,
   },
   {
     id: '2',
     type: 'incheckning',
     name: 'Incheckningsinformation',
-    subject: 'Valkommeninformation - {{hotelName}}',
-    body: 'Hej {{guestName}},\n\nValkommen till {{hotelName}}!\n\nIncheckning sker fran kl 15:00.\nWiFi: {{wifiCode}}\nFrukost serveras kl 07:00-10:00.\n\nVid fragor, kontakta receptionen.\n\nValkommen!',
+    subject: 'Välkomstinformation - {{hotelName}}',
+    body: 'Hej {{guestName}},\n\nVälkommen till {{hotelName}}!\n\nIncheckning sker från kl 15:00.\nWiFi: {{wifiCode}}\nFrukost serveras kl 07:00-10:00.\n\nVid frågor, kontakta receptionen.\n\nVälkommen!',
     active: true,
   },
   {
     id: '3',
     type: 'utcheckning',
-    name: 'Utcheckningspaminnelse',
-    subject: 'Paminnelse om utcheckning - {{hotelName}}',
-    body: 'Hej {{guestName}},\n\nVi papminner om att utcheckning sker senast kl 11:00.\n\nVi hoppas att du trivdes hos oss!\n\nMed vanlig halsning,\n{{hotelName}}',
+    name: 'Utcheckningspåminnelse',
+    subject: 'Påminnelse om utcheckning - {{hotelName}}',
+    body: 'Hej {{guestName}},\n\nVi påminner om att utcheckning sker senast kl 11:00.\n\nVi hoppas att du trivdes hos oss!\n\nMed vänlig hälsning,\n{{hotelName}}',
     active: true,
   },
   {
     id: '4',
     type: 'recensionspaminnelse',
-    name: 'Recensionspaminnelse',
-    subject: 'Hur var din vistelse pa {{hotelName}}?',
-    body: 'Hej {{guestName}},\n\nTack for att du bodde hos oss! Vi hade uppskattat om du tog nagon minut att bedomma din vistelse.\n\nDin feedback ar vardefull for oss.\n\nMed vanlig halsning,\n{{hotelName}}',
+    name: 'Recensionspåminnelse',
+    subject: 'Hur var din vistelse på {{hotelName}}?',
+    body: 'Hej {{guestName}},\n\nTack för att du bodde hos oss! Vi hade uppskattat om du tog någon minut att bedöma din vistelse.\n\nDin feedback är värdefull för oss.\n\nMed vänlig hälsning,\n{{hotelName}}',
     active: true,
   },
 ]
@@ -331,7 +331,7 @@ export function GastkommunikationWorkspace({ module: mod, sectorSlug, settingsHr
             <TabsContent value="mallar" className="space-y-6">
               {saving && <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Sparar...</div>}
               {templates.length === 0 ? (
-                <EmptyModuleState icon={MessageSquare} title="Inga mallar" description="Skapa meddelandemallar for gastkommunikation." actionLabel="Ny mall" onAction={openNewTemplate} />
+                <EmptyModuleState icon={MessageSquare} title="Inga mallar" description="Skapa meddelandemallar för gästkommunikation." actionLabel="Ny mall" onAction={openNewTemplate} />
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2">
                   {templates.map(template => (
@@ -374,12 +374,12 @@ export function GastkommunikationWorkspace({ module: mod, sectorSlug, settingsHr
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                 <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Sok i loggen..." value={logSearch} onChange={e => setLogSearch(e.target.value)} className="pl-9" />
+                  <Input placeholder="Sök i loggen..." value={logSearch} onChange={e => setLogSearch(e.target.value)} className="pl-9" />
                 </div>
                 <span className="text-sm text-muted-foreground">{sendLog.length} utskick totalt</span>
               </div>
               {filteredLog.length === 0 ? (
-                <EmptyModuleState icon={Mail} title="Inga utskick" description="Skicka meddelanden till gaster for att se historik har." />
+                <EmptyModuleState icon={Mail} title="Inga utskick" description="Skicka meddelanden till gäster för att se historik här." />
               ) : (
                 <div className="rounded-xl border border-border overflow-hidden">
                   <Table>
@@ -388,9 +388,9 @@ export function GastkommunikationWorkspace({ module: mod, sectorSlug, settingsHr
                         <TableHead className="font-medium">Datum</TableHead>
                         <TableHead className="font-medium">Mall</TableHead>
                         <TableHead className="font-medium">Typ</TableHead>
-                        <TableHead className="font-medium">Gast</TableHead>
+                        <TableHead className="font-medium">Gäst</TableHead>
                         <TableHead className="font-medium">Mottagare</TableHead>
-                        <TableHead className="font-medium text-right">Atgarder</TableHead>
+                        <TableHead className="font-medium text-right">Åtgärder</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -426,13 +426,13 @@ export function GastkommunikationWorkspace({ module: mod, sectorSlug, settingsHr
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingTemplate ? 'Redigera mall' : 'Ny meddelandemall'}</DialogTitle>
-            <DialogDescription>Anvand platshallare som {'{{guestName}}'}, {'{{checkinDate}}'}, {'{{checkoutDate}}'}, {'{{roomType}}'}, {'{{hotelName}}'}.</DialogDescription>
+            <DialogDescription>Använd platshållare som {'{{guestName}}'}, {'{{checkinDate}}'}, {'{{checkoutDate}}'}, {'{{roomType}}'}, {'{{hotelName}}'}.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Mallnamn *</Label>
-                <Input value={templateForm.name} onChange={e => setTemplateForm(f => ({ ...f, name: e.target.value }))} placeholder="Bokningsbekraftelse" />
+                <Input value={templateForm.name} onChange={e => setTemplateForm(f => ({ ...f, name: e.target.value }))} placeholder="Bokningsbekräftelse" />
               </div>
               <div className="grid gap-2">
                 <Label>Typ *</Label>
@@ -443,8 +443,8 @@ export function GastkommunikationWorkspace({ module: mod, sectorSlug, settingsHr
               </div>
             </div>
             <div className="grid gap-2">
-              <Label>Amnesrad *</Label>
-              <Input value={templateForm.subject} onChange={e => setTemplateForm(f => ({ ...f, subject: e.target.value }))} placeholder="Bokningsbekraftelse - {{hotelName}}" />
+              <Label>Ämnesrad *</Label>
+              <Input value={templateForm.subject} onChange={e => setTemplateForm(f => ({ ...f, subject: e.target.value }))} placeholder="Bokningsbekräftelse - {{hotelName}}" />
             </div>
             <div className="grid gap-2">
               <Label>Meddelandetext *</Label>
@@ -469,11 +469,11 @@ export function GastkommunikationWorkspace({ module: mod, sectorSlug, settingsHr
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Skicka meddelande</DialogTitle>
-            <DialogDescription>Ange mottagarinformation for att logga utskicket.</DialogDescription>
+            <DialogDescription>Ange mottagarinformation för att logga utskicket.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
-              <Label>Gastnamn *</Label>
+              <Label>Gästnamn *</Label>
               <Input value={sendForm.guestName} onChange={e => setSendForm(f => ({ ...f, guestName: e.target.value }))} placeholder="Anna Andersson" />
             </div>
             <div className="grid gap-2">
@@ -495,7 +495,7 @@ export function GastkommunikationWorkspace({ module: mod, sectorSlug, settingsHr
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Ta bort mall</DialogTitle>
-            <DialogDescription>Ar du saker pa att du vill ta bort mallen &quot;{templateToDelete?.name}&quot;?</DialogDescription>
+            <DialogDescription>Är du säker på att du vill ta bort mallen &quot;{templateToDelete?.name}&quot;?</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button>

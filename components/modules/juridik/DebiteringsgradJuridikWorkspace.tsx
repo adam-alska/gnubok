@@ -250,10 +250,10 @@ export function DebiteringsgradJuridikWorkspace({ module: mod, sectorSlug, setti
       >
         <Tabs defaultValue="oversikt" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="oversikt">Oversikt</TabsTrigger>
+            <TabsTrigger value="oversikt">Översikt</TabsTrigger>
             <TabsTrigger value="per-jurist">Per jurist</TabsTrigger>
             <TabsTrigger value="detaljer">Detaljer</TabsTrigger>
-            <TabsTrigger value="installningar">Installningar</TabsTrigger>
+            <TabsTrigger value="installningar">Inställningar</TabsTrigger>
           </TabsList>
 
           {/* Overview */}
@@ -266,7 +266,7 @@ export function DebiteringsgradJuridikWorkspace({ module: mod, sectorSlug, setti
               <EmptyModuleState
                 icon={Target}
                 title="Ingen data"
-                description="Registrera debiterbara och totala timmar for att berakna debiteringsgrad."
+                description="Registrera debiterbara och totala timmar för att beräkna debiteringsgrad."
                 actionLabel="Ny registrering"
                 onAction={openNewEntry}
               />
@@ -280,7 +280,7 @@ export function DebiteringsgradJuridikWorkspace({ module: mod, sectorSlug, setti
                   trend={summary.variance >= 0 ? 'up' : 'down'}
                   trendLabel={`${summary.variance >= 0 ? '+' : ''}${fmtPct(summary.variance)} pp`}
                 />
-                <KPICard label="Malvarde" value={fmtPct(targetPct)} unit="%" />
+                <KPICard label="Målvärde" value={fmtPct(targetPct)} unit="%" />
                 <KPICard label="Debiterbara timmar" value={fmt(summary.totalBillable)} unit="h" />
                 <KPICard label="Totalt timmar" value={fmt(summary.totalHours)} unit="h" />
                 <KPICard label="Antal jurister" value={String(summary.lawyerCount)} />
@@ -298,7 +298,7 @@ export function DebiteringsgradJuridikWorkspace({ module: mod, sectorSlug, setti
               <EmptyModuleState
                 icon={Target}
                 title="Ingen data per jurist"
-                description="Lagg till tidsregistreringar for att se debiteringsgrad per jurist."
+                description="Lägg till tidsregistreringar för att se debiteringsgrad per jurist."
               />
             ) : (
               <div className="rounded-xl border border-border overflow-hidden">
@@ -309,7 +309,7 @@ export function DebiteringsgradJuridikWorkspace({ module: mod, sectorSlug, setti
                       <TableHead className="font-medium text-right">Debiterbara</TableHead>
                       <TableHead className="font-medium text-right">Totalt</TableHead>
                       <TableHead className="font-medium">Debiteringsgrad</TableHead>
-                      <TableHead className="font-medium text-right">vs Mal</TableHead>
+                      <TableHead className="font-medium text-right">vs Mål</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -350,7 +350,7 @@ export function DebiteringsgradJuridikWorkspace({ module: mod, sectorSlug, setti
               <EmptyModuleState
                 icon={Target}
                 title="Inga registreringar"
-                description="Borja registrera tidsdata per jurist och period."
+                description="Börja registrera tidsdata per jurist och period."
                 actionLabel="Ny registrering"
                 onAction={openNewEntry}
               />
@@ -364,7 +364,7 @@ export function DebiteringsgradJuridikWorkspace({ module: mod, sectorSlug, setti
                       <TableHead className="font-medium text-right">Totalt (h)</TableHead>
                       <TableHead className="font-medium text-right">Debiterbart (h)</TableHead>
                       <TableHead className="font-medium text-right">Grad (%)</TableHead>
-                      <TableHead className="font-medium text-right">Atgarder</TableHead>
+                      <TableHead className="font-medium text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -399,13 +399,13 @@ export function DebiteringsgradJuridikWorkspace({ module: mod, sectorSlug, setti
           {/* Settings */}
           <TabsContent value="installningar" className="space-y-6">
             <div className="rounded-xl border border-border bg-card p-6 max-w-md space-y-4">
-              <h3 className="text-sm font-semibold">Malvarde debiteringsgrad</h3>
+              <h3 className="text-sm font-semibold">Målvärde debiteringsgrad</h3>
               <p className="text-xs text-muted-foreground">
-                Ange malvarde for debiteringsgrad i procent. Typiskt 65-80% for advokatbyraer.
+                Ange målvärde för debiteringsgrad i procent. Typiskt 65-80% för advokatbyråer.
               </p>
               <div className="flex items-end gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Mal (%)</Label>
+                  <Label className="text-xs">Mål (%)</Label>
                   <Input
                     type="number"
                     step="0.5"
@@ -475,7 +475,7 @@ export function DebiteringsgradJuridikWorkspace({ module: mod, sectorSlug, setti
           <DialogHeader>
             <DialogTitle>Ta bort registrering</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort registreringen for{' '}
+              Är du säker på att du vill ta bort registreringen för{' '}
               <span className="font-semibold">{entryToDelete?.lawyerName}</span> ({entryToDelete?.period})?
             </DialogDescription>
           </DialogHeader>

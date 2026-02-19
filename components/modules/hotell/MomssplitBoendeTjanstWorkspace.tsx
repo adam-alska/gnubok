@@ -79,7 +79,7 @@ const VAT_CATEGORIES: { value: VatCategory; label: string; defaultRate: number }
   { value: 'spa', label: 'Spa & Wellness', defaultRate: 25 },
   { value: 'konferens', label: 'Konferens', defaultRate: 25 },
   { value: 'parkering', label: 'Parkering', defaultRate: 25 },
-  { value: 'ovrigt', label: 'Ovrigt', defaultRate: 25 },
+  { value: 'ovrigt', label: 'Övrigt', defaultRate: 25 },
 ]
 
 const DEFAULT_RULES: VatRule[] = [
@@ -324,7 +324,7 @@ export function MomssplitBoendeTjanstWorkspace({ module: mod, sectorSlug, settin
             {/* Rules tab */}
             <TabsContent value="regler" className="space-y-6">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">Definiera momssatser per kategori av tjanst.</p>
+                <p className="text-sm text-muted-foreground">Definiera momssatser per kategori av tjänst.</p>
                 <Button onClick={openNewRule} size="sm">
                   <Plus className="mr-2 h-4 w-4" />
                   Ny regel
@@ -340,7 +340,7 @@ export function MomssplitBoendeTjanstWorkspace({ module: mod, sectorSlug, settin
                 <EmptyModuleState
                   icon={Receipt}
                   title="Inga momsregler"
-                  description="Lagg till momsregler for att definiera momssatser per tjanstekategori."
+                  description="Lägg till momsregler för att definiera momssatser per tjänstekategori."
                   actionLabel="Ny regel"
                   onAction={openNewRule}
                 />
@@ -350,10 +350,10 @@ export function MomssplitBoendeTjanstWorkspace({ module: mod, sectorSlug, settin
                     <TableHeader>
                       <TableRow className="bg-muted/50">
                         <TableHead className="font-medium">Kategori</TableHead>
-                        <TableHead className="font-medium">Benamning</TableHead>
+                        <TableHead className="font-medium">Benämning</TableHead>
                         <TableHead className="font-medium text-right">Momssats %</TableHead>
                         <TableHead className="font-medium">Konto</TableHead>
-                        <TableHead className="font-medium text-right">Atgarder</TableHead>
+                        <TableHead className="font-medium text-right">Åtgärder</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -393,7 +393,7 @@ export function MomssplitBoendeTjanstWorkspace({ module: mod, sectorSlug, settin
             <TabsContent value="kalkylator" className="space-y-6">
               <Card className="max-w-lg">
                 <CardHeader>
-                  <CardTitle className="text-base">Momsberaknare</CardTitle>
+                  <CardTitle className="text-base">Momsberäknare</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -454,7 +454,7 @@ export function MomssplitBoendeTjanstWorkspace({ module: mod, sectorSlug, settin
                 <EmptyModuleState
                   icon={Calculator}
                   title="Inga paket"
-                  description="Skapa kombinationspaket for att automatiskt berakna momsuppdelning."
+                  description="Skapa kombinationspaket för att automatiskt beräkna momsuppdelning."
                   actionLabel="Nytt paket"
                   onAction={openNewPackage}
                 />
@@ -526,7 +526,7 @@ export function MomssplitBoendeTjanstWorkspace({ module: mod, sectorSlug, settin
           <DialogHeader>
             <DialogTitle>{editingRule ? 'Redigera momsregel' : 'Ny momsregel'}</DialogTitle>
             <DialogDescription>
-              {editingRule ? 'Uppdatera momsregeln nedan.' : 'Definiera en ny momsregel for en tjanstekategori.'}
+              {editingRule ? 'Uppdatera momsregeln nedan.' : 'Definiera en ny momsregel för en tjänstekategori.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
@@ -543,7 +543,7 @@ export function MomssplitBoendeTjanstWorkspace({ module: mod, sectorSlug, settin
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label>Benamning *</Label>
+                <Label>Benämning *</Label>
                 <Input value={ruleForm.label} onChange={e => setRuleForm(f => ({ ...f, label: e.target.value }))} placeholder="Rumsintakt" />
               </div>
             </div>
@@ -571,7 +571,7 @@ export function MomssplitBoendeTjanstWorkspace({ module: mod, sectorSlug, settin
           <DialogHeader>
             <DialogTitle>Ta bort momsregel</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort regeln &quot;{ruleToDelete?.label}&quot;?
+              Är du säker på att du vill ta bort regeln &quot;{ruleToDelete?.label}&quot;?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -589,7 +589,7 @@ export function MomssplitBoendeTjanstWorkspace({ module: mod, sectorSlug, settin
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingPkg ? 'Redigera paket' : 'Nytt kombinationspaket'}</DialogTitle>
-            <DialogDescription>Definiera paketets namn, totalpris och ingaende delar med belopp.</DialogDescription>
+            <DialogDescription>Definiera paketets namn, totalpris och ingående delar med belopp.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
@@ -605,10 +605,10 @@ export function MomssplitBoendeTjanstWorkspace({ module: mod, sectorSlug, settin
             <Separator />
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label>Ingaende delar</Label>
+                <Label>Ingående delar</Label>
                 <Button variant="outline" size="sm" onClick={addPkgLine}>
                   <Plus className="mr-1 h-3 w-3" />
-                  Lagg till
+                  Lägg till
                 </Button>
               </div>
               {pkgForm.lines.map((line, idx) => (
@@ -625,7 +625,7 @@ export function MomssplitBoendeTjanstWorkspace({ module: mod, sectorSlug, settin
                     </Select>
                   </div>
                   <div className="grid gap-1 flex-1">
-                    <Label className="text-xs">Benamning</Label>
+                    <Label className="text-xs">Benämning</Label>
                     <Input className="h-9" value={line.label} onChange={e => updatePkgLine(idx, 'label', e.target.value)} placeholder="Rum" />
                   </div>
                   <div className="grid gap-1 w-28">

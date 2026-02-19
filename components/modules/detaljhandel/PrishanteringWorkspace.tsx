@@ -185,14 +185,14 @@ export function PrishanteringWorkspace({ module: mod, sectorSlug, settingsHref }
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <KPICard label="Snittmarginal" value={fmtPct(avgMargin)} unit="%" trend={avgMargin >= 25 ? 'up' : avgMargin >= 15 ? 'neutral' : 'down'} />
               <KPICard label="Antal artiklar" value={String(items.length)} unit="st" />
-              <KPICard label="Lag marginal (<15%)" value={String(lowMarginCount)} unit="st" trend={lowMarginCount > 0 ? 'down' : 'up'} />
-              <KPICard label="Prisandringar (7 dgr)" value={String(recentChanges)} unit="st" />
+              <KPICard label="Låg marginal (<15%)" value={String(lowMarginCount)} unit="st" trend={lowMarginCount > 0 ? 'down' : 'up'} />
+              <KPICard label="Prisändringar (7 dgr)" value={String(recentChanges)} unit="st" />
             </div>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Sok artikel..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
+                <Input placeholder="Sök artikel..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
               </div>
               <Select value={filterCategory} onValueChange={setFilterCategory}>
                 <SelectTrigger className="w-[180px]"><SelectValue placeholder="Alla kategorier" /></SelectTrigger>
@@ -204,7 +204,7 @@ export function PrishanteringWorkspace({ module: mod, sectorSlug, settingsHref }
             </div>
 
             {filteredItems.length === 0 ? (
-              <EmptyModuleState icon={DollarSign} title="Inga artiklar" description="Lagg till artiklar for att hantera priser och marginaler." actionLabel="Ny artikel" onAction={openNewItem} />
+              <EmptyModuleState icon={DollarSign} title="Inga artiklar" description="Lägg till artiklar för att hantera priser och marginaler." actionLabel="Ny artikel" onAction={openNewItem} />
             ) : (
               <div className="rounded-xl border border-border overflow-hidden">
                 <Table>
@@ -213,11 +213,11 @@ export function PrishanteringWorkspace({ module: mod, sectorSlug, settingsHref }
                       <TableHead className="font-medium">SKU</TableHead>
                       <TableHead className="font-medium">Artikel</TableHead>
                       <TableHead className="font-medium">Kategori</TableHead>
-                      <TableHead className="font-medium text-right">Inkop (kr)</TableHead>
-                      <TableHead className="font-medium text-right">Forsaljning (kr)</TableHead>
+                      <TableHead className="font-medium text-right">Inköp (kr)</TableHead>
+                      <TableHead className="font-medium text-right">Försäljning (kr)</TableHead>
                       <TableHead className="font-medium text-right">Marginal</TableHead>
-                      <TableHead className="font-medium">Senast andrad</TableHead>
-                      <TableHead className="font-medium text-right">Atgarder</TableHead>
+                      <TableHead className="font-medium">Senast ändrad</TableHead>
+                      <TableHead className="font-medium text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -256,7 +256,7 @@ export function PrishanteringWorkspace({ module: mod, sectorSlug, settingsHref }
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>{editingItem ? 'Redigera pris' : 'Ny artikel'}</DialogTitle><DialogDescription>{editingItem ? 'Uppdatera pris och marginal.' : 'Lagg till en ny artikel med prissattning.'}</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{editingItem ? 'Redigera pris' : 'Ny artikel'}</DialogTitle><DialogDescription>{editingItem ? 'Uppdatera pris och marginal.' : 'Lägg till en ny artikel med prissättning.'}</DialogDescription></DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2"><Label>SKU *</Label><Input value={form.sku} onChange={(e) => setForm(f => ({ ...f, sku: e.target.value }))} placeholder="ART-001" disabled={!!editingItem} /></div>
@@ -264,11 +264,11 @@ export function PrishanteringWorkspace({ module: mod, sectorSlug, settingsHref }
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2"><Label>Kategori</Label><Select value={form.category} onValueChange={(v) => setForm(f => ({ ...f, category: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
-              <div className="grid gap-2"><Label>Inkopspris (kr) *</Label><Input type="number" min={0} step="0.01" value={form.purchasePrice} onChange={(e) => setForm(f => ({ ...f, purchasePrice: Number(e.target.value) || 0 }))} /></div>
-              <div className="grid gap-2"><Label>Forsaljningspris (kr) *</Label><Input type="number" min={0} step="0.01" value={form.sellingPrice} onChange={(e) => setForm(f => ({ ...f, sellingPrice: Number(e.target.value) || 0 }))} /></div>
+              <div className="grid gap-2"><Label>Inköpspris (kr) *</Label><Input type="number" min={0} step="0.01" value={form.purchasePrice} onChange={(e) => setForm(f => ({ ...f, purchasePrice: Number(e.target.value) || 0 }))} /></div>
+              <div className="grid gap-2"><Label>Försäljningspris (kr) *</Label><Input type="number" min={0} step="0.01" value={form.sellingPrice} onChange={(e) => setForm(f => ({ ...f, sellingPrice: Number(e.target.value) || 0 }))} /></div>
             </div>
             {editingItem && editingItem.sellingPrice !== form.sellingPrice && (
-              <div className="grid gap-2"><Label>Anledning till prisandring</Label><Input value={form.changeReason} onChange={(e) => setForm(f => ({ ...f, changeReason: e.target.value }))} placeholder="T.ex. leverantorshojning" /></div>
+              <div className="grid gap-2"><Label>Anledning till prisändring</Label><Input value={form.changeReason} onChange={(e) => setForm(f => ({ ...f, changeReason: e.target.value }))} placeholder="T.ex. leverantörshöjning" /></div>
             )}
             {form.sellingPrice > 0 && (
               <p className="text-xs text-muted-foreground">
@@ -278,16 +278,16 @@ export function PrishanteringWorkspace({ module: mod, sectorSlug, settingsHref }
               </p>
             )}
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setDialogOpen(false)}>Avbryt</Button><Button onClick={handleSaveItem} disabled={!form.name.trim() || !form.sku.trim() || form.sellingPrice <= 0}>{editingItem ? 'Uppdatera' : 'Lagg till'}</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setDialogOpen(false)}>Avbryt</Button><Button onClick={handleSaveItem} disabled={!form.name.trim() || !form.sku.trim() || form.sellingPrice <= 0}>{editingItem ? 'Uppdatera' : 'Lägg till'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={logDialogOpen} onOpenChange={setLogDialogOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Prishistorik: {logItem?.name}</DialogTitle><DialogDescription>Alla prisandringar for denna artikel.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Prishistorik: {logItem?.name}</DialogTitle><DialogDescription>Alla prisändringar för denna artikel.</DialogDescription></DialogHeader>
           <div className="space-y-2 py-2 max-h-64 overflow-y-auto">
             {logItem?.changeLog?.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Inga prisandringar registrerade.</p>
+              <p className="text-sm text-muted-foreground">Inga prisändringar registrerade.</p>
             ) : (
               logItem?.changeLog?.map((log, i) => (
                 <div key={i} className="flex items-center justify-between text-sm border-b border-border pb-2 last:border-0">
@@ -297,13 +297,13 @@ export function PrishanteringWorkspace({ module: mod, sectorSlug, settingsHref }
               ))
             )}
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setLogDialogOpen(false)}>Stang</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setLogDialogOpen(false)}>Stäng</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Ta bort artikel</DialogTitle><DialogDescription>Ar du saker pa att du vill ta bort {itemToDelete?.name}?</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Ta bort artikel</DialogTitle><DialogDescription>Är du säker på att du vill ta bort {itemToDelete?.name}?</DialogDescription></DialogHeader>
           <DialogFooter><Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button><Button variant="destructive" onClick={handleDeleteItem}><Trash2 className="mr-2 h-4 w-4" />Ta bort</Button></DialogFooter>
         </DialogContent>
       </Dialog>

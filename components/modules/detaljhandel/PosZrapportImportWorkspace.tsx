@@ -19,7 +19,7 @@ interface ModuleWorkspaceProps {
 
 const EXPECTED_COLUMNS = [
   'Datum',
-  'Total forsaljning',
+  'Total försäljning',
   'Kontant',
   'Kort',
   'Swish',
@@ -136,15 +136,15 @@ export function PosZrapportImportWorkspace({ module, sectorSlug, settingsHref }:
               <ImportDropzone
                 accept=".csv,.xlsx,.xls"
                 onFileSelect={handleFileSelect}
-                label="Dra och slapp din POS Z-rapport har"
-                description="CSV eller Excel fran iZettle/Sitoo. Kolumner: Datum, Total forsaljning, Kontant, Kort, Swish, Moms 6%, Moms 12%, Moms 25%"
+                label="Dra och släpp din POS Z-rapport här"
+                description="CSV eller Excel från iZettle/Sitoo. Kolumner: Datum, Total försäljning, Kontant, Kort, Swish, Moms 6%, Moms 12%, Moms 25%"
               />
             )}
 
             {saved && (
               <div className="flex flex-col items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-8">
                 <CheckCircle className="h-8 w-8 text-emerald-600" />
-                <p className="text-sm font-medium text-emerald-700">Importen ar klar! Momssplit har bokforts automatiskt.</p>
+                <p className="text-sm font-medium text-emerald-700">Importen är klar! Momssplit har bokförts automatiskt.</p>
                 <Button variant="outline" size="sm" onClick={() => setSaved(false)}>Importera en ny fil</Button>
               </div>
             )}
@@ -160,7 +160,7 @@ export function PosZrapportImportWorkspace({ module, sectorSlug, settingsHref }:
                     <Button variant="outline" size="sm" onClick={() => { setParsedData(null); setFilename('') }}>Avbryt</Button>
                     <Button size="sm" onClick={handleConfirmImport} disabled={saving}>
                       {saving && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
-                      Bekrafta import
+                      Bekräfta import
                     </Button>
                   </div>
                 </div>
@@ -188,7 +188,7 @@ export function PosZrapportImportWorkspace({ module, sectorSlug, settingsHref }:
                 </div>
 
                 <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3">
-                  <p className="text-xs text-amber-700"><strong>Forvantade kolumner:</strong> {EXPECTED_COLUMNS.join(', ')}</p>
+                  <p className="text-xs text-amber-700"><strong>Förväntade kolumner:</strong> {EXPECTED_COLUMNS.join(', ')}</p>
                 </div>
               </div>
             )}
@@ -201,7 +201,7 @@ export function PosZrapportImportWorkspace({ module, sectorSlug, settingsHref }:
                 <span className="text-sm text-muted-foreground">Laddar importhistorik...</span>
               </div>
             ) : imports.length === 0 ? (
-              <EmptyModuleState icon={History} title="Ingen importhistorik" description="Nar du importerar POS Z-rapporter visas de har." />
+              <EmptyModuleState icon={History} title="Ingen importhistorik" description="När du importerar POS Z-rapporter visas de här." />
             ) : (
               <div className="rounded-lg border overflow-auto">
                 <table className="w-full text-sm">

@@ -697,7 +697,7 @@ export function RepresentationsbokforingWorkspace({ module: mod, sectorSlug, set
                 <EmptyModuleState
                   icon={Receipt}
                   title="Inga poster"
-                  description="Det finns inga representationsposter for vald period. Lagg till en ny post under fliken Ny representation."
+                  description="Det finns inga representationsposter för vald period. Lägg till en ny post under fliken Ny representation."
                   actionLabel="Ny representation"
                   onAction={openNewEntry}
                 />

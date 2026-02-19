@@ -216,7 +216,7 @@ export function GastregisterWorkspace({ module: mod, sectorSlug, settingsHref }:
         actions={
           <Button onClick={openNew}>
             <Plus className="mr-2 h-4 w-4" />
-            Ny gast
+            Ny gäst
           </Button>
         }
       >
@@ -229,18 +229,18 @@ export function GastregisterWorkspace({ module: mod, sectorSlug, settingsHref }:
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Sok gast (namn, e-post, telefon, stad)..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
+                <Input placeholder="Sök gäst (namn, e-post, telefon, stad)..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
               </div>
-              <span className="text-sm text-muted-foreground">{guests.length} gaster totalt</span>
+              <span className="text-sm text-muted-foreground">{guests.length} gäster totalt</span>
               {saving && <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Sparar...</div>}
             </div>
 
             {filteredGuests.length === 0 ? (
               <EmptyModuleState
                 icon={Users}
-                title="Inga gaster"
-                description={searchQuery ? 'Inga gaster matchar sokningen.' : 'Lagg till gaster for att bygga upp gastregistret.'}
-                actionLabel={!searchQuery ? 'Ny gast' : undefined}
+                title="Inga gäster"
+                description={searchQuery ? 'Inga gäster matchar sökningen.' : 'Lägg till gäster för att bygga upp gästregistret.'}
+                actionLabel={!searchQuery ? 'Ny gäst' : undefined}
                 onAction={!searchQuery ? openNew : undefined}
               />
             ) : (
@@ -252,9 +252,9 @@ export function GastregisterWorkspace({ module: mod, sectorSlug, settingsHref }:
                       <TableHead className="font-medium">E-post</TableHead>
                       <TableHead className="font-medium">Telefon</TableHead>
                       <TableHead className="font-medium">Stad</TableHead>
-                      <TableHead className="font-medium text-right">Besok</TableHead>
+                      <TableHead className="font-medium text-right">Besök</TableHead>
                       <TableHead className="font-medium">Senaste</TableHead>
-                      <TableHead className="font-medium text-right">Atgarder</TableHead>
+                      <TableHead className="font-medium text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -291,13 +291,13 @@ export function GastregisterWorkspace({ module: mod, sectorSlug, settingsHref }:
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editingGuest ? 'Redigera gast' : 'Ny gast'}</DialogTitle>
-            <DialogDescription>Fyll i gastens kontaktuppgifter och preferenser.</DialogDescription>
+            <DialogTitle>{editingGuest ? 'Redigera gäst' : 'Ny gäst'}</DialogTitle>
+            <DialogDescription>Fyll i gästens kontaktuppgifter och preferenser.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2 max-h-[60vh] overflow-y-auto">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Fornamn *</Label>
+                <Label>Förnamn *</Label>
                 <Input value={form.firstName} onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))} placeholder="Anna" />
               </div>
               <div className="grid gap-2">
@@ -331,15 +331,15 @@ export function GastregisterWorkspace({ module: mod, sectorSlug, settingsHref }:
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">
-                <Label>Antal besok</Label>
+                <Label>Antal besök</Label>
                 <Input type="number" min={0} value={form.visitCount} onChange={e => setForm(f => ({ ...f, visitCount: parseInt(e.target.value) || 0 }))} />
               </div>
               <div className="grid gap-2">
-                <Label>Senaste besok</Label>
+                <Label>Senaste besök</Label>
                 <Input type="date" value={form.lastVisit} onChange={e => setForm(f => ({ ...f, lastVisit: e.target.value }))} />
               </div>
               <div className="grid gap-2">
-                <Label>VIP-gast</Label>
+                <Label>VIP-gäst</Label>
                 <div className="flex items-center h-9">
                   <input type="checkbox" checked={form.vip} onChange={e => setForm(f => ({ ...f, vip: e.target.checked }))} className="h-4 w-4" />
                   <span className="ml-2 text-sm">VIP</span>
@@ -348,7 +348,7 @@ export function GastregisterWorkspace({ module: mod, sectorSlug, settingsHref }:
             </div>
             <div className="grid gap-2">
               <Label>Preferenser</Label>
-              <Textarea value={form.preferences} onChange={e => setForm(f => ({ ...f, preferences: e.target.value }))} rows={2} placeholder="T.ex. hogt rum, extra kuddar, allergier..." />
+              <Textarea value={form.preferences} onChange={e => setForm(f => ({ ...f, preferences: e.target.value }))} rows={2} placeholder="T.ex. högt rum, extra kuddar, allergier..." />
             </div>
             <div className="grid gap-2">
               <Label>Anteckningar</Label>
@@ -358,7 +358,7 @@ export function GastregisterWorkspace({ module: mod, sectorSlug, settingsHref }:
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Avbryt</Button>
             <Button onClick={handleSave} disabled={!form.firstName.trim() || !form.lastName.trim()}>
-              {editingGuest ? 'Uppdatera' : 'Skapa gast'}
+              {editingGuest ? 'Uppdatera' : 'Skapa gäst'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -368,8 +368,8 @@ export function GastregisterWorkspace({ module: mod, sectorSlug, settingsHref }:
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Ta bort gast</DialogTitle>
-            <DialogDescription>Ar du saker pa att du vill ta bort {guestToDelete?.firstName} {guestToDelete?.lastName}?</DialogDescription>
+            <DialogTitle>Ta bort gäst</DialogTitle>
+            <DialogDescription>Är du säker på att du vill ta bort {guestToDelete?.firstName} {guestToDelete?.lastName}?</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button>

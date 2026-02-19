@@ -284,7 +284,7 @@ export function TidrapportImportJuridikWorkspace({ module: mod, sectorSlug, sett
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="import-source">Kalla</Label>
+                    <Label htmlFor="import-source">Källa</Label>
                     <Select value={importSource} onValueChange={(val) => setImportSource(val as ImportSource)}>
                       <SelectTrigger id="import-source"><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -311,7 +311,7 @@ export function TidrapportImportJuridikWorkspace({ module: mod, sectorSlug, sett
                     id="import-csv"
                     value={csvText}
                     onChange={(e) => setCsvText(e.target.value)}
-                    placeholder={"Datum;Jurist;Arende;Klient;Timmar;Beskrivning;Debiterbar\n2024-01-15;Anna Svensson;2024-001;Klient AB;2.5;Kontraktsgranskning;Ja"}
+                    placeholder={"Datum;Jurist;Ärende;Klient;Timmar;Beskrivning;Debiterbar\n2024-01-15;Anna Svensson;2024-001;Klient AB;2.5;Kontraktsgranskning;Ja"}
                     className="min-h-[150px] font-mono text-xs"
                   />
                 </div>
@@ -322,7 +322,7 @@ export function TidrapportImportJuridikWorkspace({ module: mod, sectorSlug, sett
                     Importera
                   </Button>
                   <p className="text-xs text-muted-foreground">
-                    Format: semikolonseparerad CSV med rubriker. Stod for Clio- och Maconomy-format.
+                    Format: semikolonseparerad CSV med rubriker. Stöd för Clio- och Maconomy-format.
                   </p>
                 </div>
               </CardContent>
@@ -339,7 +339,7 @@ export function TidrapportImportJuridikWorkspace({ module: mod, sectorSlug, sett
               <EmptyModuleState
                 icon={FileText}
                 title="Ingen importhistorik"
-                description="Importera tidrapporter for att bygga upp historiken."
+                description="Importera tidrapporter för att bygga upp historiken."
               />
             ) : (
               <div className="rounded-xl border border-border overflow-hidden">
@@ -347,12 +347,12 @@ export function TidrapportImportJuridikWorkspace({ module: mod, sectorSlug, sett
                   <TableHeader>
                     <TableRow className="bg-muted/50">
                       <TableHead className="font-medium">Datum</TableHead>
-                      <TableHead className="font-medium">Kalla</TableHead>
+                      <TableHead className="font-medium">Källa</TableHead>
                       <TableHead className="font-medium">Fil</TableHead>
                       <TableHead className="font-medium text-right">Rader</TableHead>
                       <TableHead className="font-medium text-right">OK</TableHead>
                       <TableHead className="font-medium text-right">Fel</TableHead>
-                      <TableHead className="font-medium text-right">Atgarder</TableHead>
+                      <TableHead className="font-medium text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -392,7 +392,7 @@ export function TidrapportImportJuridikWorkspace({ module: mod, sectorSlug, sett
               <EmptyModuleState
                 icon={FileText}
                 title="Ingen import vald"
-                description="Valj en import fran historiken for att se detaljerna."
+                description="Välj en import från historiken för att se detaljerna."
               />
             ) : (
               <>
@@ -409,7 +409,7 @@ export function TidrapportImportJuridikWorkspace({ module: mod, sectorSlug, sett
                       <TableRow className="bg-muted/50">
                         <TableHead className="font-medium">Datum</TableHead>
                         <TableHead className="font-medium">Jurist</TableHead>
-                        <TableHead className="font-medium">Arende</TableHead>
+                        <TableHead className="font-medium">Ärende</TableHead>
                         <TableHead className="font-medium">Klient</TableHead>
                         <TableHead className="font-medium text-right">Timmar</TableHead>
                         <TableHead className="font-medium">Debiterbar</TableHead>
@@ -450,7 +450,7 @@ export function TidrapportImportJuridikWorkspace({ module: mod, sectorSlug, sett
           <DialogHeader>
             <DialogTitle>Ta bort import</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort importen{' '}
+              Är du säker på att du vill ta bort importen{' '}
               <span className="font-semibold">{batchToDelete?.fileName}</span>?
             </DialogDescription>
           </DialogHeader>

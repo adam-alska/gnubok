@@ -77,7 +77,7 @@ const DEFAULT_ASSETS: Asset[] = [
     method: 'linear', decliningRate: 30, residualValue: 0,
   },
   {
-    id: '3', name: 'Patent sokmotorteknik', assetType: 'Patent', accountNumber: '1020',
+    id: '3', name: 'Patent sökmotorteknik', assetType: 'Patent', accountNumber: '1020',
     purchaseDate: '2024-03-01', purchaseValue: 150000, usefulLifeYears: 10,
     method: 'declining', decliningRate: 20, residualValue: 10000,
   },
@@ -309,7 +309,7 @@ export function LicensavskrivningWorkspace({ module: mod, sectorSlug, settingsHr
         actions={
           <Button onClick={openNew}>
             <Plus className="mr-2 h-4 w-4" />
-            Ny tillgang
+            Ny tillgång
           </Button>
         }
       >
@@ -320,25 +320,25 @@ export function LicensavskrivningWorkspace({ module: mod, sectorSlug, settingsHr
         ) : (
           <Tabs defaultValue="register" className="space-y-6">
             <TabsList>
-              <TabsTrigger value="register">Tillgangsregister</TabsTrigger>
+              <TabsTrigger value="register">Tillgångsregister</TabsTrigger>
               <TabsTrigger value="plan">Avskrivningsplan</TabsTrigger>
             </TabsList>
 
             <TabsContent value="register" className="space-y-6">
               {/* KPI summary */}
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <KPICard label="Anskaffningsvarde" value={fmt(totals.totalPurchaseValue)} unit="kr" />
-                <KPICard label="Bokvarde" value={fmt(totals.totalBookValue)} unit="kr" />
+                <KPICard label="Anskaffningsvärde" value={fmt(totals.totalPurchaseValue)} unit="kr" />
+                <KPICard label="Bokvärde" value={fmt(totals.totalBookValue)} unit="kr" />
                 <KPICard label="Ackumulerad avskrivning" value={fmt(totals.totalAccumulated)} unit="kr" />
-                <KPICard label="Arets avskrivning" value={fmt(totals.totalYearlyDep)} unit="kr" />
+                <KPICard label="Årets avskrivning" value={fmt(totals.totalYearlyDep)} unit="kr" />
               </div>
 
               {assets.length === 0 ? (
                 <EmptyModuleState
                   icon={FileKey}
-                  title="Inga tillgangar"
-                  description="Lagg till mjukvarulicenser eller immateriella tillgangar for att borja med avskrivning."
-                  actionLabel="Ny tillgang"
+                  title="Inga tillgångar"
+                  description="Lägg till mjukvarulicenser eller immateriella tillgångar för att börja med avskrivning."
+                  actionLabel="Ny tillgång"
                   onAction={openNew}
                 />
               ) : (
@@ -351,9 +351,9 @@ export function LicensavskrivningWorkspace({ module: mod, sectorSlug, settingsHr
                         <TableHead className="font-medium">Konto</TableHead>
                         <TableHead className="font-medium">Metod</TableHead>
                         <TableHead className="font-medium text-right">Anskaffning</TableHead>
-                        <TableHead className="font-medium text-right">Bokvarde</TableHead>
+                        <TableHead className="font-medium text-right">Bokvärde</TableHead>
                         <TableHead className="font-medium text-right">Ack. avskr.</TableHead>
-                        <TableHead className="font-medium text-right">Atgarder</TableHead>
+                        <TableHead className="font-medium text-right">Åtgärder</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -404,7 +404,7 @@ export function LicensavskrivningWorkspace({ module: mod, sectorSlug, settingsHr
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-muted/50">
-                            <TableHead className="font-medium">Ar</TableHead>
+                            <TableHead className="font-medium">År</TableHead>
                             <TableHead className="font-medium text-right">IB</TableHead>
                             <TableHead className="font-medium text-right">Avskrivning</TableHead>
                             <TableHead className="font-medium text-right">UB</TableHead>
@@ -434,9 +434,9 @@ export function LicensavskrivningWorkspace({ module: mod, sectorSlug, settingsHr
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Redigera tillgang' : 'Ny tillgang'}</DialogTitle>
+            <DialogTitle>{editing ? 'Redigera tillgång' : 'Ny tillgång'}</DialogTitle>
             <DialogDescription>
-              {editing ? 'Uppdatera tillgangens uppgifter.' : 'Fyll i uppgifter for den nya tillgangen.'}
+              {editing ? 'Uppdatera tillgångens uppgifter.' : 'Fyll i uppgifter för den nya tillgången.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
@@ -462,26 +462,26 @@ export function LicensavskrivningWorkspace({ module: mod, sectorSlug, settingsHr
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="1010">1010 - Egenutvecklad</SelectItem>
-                    <SelectItem value="1020">1020 - Forvarv</SelectItem>
+                    <SelectItem value="1020">1020 - Förvärv</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label>Inkopsdatum</Label>
+                <Label>Inköpsdatum</Label>
                 <Input type="date" value={form.purchaseDate} onChange={(e) => setForm((f) => ({ ...f, purchaseDate: e.target.value }))} />
               </div>
               <div className="grid gap-2">
-                <Label>Nyttjandeperiod (ar)</Label>
+                <Label>Nyttjandeperiod (år)</Label>
                 <Input type="number" min={1} max={30} value={form.usefulLifeYears} onChange={(e) => setForm((f) => ({ ...f, usefulLifeYears: Number(e.target.value) }))} />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">
-                <Label>Anskaffningsvarde (kr)</Label>
+                <Label>Anskaffningsvärde (kr)</Label>
                 <Input type="number" min={0} value={form.purchaseValue} onChange={(e) => setForm((f) => ({ ...f, purchaseValue: Number(e.target.value) }))} />
               </div>
               <div className="grid gap-2">
-                <Label>Restvarde (kr)</Label>
+                <Label>Restvärde (kr)</Label>
                 <Input type="number" min={0} value={form.residualValue} onChange={(e) => setForm((f) => ({ ...f, residualValue: Number(e.target.value) }))} />
               </div>
               <div className="grid gap-2">
@@ -505,7 +505,7 @@ export function LicensavskrivningWorkspace({ module: mod, sectorSlug, settingsHr
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Avbryt</Button>
             <Button onClick={handleSave} disabled={!form.name.trim()}>
-              {editing ? 'Uppdatera' : 'Lagg till'}
+              {editing ? 'Uppdatera' : 'Lägg till'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -515,9 +515,9 @@ export function LicensavskrivningWorkspace({ module: mod, sectorSlug, settingsHr
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Ta bort tillgang</DialogTitle>
+            <DialogTitle>Ta bort tillgång</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort &quot;{toDelete?.name}&quot;? Denna atgard kan inte angras.
+              Är du säker på att du vill ta bort &quot;{toDelete?.name}&quot;? Denna åtgärd kan inte ångras.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

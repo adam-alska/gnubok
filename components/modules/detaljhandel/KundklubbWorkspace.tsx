@@ -182,7 +182,7 @@ export function KundklubbWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
         <Tabs defaultValue="medlemmar" className="space-y-6">
           <TabsList>
             <TabsTrigger value="medlemmar"><Users className="mr-1.5 h-3.5 w-3.5" />Medlemmar</TabsTrigger>
-            <TabsTrigger value="beloningar"><Gift className="mr-1.5 h-3.5 w-3.5" />Beloningar</TabsTrigger>
+            <TabsTrigger value="beloningar"><Gift className="mr-1.5 h-3.5 w-3.5" />Belöningar</TabsTrigger>
           </TabsList>
 
           <TabsContent value="medlemmar" className="space-y-6">
@@ -193,20 +193,20 @@ export function KundklubbWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <KPICard label="Totalt medlemmar" value={String(members.length)} unit="st" />
                   <KPICard label="Aktiva medlemmar" value={String(activeMembers)} unit="st" />
-                  <KPICard label="Totalt poang" value={fmt(totalPoints)} unit="p" />
-                  <KPICard label="Total omsattning" value={fmt(totalRevenue)} unit="kr" />
+                  <KPICard label="Totalt poäng" value={fmt(totalPoints)} unit="p" />
+                  <KPICard label="Total omsättning" value={fmt(totalRevenue)} unit="kr" />
                 </div>
 
                 <div className="flex items-center gap-3">
                   <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Sok medlem..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
+                    <Input placeholder="Sök medlem..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
                   </div>
                   <Button onClick={openNewMember}><Plus className="mr-2 h-4 w-4" />Ny medlem</Button>
                 </div>
 
                 {filteredMembers.length === 0 ? (
-                  <EmptyModuleState icon={Users} title="Inga medlemmar" description="Lagg till medlemmar for att borja med kundklubben." actionLabel="Ny medlem" onAction={openNewMember} />
+                  <EmptyModuleState icon={Users} title="Inga medlemmar" description="Lägg till medlemmar för att börja med kundklubben." actionLabel="Ny medlem" onAction={openNewMember} />
                 ) : (
                   <div className="rounded-xl border border-border overflow-hidden">
                     <Table>
@@ -215,10 +215,10 @@ export function KundklubbWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
                           <TableHead className="font-medium">Namn</TableHead>
                           <TableHead className="font-medium">E-post</TableHead>
                           <TableHead className="font-medium">Telefon</TableHead>
-                          <TableHead className="font-medium text-right">Poang</TableHead>
-                          <TableHead className="font-medium text-right">Tot. kopt</TableHead>
+                          <TableHead className="font-medium text-right">Poäng</TableHead>
+                          <TableHead className="font-medium text-right">Tot. köpt</TableHead>
                           <TableHead className="font-medium">Medlem sedan</TableHead>
-                          <TableHead className="font-medium text-right">Atgarder</TableHead>
+                          <TableHead className="font-medium text-right">Åtgärder</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -232,7 +232,7 @@ export function KundklubbWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
                             <TableCell className="text-xs text-muted-foreground">{m.memberSince}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">
-                                <Button variant="outline" size="sm" className="text-xs" onClick={() => { setPointsMember(m); setPointsAmount(0); setPointsDialogOpen(true) }}>+Poang</Button>
+                                <Button variant="outline" size="sm" className="text-xs" onClick={() => { setPointsMember(m); setPointsAmount(0); setPointsDialogOpen(true) }}>+Poäng</Button>
                                 <Button variant="ghost" size="icon" onClick={() => openEditMember(m)}><Pencil className="h-4 w-4" /></Button>
                                 <Button variant="ghost" size="icon" className="text-red-600 hover:text-red-700" onClick={() => { setItemToDelete({ type: 'member', id: m.id, name: m.name }); setDeleteDialogOpen(true) }}><Trash2 className="h-4 w-4" /></Button>
                               </div>
@@ -249,12 +249,12 @@ export function KundklubbWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
 
           <TabsContent value="beloningar" className="space-y-6">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Hantera beloningar som medlemmar kan losa in med poang.</p>
-              <Button onClick={openNewReward}><Plus className="mr-2 h-4 w-4" />Ny beloning</Button>
+              <p className="text-sm text-muted-foreground">Hantera belöningar som medlemmar kan lösa in med poäng.</p>
+              <Button onClick={openNewReward}><Plus className="mr-2 h-4 w-4" />Ny belöning</Button>
             </div>
 
             {rewards.length === 0 ? (
-              <EmptyModuleState icon={Gift} title="Inga beloningar" description="Skapa beloningar som medlemmar kan losa in." actionLabel="Ny beloning" onAction={openNewReward} />
+              <EmptyModuleState icon={Gift} title="Inga belöningar" description="Skapa belöningar som medlemmar kan lösa in." actionLabel="Ny belöning" onAction={openNewReward} />
             ) : (
               <div className="space-y-3">
                 {rewards.map((r) => (
@@ -262,7 +262,7 @@ export function KundklubbWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-sm">{r.name}</span>
-                        <Badge variant="secondary">{fmt(r.pointsCost)} poang</Badge>
+                        <Badge variant="secondary">{fmt(r.pointsCost)} poäng</Badge>
                         {!r.active && <Badge variant="outline">Inaktiv</Badge>}
                       </div>
                       {r.description && <p className="text-xs text-muted-foreground mt-0.5">{r.description}</p>}
@@ -282,42 +282,42 @@ export function KundklubbWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
 
       <Dialog open={memberDialogOpen} onOpenChange={setMemberDialogOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>{editingMember ? 'Redigera medlem' : 'Ny medlem'}</DialogTitle><DialogDescription>{editingMember ? 'Uppdatera medlemmens uppgifter.' : 'Lagg till en ny kundklubbsmedlem.'}</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{editingMember ? 'Redigera medlem' : 'Ny medlem'}</DialogTitle><DialogDescription>{editingMember ? 'Uppdatera medlemmens uppgifter.' : 'Lägg till en ny kundklubbsmedlem.'}</DialogDescription></DialogHeader>
           <div className="grid gap-4 py-2">
-            <div className="grid gap-2"><Label>Namn *</Label><Input value={memberForm.name} onChange={(e) => setMemberForm(f => ({ ...f, name: e.target.value }))} placeholder="Fornamn Efternamn" /></div>
+            <div className="grid gap-2"><Label>Namn *</Label><Input value={memberForm.name} onChange={(e) => setMemberForm(f => ({ ...f, name: e.target.value }))} placeholder="Förnamn Efternamn" /></div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2"><Label>E-post</Label><Input type="email" value={memberForm.email} onChange={(e) => setMemberForm(f => ({ ...f, email: e.target.value }))} /></div>
               <div className="grid gap-2"><Label>Telefon</Label><Input value={memberForm.phone} onChange={(e) => setMemberForm(f => ({ ...f, phone: e.target.value }))} /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2"><Label>Poang</Label><Input type="number" min={0} value={memberForm.points} onChange={(e) => setMemberForm(f => ({ ...f, points: Number(e.target.value) || 0 }))} /></div>
-              <div className="grid gap-2"><Label>Totalt kopt (kr)</Label><Input type="number" min={0} value={memberForm.totalSpent} onChange={(e) => setMemberForm(f => ({ ...f, totalSpent: Number(e.target.value) || 0 }))} /></div>
+              <div className="grid gap-2"><Label>Poäng</Label><Input type="number" min={0} value={memberForm.points} onChange={(e) => setMemberForm(f => ({ ...f, points: Number(e.target.value) || 0 }))} /></div>
+              <div className="grid gap-2"><Label>Totalt köpt (kr)</Label><Input type="number" min={0} value={memberForm.totalSpent} onChange={(e) => setMemberForm(f => ({ ...f, totalSpent: Number(e.target.value) || 0 }))} /></div>
             </div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setMemberDialogOpen(false)}>Avbryt</Button><Button onClick={handleSaveMember} disabled={!memberForm.name.trim()}>{editingMember ? 'Uppdatera' : 'Lagg till'}</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setMemberDialogOpen(false)}>Avbryt</Button><Button onClick={handleSaveMember} disabled={!memberForm.name.trim()}>{editingMember ? 'Uppdatera' : 'Lägg till'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={pointsDialogOpen} onOpenChange={setPointsDialogOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Lagg till poang</DialogTitle><DialogDescription>Lagg till poang for {pointsMember?.name}. Nuvarande saldo: {fmt(pointsMember?.points ?? 0)} poang.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Lägg till poäng</DialogTitle><DialogDescription>Lägg till poäng för {pointsMember?.name}. Nuvarande saldo: {fmt(pointsMember?.points ?? 0)} poäng.</DialogDescription></DialogHeader>
           <div className="grid gap-4 py-2">
-            <div className="grid gap-2"><Label>Antal poang</Label><Input type="number" value={pointsAmount} onChange={(e) => setPointsAmount(Number(e.target.value) || 0)} /></div>
+            <div className="grid gap-2"><Label>Antal poäng</Label><Input type="number" value={pointsAmount} onChange={(e) => setPointsAmount(Number(e.target.value) || 0)} /></div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setPointsDialogOpen(false)}>Avbryt</Button><Button onClick={handleAddPoints} disabled={pointsAmount === 0}>Lagg till</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setPointsDialogOpen(false)}>Avbryt</Button><Button onClick={handleAddPoints} disabled={pointsAmount === 0}>Lägg till</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={rewardDialogOpen} onOpenChange={setRewardDialogOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>{editingReward ? 'Redigera beloning' : 'Ny beloning'}</DialogTitle><DialogDescription>{editingReward ? 'Uppdatera beloningen.' : 'Skapa en ny beloning for kundklubben.'}</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{editingReward ? 'Redigera belöning' : 'Ny belöning'}</DialogTitle><DialogDescription>{editingReward ? 'Uppdatera belöningen.' : 'Skapa en ny belöning för kundklubben.'}</DialogDescription></DialogHeader>
           <div className="grid gap-4 py-2">
-            <div className="grid gap-2"><Label>Namn *</Label><Input value={rewardForm.name} onChange={(e) => setRewardForm(f => ({ ...f, name: e.target.value }))} placeholder="10% rabatt pa nasta kop" /></div>
+            <div className="grid gap-2"><Label>Namn *</Label><Input value={rewardForm.name} onChange={(e) => setRewardForm(f => ({ ...f, name: e.target.value }))} placeholder="10% rabatt på nästa köp" /></div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2"><Label>Poangkostnad *</Label><Input type="number" min={1} value={rewardForm.pointsCost} onChange={(e) => setRewardForm(f => ({ ...f, pointsCost: Number(e.target.value) || 0 }))} /></div>
+              <div className="grid gap-2"><Label>Poängkostnad *</Label><Input type="number" min={1} value={rewardForm.pointsCost} onChange={(e) => setRewardForm(f => ({ ...f, pointsCost: Number(e.target.value) || 0 }))} /></div>
               <div className="grid gap-2"><Label>Aktiv</Label><div className="flex items-center gap-2 pt-2"><Switch checked={rewardForm.active} onCheckedChange={(v) => setRewardForm(f => ({ ...f, active: v }))} /><span className="text-sm">{rewardForm.active ? 'Ja' : 'Nej'}</span></div></div>
             </div>
-            <div className="grid gap-2"><Label>Beskrivning</Label><Input value={rewardForm.description} onChange={(e) => setRewardForm(f => ({ ...f, description: e.target.value }))} placeholder="Beskrivning av beloningen" /></div>
+            <div className="grid gap-2"><Label>Beskrivning</Label><Input value={rewardForm.description} onChange={(e) => setRewardForm(f => ({ ...f, description: e.target.value }))} placeholder="Beskrivning av belöningen" /></div>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setRewardDialogOpen(false)}>Avbryt</Button><Button onClick={handleSaveReward} disabled={!rewardForm.name.trim() || rewardForm.pointsCost <= 0}>{editingReward ? 'Uppdatera' : 'Skapa'}</Button></DialogFooter>
         </DialogContent>
@@ -325,7 +325,7 @@ export function KundklubbWorkspace({ module: mod, sectorSlug, settingsHref }: Mo
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Ta bort {itemToDelete?.type === 'member' ? 'medlem' : 'beloning'}</DialogTitle><DialogDescription>Ar du saker pa att du vill ta bort {itemToDelete?.name}?</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Ta bort {itemToDelete?.type === 'member' ? 'medlem' : 'belöning'}</DialogTitle><DialogDescription>Är du säker på att du vill ta bort {itemToDelete?.name}?</DialogDescription></DialogHeader>
           <DialogFooter><Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button><Button variant="destructive" onClick={handleDelete}><Trash2 className="mr-2 h-4 w-4" />Ta bort</Button></DialogFooter>
         </DialogContent>
       </Dialog>

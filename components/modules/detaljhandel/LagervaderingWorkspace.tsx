@@ -266,8 +266,8 @@ export function LagervaderingWorkspace({ module: mod, sectorSlug, settingsHref }
       >
         <Tabs defaultValue="lager" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="lager">Lagervarden</TabsTrigger>
-            <TabsTrigger value="bokslut">Manadsavslut</TabsTrigger>
+            <TabsTrigger value="lager">Lagervärden</TabsTrigger>
+            <TabsTrigger value="bokslut">Månadsavslut</TabsTrigger>
           </TabsList>
 
           <TabsContent value="lager" className="space-y-6">
@@ -278,15 +278,15 @@ export function LagervaderingWorkspace({ module: mod, sectorSlug, settingsHref }
             ) : (
               <>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <KPICard label="Totalt lagervarde" value={fmt(totalValue)} unit="kr" />
+                  <KPICard label="Totalt lagervärde" value={fmt(totalValue)} unit="kr" />
                   <KPICard label="Antal artiklar" value={String(items.length)} unit="st" />
-                  <KPICard label="Inkuransavsattning" value={fmt(obsolescenceProvision)} unit="kr" />
+                  <KPICard label="Inkuransavsättning" value={fmt(obsolescenceProvision)} unit="kr" />
                   <KPICard
-                    label="Hog inkuransrisk"
+                    label="Hög inkuransrisk"
                     value={String(highRiskCount)}
                     unit="artiklar"
                     trend={highRiskCount > 0 ? 'down' : 'up'}
-                    trendLabel={highRiskCount > 0 ? 'Krav atgard' : 'Bra'}
+                    trendLabel={highRiskCount > 0 ? 'Kräv åtgärd' : 'Bra'}
                   />
                 </div>
 
@@ -294,7 +294,7 @@ export function LagervaderingWorkspace({ module: mod, sectorSlug, settingsHref }
                   <EmptyModuleState
                     icon={Package}
                     title="Inga lagerartiklar"
-                    description="Lagg till artiklar for att borja med lagervardering. Konto 1400 anvands for lagertillgangar."
+                    description="Lägg till artiklar för att börja med lagervärdering. Konto 1400 används för lagertillgångar."
                     actionLabel="Ny artikel"
                     onAction={openNewItem}
                   />
@@ -311,7 +311,7 @@ export function LagervaderingWorkspace({ module: mod, sectorSlug, settingsHref }
                           <TableHead className="font-medium text-right">Totalt</TableHead>
                           <TableHead className="font-medium">Metod</TableHead>
                           <TableHead className="font-medium">Inkurans</TableHead>
-                          <TableHead className="font-medium text-right">Atgarder</TableHead>
+                          <TableHead className="font-medium text-right">Åtgärder</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -358,19 +358,19 @@ export function LagervaderingWorkspace({ module: mod, sectorSlug, settingsHref }
 
           <TabsContent value="bokslut" className="space-y-6">
             <div className="rounded-xl border border-border bg-card p-6 max-w-lg space-y-4">
-              <h3 className="text-sm font-semibold">Manadsavslut lager</h3>
+              <h3 className="text-sm font-semibold">Månadsavslut lager</h3>
               <p className="text-xs text-muted-foreground">
-                Gor ett manadsavslut for att spara lagervarde per manad. Bokfors pa konto 1400.
-                Inkuransavsattning beraknas automatiskt baserat pa riskklass.
+                Gör ett månadsavslut för att spara lagervärde per månad. Bokförs på konto 1400.
+                Inkuransavsättning beräknas automatiskt baserat på riskklass.
               </p>
               <div className="flex items-center gap-4 text-sm">
                 <span>Period: <strong>{currentMonthStr()}</strong></span>
-                <span>Lagervarde: <strong>{fmt(totalValue)} kr</strong></span>
+                <span>Lagervärde: <strong>{fmt(totalValue)} kr</strong></span>
                 <span>Inkurans: <strong>{fmt(obsolescenceProvision)} kr</strong></span>
               </div>
               <Button onClick={handleMonthlyClosing} disabled={saving || items.length === 0}>
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Genomfor manadsavslut
+                Genomför månadsavslut
               </Button>
             </div>
 
@@ -379,10 +379,10 @@ export function LagervaderingWorkspace({ module: mod, sectorSlug, settingsHref }
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50">
-                      <TableHead className="font-medium">Manad</TableHead>
-                      <TableHead className="font-medium text-right">Lagervarde</TableHead>
+                      <TableHead className="font-medium">Månad</TableHead>
+                      <TableHead className="font-medium text-right">Lagervärde</TableHead>
                       <TableHead className="font-medium text-right">Artiklar</TableHead>
-                      <TableHead className="font-medium text-right">Inkuransavsattning</TableHead>
+                      <TableHead className="font-medium text-right">Inkuransavsättning</TableHead>
                       <TableHead className="font-medium">Avslutad</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -409,7 +409,7 @@ export function LagervaderingWorkspace({ module: mod, sectorSlug, settingsHref }
           <DialogHeader>
             <DialogTitle>{editingItem ? 'Redigera artikel' : 'Ny artikel'}</DialogTitle>
             <DialogDescription>
-              {editingItem ? 'Uppdatera artikelinformation nedan.' : 'Lagg till en ny lagerartikel.'}
+              {editingItem ? 'Uppdatera artikelinformation nedan.' : 'Lägg till en ny lagerartikel.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
@@ -420,7 +420,7 @@ export function LagervaderingWorkspace({ module: mod, sectorSlug, settingsHref }
               </div>
               <div className="grid gap-2">
                 <Label>Artikelnamn *</Label>
-                <Input value={itemForm.name} onChange={(e) => setItemForm(f => ({ ...f, name: e.target.value }))} placeholder="Mjolk 3%" />
+                <Input value={itemForm.name} onChange={(e) => setItemForm(f => ({ ...f, name: e.target.value }))} placeholder="Mjölk 3%" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -434,12 +434,12 @@ export function LagervaderingWorkspace({ module: mod, sectorSlug, settingsHref }
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label>Varderingsmetod</Label>
+                <Label>Värderingsmetod</Label>
                 <Select value={itemForm.method} onValueChange={(val) => setItemForm(f => ({ ...f, method: val as ValuationMethod }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="FIFO">FIFO</SelectItem>
-                    <SelectItem value="Vagt genomsnitt">Vagt genomsnitt</SelectItem>
+                    <SelectItem value="Vagt genomsnitt">Vägt genomsnitt</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -469,7 +469,7 @@ export function LagervaderingWorkspace({ module: mod, sectorSlug, settingsHref }
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Avbryt</Button>
             <Button onClick={handleSaveItem} disabled={!itemForm.name.trim() || !itemForm.sku.trim()}>
-              {editingItem ? 'Uppdatera' : 'Lagg till'}
+              {editingItem ? 'Uppdatera' : 'Lägg till'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -480,8 +480,8 @@ export function LagervaderingWorkspace({ module: mod, sectorSlug, settingsHref }
           <DialogHeader>
             <DialogTitle>Ta bort artikel</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort{' '}
-              <span className="font-semibold">{itemToDelete?.name}</span>? Denna atgard kan inte angras.
+              Är du säker på att du vill ta bort{' '}
+              <span className="font-semibold">{itemToDelete?.name}</span>? Denna åtgärd kan inte ångras.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

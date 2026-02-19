@@ -257,7 +257,7 @@ export function ProjektlonsamhetWorkspace({ module: mod, sectorSlug, settingsHre
         ) : (
           <Tabs defaultValue="oversikt" className="space-y-6">
             <TabsList>
-              <TabsTrigger value="oversikt">Oversikt</TabsTrigger>
+              <TabsTrigger value="oversikt">Översikt</TabsTrigger>
               <TabsTrigger value="projekt">Per projekt</TabsTrigger>
               <TabsTrigger value="timmar">Timanalys</TabsTrigger>
             </TabsList>
@@ -289,7 +289,7 @@ export function ProjektlonsamhetWorkspace({ module: mod, sectorSlug, settingsHre
                 <EmptyModuleState
                   icon={TrendingUp}
                   title="Inga projekt"
-                  description="Lagg till projekt for att analysera lonsamhet."
+                  description="Lägg till projekt för att analysera lönsamhet."
                   actionLabel="Nytt projekt"
                   onAction={openNew}
                 />
@@ -305,7 +305,7 @@ export function ProjektlonsamhetWorkspace({ module: mod, sectorSlug, settingsHre
                         <TableHead className="font-medium text-right">Vinst</TableHead>
                         <TableHead className="font-medium text-right">Marginal</TableHead>
                         <TableHead className="font-medium text-right">vs Budget</TableHead>
-                        <TableHead className="font-medium text-right">Atgarder</TableHead>
+                        <TableHead className="font-medium text-right">Åtgärder</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -404,7 +404,7 @@ export function ProjektlonsamhetWorkspace({ module: mod, sectorSlug, settingsHre
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editing ? 'Redigera projekt' : 'Nytt projekt'}</DialogTitle>
-            <DialogDescription>{editing ? 'Uppdatera projektets uppgifter.' : 'Fyll i uppgifter for att analysera projektlonsamhet.'}</DialogDescription>
+            <DialogDescription>{editing ? 'Uppdatera projektets uppgifter.' : 'Fyll i uppgifter för att analysera projektlönsamhet.'}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
@@ -473,7 +473,7 @@ export function ProjektlonsamhetWorkspace({ module: mod, sectorSlug, settingsHre
           <DialogHeader>
             <DialogTitle>Ta bort projekt</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort &quot;{toDelete?.name}&quot;? Denna atgard kan inte angras.
+              Är du säker på att du vill ta bort &quot;{toDelete?.name}&quot;? Denna åtgärd kan inte ångras.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

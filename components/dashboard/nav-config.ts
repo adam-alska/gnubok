@@ -12,6 +12,11 @@ import {
   Camera,
   HelpCircle,
   Building2,
+  Scale,
+  FileCheck2,
+  FileText,
+  ShoppingCart,
+  Zap,
   type LucideIcon,
 } from 'lucide-react'
 import type { EntityType } from '@/types'
@@ -26,13 +31,18 @@ export interface NavItemDef {
 
 export const navItems: NavItemDef[] = [
   { href: '/', label: 'Översikt', icon: LayoutDashboard, group: 'main' },
+  { href: '/insights', label: 'Insikter', icon: Zap, group: 'main' },
   { href: '/calendar', label: 'Kalender', icon: Calendar, group: 'main' },
   { href: '/invoices', label: 'Fakturor', icon: Receipt, group: 'finans' },
+  { href: '/quotes', label: 'Offerter', icon: FileText, group: 'finans' },
+  { href: '/orders', label: 'Ordrar', icon: ShoppingCart, group: 'finans' },
   { href: '/customers', label: 'Kunder', icon: Users, group: 'finans' },
   { href: '/transactions', label: 'Transaktioner', icon: ArrowLeftRight, group: 'finans' },
   { href: '/receipts', label: 'Kvitton', icon: Camera, group: 'finans' },
   { href: '/deductions', label: 'Avdrag', icon: Calculator, group: 'finans' },
   { href: '/bookkeeping', label: 'Bokföring', icon: BookOpen, group: 'finans' },
+  { href: '/reconciliation', label: 'Bankavstämning', icon: Scale, group: 'finans' },
+  { href: '/year-end', label: 'Bokslut', icon: FileCheck2, group: 'finans' },
   { href: '/modules', label: 'Företagsmoduler', icon: Building2, group: 'moduler' },
   { href: '/import', label: 'Importera', icon: Upload, group: 'övrigt' },
   { href: '/reports', label: 'Rapporter', icon: BarChart3, group: 'övrigt' },

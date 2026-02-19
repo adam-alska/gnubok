@@ -276,9 +276,9 @@ export function TidrapporteringJuridikWorkspace({ module: mod, sectorSlug, setti
       >
         <Tabs defaultValue="oversikt" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="oversikt">Oversikt</TabsTrigger>
+            <TabsTrigger value="oversikt">Översikt</TabsTrigger>
             <TabsTrigger value="tidsposter">Tidsposter</TabsTrigger>
-            <TabsTrigger value="godkannande">Godkannande</TabsTrigger>
+            <TabsTrigger value="godkannande">Godkännande</TabsTrigger>
           </TabsList>
 
           {/* Overview */}
@@ -291,7 +291,7 @@ export function TidrapporteringJuridikWorkspace({ module: mod, sectorSlug, setti
               <EmptyModuleState
                 icon={Clock}
                 title="Inga tidsposter"
-                description="Registrera tid per arende for att spara debiterbara timmar."
+                description="Registrera tid per ärende för att spåra debiterbara timmar."
                 actionLabel="Ny tidspost"
                 onAction={openNewEntry}
               />
@@ -300,9 +300,9 @@ export function TidrapporteringJuridikWorkspace({ module: mod, sectorSlug, setti
                 <KPICard label="Totalt timmar" value={fmtDec(summary.totalHours)} unit="h" />
                 <KPICard label="Debiterbara" value={fmtDec(summary.billableHours)} unit="h" />
                 <KPICard label="Interna" value={fmtDec(summary.internalHours)} unit="h" />
-                <KPICard label="Debiterbart varde" value={fmt(summary.billableValue)} unit="kr" />
+                <KPICard label="Debiterbart värde" value={fmt(summary.billableValue)} unit="kr" />
                 <KPICard
-                  label="Vantar godkannande"
+                  label="Väntar godkännande"
                   value={String(summary.pendingApproval)}
                   trend={summary.pendingApproval > 0 ? 'neutral' : 'up'}
                 />
@@ -322,7 +322,7 @@ export function TidrapporteringJuridikWorkspace({ module: mod, sectorSlug, setti
                   <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Sok jurist, arende, klient..."
+                      placeholder="Sök jurist, ärende, klient..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9"
@@ -370,12 +370,12 @@ export function TidrapporteringJuridikWorkspace({ module: mod, sectorSlug, setti
                         <TableRow className="bg-muted/50">
                           <TableHead className="font-medium">Datum</TableHead>
                           <TableHead className="font-medium">Jurist</TableHead>
-                          <TableHead className="font-medium">Arende</TableHead>
+                          <TableHead className="font-medium">Ärende</TableHead>
                           <TableHead className="font-medium">Klient</TableHead>
                           <TableHead className="font-medium text-right">Timmar</TableHead>
                           <TableHead className="font-medium">Typ</TableHead>
                           <TableHead className="font-medium">Status</TableHead>
-                          <TableHead className="font-medium text-right">Atgarder</TableHead>
+                          <TableHead className="font-medium text-right">Åtgärder</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -435,7 +435,7 @@ export function TidrapporteringJuridikWorkspace({ module: mod, sectorSlug, setti
                     return (
                       <EmptyModuleState
                         icon={CheckCircle}
-                        title="Inga att godkanna"
+                        title="Inga att godkänna"
                         description="Alla inskickade tidsposter har hanterats."
                       />
                     )
@@ -447,10 +447,10 @@ export function TidrapporteringJuridikWorkspace({ module: mod, sectorSlug, setti
                           <TableRow className="bg-muted/50">
                             <TableHead className="font-medium">Datum</TableHead>
                             <TableHead className="font-medium">Jurist</TableHead>
-                            <TableHead className="font-medium">Arende</TableHead>
+                            <TableHead className="font-medium">Ärende</TableHead>
                             <TableHead className="font-medium text-right">Timmar</TableHead>
                             <TableHead className="font-medium">Beskrivning</TableHead>
-                            <TableHead className="font-medium text-right">Atgard</TableHead>
+                            <TableHead className="font-medium text-right">Åtgärd</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -464,7 +464,7 @@ export function TidrapporteringJuridikWorkspace({ module: mod, sectorSlug, setti
                               <TableCell className="text-right">
                                 <Button variant="outline" size="sm" onClick={() => handleApprove(entry)}>
                                   <CheckCircle className="mr-1 h-3.5 w-3.5" />
-                                  Godkann
+                                  Godkänn
                                 </Button>
                               </TableCell>
                             </TableRow>
@@ -486,7 +486,7 @@ export function TidrapporteringJuridikWorkspace({ module: mod, sectorSlug, setti
           <DialogHeader>
             <DialogTitle>{editingEntry ? 'Redigera tidspost' : 'Ny tidspost'}</DialogTitle>
             <DialogDescription>
-              {editingEntry ? 'Uppdatera tidsposten.' : 'Registrera tid per arende.'}
+              {editingEntry ? 'Uppdatera tidsposten.' : 'Registrera tid per ärende.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -501,7 +501,7 @@ export function TidrapporteringJuridikWorkspace({ module: mod, sectorSlug, setti
                 <Input id="time-lawyer" value={form.lawyerName} onChange={(e) => setForm((f) => ({ ...f, lawyerName: e.target.value }))} placeholder="Namn" />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="time-case">Arende *</Label>
+                <Label htmlFor="time-case">Ärende *</Label>
                 <Input id="time-case" value={form.caseRef} onChange={(e) => setForm((f) => ({ ...f, caseRef: e.target.value }))} placeholder="2024-001" />
               </div>
             </div>
@@ -552,7 +552,7 @@ export function TidrapporteringJuridikWorkspace({ module: mod, sectorSlug, setti
           <DialogHeader>
             <DialogTitle>Ta bort tidspost</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort tidsposten for{' '}
+              Är du säker på att du vill ta bort tidsposten för{' '}
               <span className="font-semibold">{entryToDelete?.lawyerName}</span> ({entryToDelete?.date})?
             </DialogDescription>
           </DialogHeader>

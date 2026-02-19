@@ -158,9 +158,9 @@ export function SvinnprocentWorkspace({ module: mod, sectorSlug, settingsHref }:
       >
         <Tabs defaultValue="oversikt" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="oversikt">Oversikt</TabsTrigger>
+            <TabsTrigger value="oversikt">Översikt</TabsTrigger>
             <TabsTrigger value="detalj">Per kategori</TabsTrigger>
-            <TabsTrigger value="benchmark">Branschjamforelse</TabsTrigger>
+            <TabsTrigger value="benchmark">Branschjämförelse</TabsTrigger>
           </TabsList>
 
           <TabsContent value="oversikt" className="space-y-6">
@@ -168,9 +168,9 @@ export function SvinnprocentWorkspace({ module: mod, sectorSlug, settingsHref }:
               <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <KPICard label="Genomsnittlig svinn %" value={fmtPct(avgPct)} unit="%" trend={avgPct <= 1.8 ? 'up' : avgPct <= 3 ? 'neutral' : 'down'} trendLabel={avgPct <= 1.8 ? 'Under branschsnitt' : 'Over branschsnitt'} />
+                <KPICard label="Genomsnittlig svinn %" value={fmtPct(avgPct)} unit="%" trend={avgPct <= 1.8 ? 'up' : avgPct <= 3 ? 'neutral' : 'down'} trendLabel={avgPct <= 1.8 ? 'Under branschsnitt' : 'Över branschsnitt'} />
                 <KPICard label="Total svinnskostnad" value={fmt(totalShrinkage)} unit="kr" />
-                <KPICard label="Samsta kategori" value={worstCategory} />
+                <KPICard label="Sämsta kategori" value={worstCategory} />
                 <KPICard label="Branschsnitt (totalt)" value={fmtPct(INDUSTRY_BENCHMARKS['Totalt'])} unit="%" />
               </div>
             )}
@@ -178,7 +178,7 @@ export function SvinnprocentWorkspace({ module: mod, sectorSlug, settingsHref }:
 
           <TabsContent value="detalj" className="space-y-4">
             {rows.length === 0 ? (
-              <EmptyModuleState icon={TrendingDown} title="Ingen svinndata" description="Lagg till svinndata per kategori for att se trender." actionLabel="Ny post" onAction={openNewItem} />
+              <EmptyModuleState icon={TrendingDown} title="Ingen svinndata" description="Lägg till svinndata per kategori för att se trender." actionLabel="Ny post" onAction={openNewItem} />
             ) : (
               <div className="rounded-xl border border-border overflow-hidden">
                 <Table>
@@ -190,7 +190,7 @@ export function SvinnprocentWorkspace({ module: mod, sectorSlug, settingsHref }:
                       <TableHead className="font-medium text-right">Svinn (kr)</TableHead>
                       <TableHead className="font-medium text-right">Svinn %</TableHead>
                       <TableHead className="font-medium text-right">Branschsnitt</TableHead>
-                      <TableHead className="font-medium text-right">Atgarder</TableHead>
+                      <TableHead className="font-medium text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -222,7 +222,7 @@ export function SvinnprocentWorkspace({ module: mod, sectorSlug, settingsHref }:
 
           <TabsContent value="benchmark" className="space-y-4">
             <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-              <h3 className="text-sm font-semibold">Branschreferensvarden (detaljhandel livsmedel)</h3>
+              <h3 className="text-sm font-semibold">Branschreferensvärden (detaljhandel livsmedel)</h3>
               <div className="space-y-2">
                 {Object.entries(INDUSTRY_BENCHMARKS).map(([cat, pct]) => (
                   <div key={cat} className="flex items-center justify-between">
@@ -231,7 +231,7 @@ export function SvinnprocentWorkspace({ module: mod, sectorSlug, settingsHref }:
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground">Kalla: Branschgenomsnitt for svensk dagligvaruhandel.</p>
+              <p className="text-xs text-muted-foreground">Källa: Branschgenomsnitt för svensk dagligvaruhandel.</p>
             </div>
           </TabsContent>
         </Tabs>
@@ -240,7 +240,7 @@ export function SvinnprocentWorkspace({ module: mod, sectorSlug, settingsHref }:
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>{editingItem ? 'Redigera' : 'Ny svinnpost'}</DialogTitle><DialogDescription>Ange intakter och svinnskostnad for att berakna svinnprocent.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{editingItem ? 'Redigera' : 'Ny svinnpost'}</DialogTitle><DialogDescription>Ange intäkter och svinnskostnad för att beräkna svinnprocent.</DialogDescription></DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2"><Label>Kategori *</Label><Select value={form.category} onValueChange={(val) => setForm(f => ({ ...f, category: val }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
@@ -252,18 +252,18 @@ export function SvinnprocentWorkspace({ module: mod, sectorSlug, settingsHref }:
             </div>
             {form.revenue > 0 && (
               <p className="text-xs text-muted-foreground">
-                Beraknad svinnprocent: <strong className={cn((form.shrinkageCost / form.revenue * 100) <= (INDUSTRY_BENCHMARKS[form.category] ?? 1.8) ? 'text-emerald-600' : 'text-red-600')}>{fmtPct(form.shrinkageCost / form.revenue * 100)}%</strong>
+                Beräknad svinnprocent: <strong className={cn((form.shrinkageCost / form.revenue * 100) <= (INDUSTRY_BENCHMARKS[form.category] ?? 1.8) ? 'text-emerald-600' : 'text-red-600')}>{fmtPct(form.shrinkageCost / form.revenue * 100)}%</strong>
                 {' '}(branschsnitt: {fmtPct(INDUSTRY_BENCHMARKS[form.category] ?? 1.8)}%)
               </p>
             )}
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setDialogOpen(false)}>Avbryt</Button><Button onClick={handleSaveItem} disabled={form.revenue <= 0}>{editingItem ? 'Uppdatera' : 'Lagg till'}</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setDialogOpen(false)}>Avbryt</Button><Button onClick={handleSaveItem} disabled={form.revenue <= 0}>{editingItem ? 'Uppdatera' : 'Lägg till'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Ta bort post</DialogTitle><DialogDescription>Ar du saker pa att du vill ta bort denna svinnpost?</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Ta bort post</DialogTitle><DialogDescription>Är du säker på att du vill ta bort denna svinnpost?</DialogDescription></DialogHeader>
           <DialogFooter><Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button><Button variant="destructive" onClick={handleDeleteItem}><Trash2 className="mr-2 h-4 w-4" />Ta bort</Button></DialogFooter>
         </DialogContent>
       </Dialog>

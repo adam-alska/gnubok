@@ -235,7 +235,7 @@ export function RevparWorkspace({ module: mod, sectorSlug, settingsHref }: Modul
         actions={
           <Button onClick={openNew}>
             <Plus className="mr-2 h-4 w-4" />
-            Lagg till manad
+            Lägg till månad
           </Button>
         }
       >
@@ -246,18 +246,18 @@ export function RevparWorkspace({ module: mod, sectorSlug, settingsHref }: Modul
         ) : (
           <Tabs defaultValue="oversikt" className="space-y-6">
             <TabsList>
-              <TabsTrigger value="oversikt">Oversikt</TabsTrigger>
-              <TabsTrigger value="trend">Manadstrend</TabsTrigger>
-              <TabsTrigger value="mal">Malvarden</TabsTrigger>
+              <TabsTrigger value="oversikt">Översikt</TabsTrigger>
+              <TabsTrigger value="trend">Månadstrend</TabsTrigger>
+              <TabsTrigger value="mal">Målvärden</TabsTrigger>
             </TabsList>
 
             <TabsContent value="oversikt" className="space-y-6">
               {!current ? (
                 <EmptyModuleState
                   icon={BarChart3}
-                  title="Ingen data for aktuell manad"
-                  description="Lagg till data for att se RevPAR, belaggning och ADR."
-                  actionLabel="Lagg till data"
+                  title="Ingen data för aktuell månad"
+                  description="Lägg till data för att se RevPAR, beläggning och ADR."
+                  actionLabel="Lägg till data"
                   onAction={openNew}
                 />
               ) : (
@@ -270,7 +270,7 @@ export function RevparWorkspace({ module: mod, sectorSlug, settingsHref }: Modul
                     trend={targets.revparTarget > 0 ? (current.revpar >= targets.revparTarget ? 'up' : 'down') : undefined}
                   />
                   <KPICard
-                    label="Belaggning"
+                    label="Beläggning"
                     value={fmtPct(current.occupancy)}
                     unit="%"
                     target={targets.occupancyTarget || undefined}
@@ -283,28 +283,28 @@ export function RevparWorkspace({ module: mod, sectorSlug, settingsHref }: Modul
                     target={targets.adrTarget || undefined}
                     trend={targets.adrTarget > 0 ? (current.adr >= targets.adrTarget ? 'up' : 'down') : undefined}
                   />
-                  <KPICard label="Rum tillgangliga" value={fmt(current.roomsAvailable)} unit="st" />
-                  <KPICard label="Rum salda" value={fmt(current.roomsSold)} unit="st" />
+                  <KPICard label="Rum tillgängliga" value={fmt(current.roomsAvailable)} unit="st" />
+                  <KPICard label="Rum sålda" value={fmt(current.roomsSold)} unit="st" />
                 </div>
               )}
             </TabsContent>
 
             <TabsContent value="trend" className="space-y-4">
               {sortedData.length === 0 ? (
-                <EmptyModuleState icon={TrendingUp} title="Ingen data" description="Lagg till manadsdata for att se trender." actionLabel="Lagg till" onAction={openNew} />
+                <EmptyModuleState icon={TrendingUp} title="Ingen data" description="Lägg till månadsdata för att se trender." actionLabel="Lägg till" onAction={openNew} />
               ) : (
                 <div className="rounded-xl border border-border overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50">
-                        <TableHead className="font-medium">Manad</TableHead>
-                        <TableHead className="font-medium text-right">Tillgangliga</TableHead>
-                        <TableHead className="font-medium text-right">Salda</TableHead>
+                        <TableHead className="font-medium">Månad</TableHead>
+                        <TableHead className="font-medium text-right">Tillgängliga</TableHead>
+                        <TableHead className="font-medium text-right">Sålda</TableHead>
                         <TableHead className="font-medium text-right">Intakt (kr)</TableHead>
                         <TableHead className="font-medium text-right">RevPAR</TableHead>
-                        <TableHead className="font-medium text-right">Belaggning %</TableHead>
+                        <TableHead className="font-medium text-right">Beläggning %</TableHead>
                         <TableHead className="font-medium text-right">ADR</TableHead>
-                        <TableHead className="font-medium text-right">Atgarder</TableHead>
+                        <TableHead className="font-medium text-right">Åtgärder</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -333,31 +333,31 @@ export function RevparWorkspace({ module: mod, sectorSlug, settingsHref }: Modul
 
             <TabsContent value="mal" className="space-y-6">
               <div className="rounded-xl border border-border bg-card p-6 max-w-md space-y-4">
-                <h3 className="text-sm font-semibold">Malvarden</h3>
-                <p className="text-xs text-muted-foreground">Ange malvarden for RevPAR, belaggning och ADR.</p>
+                <h3 className="text-sm font-semibold">Målvärden</h3>
+                <p className="text-xs text-muted-foreground">Ange målvärden för RevPAR, beläggning och ADR.</p>
                 <div className="grid gap-4">
                   <div className="flex items-end gap-3">
                     <div className="space-y-1.5 flex-1">
-                      <Label className="text-xs">RevPAR-mal (kr)</Label>
+                      <Label className="text-xs">RevPAR-mål (kr)</Label>
                       <Input type="number" step="0.01" min={0} value={targetInput.revpar} onChange={e => setTargetInput(t => ({ ...t, revpar: e.target.value }))} className="h-9" placeholder="800" />
                     </div>
                   </div>
                   <div className="flex items-end gap-3">
                     <div className="space-y-1.5 flex-1">
-                      <Label className="text-xs">Belaggningsmal (%)</Label>
+                      <Label className="text-xs">Beläggningsmål (%)</Label>
                       <Input type="number" step="0.1" min={0} max={100} value={targetInput.occupancy} onChange={e => setTargetInput(t => ({ ...t, occupancy: e.target.value }))} className="h-9" placeholder="75" />
                     </div>
                   </div>
                   <div className="flex items-end gap-3">
                     <div className="space-y-1.5 flex-1">
-                      <Label className="text-xs">ADR-mal (kr)</Label>
+                      <Label className="text-xs">ADR-mål (kr)</Label>
                       <Input type="number" step="0.01" min={0} value={targetInput.adr} onChange={e => setTargetInput(t => ({ ...t, adr: e.target.value }))} className="h-9" placeholder="1200" />
                     </div>
                   </div>
                 </div>
                 <Button size="sm" onClick={handleSaveTargets} disabled={saving}>
                   {saving ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-2 h-3.5 w-3.5" />}
-                  Spara malvarden
+                  Spara målvärden
                 </Button>
               </div>
             </TabsContent>
@@ -369,21 +369,21 @@ export function RevparWorkspace({ module: mod, sectorSlug, settingsHref }: Modul
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingEntry ? 'Redigera manadsdata' : 'Ny manadsdata'}</DialogTitle>
-            <DialogDescription>Ange rum tillgangliga, salda och rumsintakt for att berakna RevPAR.</DialogDescription>
+            <DialogTitle>{editingEntry ? 'Redigera månadsdata' : 'Ny månadsdata'}</DialogTitle>
+            <DialogDescription>Ange rum tillgängliga, sålda och rumsintäkt för att beräkna RevPAR.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
-              <Label>Manad *</Label>
+              <Label>Månad *</Label>
               <Input type="month" value={form.month} onChange={e => setForm(f => ({ ...f, month: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Rum tillgangliga (rumdagar)</Label>
+                <Label>Rum tillgängliga (rumdagar)</Label>
                 <Input type="number" min={0} value={form.roomsAvailable || ''} onChange={e => setForm(f => ({ ...f, roomsAvailable: parseInt(e.target.value) || 0 }))} placeholder="3000" />
               </div>
               <div className="grid gap-2">
-                <Label>Rum salda</Label>
+                <Label>Rum sålda</Label>
                 <Input type="number" min={0} value={form.roomsSold || ''} onChange={e => setForm(f => ({ ...f, roomsSold: parseInt(e.target.value) || 0 }))} placeholder="2250" />
               </div>
             </div>
@@ -394,7 +394,7 @@ export function RevparWorkspace({ module: mod, sectorSlug, settingsHref }: Modul
             {form.roomsAvailable > 0 && (
               <div className="rounded-lg bg-muted/50 p-3 space-y-1 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">RevPAR:</span><span className="font-mono font-semibold">{fmtDec(form.roomRevenue / form.roomsAvailable)} kr</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Belaggning:</span><span className="font-mono">{fmtPct(form.roomsAvailable > 0 ? (form.roomsSold / form.roomsAvailable) * 100 : 0)}%</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Beläggning:</span><span className="font-mono">{fmtPct(form.roomsAvailable > 0 ? (form.roomsSold / form.roomsAvailable) * 100 : 0)}%</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">ADR:</span><span className="font-mono">{form.roomsSold > 0 ? fmtDec(form.roomRevenue / form.roomsSold) : '0,00'} kr</span></div>
               </div>
             )}
@@ -410,8 +410,8 @@ export function RevparWorkspace({ module: mod, sectorSlug, settingsHref }: Modul
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Ta bort manadsdata</DialogTitle>
-            <DialogDescription>Ar du saker pa att du vill ta bort data for {entryToDelete?.month}?</DialogDescription>
+            <DialogTitle>Ta bort månadsdata</DialogTitle>
+            <DialogDescription>Är du säker på att du vill ta bort data för {entryToDelete?.month}?</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button>

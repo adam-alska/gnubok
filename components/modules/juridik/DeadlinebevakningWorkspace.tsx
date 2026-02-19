@@ -283,7 +283,7 @@ export function DeadlinebevakningWorkspace({ module: mod, sectorSlug, settingsHr
       >
         <Tabs defaultValue="oversikt" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="oversikt">Oversikt</TabsTrigger>
+            <TabsTrigger value="oversikt">Översikt</TabsTrigger>
             <TabsTrigger value="kommande">Kommande</TabsTrigger>
             <TabsTrigger value="alla">Alla deadlines</TabsTrigger>
           </TabsList>
@@ -298,7 +298,7 @@ export function DeadlinebevakningWorkspace({ module: mod, sectorSlug, settingsHr
               <EmptyModuleState
                 icon={AlarmClock}
                 title="Inga deadlines"
-                description="Lagg till deadlines for preskriptionstider, overklaganden och mer."
+                description="Lägg till deadlines för preskriptionstider, överklaganden och mer."
                 actionLabel="Ny deadline"
                 onAction={openNewDeadline}
               />
@@ -306,7 +306,7 @@ export function DeadlinebevakningWorkspace({ module: mod, sectorSlug, settingsHr
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                 <KPICard label="Aktiva" value={String(summary.active)} />
                 <KPICard
-                  label="Forfallna"
+                  label="Förfallna"
                   value={String(summary.overdue)}
                   trend={summary.overdue > 0 ? 'down' : 'up'}
                   trendLabel={summary.overdue > 0 ? 'Akut' : 'OK'}
@@ -340,7 +340,7 @@ export function DeadlinebevakningWorkspace({ module: mod, sectorSlug, settingsHr
                       <EmptyModuleState
                         icon={CheckCircle}
                         title="Inga kommande deadlines"
-                        description="Alla deadlines ar hanterade."
+                        description="Alla deadlines är hanterade."
                       />
                     )
                   }
@@ -352,12 +352,12 @@ export function DeadlinebevakningWorkspace({ module: mod, sectorSlug, settingsHr
                           <TableRow className="bg-muted/50">
                             <TableHead className="font-medium">Deadline</TableHead>
                             <TableHead className="font-medium">Titel</TableHead>
-                            <TableHead className="font-medium">Arende</TableHead>
+                            <TableHead className="font-medium">Ärende</TableHead>
                             <TableHead className="font-medium">Typ</TableHead>
                             <TableHead className="font-medium">Eskalering</TableHead>
                             <TableHead className="font-medium">Status</TableHead>
                             <TableHead className="font-medium">Ansvarig</TableHead>
-                            <TableHead className="font-medium text-right">Atgard</TableHead>
+                            <TableHead className="font-medium text-right">Åtgärd</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -372,7 +372,7 @@ export function DeadlinebevakningWorkspace({ module: mod, sectorSlug, settingsHr
                                 <TableCell className={cn('font-medium', isOverdue ? 'text-red-600' : isUrgent ? 'text-amber-600' : '')}>
                                   {dl.deadlineDate}
                                   <span className="text-xs ml-2">
-                                    {isOverdue ? `(${Math.abs(days)}d forsenad)` : `(${days}d kvar)`}
+                                    {isOverdue ? `(${Math.abs(days)}d försenad)` : `(${days}d kvar)`}
                                   </span>
                                   {needsReminder && <Bell className="inline ml-1 h-3.5 w-3.5 text-amber-500" />}
                                 </TableCell>
@@ -418,7 +418,7 @@ export function DeadlinebevakningWorkspace({ module: mod, sectorSlug, settingsHr
                   <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Sok deadline..."
+                      placeholder="Sök deadline..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9"
@@ -440,7 +440,7 @@ export function DeadlinebevakningWorkspace({ module: mod, sectorSlug, settingsHr
                       <SelectValue placeholder="Eskalering" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Alla nivaer</SelectItem>
+                      <SelectItem value="all">Alla nivåer</SelectItem>
                       {ESCALATION_LEVELS.map((l) => (
                         <SelectItem key={l} value={l}>{l}</SelectItem>
                       ))}
@@ -467,11 +467,11 @@ export function DeadlinebevakningWorkspace({ module: mod, sectorSlug, settingsHr
                         <TableRow className="bg-muted/50">
                           <TableHead className="font-medium">Deadline</TableHead>
                           <TableHead className="font-medium">Titel</TableHead>
-                          <TableHead className="font-medium">Arende</TableHead>
+                          <TableHead className="font-medium">Ärende</TableHead>
                           <TableHead className="font-medium">Typ</TableHead>
                           <TableHead className="font-medium">Eskalering</TableHead>
                           <TableHead className="font-medium">Status</TableHead>
-                          <TableHead className="font-medium text-right">Atgarder</TableHead>
+                          <TableHead className="font-medium text-right">Åtgärder</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -517,18 +517,18 @@ export function DeadlinebevakningWorkspace({ module: mod, sectorSlug, settingsHr
           <DialogHeader>
             <DialogTitle>{editingDeadline ? 'Redigera deadline' : 'Ny deadline'}</DialogTitle>
             <DialogDescription>
-              {editingDeadline ? 'Uppdatera deadlineuppgifter.' : 'Lagg till en ny deadline med bevakning.'}
+              {editingDeadline ? 'Uppdatera deadlineuppgifter.' : 'Lägg till en ny deadline med bevakning.'}
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
               <Label htmlFor="dl-title">Titel *</Label>
-              <Input id="dl-title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Overklagandefrist tingsratten" />
+              <Input id="dl-title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Överklagandefrist tingsrätten" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="dl-case">Arende</Label>
+                <Label htmlFor="dl-case">Ärende</Label>
                 <Input id="dl-case" value={form.caseRef} onChange={(e) => setForm((f) => ({ ...f, caseRef: e.target.value }))} placeholder="2024-001" />
               </div>
               <div className="grid gap-2">
@@ -566,7 +566,7 @@ export function DeadlinebevakningWorkspace({ module: mod, sectorSlug, settingsHr
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="dl-reminder">Paminnelse (dagar fore)</Label>
+                <Label htmlFor="dl-reminder">Påminnelse (dagar före)</Label>
                 <Input id="dl-reminder" type="number" min={1} max={90} value={form.reminderDays} onChange={(e) => setForm((f) => ({ ...f, reminderDays: parseInt(e.target.value) || 14 }))} />
               </div>
               <div className="grid gap-2">
@@ -595,7 +595,7 @@ export function DeadlinebevakningWorkspace({ module: mod, sectorSlug, settingsHr
           <DialogHeader>
             <DialogTitle>Ta bort deadline</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort deadlinen{' '}
+              Är du säker på att du vill ta bort deadlinen{' '}
               <span className="font-semibold">{deadlineToDelete?.title}</span>?
             </DialogDescription>
           </DialogHeader>

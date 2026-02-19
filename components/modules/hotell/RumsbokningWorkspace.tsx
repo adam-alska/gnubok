@@ -81,7 +81,7 @@ const ROOM_TYPES: RoomType[] = ['Standard', 'Superior', 'Svit', 'Familj', 'Budge
 const BOOKING_STATUSES: BookingStatus[] = ['bekraftad', 'incheckad', 'utcheckad', 'avbokad']
 
 const STATUS_MAP: Record<BookingStatus, { label: string; color: string }> = {
-  bekraftad: { label: 'Bekraftad', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
+  bekraftad: { label: 'Bekräftad', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
   incheckad: { label: 'Incheckad', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' },
   utcheckad: { label: 'Utcheckad', color: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400' },
   avbokad: { label: 'Avbokad', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' },
@@ -404,7 +404,7 @@ export function RumsbokningWorkspace({ module: mod, sectorSlug, settingsHref }: 
                       </Badge>
                     </CardHeader>
                     <CardContent className="text-sm space-y-1">
-                      <p className="text-muted-foreground">{room.type} - Van. {room.floor}</p>
+                      <p className="text-muted-foreground">{room.type} - Vån. {room.floor}</p>
                       <p className="font-mono">{fmt(room.pricePerNight)} kr/natt</p>
                       {booking && (
                         <div className="pt-1 border-t border-border mt-2">
@@ -428,7 +428,7 @@ export function RumsbokningWorkspace({ module: mod, sectorSlug, settingsHref }: 
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                 <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Sok gast eller rum..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
+                  <Input placeholder="Sök gäst eller rum..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
                 </div>
                 <Select value={filterStatus} onValueChange={val => setFilterStatus(val as BookingStatus | 'all')}>
                   <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filtrera status" /></SelectTrigger>
@@ -441,19 +441,19 @@ export function RumsbokningWorkspace({ module: mod, sectorSlug, settingsHref }: 
               </div>
 
               {filteredBookings.length === 0 ? (
-                <EmptyModuleState icon={CalendarDays} title="Inga bokningar" description="Skapa en bokning for att komma igang." actionLabel="Ny bokning" onAction={() => openNewBooking()} />
+                <EmptyModuleState icon={CalendarDays} title="Inga bokningar" description="Skapa en bokning för att komma igång." actionLabel="Ny bokning" onAction={() => openNewBooking()} />
               ) : (
                 <div className="rounded-xl border border-border overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50">
-                        <TableHead className="font-medium">Gast</TableHead>
+                        <TableHead className="font-medium">Gäst</TableHead>
                         <TableHead className="font-medium">Rum</TableHead>
                         <TableHead className="font-medium">Incheckning</TableHead>
                         <TableHead className="font-medium">Utcheckning</TableHead>
                         <TableHead className="font-medium text-right">Totalt</TableHead>
                         <TableHead className="font-medium">Status</TableHead>
-                        <TableHead className="font-medium text-right">Atgarder</TableHead>
+                        <TableHead className="font-medium text-right">Åtgärder</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -492,9 +492,9 @@ export function RumsbokningWorkspace({ module: mod, sectorSlug, settingsHref }: 
                     <TableRow className="bg-muted/50">
                       <TableHead className="font-medium">Rumsnr</TableHead>
                       <TableHead className="font-medium">Typ</TableHead>
-                      <TableHead className="font-medium">Vaning</TableHead>
+                      <TableHead className="font-medium">Våning</TableHead>
                       <TableHead className="font-medium text-right">Pris/natt</TableHead>
-                      <TableHead className="font-medium text-right">Atgarder</TableHead>
+                      <TableHead className="font-medium text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -525,11 +525,11 @@ export function RumsbokningWorkspace({ module: mod, sectorSlug, settingsHref }: 
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editingBooking ? 'Redigera bokning' : 'Ny bokning'}</DialogTitle>
-            <DialogDescription>Fyll i gastuppgifter och valj rum.</DialogDescription>
+            <DialogDescription>Fyll i gästuppgifter och välj rum.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2 max-h-[60vh] overflow-y-auto">
             <div className="grid gap-2">
-              <Label>Gastnamn *</Label>
+              <Label>Gästnamn *</Label>
               <Input value={bookingForm.guestName} onChange={e => setBookingForm(f => ({ ...f, guestName: e.target.value }))} placeholder="Anna Andersson" />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -548,7 +548,7 @@ export function RumsbokningWorkspace({ module: mod, sectorSlug, settingsHref }: 
                 const room = rooms.find(r => r.id === val)
                 setBookingForm(f => ({ ...f, roomId: val, roomType: room?.type ?? f.roomType, pricePerNight: room?.pricePerNight ?? f.pricePerNight }))
               }}>
-                <SelectTrigger><SelectValue placeholder="Valj rum" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Välj rum" /></SelectTrigger>
                 <SelectContent>
                   {rooms.map(r => <SelectItem key={r.id} value={r.id}>Rum {r.number} - {r.type} ({fmt(r.pricePerNight)} kr/natt)</SelectItem>)}
                 </SelectContent>
@@ -579,7 +579,7 @@ export function RumsbokningWorkspace({ module: mod, sectorSlug, settingsHref }: 
             </div>
             {bookingForm.checkinDate && bookingForm.checkoutDate && bookingForm.checkoutDate > bookingForm.checkinDate && (
               <div className="rounded-lg bg-muted/50 p-3 text-sm space-y-1">
-                <div className="flex justify-between"><span className="text-muted-foreground">Natter:</span><span>{daysBetween(bookingForm.checkinDate, bookingForm.checkoutDate)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Nätter:</span><span>{daysBetween(bookingForm.checkinDate, bookingForm.checkoutDate)}</span></div>
                 <div className="flex justify-between font-semibold"><span>Totalt:</span><span className="font-mono">{fmt(bookingForm.pricePerNight * daysBetween(bookingForm.checkinDate, bookingForm.checkoutDate))} kr</span></div>
               </div>
             )}
@@ -611,7 +611,7 @@ export function RumsbokningWorkspace({ module: mod, sectorSlug, settingsHref }: 
                 <Input value={roomForm.number} onChange={e => setRoomForm(f => ({ ...f, number: e.target.value }))} placeholder="101" />
               </div>
               <div className="grid gap-2">
-                <Label>Vaning</Label>
+                <Label>Våning</Label>
                 <Input type="number" min={1} value={roomForm.floor} onChange={e => setRoomForm(f => ({ ...f, floor: parseInt(e.target.value) || 1 }))} />
               </div>
             </div>
@@ -641,7 +641,7 @@ export function RumsbokningWorkspace({ module: mod, sectorSlug, settingsHref }: 
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Ta bort bokning</DialogTitle>
-            <DialogDescription>Ar du saker pa att du vill ta bort bokningen for {bookingToDelete?.guestName}?</DialogDescription>
+            <DialogDescription>Är du säker på att du vill ta bort bokningen för {bookingToDelete?.guestName}?</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button>

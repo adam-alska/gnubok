@@ -82,18 +82,18 @@ const DEFAULT_ACCOUNTS: Account[] = [
   { number: '3020', name: 'Licensintakter', type: 'Intakt', category: 'Licensintakt' },
   { number: '3030', name: 'SaaS-abonnemang (MRR)', type: 'Intakt', category: 'SaaS MRR' },
   { number: '3040', name: 'Supportintakter', type: 'Intakt', category: 'Konsultintakt' },
-  { number: '4010', name: 'Underleverantorer konsult', type: 'Kostnad', category: 'Konsultintakt' },
-  { number: '4020', name: 'Inkopta molntjanster', type: 'Kostnad', category: 'Hosting' },
+  { number: '4010', name: 'Underleverantörer konsult', type: 'Kostnad', category: 'Konsultintakt' },
+  { number: '4020', name: 'Inköpta molntjänster', type: 'Kostnad', category: 'Hosting' },
   { number: '4030', name: 'Mjukvarulicenser', type: 'Kostnad', category: 'Mjukvara' },
   { number: '5010', name: 'Lokalkostnader', type: 'Kostnad', category: 'Ovrigt' },
-  { number: '6200', name: 'Serverhosting & molntjanster', type: 'Kostnad', category: 'Hosting' },
-  { number: '7010', name: 'Loner IT-personal', type: 'Kostnad', category: 'Personal' },
+  { number: '6200', name: 'Serverhosting & molntjänster', type: 'Kostnad', category: 'Hosting' },
+  { number: '7010', name: 'Löner IT-personal', type: 'Kostnad', category: 'Personal' },
   { number: '7510', name: 'Sociala avgifter', type: 'Kostnad', category: 'Personal' },
   { number: '7832', name: 'Avskrivning mjukvara', type: 'Kostnad', category: 'Avskrivning' },
   { number: '1010', name: 'Egenutvecklad mjukvara', type: 'Tillgang', category: 'Mjukvara' },
-  { number: '1020', name: 'Forvarv mjukvarulicenser', type: 'Tillgang', category: 'Mjukvara' },
-  { number: '1470', name: 'Pagaende projekt (WIP)', type: 'Tillgang', category: 'Ovrigt' },
-  { number: '2440', name: 'Leverantorsskulder', type: 'Skuld', category: 'Ovrigt' },
+  { number: '1020', name: 'Förvärv mjukvarulicenser', type: 'Tillgang', category: 'Mjukvara' },
+  { number: '1470', name: 'Pågående projekt (WIP)', type: 'Tillgang', category: 'Ovrigt' },
+  { number: '2440', name: 'Leverantörsskulder', type: 'Skuld', category: 'Ovrigt' },
 ]
 
 const TYPE_COLORS: Record<AccountType, string> = {
@@ -106,7 +106,7 @@ const TYPE_COLORS: Record<AccountType, string> = {
 const TYPE_LABELS: Record<AccountType, string> = {
   Intakt: 'Intakt',
   Kostnad: 'Kostnad',
-  Tillgang: 'Tillgang',
+  Tillgang: 'Tillgång',
   Skuld: 'Skuld',
 }
 
@@ -321,7 +321,7 @@ export function ItKontoplanWorkspace({ module: mod, sectorSlug, settingsHref }: 
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Sok konto (nummer eller namn)..."
+                  placeholder="Sök konto (nummer eller namn)..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
@@ -356,8 +356,8 @@ export function ItKontoplanWorkspace({ module: mod, sectorSlug, settingsHref }: 
                 title="Inga konton hittades"
                 description={
                   searchQuery || filterType !== 'all'
-                    ? 'Inga konton matchar dina sokkriterier. Prova att andra filter.'
-                    : 'Lagg till konton for att bygga upp din IT-kontoplan.'
+                    ? 'Inga konton matchar dina sökkriterier. Prova att ändra filter.'
+                    : 'Lägg till konton för att bygga upp din IT-kontoplan.'
                 }
                 actionLabel={!searchQuery && filterType === 'all' ? 'Nytt konto' : undefined}
                 onAction={!searchQuery && filterType === 'all' ? openNewAccount : undefined}
@@ -371,7 +371,7 @@ export function ItKontoplanWorkspace({ module: mod, sectorSlug, settingsHref }: 
                       <TableHead className="font-medium">Kontonamn</TableHead>
                       <TableHead className="font-medium">Typ</TableHead>
                       <TableHead className="font-medium">Kategori</TableHead>
-                      <TableHead className="font-medium text-right">Atgarder</TableHead>
+                      <TableHead className="font-medium text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -426,7 +426,7 @@ export function ItKontoplanWorkspace({ module: mod, sectorSlug, settingsHref }: 
             <DialogDescription>
               {editingAccount
                 ? 'Uppdatera kontots uppgifter nedan.'
-                : 'Fyll i uppgifterna for det nya kontot.'}
+                : 'Fyll i uppgifterna för det nya kontot.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -462,7 +462,7 @@ export function ItKontoplanWorkspace({ module: mod, sectorSlug, settingsHref }: 
                   onValueChange={(val) => setAccountForm((f) => ({ ...f, type: val as AccountType }))}
                 >
                   <SelectTrigger id="acct-type">
-                    <SelectValue placeholder="Valj typ" />
+                    <SelectValue placeholder="Välj typ" />
                   </SelectTrigger>
                   <SelectContent>
                     {ACCOUNT_TYPES.map((t) => (
@@ -478,7 +478,7 @@ export function ItKontoplanWorkspace({ module: mod, sectorSlug, settingsHref }: 
                   onValueChange={(val) => setAccountForm((f) => ({ ...f, category: val as AccountCategory }))}
                 >
                   <SelectTrigger id="acct-category">
-                    <SelectValue placeholder="Valj kategori" />
+                    <SelectValue placeholder="Välj kategori" />
                   </SelectTrigger>
                   <SelectContent>
                     {ACCOUNT_CATEGORIES.map((c) => (
@@ -510,9 +510,9 @@ export function ItKontoplanWorkspace({ module: mod, sectorSlug, settingsHref }: 
           <DialogHeader>
             <DialogTitle>Ta bort konto</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort konto{' '}
+              Är du säker på att du vill ta bort konto{' '}
               <span className="font-mono font-semibold">{accountToDelete?.number}</span>{' '}
-              ({accountToDelete?.name})? Denna atgard kan inte angras.
+              ({accountToDelete?.name})? Denna åtgärd kan inte ångras.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

@@ -78,9 +78,9 @@ interface CapacityPlan {
 const ROOM_TYPES: RoomType[] = ['Standard', 'Superior', 'Svit', 'Familj', 'Budget']
 
 const SEASON_COLORS = [
-  { value: 'emerald', label: 'Gron (hogsasong)', class: 'bg-emerald-100 text-emerald-800' },
-  { value: 'amber', label: 'Gul (mellansasong)', class: 'bg-amber-100 text-amber-800' },
-  { value: 'blue', label: 'Bla (lagsasong)', class: 'bg-blue-100 text-blue-800' },
+  { value: 'emerald', label: 'Grön (högsäsong)', class: 'bg-emerald-100 text-emerald-800' },
+  { value: 'amber', label: 'Gul (mellansäsong)', class: 'bg-amber-100 text-amber-800' },
+  { value: 'blue', label: 'Blå (lågsäsong)', class: 'bg-blue-100 text-blue-800' },
   { value: 'rose', label: 'Rosa (specialperiod)', class: 'bg-rose-100 text-rose-800' },
   { value: 'purple', label: 'Lila (event)', class: 'bg-purple-100 text-purple-800' },
 ]
@@ -280,7 +280,7 @@ export function SasongsplaneringWorkspace({ module: mod, sectorSlug, settingsHre
         actions={
           <Button onClick={openNewSeason}>
             <Plus className="mr-2 h-4 w-4" />
-            Ny sasong
+            Ny säsong
           </Button>
         }
       >
@@ -291,7 +291,7 @@ export function SasongsplaneringWorkspace({ module: mod, sectorSlug, settingsHre
         ) : (
           <Tabs defaultValue="sasonger" className="space-y-6">
             <TabsList>
-              <TabsTrigger value="sasonger">Sasonger</TabsTrigger>
+              <TabsTrigger value="sasonger">Säsonger</TabsTrigger>
               <TabsTrigger value="priser">Priser per rumstyp</TabsTrigger>
               <TabsTrigger value="kapacitet">Kapacitetsplanering</TabsTrigger>
             </TabsList>
@@ -299,7 +299,7 @@ export function SasongsplaneringWorkspace({ module: mod, sectorSlug, settingsHre
             <TabsContent value="sasonger" className="space-y-6">
               {saving && <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Sparar...</div>}
               {seasons.length === 0 ? (
-                <EmptyModuleState icon={Sun} title="Inga sasonger" description="Definiera sasonger for att satta priser och planera kapacitet." actionLabel="Ny sasong" onAction={openNewSeason} />
+                <EmptyModuleState icon={Sun} title="Inga säsonger" description="Definiera säsonger för att sätta priser och planera kapacitet." actionLabel="Ny säsong" onAction={openNewSeason} />
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {seasons.sort((a, b) => a.startDate.localeCompare(b.startDate)).map(season => (
@@ -329,21 +329,21 @@ export function SasongsplaneringWorkspace({ module: mod, sectorSlug, settingsHre
 
             <TabsContent value="priser" className="space-y-6">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">Satt pris per rumstyp och sasong.</p>
+                <p className="text-sm text-muted-foreground">Sätt pris per rumstyp och säsong.</p>
                 <Button size="sm" onClick={() => openNewPrice()} disabled={seasons.length === 0}><Plus className="mr-2 h-4 w-4" />Nytt pris</Button>
               </div>
               {prices.length === 0 ? (
-                <EmptyModuleState icon={CalendarDays} title="Inga prisregler" description="Lagg till priser per sasong och rumstyp." actionLabel="Lagg till pris" onAction={() => openNewPrice()} />
+                <EmptyModuleState icon={CalendarDays} title="Inga prisregler" description="Lägg till priser per säsong och rumstyp." actionLabel="Lägg till pris" onAction={() => openNewPrice()} />
               ) : (
                 <div className="rounded-xl border border-border overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50">
-                        <TableHead className="font-medium">Sasong</TableHead>
+                        <TableHead className="font-medium">Säsong</TableHead>
                         <TableHead className="font-medium">Rumstyp</TableHead>
                         <TableHead className="font-medium text-right">Pris/natt (kr)</TableHead>
                         <TableHead className="font-medium text-right">Min. natter</TableHead>
-                        <TableHead className="font-medium text-right">Atgarder</TableHead>
+                        <TableHead className="font-medium text-right">Åtgärder</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -352,7 +352,7 @@ export function SasongsplaneringWorkspace({ module: mod, sectorSlug, settingsHre
                         return (
                           <TableRow key={price.id}>
                             <TableCell>
-                              <Badge variant="secondary" className={getColorClass(season?.color ?? 'gray')}>{season?.name ?? 'Okand'}</Badge>
+                              <Badge variant="secondary" className={getColorClass(season?.color ?? 'gray')}>{season?.name ?? 'Okänd'}</Badge>
                             </TableCell>
                             <TableCell>{price.roomType}</TableCell>
                             <TableCell className="text-right font-mono">{fmt(price.pricePerNight)}</TableCell>
@@ -371,21 +371,21 @@ export function SasongsplaneringWorkspace({ module: mod, sectorSlug, settingsHre
 
             <TabsContent value="kapacitet" className="space-y-6">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">Planera kapacitet och belaggningsmol per sasong.</p>
+                <p className="text-sm text-muted-foreground">Planera kapacitet och beläggningsmål per säsong.</p>
                 <Button size="sm" onClick={() => openNewCapacity()} disabled={seasons.length === 0}><Plus className="mr-2 h-4 w-4" />Ny plan</Button>
               </div>
               {capacity.length === 0 ? (
-                <EmptyModuleState icon={CalendarDays} title="Inga kapacitetsplaner" description="Lagg till kapacitetsplaner per sasong." actionLabel="Lagg till" onAction={() => openNewCapacity()} />
+                <EmptyModuleState icon={CalendarDays} title="Inga kapacitetsplaner" description="Lägg till kapacitetsplaner per säsong." actionLabel="Lägg till" onAction={() => openNewCapacity()} />
               ) : (
                 <div className="rounded-xl border border-border overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50">
-                        <TableHead className="font-medium">Sasong</TableHead>
+                        <TableHead className="font-medium">Säsong</TableHead>
                         <TableHead className="font-medium">Rumstyp</TableHead>
                         <TableHead className="font-medium text-right">Antal rum</TableHead>
-                        <TableHead className="font-medium text-right">Belaggningsmol %</TableHead>
-                        <TableHead className="font-medium text-right">Atgarder</TableHead>
+                        <TableHead className="font-medium text-right">Beläggningsmål %</TableHead>
+                        <TableHead className="font-medium text-right">Åtgärder</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -394,7 +394,7 @@ export function SasongsplaneringWorkspace({ module: mod, sectorSlug, settingsHre
                         return (
                           <TableRow key={cap.id}>
                             <TableCell>
-                              <Badge variant="secondary" className={getColorClass(season?.color ?? 'gray')}>{season?.name ?? 'Okand'}</Badge>
+                              <Badge variant="secondary" className={getColorClass(season?.color ?? 'gray')}>{season?.name ?? 'Okänd'}</Badge>
                             </TableCell>
                             <TableCell>{cap.roomType}</TableCell>
                             <TableCell className="text-right">{cap.totalRooms}</TableCell>
@@ -418,13 +418,13 @@ export function SasongsplaneringWorkspace({ module: mod, sectorSlug, settingsHre
       <Dialog open={seasonDialogOpen} onOpenChange={setSeasonDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingSeason ? 'Redigera sasong' : 'Ny sasong'}</DialogTitle>
-            <DialogDescription>Definiera sasongperiod och fargkod.</DialogDescription>
+            <DialogTitle>{editingSeason ? 'Redigera säsong' : 'Ny säsong'}</DialogTitle>
+            <DialogDescription>Definiera säsongperiod och färgkod.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
-              <Label>Sasongsnamn *</Label>
-              <Input value={seasonForm.name} onChange={e => setSeasonForm(f => ({ ...f, name: e.target.value }))} placeholder="Hogsasong sommar" />
+              <Label>Säsongsnamn *</Label>
+              <Input value={seasonForm.name} onChange={e => setSeasonForm(f => ({ ...f, name: e.target.value }))} placeholder="Högsäsong sommar" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
@@ -437,7 +437,7 @@ export function SasongsplaneringWorkspace({ module: mod, sectorSlug, settingsHre
               </div>
             </div>
             <div className="grid gap-2">
-              <Label>Farg</Label>
+              <Label>Färg</Label>
               <Select value={seasonForm.color} onValueChange={val => setSeasonForm(f => ({ ...f, color: val }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{SEASON_COLORS.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
@@ -447,7 +447,7 @@ export function SasongsplaneringWorkspace({ module: mod, sectorSlug, settingsHre
           <DialogFooter>
             <Button variant="outline" onClick={() => setSeasonDialogOpen(false)}>Avbryt</Button>
             <Button onClick={handleSaveSeason} disabled={!seasonForm.name.trim() || !seasonForm.startDate || !seasonForm.endDate}>
-              {editingSeason ? 'Uppdatera' : 'Skapa sasong'}
+              {editingSeason ? 'Uppdatera' : 'Skapa säsong'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -457,14 +457,14 @@ export function SasongsplaneringWorkspace({ module: mod, sectorSlug, settingsHre
       <Dialog open={priceDialogOpen} onOpenChange={setPriceDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Satt pris per rumstyp</DialogTitle>
-            <DialogDescription>Valj sasong, rumstyp och ange pris.</DialogDescription>
+            <DialogTitle>Sätt pris per rumstyp</DialogTitle>
+            <DialogDescription>Välj säsong, rumstyp och ange pris.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
-              <Label>Sasong *</Label>
+              <Label>Säsong *</Label>
               <Select value={priceForm.seasonId} onValueChange={val => setPriceForm(f => ({ ...f, seasonId: val }))}>
-                <SelectTrigger><SelectValue placeholder="Valj sasong" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Välj säsong" /></SelectTrigger>
                 <SelectContent>{seasons.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
@@ -498,13 +498,13 @@ export function SasongsplaneringWorkspace({ module: mod, sectorSlug, settingsHre
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Kapacitetsplan</DialogTitle>
-            <DialogDescription>Planera antal rum och belaggningsmol per sasong.</DialogDescription>
+            <DialogDescription>Planera antal rum och beläggningsmål per säsong.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
-              <Label>Sasong *</Label>
+              <Label>Säsong *</Label>
               <Select value={capacityForm.seasonId} onValueChange={val => setCapacityForm(f => ({ ...f, seasonId: val }))}>
-                <SelectTrigger><SelectValue placeholder="Valj sasong" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Välj säsong" /></SelectTrigger>
                 <SelectContent>{seasons.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
@@ -521,7 +521,7 @@ export function SasongsplaneringWorkspace({ module: mod, sectorSlug, settingsHre
                 <Input type="number" min={0} value={capacityForm.totalRooms || ''} onChange={e => setCapacityForm(f => ({ ...f, totalRooms: parseInt(e.target.value) || 0 }))} />
               </div>
               <div className="grid gap-2">
-                <Label>Belaggningsmol (%)</Label>
+                <Label>Beläggningsmål (%)</Label>
                 <Input type="number" min={0} max={100} value={capacityForm.targetOccupancy} onChange={e => setCapacityForm(f => ({ ...f, targetOccupancy: parseInt(e.target.value) || 0 }))} />
               </div>
             </div>
@@ -537,8 +537,8 @@ export function SasongsplaneringWorkspace({ module: mod, sectorSlug, settingsHre
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Ta bort sasong</DialogTitle>
-            <DialogDescription>Ar du saker pa att du vill ta bort sasongen &quot;{seasonToDelete?.name}&quot;? Alla tillhorande priser och kapacitetsplaner tas ocksa bort.</DialogDescription>
+            <DialogTitle>Ta bort säsong</DialogTitle>
+            <DialogDescription>Är du säker på att du vill ta bort säsongen &quot;{seasonToDelete?.name}&quot;? Alla tillhörande priser och kapacitetsplaner tas också bort.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button>

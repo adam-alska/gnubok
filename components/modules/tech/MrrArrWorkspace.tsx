@@ -307,17 +307,17 @@ export function MrrArrWorkspace({ module: mod, sectorSlug, settingsHref }: Modul
         ) : (
           <Tabs defaultValue="oversikt" className="space-y-6">
             <TabsList>
-              <TabsTrigger value="oversikt">Oversikt</TabsTrigger>
+              <TabsTrigger value="oversikt">Översikt</TabsTrigger>
               <TabsTrigger value="abonnemang">Abonnemang</TabsTrigger>
-              <TabsTrigger value="trend">Manadstrend</TabsTrigger>
+              <TabsTrigger value="trend">Månadstrend</TabsTrigger>
             </TabsList>
 
             <TabsContent value="oversikt" className="space-y-6">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <KPICard label="MRR" value={fmt(kpis.currentMrr)} unit="kr/man" />
-                <KPICard label="ARR" value={fmt(kpis.arr)} unit="kr/ar" />
+                <KPICard label="MRR" value={fmt(kpis.currentMrr)} unit="kr/mån" />
+                <KPICard label="ARR" value={fmt(kpis.arr)} unit="kr/år" />
                 <KPICard
-                  label="Tillvaxt"
+                  label="Tillväxt"
                   value={fmtPct(kpis.growthRate)}
                   unit="%"
                   trend={kpis.growthRate > 0 ? 'up' : kpis.growthRate < 0 ? 'down' : 'neutral'}
@@ -332,8 +332,8 @@ export function MrrArrWorkspace({ module: mod, sectorSlug, settingsHref }: Modul
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
                 <KPICard label="Aktiva kunder" value={String(kpis.activeCount)} unit="st" />
-                <KPICard label="Expansion MRR" value={fmt(kpis.expansionRevenue)} unit="kr/man" />
-                <KPICard label="Churnad MRR" value={fmt(kpis.churnedMrr)} unit="kr/man" />
+                <KPICard label="Expansion MRR" value={fmt(kpis.expansionRevenue)} unit="kr/mån" />
+                <KPICard label="Churnad MRR" value={fmt(kpis.churnedMrr)} unit="kr/mån" />
               </div>
             </TabsContent>
 
@@ -342,7 +342,7 @@ export function MrrArrWorkspace({ module: mod, sectorSlug, settingsHref }: Modul
                 <EmptyModuleState
                   icon={Repeat}
                   title="Inga abonnemang"
-                  description="Lagg till SaaS-abonnemang for att borja tracka MRR/ARR."
+                  description="Lägg till SaaS-abonnemang för att börja tracka MRR/ARR."
                   actionLabel="Nytt abonnemang"
                   onAction={openNew}
                 />
@@ -357,7 +357,7 @@ export function MrrArrWorkspace({ module: mod, sectorSlug, settingsHref }: Modul
                         <TableHead className="font-medium">Startdatum</TableHead>
                         <TableHead className="font-medium text-right">MRR</TableHead>
                         <TableHead className="font-medium text-right">Expansion</TableHead>
-                        <TableHead className="font-medium text-right">Atgarder</TableHead>
+                        <TableHead className="font-medium text-right">Åtgärder</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -400,14 +400,14 @@ export function MrrArrWorkspace({ module: mod, sectorSlug, settingsHref }: Modul
                 <EmptyModuleState
                   icon={Repeat}
                   title="Ingen trenddata"
-                  description="Manatlig MRR-data visas har nar den finns tillganglig."
+                  description="Månatlig MRR-data visas här när den finns tillgänglig."
                 />
               ) : (
                 <div className="rounded-xl border border-border overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50">
-                        <TableHead className="font-medium">Manad</TableHead>
+                        <TableHead className="font-medium">Månad</TableHead>
                         <TableHead className="font-medium text-right">Ny MRR</TableHead>
                         <TableHead className="font-medium text-right">Expansion</TableHead>
                         <TableHead className="font-medium text-right">Churn</TableHead>
@@ -442,7 +442,7 @@ export function MrrArrWorkspace({ module: mod, sectorSlug, settingsHref }: Modul
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editing ? 'Redigera abonnemang' : 'Nytt abonnemang'}</DialogTitle>
-            <DialogDescription>{editing ? 'Uppdatera abonnemangsuppgifter.' : 'Lagg till ett nytt SaaS-abonnemang.'}</DialogDescription>
+            <DialogDescription>{editing ? 'Uppdatera abonnemangsuppgifter.' : 'Lägg till ett nytt SaaS-abonnemang.'}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
@@ -482,7 +482,7 @@ export function MrrArrWorkspace({ module: mod, sectorSlug, settingsHref }: Modul
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Avbryt</Button>
             <Button onClick={handleSave} disabled={!form.customerName.trim()}>
-              {editing ? 'Uppdatera' : 'Lagg till'}
+              {editing ? 'Uppdatera' : 'Lägg till'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -494,7 +494,7 @@ export function MrrArrWorkspace({ module: mod, sectorSlug, settingsHref }: Modul
           <DialogHeader>
             <DialogTitle>Ta bort abonnemang</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort abonnemanget for {toDelete?.customerName}? Denna atgard kan inte angras.
+              Är du säker på att du vill ta bort abonnemanget för {toDelete?.customerName}? Denna åtgärd kan inte ångras.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

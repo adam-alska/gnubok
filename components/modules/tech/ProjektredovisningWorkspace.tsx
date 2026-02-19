@@ -320,9 +320,9 @@ export function ProjektredovisningWorkspace({ module: mod, sectorSlug, settingsH
         ) : (
           <Tabs defaultValue="oversikt" className="space-y-6">
             <TabsList>
-              <TabsTrigger value="oversikt">Oversikt</TabsTrigger>
+              <TabsTrigger value="oversikt">Översikt</TabsTrigger>
               <TabsTrigger value="projekt">Projekt</TabsTrigger>
-              <TabsTrigger value="wip">WIP-berakning</TabsTrigger>
+              <TabsTrigger value="wip">WIP-beräkning</TabsTrigger>
             </TabsList>
 
             <TabsContent value="oversikt" className="space-y-6">
@@ -346,7 +346,7 @@ export function ProjektredovisningWorkspace({ module: mod, sectorSlug, settingsH
                 <EmptyModuleState
                   icon={FolderKanban}
                   title="Inga projekt"
-                  description="Lagg till projekt for att borja med projektredovisning."
+                  description="Lägg till projekt för att börja med projektredovisning."
                   actionLabel="Nytt projekt"
                   onAction={openNewProject}
                 />
@@ -361,8 +361,8 @@ export function ProjektredovisningWorkspace({ module: mod, sectorSlug, settingsH
                         <TableHead className="font-medium text-right">Budget intakt</TableHead>
                         <TableHead className="font-medium text-right">Faktisk intakt</TableHead>
                         <TableHead className="font-medium text-right">Faktisk kostnad</TableHead>
-                        <TableHead className="font-medium text-right">Fardigt %</TableHead>
-                        <TableHead className="font-medium text-right">Atgarder</TableHead>
+                        <TableHead className="font-medium text-right">Färdigt %</TableHead>
+                        <TableHead className="font-medium text-right">Åtgärder</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -412,22 +412,22 @@ export function ProjektredovisningWorkspace({ module: mod, sectorSlug, settingsH
             <TabsContent value="wip" className="space-y-4">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm">Successiv vinstavrakning (konto 1470)</CardTitle>
+                  <CardTitle className="text-sm">Successiv vinstavräkning (konto 1470)</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {wipCalculation.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Inga pagaende projekt med successiv vinstavrakning.</p>
+                    <p className="text-sm text-muted-foreground">Inga pågående projekt med successiv vinstavräkning.</p>
                   ) : (
                     <div className="rounded-xl border border-border overflow-hidden">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-muted/50">
                             <TableHead className="font-medium">Projekt</TableHead>
-                            <TableHead className="font-medium text-right">Fardigt %</TableHead>
-                            <TableHead className="font-medium text-right">Beraknad intakt</TableHead>
-                            <TableHead className="font-medium text-right">Beraknad kostnad</TableHead>
-                            <TableHead className="font-medium text-right">Beraknad vinst</TableHead>
-                            <TableHead className="font-medium text-right">WIP-varde</TableHead>
+                            <TableHead className="font-medium text-right">Färdigt %</TableHead>
+                            <TableHead className="font-medium text-right">Beräknad intakt</TableHead>
+                            <TableHead className="font-medium text-right">Beräknad kostnad</TableHead>
+                            <TableHead className="font-medium text-right">Beräknad vinst</TableHead>
+                            <TableHead className="font-medium text-right">WIP-värde</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -464,7 +464,7 @@ export function ProjektredovisningWorkspace({ module: mod, sectorSlug, settingsH
           <DialogHeader>
             <DialogTitle>{editingProject ? 'Redigera projekt' : 'Nytt projekt'}</DialogTitle>
             <DialogDescription>
-              {editingProject ? 'Uppdatera projektuppgifter.' : 'Fyll i uppgifter for det nya projektet.'}
+              {editingProject ? 'Uppdatera projektuppgifter.' : 'Fyll i uppgifter för det nya projektet.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
@@ -499,7 +499,7 @@ export function ProjektredovisningWorkspace({ module: mod, sectorSlug, settingsH
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label>Fardigt %</Label>
+                <Label>Färdigt %</Label>
                 <Input type="number" min={0} max={100} value={form.completionPct} onChange={(e) => setForm((f) => ({ ...f, completionPct: Number(e.target.value) }))} />
               </div>
             </div>
@@ -543,7 +543,7 @@ export function ProjektredovisningWorkspace({ module: mod, sectorSlug, settingsH
           <DialogHeader>
             <DialogTitle>Ta bort projekt</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort projektet &quot;{projectToDelete?.name}&quot;? Denna atgard kan inte angras.
+              Är du säker på att du vill ta bort projektet &quot;{projectToDelete?.name}&quot;? Denna åtgärd kan inte ångras.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

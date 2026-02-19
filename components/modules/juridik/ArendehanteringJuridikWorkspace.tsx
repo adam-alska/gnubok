@@ -248,14 +248,14 @@ export function ArendehanteringJuridikWorkspace({ module: mod, sectorSlug, setti
         actions={
           <Button onClick={openNewCase}>
             <Plus className="mr-2 h-4 w-4" />
-            Nytt arende
+            Nytt ärende
           </Button>
         }
       >
         <Tabs defaultValue="oversikt" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="oversikt">Oversikt</TabsTrigger>
-            <TabsTrigger value="arenden">Arenden</TabsTrigger>
+            <TabsTrigger value="oversikt">Översikt</TabsTrigger>
+            <TabsTrigger value="arenden">Ärenden</TabsTrigger>
             <TabsTrigger value="deadlines">Deadlines</TabsTrigger>
           </TabsList>
 
@@ -268,21 +268,21 @@ export function ArendehanteringJuridikWorkspace({ module: mod, sectorSlug, setti
             ) : cases.length === 0 ? (
               <EmptyModuleState
                 icon={Briefcase}
-                title="Inga arenden"
-                description="Skapa arenden for att borja hantera dina juridiska uppdrag."
-                actionLabel="Nytt arende"
+                title="Inga ärenden"
+                description="Skapa ärenden för att börja hantera dina juridiska uppdrag."
+                actionLabel="Nytt ärende"
                 onAction={openNewCase}
               />
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <KPICard label="Totalt arenden" value={String(summary.total)} />
-                <KPICard label="Pagaende" value={String(summary.active)} />
+                <KPICard label="Totalt ärenden" value={String(summary.total)} />
+                <KPICard label="Pågående" value={String(summary.active)} />
                 <KPICard label="Nya" value={String(summary.newCases)} />
                 <KPICard
-                  label="Forfallna deadlines"
+                  label="Förfallna deadlines"
                   value={String(summary.overdue)}
                   trend={summary.overdue > 0 ? 'down' : 'up'}
-                  trendLabel={summary.overdue > 0 ? 'Krav atgard' : 'OK'}
+                  trendLabel={summary.overdue > 0 ? 'Kräver åtgärd' : 'OK'}
                 />
               </div>
             )}
@@ -300,7 +300,7 @@ export function ArendehanteringJuridikWorkspace({ module: mod, sectorSlug, setti
                   <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Sok arende, klient, jurist..."
+                      placeholder="Sök ärende, klient, jurist..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9"
@@ -319,7 +319,7 @@ export function ArendehanteringJuridikWorkspace({ module: mod, sectorSlug, setti
                   </Select>
                   <Select value={filterType} onValueChange={(val) => setFilterType(val as CaseType | 'all')}>
                     <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Arendetyp" />
+                      <SelectValue placeholder="Ärendetyp" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Alla typer</SelectItem>
@@ -339,8 +339,8 @@ export function ArendehanteringJuridikWorkspace({ module: mod, sectorSlug, setti
                 {filteredCases.length === 0 ? (
                   <EmptyModuleState
                     icon={Briefcase}
-                    title="Inga arenden hittades"
-                    description="Inga arenden matchar filtret."
+                    title="Inga ärenden hittades"
+                    description="Inga ärenden matchar filtret."
                   />
                 ) : (
                   <div className="rounded-xl border border-border overflow-hidden">
@@ -354,7 +354,7 @@ export function ArendehanteringJuridikWorkspace({ module: mod, sectorSlug, setti
                           <TableHead className="font-medium">Status</TableHead>
                           <TableHead className="font-medium">Ansvarig</TableHead>
                           <TableHead className="font-medium">Deadline</TableHead>
-                          <TableHead className="font-medium text-right">Atgarder</TableHead>
+                          <TableHead className="font-medium text-right">Åtgärder</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -413,7 +413,7 @@ export function ArendehanteringJuridikWorkspace({ module: mod, sectorSlug, setti
                       <EmptyModuleState
                         icon={AlertTriangle}
                         title="Inga deadlines"
-                        description="Inga aktiva arenden har deadlines satta."
+                        description="Inga aktiva ärenden har deadlines satta."
                       />
                     )
                   }
@@ -440,7 +440,7 @@ export function ArendehanteringJuridikWorkspace({ module: mod, sectorSlug, setti
                                 <TableCell className={cn('font-medium', overdue ? 'text-red-600' : daysLeft <= 7 ? 'text-amber-600' : '')}>
                                   {c.deadline}
                                   <span className="text-xs ml-2">
-                                    {overdue ? `(${Math.abs(daysLeft)}d forsenad)` : `(${daysLeft}d kvar)`}
+                                    {overdue ? `(${Math.abs(daysLeft)}d försenad)` : `(${daysLeft}d kvar)`}
                                   </span>
                                 </TableCell>
                                 <TableCell className="font-mono">{c.caseRef}</TableCell>
@@ -468,21 +468,21 @@ export function ArendehanteringJuridikWorkspace({ module: mod, sectorSlug, setti
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editingCase ? 'Redigera arende' : 'Nytt arende'}</DialogTitle>
+            <DialogTitle>{editingCase ? 'Redigera ärende' : 'Nytt ärende'}</DialogTitle>
             <DialogDescription>
-              {editingCase ? 'Uppdatera arendeuppgifter.' : 'Skapa ett nytt juridiskt arende.'}
+              {editingCase ? 'Uppdatera ärendeuppgifter.' : 'Skapa ett nytt juridiskt ärende.'}
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="case-ref">Arenderef *</Label>
+                <Label htmlFor="case-ref">Ärenderef *</Label>
                 <Input id="case-ref" value={form.caseRef} onChange={(e) => setForm((f) => ({ ...f, caseRef: e.target.value }))} placeholder="2024-001" />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="case-title">Titel *</Label>
-                <Input id="case-title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Kontraktsforhandling" />
+                <Input id="case-title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Kontraktsförhandling" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -497,7 +497,7 @@ export function ArendehanteringJuridikWorkspace({ module: mod, sectorSlug, setti
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="case-type">Arendetyp</Label>
+                <Label htmlFor="case-type">Ärendetyp</Label>
                 <Select value={form.caseType} onValueChange={(val) => setForm((f) => ({ ...f, caseType: val as CaseType }))}>
                   <SelectTrigger id="case-type"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -548,9 +548,9 @@ export function ArendehanteringJuridikWorkspace({ module: mod, sectorSlug, setti
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Ta bort arende</DialogTitle>
+            <DialogTitle>Ta bort ärende</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort arende{' '}
+              Är du säker på att du vill ta bort ärende{' '}
               <span className="font-mono font-semibold">{caseToDelete?.caseRef}</span>?
             </DialogDescription>
           </DialogHeader>

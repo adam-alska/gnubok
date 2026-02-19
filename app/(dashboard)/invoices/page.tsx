@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PageHeader } from '@/components/ui/page-header'
 import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { Plus, Search, Receipt, FileText, Send, CheckCircle, Clock, XCircle, ReceiptText, AlertTriangle } from 'lucide-react'
+import { Plus, Search, Receipt, FileText, Send, CheckCircle, Clock, XCircle, ReceiptText, AlertTriangle, RefreshCw } from 'lucide-react'
 import { EmptyInvoices } from '@/components/ui/empty-state'
 import type { Invoice, InvoiceStatus } from '@/types'
 
@@ -105,12 +105,20 @@ export default function InvoicesPage() {
         title="Fakturor"
         description="Skapa och hantera dina fakturor"
         action={
-          <Link href="/invoices/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Ny faktura
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/invoices/recurring">
+              <Button variant="outline">
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Återkommande
+              </Button>
+            </Link>
+            <Link href="/invoices/new">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Ny faktura
+              </Button>
+            </Link>
+          </div>
         }
       />
 

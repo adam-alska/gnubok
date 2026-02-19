@@ -63,21 +63,21 @@ function ConfigForm({
       <div>
         <h3 className="text-base font-semibold">Alkohol & Accis</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Inst\u00e4llningar f\u00f6r alkoholtillst\u00e5nd och rapportering.
+          Inställningar för alkoholtillstånd och rapportering.
         </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="tillstandstyp">Tillst\u00e5ndstyp</Label>
+          <Label htmlFor="tillstandstyp">Tillståndstyp</Label>
           <select
             id="tillstandstyp"
             value={settings.tillstandstyp}
             onChange={e => setSettings(prev => ({ ...prev, tillstandstyp: e.target.value as ExciseSettings['tillstandstyp'] }))}
             className={selectClassName}
           >
-            <option value="stadigvarande">Stadigvarande serveringstillst\u00e5nd</option>
-            <option value="tillfalligt">Tillf\u00e4lligt serveringstillst\u00e5nd</option>
+            <option value="stadigvarande">Stadigvarande serveringstillstånd</option>
+            <option value="tillfalligt">Tillfälligt serveringstillstånd</option>
             <option value="catering">Catering</option>
           </select>
         </div>
@@ -89,9 +89,9 @@ function ConfigForm({
             onChange={e => setSettings(prev => ({ ...prev, rapporteringsfrekvens: e.target.value as ExciseSettings['rapporteringsfrekvens'] }))}
             className={selectClassName}
           >
-            <option value="manadsvis">M\u00e5nadsvis</option>
+            <option value="manadsvis">Månadsvis</option>
             <option value="kvartalsvis">Kvartalsvis</option>
-            <option value="arsvis">\u00c5rsvis</option>
+            <option value="arsvis">Årsvis</option>
           </select>
         </div>
       </div>
@@ -99,7 +99,7 @@ function ConfigForm({
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={saving}>
           {saving && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
-          Spara inst\u00e4llningar
+          Spara inställningar
         </Button>
       </div>
     </div>

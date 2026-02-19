@@ -53,11 +53,11 @@ function fmtDec(n: number): string {
 }
 
 function getReorderSuggestion(turnoverRate: number): string {
-  if (turnoverRate >= 24) return 'Daglig bestallning'
-  if (turnoverRate >= 12) return 'Veckovis bestallning'
+  if (turnoverRate >= 24) return 'Daglig beställning'
+  if (turnoverRate >= 12) return 'Veckovis beställning'
   if (turnoverRate >= 6) return 'Varannan vecka'
-  if (turnoverRate >= 4) return 'Manadsvis bestallning'
-  return 'Minska lager - lagom bestallning'
+  if (turnoverRate >= 4) return 'Månadsvis beställning'
+  return 'Minska lager - lagom beställning'
 }
 
 const EMPTY_FORM = {
@@ -158,26 +158,26 @@ export function LageromsattningshastighetWorkspace({ module: mod, sectorSlug, se
         ) : (
           <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <KPICard label="Snitt omsattningshastighet" value={fmtDec(avgTurnover)} unit="ggr/ar" trend={avgTurnover >= 12 ? 'up' : avgTurnover >= 6 ? 'neutral' : 'down'} />
+              <KPICard label="Snitt omsättningshastighet" value={fmtDec(avgTurnover)} unit="ggr/år" trend={avgTurnover >= 12 ? 'up' : avgTurnover >= 6 ? 'neutral' : 'down'} />
               <KPICard label="Bundet kapital" value={fmt(totalCapital)} unit="kr" />
               <KPICard label="Antal varugrupper" value={String(items.length)} unit="st" />
-              <KPICard label="Lagroterande" value={String(slowMoving)} unit="varugrupper" trend={slowMoving > 0 ? 'down' : 'up'} trendLabel={slowMoving > 0 ? 'Krav atgard' : 'Bra'} />
+              <KPICard label="Långroterande" value={String(slowMoving)} unit="varugrupper" trend={slowMoving > 0 ? 'down' : 'up'} trendLabel={slowMoving > 0 ? 'Kräv åtgärd' : 'Bra'} />
             </div>
 
             {items.length === 0 ? (
-              <EmptyModuleState icon={RotateCw} title="Inga varugrupper" description="Lagg till varugrupper for att berakna lageromsattningshastighet." actionLabel="Ny varugrupp" onAction={openNewItem} />
+              <EmptyModuleState icon={RotateCw} title="Inga varugrupper" description="Lägg till varugrupper för att beräkna lageromsättningshastighet." actionLabel="Ny varugrupp" onAction={openNewItem} />
             ) : (
               <div className="rounded-xl border border-border overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50">
                       <TableHead className="font-medium">Varugrupp</TableHead>
-                      <TableHead className="font-medium text-right">Arlig VKV (kr)</TableHead>
+                      <TableHead className="font-medium text-right">Årlig VKV (kr)</TableHead>
                       <TableHead className="font-medium text-right">Snittlager (kr)</TableHead>
                       <TableHead className="font-medium text-right">Oms. hastighet</TableHead>
                       <TableHead className="font-medium text-right">Dagar i lager</TableHead>
-                      <TableHead className="font-medium">Bestallningsforslag</TableHead>
-                      <TableHead className="font-medium text-right">Atgarder</TableHead>
+                      <TableHead className="font-medium">Beställningsförslag</TableHead>
+                      <TableHead className="font-medium text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -216,7 +216,7 @@ export function LageromsattningshastighetWorkspace({ module: mod, sectorSlug, se
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editingItem ? 'Redigera varugrupp' : 'Ny varugrupp'}</DialogTitle>
-            <DialogDescription>Ange arlig varuforbrukningskostnad och genomsnittligt lagervarde.</DialogDescription>
+            <DialogDescription>Ange årlig varuförbrukningskostnad och genomsnittligt lagervärde.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
@@ -224,25 +224,25 @@ export function LageromsattningshastighetWorkspace({ module: mod, sectorSlug, se
               <Select value={form.group} onValueChange={(val) => setForm(f => ({ ...f, group: val }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{PRODUCT_GROUPS.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2"><Label>Arlig VKV (kr) *</Label><Input type="number" min={0} value={form.annualCOGS} onChange={(e) => setForm(f => ({ ...f, annualCOGS: Number(e.target.value) || 0 }))} /></div>
+              <div className="grid gap-2"><Label>Årlig VKV (kr) *</Label><Input type="number" min={0} value={form.annualCOGS} onChange={(e) => setForm(f => ({ ...f, annualCOGS: Number(e.target.value) || 0 }))} /></div>
               <div className="grid gap-2"><Label>Snittlager (kr) *</Label><Input type="number" min={0} value={form.avgInventory} onChange={(e) => setForm(f => ({ ...f, avgInventory: Number(e.target.value) || 0 }))} /></div>
             </div>
             {form.avgInventory > 0 && (
               <p className="text-xs text-muted-foreground">
-                Beraknad omsattning: <strong>{fmtDec(form.annualCOGS / form.avgInventory)} ggr/ar</strong> ({fmtDec(365 / (form.annualCOGS / form.avgInventory))} dagar i lager)
+                Beräknad omsättning: <strong>{fmtDec(form.annualCOGS / form.avgInventory)} ggr/år</strong> ({fmtDec(365 / (form.annualCOGS / form.avgInventory))} dagar i lager)
               </p>
             )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Avbryt</Button>
-            <Button onClick={handleSaveItem} disabled={form.avgInventory <= 0}>{editingItem ? 'Uppdatera' : 'Lagg till'}</Button>
+            <Button onClick={handleSaveItem} disabled={form.avgInventory <= 0}>{editingItem ? 'Uppdatera' : 'Lägg till'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Ta bort varugrupp</DialogTitle><DialogDescription>Ar du saker pa att du vill ta bort {itemToDelete?.group}?</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Ta bort varugrupp</DialogTitle><DialogDescription>Är du säker på att du vill ta bort {itemToDelete?.group}?</DialogDescription></DialogHeader>
           <DialogFooter><Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button><Button variant="destructive" onClick={handleDeleteItem}><Trash2 className="mr-2 h-4 w-4" />Ta bort</Button></DialogFooter>
         </DialogContent>
       </Dialog>

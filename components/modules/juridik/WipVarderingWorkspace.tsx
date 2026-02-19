@@ -268,7 +268,7 @@ export function WipVarderingWorkspace({ module: mod, sectorSlug, settingsHref }:
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={handleRevalue} disabled={saving || entries.length === 0}>
               <RefreshCw className="mr-2 h-4 w-4" />
-              Manadlig omvardering
+              Månadlig omvärdering
             </Button>
             <Button onClick={openNewEntry}>
               <Plus className="mr-2 h-4 w-4" />
@@ -279,9 +279,9 @@ export function WipVarderingWorkspace({ module: mod, sectorSlug, settingsHref }:
       >
         <Tabs defaultValue="oversikt" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="oversikt">Oversikt</TabsTrigger>
+            <TabsTrigger value="oversikt">Översikt</TabsTrigger>
             <TabsTrigger value="detaljer">WIP-poster</TabsTrigger>
-            <TabsTrigger value="historik">Omvarderingshistorik</TabsTrigger>
+            <TabsTrigger value="historik">Omvärderingshistorik</TabsTrigger>
           </TabsList>
 
           {/* Overview */}
@@ -294,16 +294,16 @@ export function WipVarderingWorkspace({ module: mod, sectorSlug, settingsHref }:
               <EmptyModuleState
                 icon={Clock}
                 title="Inga WIP-poster"
-                description="Lagg till poshende arbete for att borja vardera ofakturerad tid."
+                description="Lägg till pågående arbete för att börja värdera ofakturerad tid."
                 actionLabel="Ny WIP-post"
                 onAction={openNewEntry}
               />
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                <KPICard label="Bruttovarde" value={fmt(summary.totalGross)} unit="kr" />
+                <KPICard label="Bruttovärde" value={fmt(summary.totalGross)} unit="kr" />
                 <KPICard label="Nedskrivning" value={fmt(summary.totalWriteDown)} unit="kr" />
                 <KPICard
-                  label="Nettovarde (1470)"
+                  label="Nettovärde (1470)"
                   value={fmt(summary.totalNet)}
                   unit="kr"
                   trend={summary.totalNet > 0 ? 'up' : 'neutral'}
@@ -324,7 +324,7 @@ export function WipVarderingWorkspace({ module: mod, sectorSlug, settingsHref }:
               <EmptyModuleState
                 icon={Clock}
                 title="Inga WIP-poster"
-                description="Borja med att lagga till ofakturerade uppdrag."
+                description="Börja med att lägga till ofakturerade uppdrag."
                 actionLabel="Ny WIP-post"
                 onAction={openNewEntry}
               />
@@ -334,14 +334,14 @@ export function WipVarderingWorkspace({ module: mod, sectorSlug, settingsHref }:
                   <TableHeader>
                     <TableRow className="bg-muted/50">
                       <TableHead className="font-medium">Klient</TableHead>
-                      <TableHead className="font-medium">Arende</TableHead>
+                      <TableHead className="font-medium">Ärende</TableHead>
                       <TableHead className="font-medium">Jurist</TableHead>
                       <TableHead className="font-medium text-right">Timmar</TableHead>
                       <TableHead className="font-medium text-right">Timpris</TableHead>
                       <TableHead className="font-medium text-right">Brutto</TableHead>
                       <TableHead className="font-medium text-right">Nedskr. %</TableHead>
                       <TableHead className="font-medium text-right">Netto</TableHead>
-                      <TableHead className="font-medium text-right">Atgarder</TableHead>
+                      <TableHead className="font-medium text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -392,16 +392,16 @@ export function WipVarderingWorkspace({ module: mod, sectorSlug, settingsHref }:
             {revaluations.length === 0 ? (
               <EmptyModuleState
                 icon={RefreshCw}
-                title="Ingen omvarderingshistorik"
-                description="Kor en manadlig omvardering for att borja bygga upp historiken."
+                title="Ingen omvärderingshistorik"
+                description="Kör en månadlig omvärdering för att börja bygga upp historiken."
               />
             ) : (
               <div className="rounded-xl border border-border overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50">
-                      <TableHead className="font-medium">Manad</TableHead>
-                      <TableHead className="font-medium text-right">Fore (kr)</TableHead>
+                      <TableHead className="font-medium">Månad</TableHead>
+                      <TableHead className="font-medium text-right">Före (kr)</TableHead>
                       <TableHead className="font-medium text-right">Efter (kr)</TableHead>
                       <TableHead className="font-medium text-right">Nedskrivning (kr)</TableHead>
                     </TableRow>
@@ -430,8 +430,8 @@ export function WipVarderingWorkspace({ module: mod, sectorSlug, settingsHref }:
             <DialogTitle>{editingEntry ? 'Redigera WIP-post' : 'Ny WIP-post'}</DialogTitle>
             <DialogDescription>
               {editingEntry
-                ? 'Uppdatera varderings uppgifterna nedan.'
-                : 'Registrera ofakturerat arbete for vardering pa konto 1470.'}
+                ? 'Uppdatera värderingsuppgifterna nedan.'
+                : 'Registrera ofakturerat arbete för värdering på konto 1470.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -447,7 +447,7 @@ export function WipVarderingWorkspace({ module: mod, sectorSlug, settingsHref }:
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="wip-case">Arende *</Label>
+                <Label htmlFor="wip-case">Ärende *</Label>
                 <Input
                   id="wip-case"
                   value={wipForm.caseRef}
@@ -463,7 +463,7 @@ export function WipVarderingWorkspace({ module: mod, sectorSlug, settingsHref }:
                 id="wip-lawyer"
                 value={wipForm.lawyer}
                 onChange={(e) => setWipForm((f) => ({ ...f, lawyer: e.target.value }))}
-                placeholder="Namn pa jurist"
+                placeholder="Namn på jurist"
               />
             </div>
 
@@ -524,7 +524,7 @@ export function WipVarderingWorkspace({ module: mod, sectorSlug, settingsHref }:
           <DialogHeader>
             <DialogTitle>Ta bort WIP-post</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort WIP-posten for{' '}
+              Är du säker på att du vill ta bort WIP-posten för{' '}
               <span className="font-semibold">{entryToDelete?.clientName}</span> ({entryToDelete?.caseRef})?
             </DialogDescription>
           </DialogHeader>

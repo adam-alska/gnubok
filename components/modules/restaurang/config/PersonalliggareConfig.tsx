@@ -13,7 +13,7 @@ interface ModuleConfigProps {
 
 interface StaffRegisterSettings {
   exportformat: 'CSV' | 'PDF' | 'XML'
-  rapporteringsperiod: 'Dagligen' | 'Veckovis' | 'M\u00e5nadsvis'
+  rapporteringsperiod: 'Dagligen' | 'Veckovis' | 'Månadsvis'
 }
 
 const DEFAULT_SETTINGS: StaffRegisterSettings = {
@@ -63,7 +63,7 @@ function ConfigForm({
       <div>
         <h3 className="text-base font-semibold">Personalliggare</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Inst\u00e4llningar f\u00f6r exportformat och rapporteringsfrekvens.
+          Inställningar för exportformat och rapporteringsfrekvens.
         </p>
       </div>
 
@@ -91,7 +91,7 @@ function ConfigForm({
           >
             <option value="Dagligen">Dagligen</option>
             <option value="Veckovis">Veckovis</option>
-            <option value="M\u00e5nadsvis">M\u00e5nadsvis</option>
+            <option value="Månadsvis">Månadsvis</option>
           </select>
         </div>
       </div>
@@ -99,7 +99,7 @@ function ConfigForm({
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={saving}>
           {saving && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
-          Spara inst\u00e4llningar
+          Spara inställningar
         </Button>
       </div>
     </div>

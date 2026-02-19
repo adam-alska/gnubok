@@ -150,14 +150,14 @@ export function ForsaljningPerM2Workspace({ module: mod, sectorSlug, settingsHre
         ) : (
           <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <KPICard label="Snitt forsaljning/m2" value={fmt(avgPerM2)} unit="kr/m2" />
-              <KPICard label="Basta butik" value={bestStore} />
+              <KPICard label="Snitt försäljning/m2" value={fmt(avgPerM2)} unit="kr/m2" />
+              <KPICard label="Bästa butik" value={bestStore} />
               <KPICard label="Total intakt" value={fmt(totalRevenue)} unit="kr" />
               <KPICard label="Total yta" value={fmt(totalArea)} unit="m2" />
             </div>
 
             {entries.length === 0 ? (
-              <EmptyModuleState icon={LayoutGrid} title="Ingen data" description="Lagg till butiker och intakter for att berakna forsaljning per kvadratmeter." actionLabel="Ny post" onAction={openNewItem} />
+              <EmptyModuleState icon={LayoutGrid} title="Ingen data" description="Lägg till butiker och intäkter för att beräkna försäljning per kvadratmeter." actionLabel="Ny post" onAction={openNewItem} />
             ) : (
               <div className="rounded-xl border border-border overflow-hidden">
                 <Table>
@@ -168,7 +168,7 @@ export function ForsaljningPerM2Workspace({ module: mod, sectorSlug, settingsHre
                       <TableHead className="font-medium text-right">Intakt (kr)</TableHead>
                       <TableHead className="font-medium text-right">Kr/m2</TableHead>
                       <TableHead className="font-medium">Period</TableHead>
-                      <TableHead className="font-medium text-right">Atgarder</TableHead>
+                      <TableHead className="font-medium text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -212,25 +212,25 @@ export function ForsaljningPerM2Workspace({ module: mod, sectorSlug, settingsHre
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>{editingItem ? 'Redigera' : 'Ny butik/period'}</DialogTitle><DialogDescription>Ange butik, forsaljningsyta och intakter for att berakna kr/m2.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{editingItem ? 'Redigera' : 'Ny butik/period'}</DialogTitle><DialogDescription>Ange butik, försäljningsyta och intäkter för att beräkna kr/m2.</DialogDescription></DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2"><Label>Butik *</Label><Input value={form.storeName} onChange={(e) => setForm(f => ({ ...f, storeName: e.target.value }))} placeholder="Butik City" /></div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2"><Label>Forsaljningsyta (m2) *</Label><Input type="number" min={1} value={form.areaM2} onChange={(e) => setForm(f => ({ ...f, areaM2: Number(e.target.value) || 0 }))} /></div>
+              <div className="grid gap-2"><Label>Försäljningsyta (m2) *</Label><Input type="number" min={1} value={form.areaM2} onChange={(e) => setForm(f => ({ ...f, areaM2: Number(e.target.value) || 0 }))} /></div>
               <div className="grid gap-2"><Label>Intakt (kr) *</Label><Input type="number" min={0} value={form.revenue} onChange={(e) => setForm(f => ({ ...f, revenue: Number(e.target.value) || 0 }))} /></div>
             </div>
             <div className="grid gap-2"><Label>Period</Label><Input value={form.period} onChange={(e) => setForm(f => ({ ...f, period: e.target.value }))} placeholder="2024-01" /></div>
             {form.areaM2 > 0 && form.revenue > 0 && (
-              <p className="text-xs text-muted-foreground">Beraknad forsaljning per m2: <strong>{fmt(form.revenue / form.areaM2)} kr/m2</strong></p>
+              <p className="text-xs text-muted-foreground">Beräknad försäljning per m2: <strong>{fmt(form.revenue / form.areaM2)} kr/m2</strong></p>
             )}
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setDialogOpen(false)}>Avbryt</Button><Button onClick={handleSaveItem} disabled={!form.storeName.trim() || form.areaM2 <= 0}>{editingItem ? 'Uppdatera' : 'Lagg till'}</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setDialogOpen(false)}>Avbryt</Button><Button onClick={handleSaveItem} disabled={!form.storeName.trim() || form.areaM2 <= 0}>{editingItem ? 'Uppdatera' : 'Lägg till'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Ta bort post</DialogTitle><DialogDescription>Ar du saker pa att du vill ta bort {itemToDelete?.storeName}?</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Ta bort post</DialogTitle><DialogDescription>Är du säker på att du vill ta bort {itemToDelete?.storeName}?</DialogDescription></DialogHeader>
           <DialogFooter><Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button><Button variant="destructive" onClick={handleDeleteItem}><Trash2 className="mr-2 h-4 w-4" />Ta bort</Button></DialogFooter>
         </DialogContent>
       </Dialog>

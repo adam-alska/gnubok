@@ -231,10 +231,10 @@ export function KassaavstamningButikWorkspace({ module: mod, sectorSlug, setting
       settingsHref={settingsHref}
     >
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
-        <KPICard label="Total fsg. denna manad" value={fmt(monthTotalSales)} unit="kr" />
+        <KPICard label="Total fsg. denna månad" value={fmt(monthTotalSales)} unit="kr" />
         <KPICard label="Snittavvikelse" value={fmtDecimal(monthAvgDiff)} unit="kr"
           trend={monthAvgDiff === 0 ? 'up' : monthAvgDiff < 50 ? 'neutral' : 'down'}
-          trendLabel={monthAvgDiff === 0 ? 'Perfekt' : monthAvgDiff < 50 ? 'OK' : 'Hog'} />
+          trendLabel={monthAvgDiff === 0 ? 'Perfekt' : monthAvgDiff < 50 ? 'OK' : 'Hög'} />
         <KPICard label="Kontant totalt" value={fmt(monthCashTotal)} unit="kr" />
         <KPICard label="Kort totalt" value={fmt(monthCardTotal)} unit="kr" />
       </div>
@@ -260,7 +260,7 @@ export function KassaavstamningButikWorkspace({ module: mod, sectorSlug, setting
               <Separator />
               <div className="grid gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Total forsaljning (kr)</Label>
+                  <Label className="text-xs">Total försäljning (kr)</Label>
                   <Input type="number" step="0.01" value={zReport.totalSales || ''} onChange={(e) => setZReport(z => ({ ...z, totalSales: numVal(e.target.value) }))} placeholder="0" className="h-9" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -279,7 +279,7 @@ export function KassaavstamningButikWorkspace({ module: mod, sectorSlug, setting
                     <Input type="number" step="0.01" value={zReport.swish || ''} onChange={(e) => setZReport(z => ({ ...z, swish: numVal(e.target.value) }))} placeholder="0" className="h-9" />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Ovrigt (kr)</Label>
+                    <Label className="text-xs">Övrigt (kr)</Label>
                     <Input type="number" step="0.01" value={zReport.other || ''} onChange={(e) => setZReport(z => ({ ...z, other: numVal(e.target.value) }))} placeholder="0" className="h-9" />
                   </div>
                 </div>
@@ -295,11 +295,11 @@ export function KassaavstamningButikWorkspace({ module: mod, sectorSlug, setting
                 <Separator />
                 <div className="grid gap-3">
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Raknad kassa i kassaladan (kr)</Label>
+                    <Label className="text-xs">Räknad kassa i kassalådan (kr)</Label>
                     <Input type="number" step="0.01" value={actual.countedCash || ''} onChange={(e) => setActual(a => ({ ...a, countedCash: numVal(e.target.value) }))} placeholder="0" className="h-9" />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Kontantinsattning till bank (kr)</Label>
+                    <Label className="text-xs">Kontantinsättning till bank (kr)</Label>
                     <Input type="number" step="0.01" value={actual.cashDeposits || ''} onChange={(e) => setActual(a => ({ ...a, cashDeposits: numVal(e.target.value) }))} placeholder="0" className="h-9" />
                   </div>
                 </div>
@@ -308,7 +308,7 @@ export function KassaavstamningButikWorkspace({ module: mod, sectorSlug, setting
                 <h3 className="text-sm font-semibold">Banktransaktioner</h3>
                 <Separator />
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Kortterminal fran bank (kr)</Label>
+                  <Label className="text-xs">Kortterminal från bank (kr)</Label>
                   <Input type="number" step="0.01" value={bank.cardTerminalAmount || ''} onChange={(e) => setBank(b => ({ ...b, cardTerminalAmount: numVal(e.target.value) }))} placeholder="0" className="h-9" />
                 </div>
               </div>
@@ -316,11 +316,11 @@ export function KassaavstamningButikWorkspace({ module: mod, sectorSlug, setting
           </div>
 
           <div className={cn('rounded-xl border p-5 space-y-4', getDifferenceBg(totalDifference))}>
-            <h3 className="text-sm font-semibold">Beraknade differenser</h3>
+            <h3 className="text-sm font-semibold">Beräknade differenser</h3>
             <Separator />
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Forvantad kassa</p>
+                <p className="text-xs text-muted-foreground">Förväntad kassa</p>
                 <p className="text-lg font-semibold tabular-nums">{fmtDecimal(expectedCash)} kr</p>
               </div>
               <div className="space-y-1">
@@ -360,7 +360,7 @@ export function KassaavstamningButikWorkspace({ module: mod, sectorSlug, setting
 
         <TabsContent value="historik" className="space-y-4">
           <div className="flex items-center gap-3">
-            <Label className="text-sm font-medium">Manad</Label>
+            <Label className="text-sm font-medium">Månad</Label>
             <select value={historyMonth} onChange={(e) => setHistoryMonth(e.target.value)}
               className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
               {getAvailableMonths().map((m) => (<option key={m} value={m}>{m}</option>))}
@@ -375,7 +375,7 @@ export function KassaavstamningButikWorkspace({ module: mod, sectorSlug, setting
             <EmptyModuleState
               icon={Calculator}
               title="Inga avstamningar"
-              description="Det finns inga kassaavstamningar for den valda manaden."
+              description="Det finns inga kassaavstämningar för den valda månaden."
               actionLabel="Ny avstamning"
               onAction={() => setActiveTab('ny')}
             />
@@ -432,8 +432,8 @@ export function KassaavstamningButikWorkspace({ module: mod, sectorSlug, setting
                               <div className="space-y-2">
                                 <p className="font-semibold text-sm">Faktisk kassa & bank</p>
                                 <div className="space-y-1">
-                                  <div className="flex justify-between"><span className="text-muted-foreground">Raknad kassa:</span><span className="tabular-nums">{fmt(r.actual.countedCash)} kr</span></div>
-                                  <div className="flex justify-between"><span className="text-muted-foreground">Insattning:</span><span className="tabular-nums">{fmt(r.actual.cashDeposits)} kr</span></div>
+                                  <div className="flex justify-between"><span className="text-muted-foreground">Räknad kassa:</span><span className="tabular-nums">{fmt(r.actual.countedCash)} kr</span></div>
+                                  <div className="flex justify-between"><span className="text-muted-foreground">Insättning:</span><span className="tabular-nums">{fmt(r.actual.cashDeposits)} kr</span></div>
                                   <div className="flex justify-between"><span className="text-muted-foreground">Kortterminal:</span><span className="tabular-nums">{fmt(r.bank.cardTerminalAmount)} kr</span></div>
                                 </div>
                               </div>

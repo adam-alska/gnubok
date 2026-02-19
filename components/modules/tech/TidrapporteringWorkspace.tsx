@@ -335,7 +335,7 @@ export function TidrapporteringWorkspace({ module: mod, sectorSlug, settingsHref
                 <KPICard label="Totalt" value={fmt(kpis.totalHours)} unit="tim" />
                 <KPICard label="Debiterbara" value={fmt(kpis.billableHours)} unit="tim" />
                 <KPICard label="Debiteringsgrad" value={fmtPct(kpis.utilization)} unit="%" />
-                <KPICard label="Vantar godkannande" value={String(kpis.pendingApproval)} unit="st" />
+                <KPICard label="Väntar godkännande" value={String(kpis.pendingApproval)} unit="st" />
               </div>
 
               {/* Timer */}
@@ -375,7 +375,7 @@ export function TidrapporteringWorkspace({ module: mod, sectorSlug, settingsHref
                 <EmptyModuleState
                   icon={Clock}
                   title="Inga tidsregistreringar"
-                  description="Borja registrera tid med tidtagaren eller lagg till manuellt."
+                  description="Börja registrera tid med tidtagaren eller lägg till manuellt."
                   actionLabel="Ny tidsrad"
                   onAction={openNew}
                 />
@@ -391,7 +391,7 @@ export function TidrapporteringWorkspace({ module: mod, sectorSlug, settingsHref
                         <TableHead className="font-medium">Debit.</TableHead>
                         <TableHead className="font-medium">Status</TableHead>
                         <TableHead className="font-medium">Beskrivning</TableHead>
-                        <TableHead className="font-medium text-right">Atgarder</TableHead>
+                        <TableHead className="font-medium text-right">Åtgärder</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -514,7 +514,7 @@ export function TidrapporteringWorkspace({ module: mod, sectorSlug, settingsHref
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Ta bort tidsrad</DialogTitle>
-            <DialogDescription>Ar du saker pa att du vill ta bort denna tidsregistrering?</DialogDescription>
+            <DialogDescription>Är du säker på att du vill ta bort denna tidsregistrering?</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button>

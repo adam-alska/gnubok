@@ -47,8 +47,8 @@ interface Campaign {
 const TYPES = [
   { value: 'procent', label: 'Procentrabatt' },
   { value: 'kronor', label: 'Kronrabatt' },
-  { value: 'mangdrabatt', label: 'Mangdrabatt' },
-  { value: 'kop3betal2', label: 'Kop 3 betala for 2' },
+  { value: 'mangdrabatt', label: 'Mängdrabatt' },
+  { value: 'kop3betal2', label: 'Köp 3 betala för 2' },
 ]
 
 const CATEGORIES = ['Livsmedel', 'Dryck', 'Frukt & Gront', 'Mejeri', 'Kott & Chark', 'Non-food', 'Alla varor']
@@ -196,13 +196,13 @@ export function KampanjerRabatterWorkspace({ module: mod, sectorSlug, settingsHr
           <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <KPICard label="Aktiva kampanjer" value={String(activeCampaigns.length)} unit="st" />
-              <KPICard label="Gar ut inom 7 dagar" value={String(expiringSoon.length)} unit="st" trend={expiringSoon.length > 0 ? 'neutral' : 'up'} trendLabel={expiringSoon.length > 0 ? 'Bevaka' : 'OK'} />
+              <KPICard label="Går ut inom 7 dagar" value={String(expiringSoon.length)} unit="st" trend={expiringSoon.length > 0 ? 'neutral' : 'up'} trendLabel={expiringSoon.length > 0 ? 'Bevaka' : 'OK'} />
               <KPICard label="Snittmarginal (kampanj)" value={fmtPct(avgMarginReduction)} unit="%" trend={avgMarginReduction >= 15 ? 'up' : 'down'} />
               <KPICard label="Totalt antal" value={String(campaigns.length)} unit="kampanjer" />
             </div>
 
             {campaigns.length === 0 ? (
-              <EmptyModuleState icon={Tag} title="Inga kampanjer" description="Skapa kampanjer och rabattregler for att driva forsaljning." actionLabel="Ny kampanj" onAction={openNewItem} />
+              <EmptyModuleState icon={Tag} title="Inga kampanjer" description="Skapa kampanjer och rabattregler för att driva försäljning." actionLabel="Ny kampanj" onAction={openNewItem} />
             ) : (
               <div className="rounded-xl border border-border overflow-hidden">
                 <Table>
@@ -216,7 +216,7 @@ export function KampanjerRabatterWorkspace({ module: mod, sectorSlug, settingsHr
                       <TableHead className="font-medium text-right">Marginal</TableHead>
                       <TableHead className="font-medium">Period</TableHead>
                       <TableHead className="font-medium text-center">Aktiv</TableHead>
-                      <TableHead className="font-medium text-right">Atgarder</TableHead>
+                      <TableHead className="font-medium text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -253,14 +253,14 @@ export function KampanjerRabatterWorkspace({ module: mod, sectorSlug, settingsHr
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>{editingItem ? 'Redigera kampanj' : 'Ny kampanj'}</DialogTitle><DialogDescription>{editingItem ? 'Uppdatera kampanjens regler.' : 'Skapa en ny kampanj med rabattregler.'}</DialogDescription></DialogHeader>
           <div className="grid gap-4 py-2">
-            <div className="grid gap-2"><Label>Kampanjnamn *</Label><Input value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Veckas erbjudande" /></div>
+            <div className="grid gap-2"><Label>Kampanjnamn *</Label><Input value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Veckans erbjudande" /></div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2"><Label>Typ *</Label><Select value={form.type} onValueChange={(v) => setForm(f => ({ ...f, type: v as Campaign['type'] }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent></Select></div>
-              <div className="grid gap-2"><Label>Rabattvarde</Label><Input type="number" min={0} value={form.discountValue} onChange={(e) => setForm(f => ({ ...f, discountValue: Number(e.target.value) || 0 }))} /></div>
+              <div className="grid gap-2"><Label>Rabattvärde</Label><Input type="number" min={0} value={form.discountValue} onChange={(e) => setForm(f => ({ ...f, discountValue: Number(e.target.value) || 0 }))} /></div>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2"><Label>Ordinarie pris</Label><Input type="number" min={0} value={form.originalPrice} onChange={(e) => setForm(f => ({ ...f, originalPrice: Number(e.target.value) || 0 }))} /></div>
-              <div className="grid gap-2"><Label>Inkopspris</Label><Input type="number" min={0} value={form.purchasePrice} onChange={(e) => setForm(f => ({ ...f, purchasePrice: Number(e.target.value) || 0 }))} /></div>
+              <div className="grid gap-2"><Label>Inköpspris</Label><Input type="number" min={0} value={form.purchasePrice} onChange={(e) => setForm(f => ({ ...f, purchasePrice: Number(e.target.value) || 0 }))} /></div>
               <div className="grid gap-2"><Label>Kategori</Label><Select value={form.category} onValueChange={(v) => setForm(f => ({ ...f, category: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -277,7 +277,7 @@ export function KampanjerRabatterWorkspace({ module: mod, sectorSlug, settingsHr
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Ta bort kampanj</DialogTitle><DialogDescription>Ar du saker pa att du vill ta bort {itemToDelete?.name}?</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Ta bort kampanj</DialogTitle><DialogDescription>Är du säker på att du vill ta bort {itemToDelete?.name}?</DialogDescription></DialogHeader>
           <DialogFooter><Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button><Button variant="destructive" onClick={handleDeleteItem}><Trash2 className="mr-2 h-4 w-4" />Ta bort</Button></DialogFooter>
         </DialogContent>
       </Dialog>

@@ -342,7 +342,7 @@ export function IntressekonfliktskontrollWorkspace({ module: mod, sectorSlug, se
       >
         <Tabs defaultValue="kontroll" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="kontroll">Konfliktsokning</TabsTrigger>
+            <TabsTrigger value="kontroll">Konfliktsökning</TabsTrigger>
             <TabsTrigger value="partregister">Partregister</TabsTrigger>
             <TabsTrigger value="granskningslogg">Granskningslogg</TabsTrigger>
           </TabsList>
@@ -357,7 +357,7 @@ export function IntressekonfliktskontrollWorkspace({ module: mod, sectorSlug, se
               <>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                   <KPICard label="Registrerade parter" value={String(summary.totalParties)} />
-                  <KPICard label="Genomforda kontroller" value={String(summary.totalChecks)} />
+                  <KPICard label="Genomförda kontroller" value={String(summary.totalChecks)} />
                   <KPICard
                     label="Konflikter"
                     value={String(summary.conflicts)}
@@ -372,14 +372,14 @@ export function IntressekonfliktskontrollWorkspace({ module: mod, sectorSlug, se
                 </div>
 
                 <div className="rounded-xl border border-border bg-card p-6 max-w-lg space-y-4">
-                  <h3 className="text-sm font-semibold">Sok intressekonflikt</h3>
+                  <h3 className="text-sm font-semibold">Sök intressekonflikt</h3>
                   <p className="text-xs text-muted-foreground">
-                    Sok pa namn eller organisationsnummer for att kontrollera mot partregistret.
+                    Sök på namn eller organisationsnummer för att kontrollera mot partregistret.
                   </p>
                   <div className="grid gap-3">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="grid gap-2">
-                        <Label htmlFor="conflict-search">Sokterm *</Label>
+                        <Label htmlFor="conflict-search">Sökterm *</Label>
                         <Input
                           id="conflict-search"
                           value={conflictSearchTerm}
@@ -388,7 +388,7 @@ export function IntressekonfliktskontrollWorkspace({ module: mod, sectorSlug, se
                         />
                       </div>
                       <div className="grid gap-2">
-                        <Label htmlFor="conflict-by">Utford av</Label>
+                        <Label htmlFor="conflict-by">Utförd av</Label>
                         <Input
                           id="conflict-by"
                           value={conflictPerformedBy}
@@ -399,7 +399,7 @@ export function IntressekonfliktskontrollWorkspace({ module: mod, sectorSlug, se
                     </div>
                     <Button onClick={handleConflictCheck} disabled={!conflictSearchTerm.trim() || saving}>
                       {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
-                      Sok
+                      Sök
                     </Button>
                   </div>
 
@@ -447,7 +447,7 @@ export function IntressekonfliktskontrollWorkspace({ module: mod, sectorSlug, se
                   <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Sok part..."
+                      placeholder="Sök part..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9"
@@ -476,7 +476,7 @@ export function IntressekonfliktskontrollWorkspace({ module: mod, sectorSlug, se
                   <EmptyModuleState
                     icon={Shield}
                     title="Inga parter registrerade"
-                    description="Lagg till parter i registret for att kunna gora intressekonfliktskontroller."
+                    description="Lägg till parter i registret för att kunna göra intressekonfliktskontroller."
                     actionLabel="Ny part"
                     onAction={openNewParty}
                   />
@@ -488,10 +488,10 @@ export function IntressekonfliktskontrollWorkspace({ module: mod, sectorSlug, se
                           <TableHead className="font-medium">Namn</TableHead>
                           <TableHead className="font-medium">Org.nr</TableHead>
                           <TableHead className="font-medium">Roll</TableHead>
-                          <TableHead className="font-medium">Arende</TableHead>
+                          <TableHead className="font-medium">Ärende</TableHead>
                           <TableHead className="font-medium">Jurist</TableHead>
                           <TableHead className="font-medium">Registrerad</TableHead>
-                          <TableHead className="font-medium text-right">Atgarder</TableHead>
+                          <TableHead className="font-medium text-right">Åtgärder</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -535,7 +535,7 @@ export function IntressekonfliktskontrollWorkspace({ module: mod, sectorSlug, se
               <EmptyModuleState
                 icon={Shield}
                 title="Ingen granskningslogg"
-                description="Genomfor en intressekonfliktskontroll for att borja logga."
+                description="Genomför en intressekonfliktskontroll för att börja logga."
               />
             ) : (
               <div className="rounded-xl border border-border overflow-hidden">
@@ -543,8 +543,8 @@ export function IntressekonfliktskontrollWorkspace({ module: mod, sectorSlug, se
                   <TableHeader>
                     <TableRow className="bg-muted/50">
                       <TableHead className="font-medium">Datum</TableHead>
-                      <TableHead className="font-medium">Sokterm</TableHead>
-                      <TableHead className="font-medium">Utford av</TableHead>
+                      <TableHead className="font-medium">Sökterm</TableHead>
+                      <TableHead className="font-medium">Utförd av</TableHead>
                       <TableHead className="font-medium">Resultat</TableHead>
                       <TableHead className="font-medium">Matchningar</TableHead>
                     </TableRow>
@@ -587,7 +587,7 @@ export function IntressekonfliktskontrollWorkspace({ module: mod, sectorSlug, se
           <DialogHeader>
             <DialogTitle>{editingParty ? 'Redigera part' : 'Ny part'}</DialogTitle>
             <DialogDescription>
-              {editingParty ? 'Uppdatera partens uppgifter.' : 'Registrera en ny part i registret for intressekonfliktskontroll.'}
+              {editingParty ? 'Uppdatera partens uppgifter.' : 'Registrera en ny part i registret för intressekonfliktskontroll.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -595,7 +595,7 @@ export function IntressekonfliktskontrollWorkspace({ module: mod, sectorSlug, se
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="party-name">Namn *</Label>
-                <Input id="party-name" value={partyForm.name} onChange={(e) => setPartyForm((f) => ({ ...f, name: e.target.value }))} placeholder="Foretag AB" />
+                <Input id="party-name" value={partyForm.name} onChange={(e) => setPartyForm((f) => ({ ...f, name: e.target.value }))} placeholder="Företag AB" />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="party-org">Org.nr</Label>
@@ -615,7 +615,7 @@ export function IntressekonfliktskontrollWorkspace({ module: mod, sectorSlug, se
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="party-case">Arende</Label>
+                <Label htmlFor="party-case">Ärende</Label>
                 <Input id="party-case" value={partyForm.caseRef} onChange={(e) => setPartyForm((f) => ({ ...f, caseRef: e.target.value }))} placeholder="2024-001" />
               </div>
             </div>
@@ -644,8 +644,8 @@ export function IntressekonfliktskontrollWorkspace({ module: mod, sectorSlug, se
           <DialogHeader>
             <DialogTitle>Ta bort part</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort{' '}
-              <span className="font-semibold">{partyToDelete?.name}</span> fran partregistret?
+              Är du säker på att du vill ta bort{' '}
+              <span className="font-semibold">{partyToDelete?.name}</span> från partregistret?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

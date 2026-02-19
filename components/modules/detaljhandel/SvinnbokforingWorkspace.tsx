@@ -54,7 +54,7 @@ interface ShrinkageEntry {
 }
 
 const CATEGORIES = ['Livsmedel', 'Dryck', 'Frukt & Gront', 'Mejeri', 'Kott & Chark', 'Non-food', 'Ovrigt']
-const REASONS = ['Utgangsdatum', 'Skadat', 'Stold', 'Svinn vid hantering', 'Felaktigt', 'Ovrigt']
+const REASONS = ['Utgångsdatum', 'Skadat', 'Stöld', 'Svinn vid hantering', 'Felaktigt', 'Övrigt']
 
 function generateId(): string {
   return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
@@ -80,7 +80,7 @@ const EMPTY_FORM = {
   product: '',
   quantity: 1,
   unitCost: 0,
-  reason: 'Utgangsdatum',
+  reason: 'Utgångsdatum',
 }
 
 export function SvinnbokforingWorkspace({ module: mod, sectorSlug, settingsHref }: ModuleWorkspaceProps) {
@@ -197,7 +197,7 @@ export function SvinnbokforingWorkspace({ module: mod, sectorSlug, settingsHref 
       >
         <Tabs defaultValue="oversikt" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="oversikt">Oversikt</TabsTrigger>
+            <TabsTrigger value="oversikt">Översikt</TabsTrigger>
             <TabsTrigger value="poster">Poster</TabsTrigger>
             <TabsTrigger value="analys">Analys</TabsTrigger>
           </TabsList>
@@ -211,7 +211,7 @@ export function SvinnbokforingWorkspace({ module: mod, sectorSlug, settingsHref 
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <KPICard label="Total svinnskostnad" value={fmt(totalCost)} unit="kr" />
                 <KPICard label="Antal poster" value={String(filteredEntries.length)} unit="st" />
-                <KPICard label="Storsta kategori" value={categoryBreakdown[0]?.[0] ?? '-'} />
+                <KPICard label="Största kategori" value={categoryBreakdown[0]?.[0] ?? '-'} />
                 <KPICard label="Vanligaste orsak" value={reasonBreakdown[0]?.[0] ?? '-'} />
               </div>
             )}
@@ -226,7 +226,7 @@ export function SvinnbokforingWorkspace({ module: mod, sectorSlug, settingsHref 
               <EmptyModuleState
                 icon={AlertTriangle}
                 title="Inga svinnposter"
-                description="Registrera svinn for att spara pa konto 4730. Alla poster bokfors som kostnad."
+                description="Registrera svinn för att spara på konto 4730. Alla poster bokförs som kostnad."
                 actionLabel="Registrera svinn"
                 onAction={() => { setForm({ ...EMPTY_FORM, date: todayStr() }); setDialogOpen(true) }}
               />
@@ -241,7 +241,7 @@ export function SvinnbokforingWorkspace({ module: mod, sectorSlug, settingsHref 
                       <TableHead className="font-medium">Orsak</TableHead>
                       <TableHead className="font-medium text-right">Antal</TableHead>
                       <TableHead className="font-medium text-right">Kostnad</TableHead>
-                      <TableHead className="font-medium text-right">Atgarder</TableHead>
+                      <TableHead className="font-medium text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -277,7 +277,7 @@ export function SvinnbokforingWorkspace({ module: mod, sectorSlug, settingsHref 
               <div className="rounded-xl border border-border bg-card p-5 space-y-4">
                 <h3 className="text-sm font-semibold">Per kategori</h3>
                 {categoryBreakdown.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Ingen data for vald period.</p>
+                  <p className="text-xs text-muted-foreground">Ingen data för vald period.</p>
                 ) : (
                   <div className="space-y-2">
                     {categoryBreakdown.map(([cat, cost]) => (
@@ -292,7 +292,7 @@ export function SvinnbokforingWorkspace({ module: mod, sectorSlug, settingsHref 
               <div className="rounded-xl border border-border bg-card p-5 space-y-4">
                 <h3 className="text-sm font-semibold">Per orsak</h3>
                 {reasonBreakdown.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Ingen data for vald period.</p>
+                  <p className="text-xs text-muted-foreground">Ingen data för vald period.</p>
                 ) : (
                   <div className="space-y-2">
                     {reasonBreakdown.map(([reason, cost]) => (
@@ -305,7 +305,7 @@ export function SvinnbokforingWorkspace({ module: mod, sectorSlug, settingsHref 
                 )}
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">Svinnkostnad bokfors pa konto 4730.</p>
+            <p className="text-xs text-muted-foreground">Svinnkostnad bokförs på konto 4730.</p>
           </TabsContent>
         </Tabs>
       </ModuleWorkspaceShell>
@@ -314,7 +314,7 @@ export function SvinnbokforingWorkspace({ module: mod, sectorSlug, settingsHref 
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Registrera svinn</DialogTitle>
-            <DialogDescription>Registrera en svinnpost som bokfors pa konto 4730.</DialogDescription>
+            <DialogDescription>Registrera en svinnpost som bokförs på konto 4730.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
@@ -334,7 +334,7 @@ export function SvinnbokforingWorkspace({ module: mod, sectorSlug, settingsHref 
             </div>
             <div className="grid gap-2">
               <Label>Produkt *</Label>
-              <Input value={form.product} onChange={(e) => setForm(f => ({ ...f, product: e.target.value }))} placeholder="T.ex. Mjolk 3% 1L" />
+              <Input value={form.product} onChange={(e) => setForm(f => ({ ...f, product: e.target.value }))} placeholder="T.ex. Mjölk 3% 1L" />
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">
@@ -371,7 +371,7 @@ export function SvinnbokforingWorkspace({ module: mod, sectorSlug, settingsHref 
           <DialogHeader>
             <DialogTitle>Ta bort svinnpost</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort denna svinnpost ({entryToDelete?.product})?
+              Är du säker på att du vill ta bort denna svinnpost ({entryToDelete?.product})?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

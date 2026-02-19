@@ -232,7 +232,7 @@ export function GenomsnittligTimintaktWorkspace({ module: mod, sectorSlug, setti
   const GROUP_LABELS: Record<GroupBy, string> = {
     lawyer: 'Per jurist',
     client: 'Per klient',
-    caseType: 'Per arendetyp',
+    caseType: 'Per ärendetyp',
   }
 
   return (
@@ -253,7 +253,7 @@ export function GenomsnittligTimintaktWorkspace({ module: mod, sectorSlug, setti
       >
         <Tabs defaultValue="oversikt" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="oversikt">Oversikt</TabsTrigger>
+            <TabsTrigger value="oversikt">Översikt</TabsTrigger>
             <TabsTrigger value="grupperad">Grupperad analys</TabsTrigger>
             <TabsTrigger value="detaljer">Detaljer</TabsTrigger>
           </TabsList>
@@ -268,7 +268,7 @@ export function GenomsnittligTimintaktWorkspace({ module: mod, sectorSlug, setti
               <EmptyModuleState
                 icon={DollarSign}
                 title="Ingen data"
-                description="Registrera intakter och timmar for att berakna genomsnittlig timintakt."
+                description="Registrera intäkter och timmar för att beräkna genomsnittlig timintäkt."
                 actionLabel="Ny post"
                 onAction={openNewEntry}
               />
@@ -282,7 +282,7 @@ export function GenomsnittligTimintaktWorkspace({ module: mod, sectorSlug, setti
                   unit="%"
                   trend={summary.priceRealization >= 95 ? 'up' : summary.priceRealization >= 80 ? 'neutral' : 'down'}
                 />
-                <KPICard label="Total intakt" value={fmt(summary.totalRevenue)} unit="kr" />
+                <KPICard label="Total intäkt" value={fmt(summary.totalRevenue)} unit="kr" />
                 <KPICard label="Totalt timmar" value={fmt(summary.totalHours)} unit="h" />
               </div>
             )}
@@ -304,7 +304,7 @@ export function GenomsnittligTimintaktWorkspace({ module: mod, sectorSlug, setti
                     <SelectContent>
                       <SelectItem value="lawyer">Per jurist</SelectItem>
                       <SelectItem value="client">Per klient</SelectItem>
-                      <SelectItem value="caseType">Per arendetyp</SelectItem>
+                      <SelectItem value="caseType">Per ärendetyp</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -313,7 +313,7 @@ export function GenomsnittligTimintaktWorkspace({ module: mod, sectorSlug, setti
                   <EmptyModuleState
                     icon={DollarSign}
                     title="Ingen data"
-                    description="Lagg till poster for att se grupperad analys."
+                    description="Lägg till poster för att se grupperad analys."
                   />
                 ) : (
                   <div className="rounded-xl border border-border overflow-hidden">
@@ -322,7 +322,7 @@ export function GenomsnittligTimintaktWorkspace({ module: mod, sectorSlug, setti
                         <TableRow className="bg-muted/50">
                           <TableHead className="font-medium">{GROUP_LABELS[groupBy]}</TableHead>
                           <TableHead className="font-medium text-right">Timmar</TableHead>
-                          <TableHead className="font-medium text-right">Intakt (kr)</TableHead>
+                          <TableHead className="font-medium text-right">Intäkt (kr)</TableHead>
                           <TableHead className="font-medium text-right">Snitttimpris</TableHead>
                           <TableHead className="font-medium text-right">Prislista</TableHead>
                           <TableHead className="font-medium text-right">vs Prislista</TableHead>
@@ -364,7 +364,7 @@ export function GenomsnittligTimintaktWorkspace({ module: mod, sectorSlug, setti
               <EmptyModuleState
                 icon={DollarSign}
                 title="Inga poster"
-                description="Borja registrera tidsdata for att analysera timintakten."
+                description="Börja registrera tidsdata för att analysera timintäkten."
                 actionLabel="Ny post"
                 onAction={openNewEntry}
               />
@@ -378,9 +378,9 @@ export function GenomsnittligTimintaktWorkspace({ module: mod, sectorSlug, setti
                       <TableHead className="font-medium">Klient</TableHead>
                       <TableHead className="font-medium">Typ</TableHead>
                       <TableHead className="font-medium text-right">Timmar</TableHead>
-                      <TableHead className="font-medium text-right">Intakt</TableHead>
+                      <TableHead className="font-medium text-right">Intäkt</TableHead>
                       <TableHead className="font-medium text-right">Timpris</TableHead>
-                      <TableHead className="font-medium text-right">Atgarder</TableHead>
+                      <TableHead className="font-medium text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -422,7 +422,7 @@ export function GenomsnittligTimintaktWorkspace({ module: mod, sectorSlug, setti
           <DialogHeader>
             <DialogTitle>{editingEntry ? 'Redigera post' : 'Ny post'}</DialogTitle>
             <DialogDescription>
-              {editingEntry ? 'Uppdatera intaktsdata.' : 'Registrera intakter, timmar och prislistvarde.'}
+              {editingEntry ? 'Uppdatera intäktsdata.' : 'Registrera intäkter, timmar och prislistvärde.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -437,7 +437,7 @@ export function GenomsnittligTimintaktWorkspace({ module: mod, sectorSlug, setti
                 <Input id="avg-client" value={form.clientName} onChange={(e) => setForm((f) => ({ ...f, clientName: e.target.value }))} placeholder="Klient AB" />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="avg-type">Arendetyp</Label>
+                <Label htmlFor="avg-type">Ärendetyp</Label>
                 <Select value={form.caseType} onValueChange={(val) => setForm((f) => ({ ...f, caseType: val }))}>
                   <SelectTrigger id="avg-type"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -455,7 +455,7 @@ export function GenomsnittligTimintaktWorkspace({ module: mod, sectorSlug, setti
                 <Input id="avg-hours" type="number" min={0} step="0.5" value={form.billableHours} onChange={(e) => setForm((f) => ({ ...f, billableHours: parseFloat(e.target.value) || 0 }))} />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="avg-rev">Intakt (kr) *</Label>
+                <Label htmlFor="avg-rev">Intäkt (kr) *</Label>
                 <Input id="avg-rev" type="number" min={0} value={form.revenue} onChange={(e) => setForm((f) => ({ ...f, revenue: parseFloat(e.target.value) || 0 }))} />
               </div>
               <div className="grid gap-2">
@@ -484,7 +484,7 @@ export function GenomsnittligTimintaktWorkspace({ module: mod, sectorSlug, setti
           <DialogHeader>
             <DialogTitle>Ta bort post</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort posten for{' '}
+              Är du säker på att du vill ta bort posten för{' '}
               <span className="font-semibold">{entryToDelete?.lawyerName}</span>?
             </DialogDescription>
           </DialogHeader>

@@ -329,7 +329,7 @@ export function DebiteringsgradWorkspace({ module: mod, sectorSlug, settingsHref
         actions={
           <Button onClick={openNew}>
             <Plus className="mr-2 h-4 w-4" />
-            Lagg till konsult
+            Lägg till konsult
           </Button>
         }
       >
@@ -340,11 +340,11 @@ export function DebiteringsgradWorkspace({ module: mod, sectorSlug, settingsHref
         ) : (
           <Tabs defaultValue="oversikt" className="space-y-6">
             <TabsList>
-              <TabsTrigger value="oversikt">Oversikt</TabsTrigger>
+              <TabsTrigger value="oversikt">Översikt</TabsTrigger>
               <TabsTrigger value="konsulter">Per konsult</TabsTrigger>
               <TabsTrigger value="team">Per team</TabsTrigger>
               <TabsTrigger value="trend">Trend</TabsTrigger>
-              <TabsTrigger value="installningar">Installningar</TabsTrigger>
+              <TabsTrigger value="installningar">Inställningar</TabsTrigger>
             </TabsList>
 
             <TabsContent value="oversikt" className="space-y-6">
@@ -357,7 +357,7 @@ export function DebiteringsgradWorkspace({ module: mod, sectorSlug, settingsHref
                   trend={kpis.variance >= 0 ? 'up' : 'down'}
                   trendLabel={`${kpis.variance >= 0 ? '+' : ''}${fmtPct(kpis.variance)} pp`}
                 />
-                <KPICard label="Malvarde" value={fmtPct(target)} unit="%" />
+                <KPICard label="Målvärde" value={fmtPct(target)} unit="%" />
                 <KPICard label="Debiterbara timmar" value={fmt(kpis.billableHours)} unit="tim" />
                 <KPICard label="Totala timmar" value={fmt(kpis.totalHours)} unit="tim" />
                 <KPICard label="Antal konsulter" value={String(consultants.length)} unit="st" />
@@ -369,8 +369,8 @@ export function DebiteringsgradWorkspace({ module: mod, sectorSlug, settingsHref
                 <EmptyModuleState
                   icon={BarChart3}
                   title="Inga konsulter"
-                  description="Lagg till konsulter for att berakna debiteringsgrad."
-                  actionLabel="Lagg till konsult"
+                  description="Lägg till konsulter för att beräkna debiteringsgrad."
+                  actionLabel="Lägg till konsult"
                   onAction={openNew}
                 />
               ) : (
@@ -383,8 +383,8 @@ export function DebiteringsgradWorkspace({ module: mod, sectorSlug, settingsHref
                         <TableHead className="font-medium text-right">Tot timmar</TableHead>
                         <TableHead className="font-medium text-right">Debiterbara</TableHead>
                         <TableHead className="font-medium text-right">Debiteringsgrad</TableHead>
-                        <TableHead className="font-medium text-right">vs Mal</TableHead>
-                        <TableHead className="font-medium text-right">Atgarder</TableHead>
+                        <TableHead className="font-medium text-right">vs Mål</TableHead>
+                        <TableHead className="font-medium text-right">Åtgärder</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -467,14 +467,14 @@ export function DebiteringsgradWorkspace({ module: mod, sectorSlug, settingsHref
                 <EmptyModuleState
                   icon={BarChart3}
                   title="Ingen trenddata"
-                  description="Spara konsultdata for att borja bygga upp en manadstrend."
+                  description="Spara konsultdata för att börja bygga upp en månadstrend."
                 />
               ) : (
                 <div className="rounded-xl border border-border overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50">
-                        <TableHead className="font-medium">Manad</TableHead>
+                        <TableHead className="font-medium">Månad</TableHead>
                         <TableHead className="font-medium text-right">Tot timmar</TableHead>
                         <TableHead className="font-medium text-right">Debiterbara</TableHead>
                         <TableHead className="font-medium text-right">Debiteringsgrad</TableHead>
@@ -501,13 +501,13 @@ export function DebiteringsgradWorkspace({ module: mod, sectorSlug, settingsHref
 
             <TabsContent value="installningar" className="space-y-6">
               <div className="rounded-xl border border-border bg-card p-6 max-w-md space-y-4">
-                <h3 className="text-sm font-semibold">Malvarde debiteringsgrad</h3>
+                <h3 className="text-sm font-semibold">Målvärde debiteringsgrad</h3>
                 <p className="text-xs text-muted-foreground">
-                  Ange ditt malvarde for debiteringsgrad i procent. Typiskt 70-85% for konsultbolag.
+                  Ange ditt målvärde för debiteringsgrad i procent. Typiskt 70-85% för konsultbolag.
                 </p>
                 <div className="flex items-end gap-3">
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Mal (%)</Label>
+                    <Label className="text-xs">Mål (%)</Label>
                     <Input
                       type="number"
                       step="0.1"
@@ -536,7 +536,7 @@ export function DebiteringsgradWorkspace({ module: mod, sectorSlug, settingsHref
           <DialogHeader>
             <DialogTitle>{editing ? 'Redigera konsult' : 'Ny konsult'}</DialogTitle>
             <DialogDescription>
-              {editing ? 'Uppdatera konsultens tidsdata.' : 'Lagg till en ny konsult och dess timmar.'}
+              {editing ? 'Uppdatera konsultens tidsdata.' : 'Lägg till en ny konsult och dess timmar.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
@@ -564,7 +564,7 @@ export function DebiteringsgradWorkspace({ module: mod, sectorSlug, settingsHref
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Avbryt</Button>
             <Button onClick={handleSave} disabled={!form.name.trim() || !form.team.trim()}>
-              {editing ? 'Uppdatera' : 'Lagg till'}
+              {editing ? 'Uppdatera' : 'Lägg till'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -576,7 +576,7 @@ export function DebiteringsgradWorkspace({ module: mod, sectorSlug, settingsHref
           <DialogHeader>
             <DialogTitle>Ta bort konsult</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort {toDelete?.name}? Denna atgard kan inte angras.
+              Är du säker på att du vill ta bort {toDelete?.name}? Denna åtgärd kan inte ångras.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

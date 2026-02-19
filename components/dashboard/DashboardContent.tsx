@@ -15,6 +15,7 @@ import { getSchablonavdragSummary } from '@/lib/tax/schablonavdrag'
 import FSkattWarningCard from '@/components/dashboard/FSkattWarningCard'
 import { UpcomingDeadlinesWidget } from '@/components/calendar/UpcomingDeadlinesWidget'
 import NewUserChecklist from '@/components/onboarding/NewUserChecklist'
+import OnboardingChecklist from '@/components/onboarding/OnboardingChecklist'
 import {
   TrendingUp,
   TrendingDown,
@@ -271,6 +272,9 @@ export default function DashboardContent({ firstName, settings, summary, onboard
           </section>
         )
       })()}
+
+      {/* Smart onboarding checklist - shows sector-specific tasks */}
+      <OnboardingChecklist className="mb-8" />
 
       {/* New user checklist */}
       {onboardingProgress && (

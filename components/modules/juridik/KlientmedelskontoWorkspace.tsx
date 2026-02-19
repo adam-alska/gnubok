@@ -278,7 +278,7 @@ export function KlientmedelskontoWorkspace({ module: mod, sectorSlug, settingsHr
       >
         <Tabs defaultValue="oversikt" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="oversikt">Oversikt</TabsTrigger>
+            <TabsTrigger value="oversikt">Översikt</TabsTrigger>
             <TabsTrigger value="klientlista">Klientlista</TabsTrigger>
             <TabsTrigger value="avstamning">Avstamning</TabsTrigger>
           </TabsList>
@@ -302,10 +302,10 @@ export function KlientmedelskontoWorkspace({ module: mod, sectorSlug, settingsHr
                 />
                 <KPICard label="Aktiva klienter" value={String(summary.activeFunds)} />
                 <KPICard
-                  label="Ej avstamda (>30d)"
+                  label="Ej avstämda (>30d)"
                   value={String(summary.unreconciled)}
                   trend={summary.unreconciled > 0 ? 'down' : 'up'}
-                  trendLabel={summary.unreconciled > 0 ? 'Krav atgard' : 'OK'}
+                  trendLabel={summary.unreconciled > 0 ? 'Kräver åtgärd' : 'OK'}
                 />
               </div>
             )}
@@ -323,7 +323,7 @@ export function KlientmedelskontoWorkspace({ module: mod, sectorSlug, settingsHr
                   <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Sok klient eller arende..."
+                      placeholder="Sök klient eller ärende..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9"
@@ -355,7 +355,7 @@ export function KlientmedelskontoWorkspace({ module: mod, sectorSlug, settingsHr
                   <EmptyModuleState
                     icon={Landmark}
                     title="Inga klientmedel"
-                    description="Lagg till klientmedel for att borja hantera klientmedelsredovisningen."
+                    description="Lägg till klientmedel för att börja hantera klientmedelsredovisningen."
                     actionLabel="Ny klientmedelspost"
                     onAction={openNewFund}
                   />
@@ -365,12 +365,12 @@ export function KlientmedelskontoWorkspace({ module: mod, sectorSlug, settingsHr
                       <TableHeader>
                         <TableRow className="bg-muted/50">
                           <TableHead className="font-medium">Klient</TableHead>
-                          <TableHead className="font-medium">Arende</TableHead>
+                          <TableHead className="font-medium">Ärende</TableHead>
                           <TableHead className="font-medium text-right">1690 (kr)</TableHead>
                           <TableHead className="font-medium text-right">2890 (kr)</TableHead>
                           <TableHead className="font-medium">Status</TableHead>
-                          <TableHead className="font-medium">Senast avstamd</TableHead>
-                          <TableHead className="font-medium text-right">Atgarder</TableHead>
+                          <TableHead className="font-medium">Senast avstämd</TableHead>
+                          <TableHead className="font-medium text-right">Åtgärder</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -427,11 +427,11 @@ export function KlientmedelskontoWorkspace({ module: mod, sectorSlug, settingsHr
               <>
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-sm">Disciplinnamndsregler</CardTitle>
+                    <CardTitle className="text-sm">Disciplinnämndsregler</CardTitle>
                   </CardHeader>
                   <CardContent className="text-sm text-muted-foreground space-y-2">
-                    <p>Klientmedel ska hallas avskilda fran byrans egna medel (konto 1690/2890).</p>
-                    <p>Manatlig avstamning kravs enligt Advokatsamfundets regler.</p>
+                    <p>Klientmedel ska hållas avskilda från byråns egna medel (konto 1690/2890).</p>
+                    <p>Månatlig avstämning krävs enligt Advokatsamfundets regler.</p>
                     <p>Differens mellan 1690 och 2890 ska alltid vara noll.</p>
                   </CardContent>
                 </Card>
@@ -442,9 +442,9 @@ export function KlientmedelskontoWorkspace({ module: mod, sectorSlug, settingsHr
                       <TableRow className="bg-muted/50">
                         <TableHead className="font-medium">Klient</TableHead>
                         <TableHead className="font-medium text-right">Differens (kr)</TableHead>
-                        <TableHead className="font-medium">Senast avstamd</TableHead>
+                        <TableHead className="font-medium">Senast avstämd</TableHead>
                         <TableHead className="font-medium">Status</TableHead>
-                        <TableHead className="font-medium text-right">Atgard</TableHead>
+                        <TableHead className="font-medium text-right">Åtgärd</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -476,7 +476,7 @@ export function KlientmedelskontoWorkspace({ module: mod, sectorSlug, settingsHr
                               ) : (
                                 <div className="flex items-center gap-1.5 text-amber-600 text-sm">
                                   <AlertTriangle className="h-4 w-4" />
-                                  {diff !== 0 ? 'Obalans' : 'Forfallen'}
+                                  {diff !== 0 ? 'Obalans' : 'Förfallen'}
                                 </div>
                               )}
                             </TableCell>
@@ -486,7 +486,7 @@ export function KlientmedelskontoWorkspace({ module: mod, sectorSlug, settingsHr
                                 size="sm"
                                 onClick={() => handleReconcile(fund)}
                               >
-                                Markera avstamd
+                                Markera avstämd
                               </Button>
                             </TableCell>
                           </TableRow>
@@ -525,7 +525,7 @@ export function KlientmedelskontoWorkspace({ module: mod, sectorSlug, settingsHr
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="fund-case">Arendereferens *</Label>
+                <Label htmlFor="fund-case">Ärendereferens *</Label>
                 <Input
                   id="fund-case"
                   value={fundForm.caseRef}
@@ -604,9 +604,9 @@ export function KlientmedelskontoWorkspace({ module: mod, sectorSlug, settingsHr
           <DialogHeader>
             <DialogTitle>Ta bort klientmedel</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort klientmedel for{' '}
+              Är du säker på att du vill ta bort klientmedel för{' '}
               <span className="font-semibold">{fundToDelete?.clientName}</span>?
-              Denna atgard kan inte angras.
+              Denna åtgärd kan inte ångras.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

@@ -76,6 +76,36 @@ export function useNavModules() {
       .eq('user_id', user.id)
       .eq('enabled', true)
 
+    // Recovery: if no module_toggles exist, check company_settings for selected_modules
+    if (!data || data.length === 0) {
+      const { data: cs } = await supabase
+        .from('company_settings')
+        .select('selected_sector, selected_modules')
+        .eq('user_id', user.id)
+        .single()
+
+      if (cs?.selected_sector && Array.isArray(cs.selected_modules) && cs.selected_modules.length > 0) {
+        const rows = cs.selected_modules.map((slug: string) => ({
+          user_id: user.id,
+          sector_slug: cs.selected_sector,
+          module_slug: slug,
+          enabled: true,
+        }))
+        await supabase
+          .from('module_toggles')
+          .upsert(rows, { onConflict: 'user_id,sector_slug,module_slug' })
+
+        setEnabledModules(
+          rows.map((r: { sector_slug: string; module_slug: string }) => ({
+            sector_slug: r.sector_slug,
+            module_slug: r.module_slug,
+          }))
+        )
+        setIsLoading(false)
+        return
+      }
+    }
+
     setEnabledModules(
       (data ?? []).map(t => ({ sector_slug: t.sector_slug, module_slug: t.module_slug }))
     )

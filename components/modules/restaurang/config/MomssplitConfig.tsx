@@ -100,7 +100,7 @@ function ConfigForm({
           onChange={e => setRules(prev => ({ ...prev, blandade_kvitton: e.target.value as VatRules['blandade_kvitton'] }))}
           className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
-          <option value="proportionellt">F\u00f6rdela proportionellt</option>
+          <option value="proportionellt">Fördela proportionellt</option>
           <option value="manuell">Manuell uppdelning</option>
         </select>
       </div>

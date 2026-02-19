@@ -53,8 +53,8 @@ const ROLES = [
   { value: 'kassapersonal', label: 'Kassapersonal' },
   { value: 'lagerarbetare', label: 'Lagerarbetare' },
   { value: 'chark', label: 'Charkpersonal' },
-  { value: 'frukt-gront', label: 'Frukt & Gront' },
-  { value: 'saljare', label: 'Saljare' },
+  { value: 'frukt-gront', label: 'Frukt & Grönt' },
+  { value: 'saljare', label: 'Säljare' },
   { value: 'deltid', label: 'Deltid/Extra' },
 ]
 
@@ -325,7 +325,7 @@ export function PersonalliggareButikWorkspace({ module: mod, sectorSlug, setting
   function getEntryStatus(entry: AttendanceEntry): { label: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'neutral' } {
     if (entry.checkIn && entry.checkOut) return { label: 'Utcheckad', variant: 'neutral' }
     if (entry.checkIn) return { label: 'Incheckad', variant: 'success' }
-    return { label: 'Ej anland', variant: 'danger' }
+    return { label: 'Ej anländ', variant: 'danger' }
   }
 
   const todayRegister = useMemo(() => {
@@ -363,7 +363,7 @@ export function PersonalliggareButikWorkspace({ module: mod, sectorSlug, setting
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Incheckade just nu</CardTitle></CardHeader>
-            <CardContent><div className="flex items-center gap-2"><UserCheck className="h-5 w-5 text-emerald-600" /><span className="text-2xl font-bold">{checkedInCount}</span><span className="text-sm text-muted-foreground">av {activeStaff.length} forvantade</span></div></CardContent>
+            <CardContent><div className="flex items-center gap-2"><UserCheck className="h-5 w-5 text-emerald-600" /><span className="text-2xl font-bold">{checkedInCount}</span><span className="text-sm text-muted-foreground">av {activeStaff.length} förväntade</span></div></CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Totala timmar idag</CardTitle></CardHeader>
@@ -382,24 +382,24 @@ export function PersonalliggareButikWorkspace({ module: mod, sectorSlug, setting
               <Download className="mr-1.5 h-3.5 w-3.5" />Exportera Skatteverket
             </Button>
             <Button variant="outline" size="sm" onClick={() => setAddPersonDialogOpen(true)}>
-              <Plus className="mr-1.5 h-3.5 w-3.5" />Lagg till person
+              <Plus className="mr-1.5 h-3.5 w-3.5" />Lägg till person
             </Button>
           </div>
         </div>
 
         {todayRegister.length === 0 ? (
-          <EmptyModuleState icon={ClipboardList} title="Inga registrerade personer" description="Lagg till personal under fliken Personal eller lagg till en person direkt." actionLabel="Lagg till personal" onAction={() => { setActiveTab('personal'); openNewStaff() }} />
+          <EmptyModuleState icon={ClipboardList} title="Inga registrerade personer" description="Lägg till personal under fliken Personal eller lägg till en person direkt." actionLabel="Lägg till personal" onAction={() => { setActiveTab('personal'); openNewStaff() }} />
         ) : (
           <div className="rounded-lg border border-border overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead>Namn</TableHead><TableHead>Roll</TableHead><TableHead>Incheckning</TableHead><TableHead>Utcheckning</TableHead><TableHead>Timmar</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Atgarder</TableHead>
+                  <TableHead>Namn</TableHead><TableHead>Roll</TableHead><TableHead>Incheckning</TableHead><TableHead>Utcheckning</TableHead><TableHead>Timmar</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Åtgärder</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {todayRegister.map(({ staff: member, entry }) => {
-                  const status = entry ? getEntryStatus(entry) : { label: 'Ej anland', variant: 'danger' as const }
+                  const status = entry ? getEntryStatus(entry) : { label: 'Ej anländ', variant: 'danger' as const }
                   const hours = entry ? calculateHoursBetween(entry.checkIn, entry.checkOut ?? (entry.checkIn ? nowTimeString() : null)) : 0
                   return (
                     <TableRow key={member.id}>
@@ -427,15 +427,15 @@ export function PersonalliggareButikWorkspace({ module: mod, sectorSlug, setting
 
       <TabsContent value="personal" className="space-y-4">
         <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">Hantera registrerade medarbetare for personalliggaren.</p>
+          <p className="text-sm text-muted-foreground">Hantera registrerade medarbetare för personalliggaren.</p>
           <Button size="sm" onClick={openNewStaff}><Plus className="mr-1.5 h-3.5 w-3.5" />Ny personal</Button>
         </div>
         {staff.length === 0 ? (
-          <EmptyModuleState icon={Users} title="Ingen personal registrerad" description="Lagg till personal som ska registreras i personalliggaren." actionLabel="Lagg till personal" onAction={openNewStaff} />
+          <EmptyModuleState icon={Users} title="Ingen personal registrerad" description="Lägg till personal som ska registreras i personalliggaren." actionLabel="Lägg till personal" onAction={openNewStaff} />
         ) : (
           <div className="rounded-lg border border-border overflow-hidden">
             <Table>
-              <TableHeader><TableRow className="bg-muted/50"><TableHead>Namn</TableHead><TableHead>Roll</TableHead><TableHead>Personnummer (sista 4)</TableHead><TableHead className="text-center">Aktiv</TableHead><TableHead className="text-right">Atgarder</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow className="bg-muted/50"><TableHead>Namn</TableHead><TableHead>Roll</TableHead><TableHead>Personnummer (sista 4)</TableHead><TableHead className="text-center">Aktiv</TableHead><TableHead className="text-right">Åtgärder</TableHead></TableRow></TableHeader>
               <TableBody>
                 {staff.map((member) => (
                   <TableRow key={member.id}>
@@ -466,7 +466,7 @@ export function PersonalliggareButikWorkspace({ module: mod, sectorSlug, setting
           {historyLoading ? (
             <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
           ) : historyEntries.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center"><CalendarDays className="h-8 w-8 text-muted-foreground mb-3" /><p className="text-sm text-muted-foreground">Inga poster for detta datum.</p></div>
+            <div className="flex flex-col items-center justify-center py-12 text-center"><CalendarDays className="h-8 w-8 text-muted-foreground mb-3" /><p className="text-sm text-muted-foreground">Inga poster för detta datum.</p></div>
           ) : (
             <div className="rounded-lg border border-border overflow-hidden">
               <Table>
@@ -496,13 +496,13 @@ export function PersonalliggareButikWorkspace({ module: mod, sectorSlug, setting
 
         <div className="space-y-4">
           <div className="flex items-center gap-4">
-            <h3 className="text-lg font-medium">Manadssammanfattning</h3>
+            <h3 className="text-lg font-medium">Månadssammanfattning</h3>
             <Input type="month" value={monthSummaryDate} onChange={(e) => setMonthSummaryDate(e.target.value)} className="w-auto" />
           </div>
           {monthlySummaryLoading ? (
             <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
           ) : monthlySummary.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">Inga poster for denna manad.</p>
+            <p className="text-sm text-muted-foreground py-4">Inga poster för denna månad.</p>
           ) : (
             <div className="rounded-lg border border-border overflow-hidden">
               <Table>
@@ -529,20 +529,20 @@ export function PersonalliggareButikWorkspace({ module: mod, sectorSlug, setting
 
       <Dialog open={staffDialogOpen} onOpenChange={setStaffDialogOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>{editingStaff ? 'Redigera personal' : 'Ny personal'}</DialogTitle><DialogDescription>{editingStaff ? 'Uppdatera personalens information nedan.' : 'Fyll i uppgifter for den nya medarbetaren.'}</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{editingStaff ? 'Redigera personal' : 'Ny personal'}</DialogTitle><DialogDescription>{editingStaff ? 'Uppdatera personalens information nedan.' : 'Fyll i uppgifter för den nya medarbetaren.'}</DialogDescription></DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2"><Label>Namn *</Label><Input value={staffForm.name} onChange={(e) => setStaffForm(f => ({ ...f, name: e.target.value }))} placeholder="Fornamn Efternamn" /></div>
+            <div className="space-y-2"><Label>Namn *</Label><Input value={staffForm.name} onChange={(e) => setStaffForm(f => ({ ...f, name: e.target.value }))} placeholder="Förnamn Efternamn" /></div>
             <div className="space-y-2"><Label>Roll</Label><Select value={staffForm.role} onValueChange={(v) => setStaffForm(f => ({ ...f, role: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{ROLES.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}</SelectContent></Select></div>
-            <div className="space-y-2"><Label>Personnummer (sista 4 siffror)</Label><Input value={staffForm.personnummer4} onChange={(e) => { const val = e.target.value.replace(/\D/g, '').slice(0, 4); setStaffForm(f => ({ ...f, personnummer4: val })) }} placeholder="1234" maxLength={4} /><p className="text-xs text-muted-foreground">Anvands for identifiering enligt Skatteverkets krav.</p></div>
+            <div className="space-y-2"><Label>Personnummer (sista 4 siffror)</Label><Input value={staffForm.personnummer4} onChange={(e) => { const val = e.target.value.replace(/\D/g, '').slice(0, 4); setStaffForm(f => ({ ...f, personnummer4: val })) }} placeholder="1234" maxLength={4} /><p className="text-xs text-muted-foreground">Används för identifiering enligt Skatteverkets krav.</p></div>
             <div className="flex items-center gap-3"><Switch id="staff-active" checked={staffForm.active} onCheckedChange={(checked) => setStaffForm(f => ({ ...f, active: checked }))} /><Label htmlFor="staff-active">Aktiv</Label></div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setStaffDialogOpen(false)}>Avbryt</Button><Button onClick={handleSaveStaff} disabled={saving || !staffForm.name.trim()}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{editingStaff ? 'Uppdatera' : 'Lagg till'}</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setStaffDialogOpen(false)}>Avbryt</Button><Button onClick={handleSaveStaff} disabled={saving || !staffForm.name.trim()}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{editingStaff ? 'Uppdatera' : 'Lägg till'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={timeOverrideDialogOpen} onOpenChange={setTimeOverrideDialogOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Andra tid manuellt</DialogTitle><DialogDescription>Ange korrekt tid for {timeOverrideTarget?.field === 'checkIn' ? 'incheckning' : 'utcheckning'}.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Ändra tid manuellt</DialogTitle><DialogDescription>Ange korrekt tid för {timeOverrideTarget?.field === 'checkIn' ? 'incheckning' : 'utcheckning'}.</DialogDescription></DialogHeader>
           <div className="space-y-4 py-2"><div className="space-y-2"><Label>{timeOverrideTarget?.field === 'checkIn' ? 'Incheckningstid' : 'Utcheckningstid'}</Label><Input type="time" value={timeOverrideValue} onChange={(e) => setTimeOverrideValue(e.target.value)} /></div></div>
           <DialogFooter><Button variant="outline" onClick={() => setTimeOverrideDialogOpen(false)}>Avbryt</Button><Button onClick={handleTimeOverrideSave} disabled={!timeOverrideValue}>Spara</Button></DialogFooter>
         </DialogContent>
@@ -550,13 +550,13 @@ export function PersonalliggareButikWorkspace({ module: mod, sectorSlug, setting
 
       <Dialog open={addPersonDialogOpen} onOpenChange={setAddPersonDialogOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Lagg till person och checka in</DialogTitle><DialogDescription>Registrera en ny person i personalliggaren. Personen checkas in automatiskt.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Lägg till person och checka in</DialogTitle><DialogDescription>Registrera en ny person i personalliggaren. Personen checkas in automatiskt.</DialogDescription></DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2"><Label>Namn *</Label><Input value={addPersonForm.name} onChange={(e) => setAddPersonForm(f => ({ ...f, name: e.target.value }))} placeholder="Fornamn Efternamn" /></div>
+            <div className="space-y-2"><Label>Namn *</Label><Input value={addPersonForm.name} onChange={(e) => setAddPersonForm(f => ({ ...f, name: e.target.value }))} placeholder="Förnamn Efternamn" /></div>
             <div className="space-y-2"><Label>Roll</Label><Select value={addPersonForm.role} onValueChange={(v) => setAddPersonForm(f => ({ ...f, role: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{ROLES.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-2"><Label>Personnummer (sista 4 siffror)</Label><Input value={addPersonForm.personnummer4} onChange={(e) => { const val = e.target.value.replace(/\D/g, '').slice(0, 4); setAddPersonForm(f => ({ ...f, personnummer4: val })) }} placeholder="1234" maxLength={4} /></div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setAddPersonDialogOpen(false)}>Avbryt</Button><Button onClick={handleQuickAddPerson} disabled={!addPersonForm.name.trim()}><LogIn className="mr-1.5 h-3.5 w-3.5" />Lagg till och checka in</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setAddPersonDialogOpen(false)}>Avbryt</Button><Button onClick={handleQuickAddPerson} disabled={!addPersonForm.name.trim()}><LogIn className="mr-1.5 h-3.5 w-3.5" />Lägg till och checka in</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </>

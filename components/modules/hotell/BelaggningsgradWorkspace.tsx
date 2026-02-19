@@ -258,18 +258,18 @@ export function BelaggningsgradWorkspace({ module: mod, sectorSlug, settingsHref
         ) : (
           <Tabs defaultValue="oversikt" className="space-y-6">
             <TabsList>
-              <TabsTrigger value="oversikt">Oversikt</TabsTrigger>
+              <TabsTrigger value="oversikt">Översikt</TabsTrigger>
               <TabsTrigger value="data">Data</TabsTrigger>
               <TabsTrigger value="prognos">Prognos</TabsTrigger>
             </TabsList>
 
             <TabsContent value="oversikt" className="space-y-6">
               {!todayEntry && entries.length === 0 ? (
-                <EmptyModuleState icon={BarChart3} title="Ingen belaggningsdata" description="Borja registrera daglig belaggning for att spara statistik." actionLabel="Registrera idag" onAction={openNew} />
+                <EmptyModuleState icon={BarChart3} title="Ingen beläggningsdata" description="Börja registrera daglig beläggning för att spåra statistik." actionLabel="Registrera idag" onAction={openNew} />
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <KPICard
-                    label="Belaggning idag"
+                    label="Beläggning idag"
                     value={todayEntry ? fmtPct(todayEntry.occupancyPct) : '-'}
                     unit="%"
                     trend={todayEntry ? (todayEntry.occupancyPct >= 75 ? 'up' : todayEntry.occupancyPct >= 50 ? 'neutral' : 'down') : undefined}
@@ -292,7 +292,7 @@ export function BelaggningsgradWorkspace({ module: mod, sectorSlug, settingsHref
                   <SelectContent>
                     <SelectItem value="daily">Daglig</SelectItem>
                     <SelectItem value="weekly">Veckovis</SelectItem>
-                    <SelectItem value="monthly">Manadsvis</SelectItem>
+                    <SelectItem value="monthly">Månadsvis</SelectItem>
                   </SelectContent>
                 </Select>
                 {saving && <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Sparar...</div>}
@@ -300,7 +300,7 @@ export function BelaggningsgradWorkspace({ module: mod, sectorSlug, settingsHref
 
               {viewMode === 'daily' ? (
                 (aggregatedData as OccupancyEntry[]).length === 0 ? (
-                  <EmptyModuleState icon={CalendarDays} title="Ingen data" description="Registrera daglig belaggning." actionLabel="Registrera" onAction={openNew} />
+                  <EmptyModuleState icon={CalendarDays} title="Ingen data" description="Registrera daglig beläggning." actionLabel="Registrera" onAction={openNew} />
                 ) : (
                   <div className="rounded-xl border border-border overflow-hidden">
                     <Table>
@@ -309,9 +309,9 @@ export function BelaggningsgradWorkspace({ module: mod, sectorSlug, settingsHref
                           <TableHead className="font-medium">Datum</TableHead>
                           <TableHead className="font-medium text-right">Totalt rum</TableHead>
                           <TableHead className="font-medium text-right">Belagda</TableHead>
-                          <TableHead className="font-medium text-right">Belaggning %</TableHead>
+                          <TableHead className="font-medium text-right">Beläggning %</TableHead>
                           <TableHead className="font-medium text-right">Framtida bok.</TableHead>
-                          <TableHead className="font-medium text-right">Atgarder</TableHead>
+                          <TableHead className="font-medium text-right">Åtgärder</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -344,7 +344,7 @@ export function BelaggningsgradWorkspace({ module: mod, sectorSlug, settingsHref
                         <TableHead className="font-medium">Period</TableHead>
                         <TableHead className="font-medium text-right">Snitt rum</TableHead>
                         <TableHead className="font-medium text-right">Snitt belagda</TableHead>
-                        <TableHead className="font-medium text-right">Belaggning %</TableHead>
+                        <TableHead className="font-medium text-right">Beläggning %</TableHead>
                         <TableHead className="font-medium text-right">Dagar</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -368,11 +368,11 @@ export function BelaggningsgradWorkspace({ module: mod, sectorSlug, settingsHref
 
             <TabsContent value="prognos" className="space-y-6">
               {!forecast ? (
-                <EmptyModuleState icon={BarChart3} title="Ingen data for prognos" description="Registrera daglig belaggning for att generera prognos." />
+                <EmptyModuleState icon={BarChart3} title="Ingen data för prognos" description="Registrera daglig beläggning för att generera prognos." />
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <KPICard label="Snitt belaggning (7d)" value={fmtPct(forecast.avgOccupancy)} unit="%" />
-                  <KPICard label="Prognostiserad belaggning" value={fmtPct(forecast.forecastOccupancy)} unit="%" trend={forecast.forecastOccupancy >= forecast.avgOccupancy ? 'up' : 'down'} />
+                  <KPICard label="Snitt beläggning (7d)" value={fmtPct(forecast.avgOccupancy)} unit="%" />
+                  <KPICard label="Prognostiserad beläggning" value={fmtPct(forecast.forecastOccupancy)} unit="%" trend={forecast.forecastOccupancy >= forecast.avgOccupancy ? 'up' : 'down'} />
                   <KPICard label="Totalt rum" value={fmt(forecast.totalRooms)} unit="st" />
                   <KPICard label="Snitt framtida bok." value={fmt(Math.round(forecast.avgBooked))} unit="st" />
                 </div>
@@ -383,8 +383,8 @@ export function BelaggningsgradWorkspace({ module: mod, sectorSlug, settingsHref
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">
-                    Prognosen baseras pa de senaste 7 dagarnas belaggning samt framtida bokningar.
-                    Registrera data dagligen for att forbattra precisionen.
+                    Prognosen baseras på de senaste 7 dagarnas beläggning samt framtida bokningar.
+                    Registrera data dagligen för att förbättra precisionen.
                   </p>
                 </CardContent>
               </Card>
@@ -397,8 +397,8 @@ export function BelaggningsgradWorkspace({ module: mod, sectorSlug, settingsHref
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingEntry ? 'Redigera belaggning' : 'Registrera belaggning'}</DialogTitle>
-            <DialogDescription>Ange antal rum och belaggning for datumet.</DialogDescription>
+            <DialogTitle>{editingEntry ? 'Redigera beläggning' : 'Registrera beläggning'}</DialogTitle>
+            <DialogDescription>Ange antal rum och beläggning för datumet.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
@@ -421,7 +421,7 @@ export function BelaggningsgradWorkspace({ module: mod, sectorSlug, settingsHref
             </div>
             {form.totalRooms > 0 && (
               <div className="rounded-lg bg-muted/50 p-3 text-sm">
-                <span className="text-muted-foreground">Belaggning: </span>
+                <span className="text-muted-foreground">Beläggning: </span>
                 <span className={cn('font-mono font-semibold', getOccupancyColor(form.totalRooms > 0 ? (form.occupiedRooms / form.totalRooms) * 100 : 0))}>
                   {fmtPct(form.totalRooms > 0 ? (form.occupiedRooms / form.totalRooms) * 100 : 0)}%
                 </span>
@@ -440,7 +440,7 @@ export function BelaggningsgradWorkspace({ module: mod, sectorSlug, settingsHref
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Ta bort post</DialogTitle>
-            <DialogDescription>Ar du saker pa att du vill ta bort belaggningsdata for {entryToDelete?.date}?</DialogDescription>
+            <DialogDescription>Är du säker på att du vill ta bort beläggningsdata för {entryToDelete?.date}?</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button>

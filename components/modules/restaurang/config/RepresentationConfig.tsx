@@ -65,13 +65,13 @@ function ConfigForm({
       <div>
         <h3 className="text-base font-semibold">Representation</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Gr\u00e4nser och avdragsinst\u00e4llningar f\u00f6r representation.
+          Gränser och avdragsinställningar för representation.
         </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="space-y-2">
-          <Label htmlFor="intern_grans">Intern gr\u00e4ns kr</Label>
+          <Label htmlFor="intern_grans">Intern gräns kr</Label>
           <Input
             id="intern_grans"
             type="number"
@@ -105,7 +105,7 @@ function ConfigForm({
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={saving}>
           {saving && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
-          Spara inst\u00e4llningar
+          Spara inställningar
         </Button>
       </div>
     </div>

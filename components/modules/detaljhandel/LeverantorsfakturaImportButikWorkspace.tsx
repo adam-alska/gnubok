@@ -16,7 +16,7 @@ interface ModuleWorkspaceProps {
   settingsHref: string
 }
 
-const EXPECTED_COLUMNS = ['Datum', 'Leverantor', 'Fakturanr', 'Beskrivning', 'Belopp', 'Moms', 'Kategori']
+const EXPECTED_COLUMNS = ['Datum', 'Leverantör', 'Fakturanr', 'Beskrivning', 'Belopp', 'Moms', 'Kategori']
 
 interface ParsedData { headers: string[]; rows: string[][] }
 interface ImportRecord { id: string; filename: string; created_at: string; rows_imported: number; status: string }
@@ -106,15 +106,15 @@ export function LeverantorsfakturaImportButikWorkspace({ module, sectorSlug, set
               <ImportDropzone
                 accept=".csv,.xlsx,.xls"
                 onFileSelect={handleFileSelect}
-                label="Dra och slapp leverantorsfakturor har"
-                description="CSV eller Excel med kolumner: Datum, Leverantor, Fakturanr, Beskrivning, Belopp, Moms, Kategori"
+                label="Dra och släpp leverantörsfakturor här"
+                description="CSV eller Excel med kolumner: Datum, Leverantör, Fakturanr, Beskrivning, Belopp, Moms, Kategori"
               />
             )}
 
             {saved && (
               <div className="flex flex-col items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-8">
                 <CheckCircle className="h-8 w-8 text-emerald-600" />
-                <p className="text-sm font-medium text-emerald-700">Importen ar klar! Inkopspriser uppdaterade.</p>
+                <p className="text-sm font-medium text-emerald-700">Importen är klar! Inköpspriser uppdaterade.</p>
                 <Button variant="outline" size="sm" onClick={() => setSaved(false)}>Importera en ny fil</Button>
               </div>
             )}
@@ -129,7 +129,7 @@ export function LeverantorsfakturaImportButikWorkspace({ module, sectorSlug, set
                   <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" onClick={() => { setParsedData(null); setFilename('') }}>Avbryt</Button>
                     <Button size="sm" onClick={handleConfirmImport} disabled={saving}>
-                      {saving && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}Bekrafta import
+                      {saving && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}Bekräfta import
                     </Button>
                   </div>
                 </div>
@@ -147,7 +147,7 @@ export function LeverantorsfakturaImportButikWorkspace({ module, sectorSlug, set
                 </div>
 
                 <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3">
-                  <p className="text-xs text-amber-700"><strong>Forvantade kolumner:</strong> {EXPECTED_COLUMNS.join(', ')}</p>
+                  <p className="text-xs text-amber-700"><strong>Förväntade kolumner:</strong> {EXPECTED_COLUMNS.join(', ')}</p>
                 </div>
               </div>
             )}
@@ -157,7 +157,7 @@ export function LeverantorsfakturaImportButikWorkspace({ module, sectorSlug, set
             {loadingImports ? (
               <div className="flex items-center gap-3 justify-center py-12"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /><span className="text-sm text-muted-foreground">Laddar importhistorik...</span></div>
             ) : imports.length === 0 ? (
-              <EmptyModuleState icon={History} title="Ingen importhistorik" description="Nar du importerar leverantorsfakturor visas de har." />
+              <EmptyModuleState icon={History} title="Ingen importhistorik" description="När du importerar leverantörsfakturor visas de här." />
             ) : (
               <div className="rounded-lg border overflow-auto">
                 <table className="w-full text-sm">

@@ -43,7 +43,7 @@ interface StockItem {
 }
 
 const CATEGORIES = ['Livsmedel', 'Dryck', 'Frukt & Gront', 'Mejeri', 'Kott & Chark', 'Non-food', 'Brod & Bageri', 'Ovrigt']
-const UNITS = ['st', 'kg', 'l', 'forpackning', 'kartong', 'pall']
+const UNITS = ['st', 'kg', 'l', 'förpackning', 'kartong', 'pall']
 
 function generateId(): string {
   return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
@@ -125,7 +125,7 @@ export function LagerhanteringWorkspace({ module: mod, sectorSlug, settingsHref 
 
   function getStockStatus(item: StockItem): { label: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'neutral' } {
     if (item.currentStock === 0) return { label: 'Slut', variant: 'danger' }
-    if (item.currentStock <= item.reorderPoint) return { label: 'Bestall', variant: 'warning' }
+    if (item.currentStock <= item.reorderPoint) return { label: 'Beställ', variant: 'warning' }
     return { label: 'I lager', variant: 'success' }
   }
 
@@ -190,7 +190,7 @@ export function LagerhanteringWorkspace({ module: mod, sectorSlug, settingsHref 
               <>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <KPICard label="Antal artiklar" value={String(items.length)} unit="st" />
-                  <KPICard label="Under bestallningspunkt" value={String(belowReorder.length)} unit="st" trend={belowReorder.length > 0 ? 'down' : 'up'} />
+                  <KPICard label="Under beställningspunkt" value={String(belowReorder.length)} unit="st" trend={belowReorder.length > 0 ? 'down' : 'up'} />
                   <KPICard label="Slut i lager" value={String(outOfStock.length)} unit="st" trend={outOfStock.length > 0 ? 'down' : 'up'} />
                   <KPICard label="Kategorier" value={String(new Set(items.map(i => i.category)).size)} unit="st" />
                 </div>
@@ -198,7 +198,7 @@ export function LagerhanteringWorkspace({ module: mod, sectorSlug, settingsHref 
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                   <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Sok artikel..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
+                    <Input placeholder="Sök artikel..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
                   </div>
                   <Select value={filterCategory} onValueChange={setFilterCategory}>
                     <SelectTrigger className="w-[180px]"><SelectValue placeholder="Alla kategorier" /></SelectTrigger>
@@ -210,7 +210,7 @@ export function LagerhanteringWorkspace({ module: mod, sectorSlug, settingsHref 
                 </div>
 
                 {filteredItems.length === 0 ? (
-                  <EmptyModuleState icon={Package} title="Inga artiklar" description="Lagg till artiklar for att borja hantera lager." actionLabel="Ny artikel" onAction={openNewItem} />
+                  <EmptyModuleState icon={Package} title="Inga artiklar" description="Lägg till artiklar för att börja hantera lager." actionLabel="Ny artikel" onAction={openNewItem} />
                 ) : (
                   <div className="rounded-xl border border-border overflow-hidden">
                     <Table>
@@ -223,7 +223,7 @@ export function LagerhanteringWorkspace({ module: mod, sectorSlug, settingsHref 
                           <TableHead className="font-medium text-right">Best.punkt</TableHead>
                           <TableHead className="font-medium">Status</TableHead>
                           <TableHead className="font-medium">Plats</TableHead>
-                          <TableHead className="font-medium text-right">Atgarder</TableHead>
+                          <TableHead className="font-medium text-right">Åtgärder</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -260,7 +260,7 @@ export function LagerhanteringWorkspace({ module: mod, sectorSlug, settingsHref 
 
           <TabsContent value="bristlista" className="space-y-4">
             {belowReorder.length === 0 ? (
-              <EmptyModuleState icon={AlertTriangle} title="Ingen brist" description="Alla artiklar ar over bestallningspunkten." />
+              <EmptyModuleState icon={AlertTriangle} title="Ingen brist" description="Alla artiklar är över beställningspunkten." />
             ) : (
               <div className="rounded-xl border border-border overflow-hidden">
                 <Table>
@@ -271,7 +271,7 @@ export function LagerhanteringWorkspace({ module: mod, sectorSlug, settingsHref 
                       <TableHead className="font-medium text-right">Saldo</TableHead>
                       <TableHead className="font-medium text-right">Best.punkt</TableHead>
                       <TableHead className="font-medium text-right">Brist</TableHead>
-                      <TableHead className="font-medium text-right">Atgarder</TableHead>
+                      <TableHead className="font-medium text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -298,11 +298,11 @@ export function LagerhanteringWorkspace({ module: mod, sectorSlug, settingsHref 
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>{editingItem ? 'Redigera artikel' : 'Ny artikel'}</DialogTitle><DialogDescription>{editingItem ? 'Uppdatera artikelinformation.' : 'Lagg till en ny lagerartikel.'}</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{editingItem ? 'Redigera artikel' : 'Ny artikel'}</DialogTitle><DialogDescription>{editingItem ? 'Uppdatera artikelinformation.' : 'Lägg till en ny lagerartikel.'}</DialogDescription></DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2"><Label>SKU *</Label><Input value={form.sku} onChange={(e) => setForm(f => ({ ...f, sku: e.target.value }))} placeholder="ART-001" /></div>
-              <div className="grid gap-2"><Label>Namn *</Label><Input value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Mjolk 3%" /></div>
+              <div className="grid gap-2"><Label>Namn *</Label><Input value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Mjölk 3%" /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2"><Label>Kategori</Label><Select value={form.category} onValueChange={(v) => setForm(f => ({ ...f, category: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
@@ -315,24 +315,24 @@ export function LagerhanteringWorkspace({ module: mod, sectorSlug, settingsHref 
             </div>
             <div className="grid gap-2"><Label>Lagerplats</Label><Input value={form.location} onChange={(e) => setForm(f => ({ ...f, location: e.target.value }))} placeholder="Hylla A3" /></div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setDialogOpen(false)}>Avbryt</Button><Button onClick={handleSaveItem} disabled={!form.name.trim() || !form.sku.trim()}>{editingItem ? 'Uppdatera' : 'Lagg till'}</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setDialogOpen(false)}>Avbryt</Button><Button onClick={handleSaveItem} disabled={!form.name.trim() || !form.sku.trim()}>{editingItem ? 'Uppdatera' : 'Lägg till'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={receiveDialogOpen} onOpenChange={setReceiveDialogOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Inleverans</DialogTitle><DialogDescription>Registrera inleverans for {receiveItem?.name}. Nuvarande saldo: {receiveItem?.currentStock} {receiveItem?.unit}.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Inleverans</DialogTitle><DialogDescription>Registrera inleverans för {receiveItem?.name}. Nuvarande saldo: {receiveItem?.currentStock} {receiveItem?.unit}.</DialogDescription></DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2"><Label>Antal att leverera in</Label><Input type="number" min={1} value={receiveQty} onChange={(e) => setReceiveQty(Number(e.target.value) || 0)} /></div>
             {receiveQty > 0 && receiveItem && <p className="text-xs text-muted-foreground">Nytt saldo: <strong>{receiveItem.currentStock + receiveQty} {receiveItem.unit}</strong></p>}
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setReceiveDialogOpen(false)}>Avbryt</Button><Button onClick={handleReceive} disabled={receiveQty <= 0}>Bekrafta inleverans</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setReceiveDialogOpen(false)}>Avbryt</Button><Button onClick={handleReceive} disabled={receiveQty <= 0}>Bekräfta inleverans</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Ta bort artikel</DialogTitle><DialogDescription>Ar du saker pa att du vill ta bort {itemToDelete?.name}?</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Ta bort artikel</DialogTitle><DialogDescription>Är du säker på att du vill ta bort {itemToDelete?.name}?</DialogDescription></DialogHeader>
           <DialogFooter><Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button><Button variant="destructive" onClick={handleDeleteItem}><Trash2 className="mr-2 h-4 w-4" />Ta bort</Button></DialogFooter>
         </DialogContent>
       </Dialog>

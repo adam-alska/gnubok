@@ -72,7 +72,7 @@ function ConfigForm({
       <div>
         <h3 className="text-base font-semibold">Kontoplan</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Mappa int\u00e4ktstyper till BAS-konton f\u00f6r bokf\u00f6ring.
+          Mappa intäktstyper till BAS-konton för bokföring.
         </p>
       </div>
 

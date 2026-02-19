@@ -70,8 +70,8 @@ const EU_COUNTRIES = [
   'Belgien', 'Bulgarien', 'Cypern', 'Danmark', 'Estland', 'Finland',
   'Frankrike', 'Grekland', 'Irland', 'Italien', 'Kroatien', 'Lettland',
   'Litauen', 'Luxemburg', 'Malta', 'Nederlanderna', 'Polen', 'Portugal',
-  'Rumanien', 'Slovakien', 'Slovenien', 'Spanien', 'Tjeckien',
-  'Tyskland', 'Ungern', 'Osterrike',
+  'Rumänien', 'Slovakien', 'Slovenien', 'Spanien', 'Tjeckien',
+  'Tyskland', 'Ungern', 'Österrike',
 ]
 
 const DEFAULT_INVOICES: EuInvoice[] = [
@@ -80,7 +80,7 @@ const DEFAULT_INVOICES: EuInvoice[] = [
     customerName: 'TechCorp GmbH', customerCountry: 'Tyskland',
     vatNumber: 'DE123456789', vatNumberValid: true,
     amount: 50000, vatRate: 0, reverseCharge: true,
-    description: 'Konsulttjanster systemutveckling',
+    description: 'Konsulttjänster systemutveckling',
   },
   {
     id: '2', invoiceNumber: 'EU-2024-002', date: '2024-07-01',
@@ -94,7 +94,7 @@ const DEFAULT_INVOICES: EuInvoice[] = [
     customerName: 'Innovatech Oy', customerCountry: 'Finland',
     vatNumber: 'FI12345678', vatNumberValid: false,
     amount: 25000, vatRate: 25, reverseCharge: false,
-    description: 'Utbildningstjanster',
+    description: 'Utbildningstjänster',
   },
 ]
 
@@ -292,7 +292,7 @@ export function EuTjanstmomsWorkspace({ module: mod, sectorSlug, settingsHref }:
           <Tabs defaultValue="fakturor" className="space-y-6">
             <TabsList>
               <TabsTrigger value="fakturor">EU-fakturor</TabsTrigger>
-              <TabsTrigger value="rapport">EU-forsaljningsrapport</TabsTrigger>
+              <TabsTrigger value="rapport">EU-försäljningsrapport</TabsTrigger>
             </TabsList>
 
             <TabsContent value="fakturor" className="space-y-6">
@@ -317,7 +317,7 @@ export function EuTjanstmomsWorkspace({ module: mod, sectorSlug, settingsHref }:
                 <EmptyModuleState
                   icon={Globe}
                   title="Inga EU-fakturor"
-                  description="Lagg till EU-fakturor for att hantera omvand skattskyldighet och EU-rapportering."
+                  description="Lägg till EU-fakturor för att hantera omvänd skattskyldighet och EU-rapportering."
                   actionLabel="Ny EU-faktura"
                   onAction={openNew}
                 />
@@ -333,7 +333,7 @@ export function EuTjanstmomsWorkspace({ module: mod, sectorSlug, settingsHref }:
                         <TableHead className="font-medium">VAT-nr</TableHead>
                         <TableHead className="font-medium">Status</TableHead>
                         <TableHead className="font-medium text-right">Belopp</TableHead>
-                        <TableHead className="font-medium text-right">Atgarder</TableHead>
+                        <TableHead className="font-medium text-right">Åtgärder</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -394,7 +394,7 @@ export function EuTjanstmomsWorkspace({ module: mod, sectorSlug, settingsHref }:
                 <CardHeader>
                   <CardTitle className="text-sm flex items-center gap-2">
                     <FileText className="h-4 w-4" />
-                    EU-forsaljningsrapport per land
+                    EU-försäljningsrapport per land
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -438,12 +438,12 @@ export function EuTjanstmomsWorkspace({ module: mod, sectorSlug, settingsHref }:
                   <CardTitle className="text-sm">Fakturakrav vid omvand skattskyldighet</CardTitle>
                 </CardHeader>
                 <CardContent className="text-sm text-muted-foreground space-y-2">
-                  <p>Fakturan ska innehalla:</p>
+                  <p>Fakturan ska innehålla:</p>
                   <ul className="list-disc list-inside space-y-1">
-                    <li>Sajarens och koparens VAT-nummer</li>
+                    <li>Säljarens och köparens VAT-nummer</li>
                     <li>Texten &quot;Reverse charge, article 196 Council Directive 2006/112/EC&quot;</li>
                     <li>Beloppet exklusive moms</li>
-                    <li>Hanvisning till relevant EU-direktiv</li>
+                    <li>Hänvisning till relevant EU-direktiv</li>
                   </ul>
                 </CardContent>
               </Card>
@@ -458,7 +458,7 @@ export function EuTjanstmomsWorkspace({ module: mod, sectorSlug, settingsHref }:
           <DialogHeader>
             <DialogTitle>{editing ? 'Redigera EU-faktura' : 'Ny EU-faktura'}</DialogTitle>
             <DialogDescription>
-              {editing ? 'Uppdatera fakturainformationen.' : 'Fyll i uppgifter for den nya EU-fakturan.'}
+              {editing ? 'Uppdatera fakturainformationen.' : 'Fyll i uppgifter för den nya EU-fakturan.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
@@ -493,7 +493,7 @@ export function EuTjanstmomsWorkspace({ module: mod, sectorSlug, settingsHref }:
                 <Input value={form.vatNumber} onChange={(e) => setForm((f) => ({ ...f, vatNumber: e.target.value }))} placeholder="DE123456789" />
                 {form.vatNumber && (
                   <p className={`text-xs ${validateVatFormat(form.vatNumber) ? 'text-emerald-600' : 'text-red-500'}`}>
-                    {validateVatFormat(form.vatNumber) ? 'Giltigt format' : 'Ogiltigt format (CC + 8-12 siffror)'}
+                    {validateVatFormat(form.vatNumber) ? 'Giltigt format' : 'Ogiltigt format (CC + 8\u201312 siffror)'}
                   </p>
                 )}
               </div>
@@ -504,7 +504,7 @@ export function EuTjanstmomsWorkspace({ module: mod, sectorSlug, settingsHref }:
             </div>
             <div className="grid gap-2">
               <Label>Beskrivning</Label>
-              <Textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Konsulttjanster..." rows={2} />
+              <Textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Konsulttjänster..." rows={2} />
             </div>
           </div>
           <DialogFooter>
@@ -522,7 +522,7 @@ export function EuTjanstmomsWorkspace({ module: mod, sectorSlug, settingsHref }:
           <DialogHeader>
             <DialogTitle>Ta bort faktura</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort faktura {toDelete?.invoiceNumber}? Denna atgard kan inte angras.
+              Är du säker på att du vill ta bort faktura {toDelete?.invoiceNumber}? Denna åtgärd kan inte ångras.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

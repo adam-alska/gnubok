@@ -245,8 +245,8 @@ export function RealisationsgradWorkspace({ module: mod, sectorSlug, settingsHre
       >
         <Tabs defaultValue="oversikt" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="oversikt">Oversikt</TabsTrigger>
-            <TabsTrigger value="per-arendetyp">Per arendetyp</TabsTrigger>
+            <TabsTrigger value="oversikt">Översikt</TabsTrigger>
+            <TabsTrigger value="per-arendetyp">Per ärendetyp</TabsTrigger>
             <TabsTrigger value="detaljer">Detaljer</TabsTrigger>
           </TabsList>
 
@@ -260,7 +260,7 @@ export function RealisationsgradWorkspace({ module: mod, sectorSlug, settingsHre
               <EmptyModuleState
                 icon={TrendingUp}
                 title="Ingen data"
-                description="Registrera tidsvarden och fakturerade belopp for att berakna realisationsgrad."
+                description="Registrera tidsvärden och fakturerade belopp för att beräkna realisationsgrad."
                 actionLabel="Ny post"
                 onAction={openNewEntry}
               />
@@ -271,9 +271,9 @@ export function RealisationsgradWorkspace({ module: mod, sectorSlug, settingsHre
                   value={fmtPct(summary.realisationPct)}
                   unit="%"
                   trend={summary.realisationPct >= 90 ? 'up' : summary.realisationPct >= 75 ? 'neutral' : 'down'}
-                  trendLabel={summary.realisationPct >= 90 ? 'Bra' : summary.realisationPct >= 75 ? 'OK' : 'Lag'}
+                  trendLabel={summary.realisationPct >= 90 ? 'Bra' : summary.realisationPct >= 75 ? 'OK' : 'Låg'}
                 />
-                <KPICard label="Tidsvarde" value={fmt(summary.totalTimeValue)} unit="kr" />
+                <KPICard label="Tidsvärde" value={fmt(summary.totalTimeValue)} unit="kr" />
                 <KPICard label="Fakturerat" value={fmt(summary.totalInvoiced)} unit="kr" />
                 <KPICard
                   label="Avskrivning"
@@ -281,7 +281,7 @@ export function RealisationsgradWorkspace({ module: mod, sectorSlug, settingsHre
                   unit="kr"
                   trend={summary.writeOff > 0 ? 'down' : 'up'}
                 />
-                <KPICard label="Antal arenden" value={String(summary.count)} />
+                <KPICard label="Antal ärenden" value={String(summary.count)} />
               </div>
             )}
           </TabsContent>
@@ -295,16 +295,16 @@ export function RealisationsgradWorkspace({ module: mod, sectorSlug, settingsHre
             ) : caseTypeSummary.length === 0 ? (
               <EmptyModuleState
                 icon={TrendingUp}
-                title="Ingen data per arendetyp"
-                description="Registrera data for att se lonsamhet per arendetyp."
+                title="Ingen data per ärendetyp"
+                description="Registrera data för att se lönsamhet per ärendetyp."
               />
             ) : (
               <div className="rounded-xl border border-border overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50">
-                      <TableHead className="font-medium">Arendetyp</TableHead>
-                      <TableHead className="font-medium text-right">Tidsvarde (kr)</TableHead>
+                      <TableHead className="font-medium">Ärendetyp</TableHead>
+                      <TableHead className="font-medium text-right">Tidsvärde (kr)</TableHead>
                       <TableHead className="font-medium text-right">Fakturerat (kr)</TableHead>
                       <TableHead className="font-medium">Realisationsgrad</TableHead>
                       <TableHead className="font-medium text-right">Antal</TableHead>
@@ -344,10 +344,10 @@ export function RealisationsgradWorkspace({ module: mod, sectorSlug, settingsHre
                 <div className="flex items-center gap-3">
                   <Select value={filterCaseType} onValueChange={(val) => setFilterCaseType(val as CaseType | 'all')}>
                     <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Filtrera arendetyp" />
+                      <SelectValue placeholder="Filtrera ärendetyp" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Alla arendetyper</SelectItem>
+                      <SelectItem value="all">Alla ärendetyper</SelectItem>
                       {CASE_TYPES.map((t) => (
                         <SelectItem key={t} value={t}>{t}</SelectItem>
                       ))}
@@ -373,13 +373,13 @@ export function RealisationsgradWorkspace({ module: mod, sectorSlug, settingsHre
                       <TableHeader>
                         <TableRow className="bg-muted/50">
                           <TableHead className="font-medium">Period</TableHead>
-                          <TableHead className="font-medium">Arende</TableHead>
+                          <TableHead className="font-medium">Ärende</TableHead>
                           <TableHead className="font-medium">Klient</TableHead>
                           <TableHead className="font-medium">Typ</TableHead>
-                          <TableHead className="font-medium text-right">Tidsvarde</TableHead>
+                          <TableHead className="font-medium text-right">Tidsvärde</TableHead>
                           <TableHead className="font-medium text-right">Fakturerat</TableHead>
                           <TableHead className="font-medium text-right">Grad</TableHead>
-                          <TableHead className="font-medium text-right">Atgarder</TableHead>
+                          <TableHead className="font-medium text-right">Åtgärder</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -427,14 +427,14 @@ export function RealisationsgradWorkspace({ module: mod, sectorSlug, settingsHre
           <DialogHeader>
             <DialogTitle>{editingEntry ? 'Redigera post' : 'Ny post'}</DialogTitle>
             <DialogDescription>
-              {editingEntry ? 'Uppdatera realisationsdata.' : 'Registrera tidsvarde och fakturerat belopp per arende.'}
+              {editingEntry ? 'Uppdatera realisationsdata.' : 'Registrera tidsvärde och fakturerat belopp per ärende.'}
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="real-case">Arende *</Label>
+                <Label htmlFor="real-case">Ärende *</Label>
                 <Input id="real-case" value={form.caseRef} onChange={(e) => setForm((f) => ({ ...f, caseRef: e.target.value }))} placeholder="2024-001" />
               </div>
               <div className="grid gap-2">
@@ -445,7 +445,7 @@ export function RealisationsgradWorkspace({ module: mod, sectorSlug, settingsHre
 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="real-type">Arendetyp</Label>
+                <Label htmlFor="real-type">Ärendetyp</Label>
                 <Select value={form.caseType} onValueChange={(val) => setForm((f) => ({ ...f, caseType: val as CaseType }))}>
                   <SelectTrigger id="real-type"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -463,7 +463,7 @@ export function RealisationsgradWorkspace({ module: mod, sectorSlug, settingsHre
 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="real-time">Tidsvarde (kr) *</Label>
+                <Label htmlFor="real-time">Tidsvärde (kr) *</Label>
                 <Input id="real-time" type="number" min={0} value={form.timeValue} onChange={(e) => setForm((f) => ({ ...f, timeValue: parseFloat(e.target.value) || 0 }))} />
               </div>
               <div className="grid gap-2">
@@ -488,7 +488,7 @@ export function RealisationsgradWorkspace({ module: mod, sectorSlug, settingsHre
           <DialogHeader>
             <DialogTitle>Ta bort post</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort posten for{' '}
+              Är du säker på att du vill ta bort posten för{' '}
               <span className="font-semibold">{entryToDelete?.caseRef}</span>?
             </DialogDescription>
           </DialogHeader>

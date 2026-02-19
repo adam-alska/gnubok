@@ -72,7 +72,7 @@ const DEFAULT_STAFF: StaffMember[] = [
   { id: 's1', name: 'Anna Svensson', role: 'Frontend-utvecklare', team: 'Frontend', hoursPerWeek: 40 },
   { id: 's2', name: 'Erik Lindberg', role: 'Backend-utvecklare', team: 'Backend', hoursPerWeek: 40 },
   { id: 's3', name: 'Maria Karlsson', role: 'Fullstack-utvecklare', team: 'Frontend', hoursPerWeek: 40 },
-  { id: 's4', name: 'Johan Nilsson', role: 'DevOps-ingenjor', team: 'DevOps', hoursPerWeek: 40 },
+  { id: 's4', name: 'Johan Nilsson', role: 'DevOps-ingenjör', team: 'DevOps', hoursPerWeek: 40 },
   { id: 's5', name: 'Sara Johansson', role: 'Projektledare', team: 'Projektledning', hoursPerWeek: 40 },
 ]
 
@@ -254,7 +254,7 @@ export function ResursplaneringWorkspace({ module: mod, sectorSlug, settingsHref
         projMap[a.projectName] = { project: a.projectName, client: a.client, allocations: [] }
       }
       const member = staff.find((s) => s.id === a.staffId)
-      projMap[a.projectName].allocations.push({ ...a, staffName: member?.name ?? 'Okand' })
+      projMap[a.projectName].allocations.push({ ...a, staffName: member?.name ?? 'Okänd' })
     }
     return Object.values(projMap)
   }, [allocations, staff])
@@ -369,7 +369,7 @@ export function ResursplaneringWorkspace({ module: mod, sectorSlug, settingsHref
         ) : (
           <Tabs defaultValue="oversikt" className="space-y-6">
             <TabsList>
-              <TabsTrigger value="oversikt">Oversikt</TabsTrigger>
+              <TabsTrigger value="oversikt">Översikt</TabsTrigger>
               <TabsTrigger value="personal">Per person</TabsTrigger>
               <TabsTrigger value="projekt">Per projekt</TabsTrigger>
               <TabsTrigger value="varningar">Varningar</TabsTrigger>
@@ -381,13 +381,13 @@ export function ResursplaneringWorkspace({ module: mod, sectorSlug, settingsHref
                 <KPICard label="Total kapacitet" value={fmt(kpis.totalCapacity)} unit="tim/v" />
                 <KPICard label="Allokerade" value={fmt(kpis.totalAllocated)} unit="tim/v" />
                 <KPICard
-                  label="Belaggningsgrad"
+                  label="Beläggningsgrad"
                   value={fmtPct(kpis.avgUtilization)}
                   unit="%"
                   trend={kpis.avgUtilization >= 70 && kpis.avgUtilization <= 95 ? 'up' : 'down'}
                 />
                 <KPICard
-                  label="Overallokerade"
+                  label="Överallokerade"
                   value={String(kpis.overallocatedCount)}
                   unit="st"
                   trend={kpis.overallocatedCount > 0 ? 'down' : 'up'}
@@ -424,7 +424,7 @@ export function ResursplaneringWorkspace({ module: mod, sectorSlug, settingsHref
                       {s.isOverallocated && (
                         <div className="flex items-center gap-1 text-xs text-red-500">
                           <AlertTriangle className="h-3 w-3" />
-                          Overallokerad med {s.allocatedHours - s.hoursPerWeek} tim
+                          Överallokerad med {s.allocatedHours - s.hoursPerWeek} tim
                         </div>
                       )}
                     </CardContent>
@@ -438,7 +438,7 @@ export function ResursplaneringWorkspace({ module: mod, sectorSlug, settingsHref
                 <EmptyModuleState
                   icon={Users}
                   title="Ingen personal"
-                  description="Lagg till personal for att borja med resursplanering."
+                  description="Lägg till personal för att börja med resursplanering."
                   actionLabel="Ny person"
                   onAction={openNewStaff}
                 />
@@ -452,8 +452,8 @@ export function ResursplaneringWorkspace({ module: mod, sectorSlug, settingsHref
                         <TableHead className="font-medium">Team</TableHead>
                         <TableHead className="font-medium text-right">Kapacitet</TableHead>
                         <TableHead className="font-medium text-right">Allokerat</TableHead>
-                        <TableHead className="font-medium text-right">Belaggning</TableHead>
-                        <TableHead className="font-medium text-right">Atgarder</TableHead>
+                        <TableHead className="font-medium text-right">Beläggning</TableHead>
+                        <TableHead className="font-medium text-right">Åtgärder</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -491,7 +491,7 @@ export function ResursplaneringWorkspace({ module: mod, sectorSlug, settingsHref
                 <EmptyModuleState
                   icon={Users}
                   title="Inga aktiva allokeringar"
-                  description="Skapa allokeringar for att se resursfordelning per projekt."
+                  description="Skapa allokeringar för att se resursfördelning per projekt."
                   actionLabel="Ny allokering"
                   onAction={openNewAlloc}
                 />
@@ -512,7 +512,7 @@ export function ResursplaneringWorkspace({ module: mod, sectorSlug, settingsHref
                               <TableHead className="font-medium">Person</TableHead>
                               <TableHead className="font-medium text-right">Tim/vecka</TableHead>
                               <TableHead className="font-medium">Period</TableHead>
-                              <TableHead className="font-medium text-right">Atgarder</TableHead>
+                              <TableHead className="font-medium text-right">Åtgärder</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -550,7 +550,7 @@ export function ResursplaneringWorkspace({ module: mod, sectorSlug, settingsHref
                     <Users className="h-8 w-8 text-emerald-600" />
                   </div>
                   <h3 className="text-lg font-medium">Inga varningar</h3>
-                  <p className="text-sm text-muted-foreground">Alla medarbetare ar korrekt allokerade.</p>
+                  <p className="text-sm text-muted-foreground">Alla medarbetare är korrekt allokerade.</p>
                 </div>
               ) : (
                 overlapWarnings.map((w) => (
@@ -558,7 +558,7 @@ export function ResursplaneringWorkspace({ module: mod, sectorSlug, settingsHref
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2 text-red-600">
                         <AlertTriangle className="h-4 w-4" />
-                        {w.name} - overallokerad med {w.excess} timmar/vecka
+                        {w.name} - överallokerad med {w.excess} timmar/vecka
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="text-sm space-y-2">
@@ -584,7 +584,7 @@ export function ResursplaneringWorkspace({ module: mod, sectorSlug, settingsHref
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editingStaff ? 'Redigera person' : 'Ny person'}</DialogTitle>
-            <DialogDescription>{editingStaff ? 'Uppdatera personaluppgifter.' : 'Lagg till en ny medarbetare.'}</DialogDescription>
+            <DialogDescription>{editingStaff ? 'Uppdatera personaluppgifter.' : 'Lägg till en ny medarbetare.'}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
@@ -598,7 +598,7 @@ export function ResursplaneringWorkspace({ module: mod, sectorSlug, settingsHref
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setStaffDialogOpen(false)}>Avbryt</Button>
-            <Button onClick={handleSaveStaff} disabled={!staffForm.name.trim() || !staffForm.role.trim()}>{editingStaff ? 'Uppdatera' : 'Lagg till'}</Button>
+            <Button onClick={handleSaveStaff} disabled={!staffForm.name.trim() || !staffForm.role.trim()}>{editingStaff ? 'Uppdatera' : 'Lägg till'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -614,7 +614,7 @@ export function ResursplaneringWorkspace({ module: mod, sectorSlug, settingsHref
             <div className="grid gap-2">
               <Label>Person *</Label>
               <Select value={allocForm.staffId} onValueChange={(v) => setAllocForm((f) => ({ ...f, staffId: v }))}>
-                <SelectTrigger><SelectValue placeholder="Valj person" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Välj person" /></SelectTrigger>
                 <SelectContent>
                   {staff.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                 </SelectContent>
@@ -632,7 +632,7 @@ export function ResursplaneringWorkspace({ module: mod, sectorSlug, settingsHref
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAllocDialogOpen(false)}>Avbryt</Button>
-            <Button onClick={handleSaveAlloc} disabled={!allocForm.staffId || !allocForm.projectName.trim()}>{editingAlloc ? 'Uppdatera' : 'Lagg till'}</Button>
+            <Button onClick={handleSaveAlloc} disabled={!allocForm.staffId || !allocForm.projectName.trim()}>{editingAlloc ? 'Uppdatera' : 'Lägg till'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -642,7 +642,7 @@ export function ResursplaneringWorkspace({ module: mod, sectorSlug, settingsHref
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Ta bort</DialogTitle>
-            <DialogDescription>Ar du saker pa att du vill ta bort detta? Denna atgard kan inte angras.</DialogDescription>
+            <DialogDescription>Är du säker på att du vill ta bort detta? Denna åtgärd kan inte ångras.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button>

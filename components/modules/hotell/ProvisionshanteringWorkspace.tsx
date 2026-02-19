@@ -296,14 +296,14 @@ export function ProvisionshanteringWorkspace({ module: mod, sectorSlug, settings
           <Tabs defaultValue="bokningar" className="space-y-6">
             <TabsList>
               <TabsTrigger value="bokningar">Bokningar</TabsTrigger>
-              <TabsTrigger value="sammanstallning">Manadssammanstallning</TabsTrigger>
+              <TabsTrigger value="sammanstallning">Månadssammanställning</TabsTrigger>
             </TabsList>
 
             <TabsContent value="bokningar" className="space-y-6">
               {/* Summary cards */}
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <Card>
-                  <CardHeader className="pb-2"><CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Brutto denna manad</CardTitle></CardHeader>
+                  <CardHeader className="pb-2"><CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Brutto denna månad</CardTitle></CardHeader>
                   <CardContent><span className="text-2xl font-semibold tracking-tight">{fmt(monthlySummary.total.gross)}</span><span className="text-sm text-muted-foreground ml-1.5">kr</span></CardContent>
                 </Card>
                 <Card>
@@ -324,7 +324,7 @@ export function ProvisionshanteringWorkspace({ module: mod, sectorSlug, settings
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                 <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Sok gast eller bokningsref..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
+                  <Input placeholder="Sök gäst eller bokningsref..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
                 </div>
                 <Select value={filterChannel} onValueChange={val => setFilterChannel(val as Channel | 'all')}>
                   <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filtrera kanal" /></SelectTrigger>
@@ -334,7 +334,7 @@ export function ProvisionshanteringWorkspace({ module: mod, sectorSlug, settings
                   </SelectContent>
                 </Select>
                 <Select value={filterMonth} onValueChange={setFilterMonth}>
-                  <SelectTrigger className="w-[160px]"><SelectValue placeholder="Manad" /></SelectTrigger>
+                  <SelectTrigger className="w-[160px]"><SelectValue placeholder="Månad" /></SelectTrigger>
                   <SelectContent>
                     {availableMonths.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                   </SelectContent>
@@ -351,7 +351,7 @@ export function ProvisionshanteringWorkspace({ module: mod, sectorSlug, settings
                 <EmptyModuleState
                   icon={Globe}
                   title="Inga bokningar"
-                  description="Registrera bokningar fran OTA-kanaler for att spara provisioner."
+                  description="Registrera bokningar från OTA-kanaler för att spåra provisioner."
                   actionLabel="Ny bokning"
                   onAction={openNew}
                 />
@@ -361,14 +361,14 @@ export function ProvisionshanteringWorkspace({ module: mod, sectorSlug, settings
                     <TableHeader>
                       <TableRow className="bg-muted/50">
                         <TableHead className="font-medium">Kanal</TableHead>
-                        <TableHead className="font-medium">Gast</TableHead>
+                        <TableHead className="font-medium">Gäst</TableHead>
                         <TableHead className="font-medium">Ref</TableHead>
                         <TableHead className="font-medium">Incheckning</TableHead>
                         <TableHead className="font-medium text-right">Brutto</TableHead>
                         <TableHead className="font-medium text-right">Prov. %</TableHead>
                         <TableHead className="font-medium text-right">Provision</TableHead>
                         <TableHead className="font-medium text-right">Netto</TableHead>
-                        <TableHead className="font-medium text-right">Atgarder</TableHead>
+                        <TableHead className="font-medium text-right">Åtgärder</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -401,7 +401,7 @@ export function ProvisionshanteringWorkspace({ module: mod, sectorSlug, settings
             {/* Monthly summary tab */}
             <TabsContent value="sammanstallning" className="space-y-6">
               <div className="flex items-center gap-3">
-                <Label>Manad:</Label>
+                <Label>Månad:</Label>
                 <Select value={filterMonth} onValueChange={setFilterMonth}>
                   <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -476,7 +476,7 @@ export function ProvisionshanteringWorkspace({ module: mod, sectorSlug, settings
               </div>
             </div>
             <div className="grid gap-2">
-              <Label>Gastnamn *</Label>
+              <Label>Gästnamn *</Label>
               <Input value={form.guestName} onChange={e => setForm(f => ({ ...f, guestName: e.target.value }))} placeholder="Anna Andersson" />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -520,7 +520,7 @@ export function ProvisionshanteringWorkspace({ module: mod, sectorSlug, settings
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Ta bort bokning</DialogTitle>
-            <DialogDescription>Ar du saker pa att du vill ta bort bokningen for {bookingToDelete?.guestName}?</DialogDescription>
+            <DialogDescription>Är du säker på att du vill ta bort bokningen för {bookingToDelete?.guestName}?</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Avbryt</Button>

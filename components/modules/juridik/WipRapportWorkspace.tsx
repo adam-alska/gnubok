@@ -263,9 +263,9 @@ export function WipRapportWorkspace({ module: mod, sectorSlug, settingsHref }: M
       >
         <Tabs defaultValue="oversikt" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="oversikt">Oversikt</TabsTrigger>
+            <TabsTrigger value="oversikt">Översikt</TabsTrigger>
             <TabsTrigger value="per-klient">Per klient</TabsTrigger>
-            <TabsTrigger value="aging">Aldersanalys</TabsTrigger>
+            <TabsTrigger value="aging">Åldersanalys</TabsTrigger>
             <TabsTrigger value="detaljer">Detaljer</TabsTrigger>
           </TabsList>
 
@@ -279,7 +279,7 @@ export function WipRapportWorkspace({ module: mod, sectorSlug, settingsHref }: M
               <EmptyModuleState
                 icon={Clock}
                 title="Ingen WIP-data"
-                description="Lagg till ofakturerade poster for att se en sammanstallning."
+                description="Lägg till ofakturerade poster för att se en sammanställning."
                 actionLabel="Ny WIP-post"
                 onAction={openNewEntry}
               />
@@ -294,13 +294,13 @@ export function WipRapportWorkspace({ module: mod, sectorSlug, settingsHref }: M
                   trend={summary.totalWriteDownRisk > 0 ? 'down' : 'up'}
                 />
                 <KPICard
-                  label="Hog risk"
+                  label="Hög risk"
                   value={String(summary.highRisk)}
                   trend={summary.highRisk > 0 ? 'down' : 'up'}
-                  trendLabel={summary.highRisk > 0 ? 'Krav atgard' : 'OK'}
+                  trendLabel={summary.highRisk > 0 ? 'Kräver åtgärd' : 'OK'}
                 />
                 <KPICard
-                  label="Aldre an 90d"
+                  label="Äldre än 90d"
                   value={String(summary.over90)}
                   trend={summary.over90 > 0 ? 'down' : 'up'}
                 />
@@ -318,7 +318,7 @@ export function WipRapportWorkspace({ module: mod, sectorSlug, settingsHref }: M
               <EmptyModuleState
                 icon={Clock}
                 title="Ingen data per klient"
-                description="Lagg till WIP-poster for att se sammanstallning per klient."
+                description="Lägg till WIP-poster för att se sammanställning per klient."
               />
             ) : (
               <div className="rounded-xl border border-border overflow-hidden">
@@ -328,7 +328,7 @@ export function WipRapportWorkspace({ module: mod, sectorSlug, settingsHref }: M
                       <TableHead className="font-medium">Klient</TableHead>
                       <TableHead className="font-medium text-right">Ofakturerat (kr)</TableHead>
                       <TableHead className="font-medium text-right">Timmar</TableHead>
-                      <TableHead className="font-medium text-right">Antal arenden</TableHead>
+                      <TableHead className="font-medium text-right">Antal ärenden</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -355,8 +355,8 @@ export function WipRapportWorkspace({ module: mod, sectorSlug, settingsHref }: M
             ) : entries.length === 0 ? (
               <EmptyModuleState
                 icon={AlertTriangle}
-                title="Ingen aldersanalys"
-                description="Lagg till poster med datum for att se aldersfordelning."
+                title="Ingen åldersanalys"
+                description="Lägg till poster med datum för att se åldersfördelning."
               />
             ) : (
               <>
@@ -382,7 +382,7 @@ export function WipRapportWorkspace({ module: mod, sectorSlug, settingsHref }: M
                             label={b.label}
                             value={fmt(total)}
                             unit="kr"
-                            trendLabel={`${items.length} arenden`}
+                            trendLabel={`${items.length} ärenden`}
                             className={cn(b.min >= 91 && total > 0 && 'border-red-200 dark:border-red-900/50')}
                           />
                         )
@@ -396,9 +396,9 @@ export function WipRapportWorkspace({ module: mod, sectorSlug, settingsHref }: M
                     <TableHeader>
                       <TableRow className="bg-muted/50">
                         <TableHead className="font-medium">Klient</TableHead>
-                        <TableHead className="font-medium">Arende</TableHead>
+                        <TableHead className="font-medium">Ärende</TableHead>
                         <TableHead className="font-medium text-right">Belopp (kr)</TableHead>
-                        <TableHead className="font-medium text-right">Alder (dagar)</TableHead>
+                        <TableHead className="font-medium text-right">Ålder (dagar)</TableHead>
                         <TableHead className="font-medium">Risk</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -438,7 +438,7 @@ export function WipRapportWorkspace({ module: mod, sectorSlug, settingsHref }: M
                   <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Sok klient eller arende..."
+                      placeholder="Sök klient eller ärende..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9"
@@ -449,7 +449,7 @@ export function WipRapportWorkspace({ module: mod, sectorSlug, settingsHref }: M
                       <SelectValue placeholder="Filtrera risk" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Alla riskniver</SelectItem>
+                      <SelectItem value="all">Alla risknivåer</SelectItem>
                       {RISK_LEVELS.map((r) => (
                         <SelectItem key={r} value={r}>{r}</SelectItem>
                       ))}
@@ -475,12 +475,12 @@ export function WipRapportWorkspace({ module: mod, sectorSlug, settingsHref }: M
                       <TableHeader>
                         <TableRow className="bg-muted/50">
                           <TableHead className="font-medium">Klient</TableHead>
-                          <TableHead className="font-medium">Arende</TableHead>
+                          <TableHead className="font-medium">Ärende</TableHead>
                           <TableHead className="font-medium text-right">Belopp (kr)</TableHead>
                           <TableHead className="font-medium text-right">Timmar</TableHead>
                           <TableHead className="font-medium">Risk</TableHead>
                           <TableHead className="font-medium text-right">Nedskr. %</TableHead>
-                          <TableHead className="font-medium text-right">Atgarder</TableHead>
+                          <TableHead className="font-medium text-right">Åtgärder</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -522,7 +522,7 @@ export function WipRapportWorkspace({ module: mod, sectorSlug, settingsHref }: M
           <DialogHeader>
             <DialogTitle>{editingEntry ? 'Redigera WIP-post' : 'Ny WIP-post'}</DialogTitle>
             <DialogDescription>
-              {editingEntry ? 'Uppdatera WIP-posten.' : 'Registrera ofakturerad tid for WIP-rapporten.'}
+              {editingEntry ? 'Uppdatera WIP-posten.' : 'Registrera ofakturerad tid för WIP-rapporten.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -533,7 +533,7 @@ export function WipRapportWorkspace({ module: mod, sectorSlug, settingsHref }: M
                 <Input id="wip-r-client" value={form.clientName} onChange={(e) => setForm((f) => ({ ...f, clientName: e.target.value }))} placeholder="Klient AB" />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="wip-r-case">Arende *</Label>
+                <Label htmlFor="wip-r-case">Ärende *</Label>
                 <Input id="wip-r-case" value={form.caseRef} onChange={(e) => setForm((f) => ({ ...f, caseRef: e.target.value }))} placeholder="2024-001" />
               </div>
             </div>
@@ -547,13 +547,13 @@ export function WipRapportWorkspace({ module: mod, sectorSlug, settingsHref }: M
                 <Input id="wip-r-hours" type="number" min={0} step="0.5" value={form.unbilledHours} onChange={(e) => setForm((f) => ({ ...f, unbilledHours: parseFloat(e.target.value) || 0 }))} />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="wip-r-date">Aldsta datum</Label>
+                <Label htmlFor="wip-r-date">Äldsta datum</Label>
                 <Input id="wip-r-date" type="date" value={form.oldestDate} onChange={(e) => setForm((f) => ({ ...f, oldestDate: e.target.value }))} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="wip-r-risk">Riskniva</Label>
+                <Label htmlFor="wip-r-risk">Risknivå</Label>
                 <Select value={form.riskLevel} onValueChange={(val) => setForm((f) => ({ ...f, riskLevel: val as RiskLevel }))}>
                   <SelectTrigger id="wip-r-risk"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -589,7 +589,7 @@ export function WipRapportWorkspace({ module: mod, sectorSlug, settingsHref }: M
           <DialogHeader>
             <DialogTitle>Ta bort WIP-post</DialogTitle>
             <DialogDescription>
-              Ar du saker pa att du vill ta bort posten for{' '}
+              Är du säker på att du vill ta bort posten för{' '}
               <span className="font-semibold">{entryToDelete?.clientName}</span> ({entryToDelete?.caseRef})?
             </DialogDescription>
           </DialogHeader>

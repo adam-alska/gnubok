@@ -17,7 +17,7 @@ interface ModuleWorkspaceProps {
   settingsHref: string
 }
 
-const EXPECTED_COLUMNS = ['Artikelnr', 'Artikelnamn', 'System antal', 'Raknat antal', 'Enhetskostnad']
+const EXPECTED_COLUMNS = ['Artikelnr', 'Artikelnamn', 'System antal', 'Räknat antal', 'Enhetskostnad']
 
 interface ParsedData { headers: string[]; rows: string[][] }
 interface ImportRecord { id: string; filename: string; created_at: string; rows_imported: number; status: string }
@@ -73,7 +73,7 @@ export function InventeringsimportWorkspace({ module, sectorSlug, settingsHref }
 
         // Calculate variance stats
         const systemIdx = parsed.headers.indexOf('System antal')
-        const countedIdx = parsed.headers.indexOf('Raknat antal')
+        const countedIdx = parsed.headers.indexOf('Räknat antal')
         const costIdx = parsed.headers.indexOf('Enhetskostnad')
 
         if (systemIdx >= 0 && countedIdx >= 0) {
@@ -140,15 +140,15 @@ export function InventeringsimportWorkspace({ module, sectorSlug, settingsHref }
               <ImportDropzone
                 accept=".csv,.xlsx,.xls"
                 onFileSelect={handleFileSelect}
-                label="Dra och slapp inventeringsfil har"
-                description="CSV eller Excel med kolumner: Artikelnr, Artikelnamn, System antal, Raknat antal, Enhetskostnad"
+                label="Dra och släpp inventeringsfil här"
+                description="CSV eller Excel med kolumner: Artikelnr, Artikelnamn, System antal, Räknat antal, Enhetskostnad"
               />
             )}
 
             {saved && (
               <div className="flex flex-col items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-8">
                 <CheckCircle className="h-8 w-8 text-emerald-600" />
-                <p className="text-sm font-medium text-emerald-700">Inventering importerad! Differenser beraknade och svinn bokforts.</p>
+                <p className="text-sm font-medium text-emerald-700">Inventering importerad! Differenser beräknade och svinn bokförts.</p>
                 <Button variant="outline" size="sm" onClick={() => setSaved(false)}>Importera en ny fil</Button>
               </div>
             )}
@@ -159,7 +159,7 @@ export function InventeringsimportWorkspace({ module, sectorSlug, settingsHref }
                   <div className="grid gap-4 sm:grid-cols-3">
                     <KPICard label="Artiklar med differens" value={String(varianceStats.itemsWithDiff)} unit="st" />
                     <KPICard label="Total enhetsdifferens" value={String(varianceStats.totalVariance)} unit="st" />
-                    <KPICard label="Svinnbokforing" value={fmt(varianceStats.shrinkageBooking)} unit="kr" />
+                    <KPICard label="Svinnbokföring" value={fmt(varianceStats.shrinkageBooking)} unit="kr" />
                   </div>
                 )}
 
@@ -171,7 +171,7 @@ export function InventeringsimportWorkspace({ module, sectorSlug, settingsHref }
                   <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" onClick={() => { setParsedData(null); setFilename(''); setVarianceStats(null) }}>Avbryt</Button>
                     <Button size="sm" onClick={handleConfirmImport} disabled={saving}>
-                      {saving && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}Bekrafta import
+                      {saving && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}Bekräfta import
                     </Button>
                   </div>
                 </div>
@@ -189,7 +189,7 @@ export function InventeringsimportWorkspace({ module, sectorSlug, settingsHref }
                 </div>
 
                 <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3">
-                  <p className="text-xs text-amber-700"><strong>Forvantade kolumner:</strong> {EXPECTED_COLUMNS.join(', ')}</p>
+                  <p className="text-xs text-amber-700"><strong>Förväntade kolumner:</strong> {EXPECTED_COLUMNS.join(', ')}</p>
                 </div>
               </div>
             )}
@@ -199,7 +199,7 @@ export function InventeringsimportWorkspace({ module, sectorSlug, settingsHref }
             {loadingImports ? (
               <div className="flex items-center gap-3 justify-center py-12"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /><span className="text-sm text-muted-foreground">Laddar importhistorik...</span></div>
             ) : imports.length === 0 ? (
-              <EmptyModuleState icon={History} title="Ingen importhistorik" description="Nar du importerar inventeringar visas de har." />
+              <EmptyModuleState icon={History} title="Ingen importhistorik" description="När du importerar inventeringar visas de här." />
             ) : (
               <div className="rounded-lg border overflow-auto">
                 <table className="w-full text-sm">
