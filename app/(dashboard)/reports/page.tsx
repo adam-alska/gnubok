@@ -6,7 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Download, FileText, TrendingUp, Scale, AlertCircle, Receipt, Briefcase } from 'lucide-react'
+import { Download, FileText, FileDown, TrendingUp, Scale, AlertCircle, Receipt, Briefcase } from 'lucide-react'
+import { NEDeclarationView } from '@/extensions/ne-bilaga/NEDeclarationView'
+import { SRUExportView } from '@/extensions/sru-export/SRUExportView'
 import type {
   FiscalPeriod,
   TrialBalanceRow,
@@ -14,7 +16,6 @@ import type {
   BalanceSheetReport,
   VatDeclaration,
   VatPeriodType,
-  NEDeclaration,
 } from '@/types'
 
 function formatAmount(amount: number): string {
@@ -25,9 +26,11 @@ export default function ReportsPage() {
   const [periods, setPeriods] = useState<FiscalPeriod[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState('')
   const [activeTab, setActiveTab] = useState('trial-balance')
+  const [entityType, setEntityType] = useState<string | null>(null)
 
   useEffect(() => {
     fetchPeriods()
+    fetchEntityType()
   }, [])
 
   async function fetchPeriods() {
@@ -39,13 +42,27 @@ export default function ReportsPage() {
     }
   }
 
+  async function fetchEntityType() {
+    try {
+      const res = await fetch('/api/settings')
+      const { data } = await res.json()
+      if (data?.entity_type) {
+        setEntityType(data.entity_type)
+      }
+    } catch {
+      // Ignore - entity type is optional for tab visibility
+    }
+  }
+
+  const isEnskildFirma = entityType === 'enskild_firma'
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Rapporter</h1>
           <p className="text-muted-foreground">
-            Saldobalans, resultaträkning, balansräkning, momsdeklaration, NE-bilaga och SIE-export
+            Saldobalans, resultaträkning, balansräkning, momsdeklaration, NE-bilaga, SRU-export och SIE-export
           </p>
         </div>
       </div>
@@ -97,9 +114,15 @@ export default function ReportsPage() {
               <Receipt className="h-4 w-4 mr-1" />
               Momsdeklaration
             </TabsTrigger>
-            <TabsTrigger value="ne-declaration">
-              <Briefcase className="h-4 w-4 mr-1" />
-              NE-bilaga
+            {isEnskildFirma && (
+              <TabsTrigger value="ne-declaration">
+                <Briefcase className="h-4 w-4 mr-1" />
+                NE-bilaga
+              </TabsTrigger>
+            )}
+            <TabsTrigger value="sru-export">
+              <FileDown className="h-4 w-4 mr-1" />
+              SRU-export
             </TabsTrigger>
           </TabsList>
 
@@ -115,8 +138,13 @@ export default function ReportsPage() {
           <TabsContent value="vat-declaration">
             <VatDeclarationView />
           </TabsContent>
-          <TabsContent value="ne-declaration">
-            <NEDeclarationView periodId={selectedPeriod} />
+          {isEnskildFirma && (
+            <TabsContent value="ne-declaration">
+              <NEDeclarationView periodId={selectedPeriod} />
+            </TabsContent>
+          )}
+          <TabsContent value="sru-export">
+            <SRUExportView periodId={selectedPeriod} />
           </TabsContent>
         </Tabs>
       ) : (
@@ -867,290 +895,6 @@ function VatRutaRow({
         <td className="py-1 pl-6 text-xs">Underlag (ruta {parseInt(ruta) + 5})</td>
         <td className="py-1 text-right text-xs">{formatAmount(baseAmount)} kr</td>
       </tr>
-    </>
-  )
-}
-
-function NEDeclarationView({ periodId }: { periodId: string }) {
-  const [data, setData] = useState<NEDeclaration | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const fetchDeclaration = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch(`/api/reports/ne-declaration?period_id=${periodId}`)
-      const result = await res.json()
-      if (result.error) {
-        setError(result.error)
-      } else {
-        setData(result.data)
-      }
-    } catch {
-      setError('Kunde inte hämta NE-bilaga')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const downloadSRU = () => {
-    window.open(`/api/reports/ne-declaration?period_id=${periodId}&format=sru`, '_blank')
-  }
-
-  // NE ruta labels
-  const rutaLabels: Record<string, string> = {
-    R1: 'Försäljning med moms (25%)',
-    R2: 'Momsfria intäkter',
-    R3: 'Bil/bostadsförmån',
-    R4: 'Ränteintäkter',
-    R5: 'Varuinköp',
-    R6: 'Övriga kostnader',
-    R7: 'Lönekostnader',
-    R8: 'Räntekostnader',
-    R9: 'Avskrivningar fastighet',
-    R10: 'Avskrivningar övriga tillgångar',
-    R11: 'Årets resultat',
-  }
-
-  // Categorize rutor
-  const revenueRutor = ['R1', 'R2', 'R3', 'R4'] as const
-  const expenseRutor = ['R5', 'R6', 'R7', 'R8', 'R9', 'R10'] as const
-
-  return (
-    <div className="space-y-4">
-      {/* Info card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">NE-bilaga (Enskild firma)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
-            NE-bilagan används för att deklarera resultat från enskild näringsverksamhet.
-            Uppgifterna hämtas från bokföringen för valt räkenskapsår.
-          </p>
-          <div className="flex gap-2">
-            <Button onClick={fetchDeclaration} disabled={loading}>
-              {loading ? 'Laddar...' : 'Hämta NE-bilaga'}
-            </Button>
-            {data && (
-              <Button variant="outline" onClick={downloadSRU}>
-                <Download className="h-4 w-4 mr-2" />
-                Ladda ner SRU-fil
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {error && (
-        <Card>
-          <CardContent className="p-8 text-center text-destructive">
-            <AlertCircle className="h-6 w-6 mx-auto mb-2" />
-            {error}
-          </CardContent>
-        </Card>
-      )}
-
-      {data && (
-        <>
-          {/* Warnings */}
-          {data.warnings.length > 0 && (
-            <Card className="border-orange-200 bg-orange-50">
-              <CardContent className="py-4">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5" />
-                  <div>
-                    {data.warnings.map((warning, i) => (
-                      <p key={i} className="text-sm text-orange-800">{warning}</p>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Company info */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>
-                  {data.companyInfo.companyName}
-                </CardTitle>
-                <Badge className="bg-blue-100 text-blue-800">
-                  {data.fiscalYear.name}
-                </Badge>
-              </div>
-              {data.companyInfo.orgNumber && (
-                <p className="text-sm text-muted-foreground">
-                  Org.nr: {data.companyInfo.orgNumber}
-                </p>
-              )}
-            </CardHeader>
-          </Card>
-
-          {/* Revenue section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Intäkter</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <table className="w-full text-sm">
-                <tbody>
-                  {revenueRutor.map((ruta) => {
-                    const value = data.rutor[ruta]
-                    const breakdown = data.breakdown[ruta]
-                    return (
-                      <NEDeclarationRow
-                        key={ruta}
-                        ruta={ruta}
-                        label={rutaLabels[ruta]}
-                        amount={value}
-                        accounts={breakdown?.accounts || []}
-                      />
-                    )
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t-2 font-semibold">
-                    <td className="py-2">Summa intäkter</td>
-                    <td className="py-2 text-right">
-                      {formatAmount(
-                        data.rutor.R1 + data.rutor.R2 + data.rutor.R3 + data.rutor.R4
-                      )} kr
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </CardContent>
-          </Card>
-
-          {/* Expenses section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Kostnader</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <table className="w-full text-sm">
-                <tbody>
-                  {expenseRutor.map((ruta) => {
-                    const value = data.rutor[ruta]
-                    const breakdown = data.breakdown[ruta]
-                    return (
-                      <NEDeclarationRow
-                        key={ruta}
-                        ruta={ruta}
-                        label={rutaLabels[ruta]}
-                        amount={value}
-                        accounts={breakdown?.accounts || []}
-                        isExpense
-                      />
-                    )
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t-2 font-semibold">
-                    <td className="py-2">Summa kostnader</td>
-                    <td className="py-2 text-right">
-                      -{formatAmount(
-                        data.rutor.R5 + data.rutor.R6 + data.rutor.R7 +
-                        data.rutor.R8 + data.rutor.R9 + data.rutor.R10
-                      )} kr
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </CardContent>
-          </Card>
-
-          {/* Result */}
-          <Card className="border-2">
-            <CardContent className="py-4">
-              <div className="flex justify-between items-center">
-                <div>
-                  <span className="font-mono text-xs bg-muted px-1 rounded mr-2">R11</span>
-                  <span className="font-bold text-xl">Årets resultat</span>
-                </div>
-                <span
-                  className={`text-2xl font-bold ${
-                    data.rutor.R11 >= 0 ? 'text-green-600' : 'text-red-600'
-                  }`}
-                >
-                  {formatAmount(data.rutor.R11)} kr
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        </>
-      )}
-
-      {!data && !loading && !error && (
-        <Card>
-          <CardContent className="p-8 text-center text-muted-foreground">
-            Klicka &quot;Hämta NE-bilaga&quot; för att generera deklarationsunderlaget.
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  )
-}
-
-function NEDeclarationRow({
-  ruta,
-  label,
-  amount,
-  accounts,
-  isExpense,
-}: {
-  ruta: string
-  label: string
-  amount: number
-  accounts: Array<{ accountNumber: string; accountName: string; amount: number }>
-  isExpense?: boolean
-}) {
-  const [expanded, setExpanded] = useState(false)
-
-  // Don't show rows with zero values
-  if (amount === 0 && accounts.length === 0) return null
-
-  return (
-    <>
-      <tr
-        className="border-b cursor-pointer hover:bg-muted/50"
-        onClick={() => accounts.length > 0 && setExpanded(!expanded)}
-      >
-        <td className="py-2">
-          <span className="font-mono text-xs bg-muted px-1 rounded mr-2">{ruta}</span>
-          {label}
-          {accounts.length > 0 && (
-            <span className="text-xs text-muted-foreground ml-2">
-              ({accounts.length} konton)
-            </span>
-          )}
-        </td>
-        <td className="py-2 text-right">
-          {isExpense && amount > 0 ? '-' : ''}{formatAmount(Math.abs(amount))} kr
-        </td>
-      </tr>
-      {expanded && accounts.length > 0 && (
-        <tr>
-          <td colSpan={2} className="py-2 pl-8 bg-muted/30">
-            <table className="w-full text-xs">
-              <tbody>
-                {accounts.map((acc) => (
-                  <tr key={acc.accountNumber}>
-                    <td className="py-1 font-mono">{acc.accountNumber}</td>
-                    <td className="py-1">{acc.accountName}</td>
-                    <td className="py-1 text-right">
-                      {isExpense && acc.amount > 0 ? '-' : ''}{formatAmount(Math.abs(acc.amount))} kr
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </td>
-        </tr>
-      )}
     </>
   )
 }

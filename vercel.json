@@ -13,7 +13,7 @@
       "schedule": "0 8 * * *"
     },
     {
-      "path": "/api/push/cron",
+      "path": "/api/extensions/push-notifications/cron",
       "schedule": "0 9 * * *"
     },
     {

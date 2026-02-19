@@ -15,16 +15,12 @@ import {
   BarChart3,
   Settings,
   LogOut,
-  Calculator,
   Upload,
   Calendar,
-  Camera,
   Menu,
   X,
   HelpCircle,
   ChevronDown,
-  ChevronUp,
-  Building2,
 } from 'lucide-react'
 import type { EntityType } from '@/types'
 
@@ -48,10 +44,7 @@ const navItems: NavItem[] = [
   { href: '/invoices', label: 'Fakturor', icon: Receipt, group: 'finans' },
   { href: '/customers', label: 'Kunder', icon: Users, group: 'finans' },
   { href: '/transactions', label: 'Transaktioner', icon: ArrowLeftRight, group: 'finans' },
-  { href: '/receipts', label: 'Kvitton', icon: Camera, group: 'finans' },
-  { href: '/deductions', label: 'Avdrag', icon: Calculator, group: 'finans' },
   { href: '/bookkeeping', label: 'Bokföring', icon: BookOpen, group: 'finans' },
-  { href: '/modules', label: 'Företagsmoduler', icon: Building2, group: 'moduler' },
   { href: '/import', label: 'Importera', icon: Upload, group: 'övrigt' },
   { href: '/reports', label: 'Rapporter', icon: BarChart3, group: 'övrigt' },
   { href: '/help', label: 'Hjälp', icon: HelpCircle, group: 'övrigt' },
@@ -61,7 +54,6 @@ const navItems: NavItem[] = [
 const groupLabels: Record<string, string> = {
   main: 'Huvudmeny',
   finans: 'Finans',
-  moduler: 'Företagsmoduler',
   övrigt: 'Övrigt',
 }
 
@@ -93,40 +85,35 @@ export default function DashboardNav({ companyName, entityType }: DashboardNavPr
 
   const mainItems = filteredItems.filter(i => i.group === 'main')
   const finansItems = filteredItems.filter(i => i.group === 'finans')
-  const modulerItems = filteredItems.filter(i => i.group === 'moduler')
   const övrigtItems = filteredItems.filter(i => i.group === 'övrigt')
 
   const mobileNavItems = [
     { href: '/', label: 'Översikt', icon: LayoutDashboard },
     { href: '/invoices', label: 'Fakturor', icon: Receipt },
-    { href: '/receipts/scan', label: 'Skanna', icon: Camera, isScan: true },
     { href: '/transactions', label: 'Transaktioner', icon: ArrowLeftRight },
   ]
 
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden md:fixed md:inset-y-0 md:flex md:w-60 md:flex-col">
-        <div className="flex min-h-0 flex-1 flex-col border-r border-border/40 bg-card">
-          <div className="flex flex-1 flex-col overflow-y-auto pt-8 pb-4">
-            {/* Logo */}
-            <div className="px-6 mb-10">
-              <h1 className="font-display text-lg font-medium tracking-tight truncate">
+      <aside className="hidden md:fixed md:inset-y-0 md:flex md:w-[232px] md:flex-col">
+        <div className="flex min-h-0 flex-1 flex-col border-r border-border/30 bg-card/80">
+          <div className="flex flex-1 flex-col overflow-y-auto pt-7 pb-4">
+            {/* Company name */}
+            <div className="px-5 mb-8">
+              <p className="text-[13px] font-semibold text-foreground truncate tracking-[-0.01em]">
                 {companyName}
-              </h1>
-              <p className="text-xs text-muted-foreground mt-0.5 tracking-wide uppercase">
-                Ekonomi
               </p>
             </div>
 
             {/* Navigation with group headers */}
             <nav className="flex-1 px-3" aria-label="Huvudnavigation">
               {/* Huvudmeny group */}
-              <div className="mb-4">
-                <p className="px-3 mb-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+              <div className="mb-6">
+                <p className="px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-[0.08em]">
                   {groupLabels.main}
                 </p>
-                <div className="space-y-0.5">
+                <div className="space-y-px">
                   {mainItems.map((item) => {
                     const Icon = item.icon
                     const active = isActive(item.href)
@@ -135,15 +122,15 @@ export default function DashboardNav({ companyName, entityType }: DashboardNavPr
                         key={item.href}
                         href={item.href}
                         className={cn(
-                          'group flex items-center px-3 py-2 text-sm transition-all duration-200 rounded-lg',
+                          'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
                           active
-                            ? 'bg-primary/10 text-primary font-medium'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+                            ? 'bg-primary/8 text-foreground font-medium'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
                         )}
                       >
                         <Icon className={cn(
-                          "mr-3 h-4 w-4 flex-shrink-0",
-                          active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                          "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
+                          active ? "text-primary" : "text-muted-foreground/70 group-hover:text-muted-foreground"
                         )} />
                         {item.label}
                       </Link>
@@ -152,15 +139,12 @@ export default function DashboardNav({ companyName, entityType }: DashboardNavPr
                 </div>
               </div>
 
-              {/* Separator */}
-              <div className="border-t border-border/40 mx-3 mb-4" />
-
               {/* Finans group */}
-              <div className="mb-4">
-                <p className="px-3 mb-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+              <div className="mb-6">
+                <p className="px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-[0.08em]">
                   {groupLabels.finans}
                 </p>
-                <div className="space-y-0.5">
+                <div className="space-y-px">
                   {finansItems.map((item) => {
                     const Icon = item.icon
                     const active = isActive(item.href)
@@ -169,15 +153,15 @@ export default function DashboardNav({ companyName, entityType }: DashboardNavPr
                         key={item.href}
                         href={item.href}
                         className={cn(
-                          'group flex items-center px-3 py-2 text-sm transition-all duration-200 rounded-lg',
+                          'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
                           active
-                            ? 'bg-primary/10 text-primary font-medium'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+                            ? 'bg-primary/8 text-foreground font-medium'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
                         )}
                       >
                         <Icon className={cn(
-                          "mr-3 h-4 w-4 flex-shrink-0",
-                          active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                          "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
+                          active ? "text-primary" : "text-muted-foreground/70 group-hover:text-muted-foreground"
                         )} />
                         {item.label}
                       </Link>
@@ -185,59 +169,21 @@ export default function DashboardNav({ companyName, entityType }: DashboardNavPr
                   })}
                 </div>
               </div>
-
-              {/* Separator */}
-              <div className="border-t border-border/40 mx-3 mb-4" />
-
-              {/* Moduler group */}
-              <div className="mb-4">
-                <p className="px-3 mb-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                  {groupLabels.moduler}
-                </p>
-                <div className="space-y-0.5">
-                  {modulerItems.map((item) => {
-                    const Icon = item.icon
-                    const active = isActive(item.href)
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={cn(
-                          'group flex items-center px-3 py-2 text-sm transition-all duration-200 rounded-lg',
-                          active
-                            ? 'bg-primary/10 text-primary font-medium'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
-                        )}
-                      >
-                        <Icon className={cn(
-                          "mr-3 h-4 w-4 flex-shrink-0",
-                          active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                        )} />
-                        {item.label}
-                      </Link>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Separator */}
-              <div className="border-t border-border/40 mx-3 mb-4" />
 
               {/* Övrigt group - collapsible */}
               <div className="mb-4">
                 <button
                   onClick={() => setIsOvrigtExpanded(!isOvrigtExpanded)}
-                  className="w-full flex items-center justify-between px-3 mb-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+                  className="w-full flex items-center justify-between px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-[0.08em] hover:text-muted-foreground transition-colors"
                 >
                   <span>{groupLabels.övrigt}</span>
-                  {isOvrigtExpanded ? (
-                    <ChevronUp className="h-3 w-3" />
-                  ) : (
-                    <ChevronDown className="h-3 w-3" />
-                  )}
+                  <ChevronDown className={cn(
+                    "h-3 w-3 transition-transform duration-200",
+                    isOvrigtExpanded && "rotate-180"
+                  )} />
                 </button>
                 {isOvrigtExpanded && (
-                  <div className="space-y-0.5 animate-fade-in">
+                  <div className="space-y-px animate-fade-in">
                     {övrigtItems.map((item) => {
                       const Icon = item.icon
                       const active = isActive(item.href)
@@ -246,15 +192,15 @@ export default function DashboardNav({ companyName, entityType }: DashboardNavPr
                           key={item.href}
                           href={item.href}
                           className={cn(
-                            'group flex items-center px-3 py-2 text-sm transition-all duration-200 rounded-lg',
+                            'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
                             active
-                              ? 'bg-primary/10 text-primary font-medium'
-                              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+                              ? 'bg-primary/8 text-foreground font-medium'
+                              : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
                           )}
                         >
                           <Icon className={cn(
-                            "mr-3 h-4 w-4 flex-shrink-0",
-                            active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                            "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
+                            active ? "text-primary" : "text-muted-foreground/70 group-hover:text-muted-foreground"
                           )} />
                           {item.label}
                         </Link>
@@ -267,13 +213,13 @@ export default function DashboardNav({ companyName, entityType }: DashboardNavPr
           </div>
 
           {/* Logout button */}
-          <div className="flex-shrink-0 p-4 border-t border-border/40">
+          <div className="flex-shrink-0 px-3 py-3 border-t border-border/20">
             <Button
               variant="ghost"
-              className="w-full justify-start text-muted-foreground hover:text-foreground text-sm"
+              className="w-full justify-start text-muted-foreground hover:text-foreground text-[13px] h-9 px-3"
               onClick={handleLogout}
             >
-              <LogOut className="mr-3 h-4 w-4" />
+              <LogOut className="mr-2.5 h-[15px] w-[15px]" />
               Logga ut
             </Button>
           </div>
@@ -286,23 +232,6 @@ export default function DashboardNav({ companyName, entityType }: DashboardNavPr
           {mobileNavItems.map((item) => {
             const Icon = item.icon
             const active = isActive(item.href)
-            const isScan = 'isScan' in item && item.isScan
-
-            if (isScan) {
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-label="Skanna kvitto"
-                  className="flex flex-col items-center justify-center flex-1 h-full -mt-3"
-                >
-                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-accent text-accent-foreground shadow-md">
-                    <Icon className="h-6 w-6" />
-                  </div>
-                  <span className="text-[10px] mt-0.5 text-accent font-medium">{item.label}</span>
-                </Link>
-              )
-            }
 
             return (
               <Link
@@ -403,33 +332,6 @@ export default function DashboardNav({ companyName, entityType }: DashboardNavPr
                   Finans
                 </p>
                 {finansItems.map((item) => {
-                  const Icon = item.icon
-                  const active = isActive(item.href)
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={closeMobileMenu}
-                      className={cn(
-                        'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
-                        active
-                          ? 'bg-primary/10 text-primary font-medium'
-                          : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
-                      )}
-                    >
-                      <Icon className="h-5 w-5" />
-                      {item.label}
-                    </Link>
-                  )
-                })}
-              </div>
-
-              {/* Moduler section */}
-              <div className="mb-4">
-                <p className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Företagsmoduler
-                </p>
-                {modulerItems.map((item) => {
                   const Icon = item.icon
                   const active = isActive(item.href)
                   return (

@@ -119,8 +119,8 @@ export default function InvoicesPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Receipt className="h-6 w-6 text-primary" />
+              <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center">
+                <Receipt className="h-6 w-6 text-muted-foreground" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Totalt antal</p>
@@ -132,8 +132,8 @@ export default function InvoicesPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-lg bg-warning/10 flex items-center justify-center">
-                <Clock className="h-6 w-6 text-warning" />
+              <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center">
+                <Clock className="h-6 w-6 text-muted-foreground" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Obetalda</p>
@@ -149,11 +149,11 @@ export default function InvoicesPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-success/5 to-transparent border-success/20">
+        <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-lg bg-success/10 flex items-center justify-center">
-                <Send className="h-6 w-6 text-success" />
+              <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center">
+                <Send className="h-6 w-6 text-muted-foreground" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Att få in</p>

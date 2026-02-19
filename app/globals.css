@@ -8,85 +8,84 @@ html, :root {
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: 40 30% 97% !important;
-    --foreground: 30 10% 15% !important;
-    --card: 40 40% 99% !important;
-    --card-foreground: 30 10% 15% !important;
-    --popover: 40 40% 99% !important;
-    --popover-foreground: 30 10% 15% !important;
-    --primary: 28 40% 35% !important;
-    --primary-foreground: 40 40% 99% !important;
-    --secondary: 35 25% 93% !important;
-    --secondary-foreground: 30 10% 15% !important;
-    --muted: 35 15% 91% !important;
-    --muted-foreground: 30 8% 45% !important;
-    --accent: 18 45% 55% !important;
-    --accent-foreground: 40 40% 99% !important;
-    --destructive: 0 45% 55% !important;
-    --destructive-foreground: 40 40% 99% !important;
-    --border: 35 20% 88% !important;
-    --input: 35 20% 88% !important;
-    --ring: 28 40% 35% !important;
+    --background: 220 14% 96% !important;
+    --foreground: 224 12% 13% !important;
+    --card: 0 0% 100% !important;
+    --card-foreground: 224 12% 13% !important;
+    --popover: 0 0% 100% !important;
+    --popover-foreground: 224 12% 13% !important;
+    --primary: 222 47% 35% !important;
+    --primary-foreground: 0 0% 100% !important;
+    --secondary: 220 13% 93% !important;
+    --secondary-foreground: 224 12% 13% !important;
+    --muted: 218 12% 91% !important;
+    --muted-foreground: 218 8% 46% !important;
+    --accent: 213 72% 50% !important;
+    --accent-foreground: 0 0% 100% !important;
+    --destructive: 0 68% 50% !important;
+    --destructive-foreground: 0 0% 100% !important;
+    --border: 218 14% 89% !important;
+    --input: 218 14% 89% !important;
+    --ring: 222 47% 35% !important;
   }
 }
 
 :root {
-  /* Nordic Warmth Color Palette */
-  /* Inspired by Swedish nature: forest, stone, linen, birch */
+  /* Clean Slate — Modern ERP Palette */
 
-  --background: 40 30% 97%;              /* Warm paper white */
-  --foreground: 30 10% 15%;              /* Soft charcoal, not harsh black */
+  --background: 220 14% 96%;              /* Cool off-white #F2F4F7 */
+  --foreground: 224 12% 13%;              /* Deep slate #1D2029 */
 
-  --card: 40 40% 99%;                    /* Natural white with warmth */
-  --card-foreground: 30 10% 15%;
+  --card: 0 0% 100%;                      /* Pure white */
+  --card-foreground: 224 12% 13%;
 
-  --popover: 40 40% 99%;
-  --popover-foreground: 30 10% 15%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 224 12% 13%;
 
-  /* Primary - Leather Brown (warm, dark) */
-  --primary: 28 40% 35%;                 /* Dark leather brown */
-  --primary-foreground: 40 40% 99%;
+  /* Primary — Refined navy-blue */
+  --primary: 222 47% 35%;                 /* #304D83 */
+  --primary-foreground: 0 0% 100%;
 
-  /* Secondary - Warm Linen */
-  --secondary: 35 25% 93%;               /* Soft linen/oat */
-  --secondary-foreground: 30 10% 15%;
+  /* Secondary — Cool pale gray */
+  --secondary: 220 13% 93%;               /* #EBEDF1 */
+  --secondary-foreground: 224 12% 13%;
 
-  /* Muted - Stone */
-  --muted: 35 15% 91%;                   /* Warm stone gray */
-  --muted-foreground: 30 8% 45%;         /* Soft warm gray */
+  /* Muted — Neutral gray */
+  --muted: 218 12% 91%;                   /* #E3E6EB */
+  --muted-foreground: 218 8% 46%;         /* #6B7280 */
 
-  /* Accent - Terracotta */
-  --accent: 18 45% 55%;                  /* Muted terracotta/clay */
-  --accent-foreground: 40 40% 99%;
+  /* Accent — Clear blue for interactive highlights */
+  --accent: 213 72% 50%;                  /* #2373D8 */
+  --accent-foreground: 0 0% 100%;
 
-  /* Destructive - Muted Rose */
-  --destructive: 0 45% 55%;              /* Soft dusty rose */
-  --destructive-foreground: 40 40% 99%;
+  /* Destructive — Clean red */
+  --destructive: 0 68% 50%;               /* #D63232 */
+  --destructive-foreground: 0 0% 100%;
 
-  /* Borders & Input - Soft warm line */
-  --border: 35 20% 88%;
-  --input: 35 20% 88%;
-  --ring: 28 40% 35%;
+  /* Borders & Input */
+  --border: 218 14% 89%;                  /* #DEE1E7 */
+  --input: 218 14% 89%;
+  --ring: 222 47% 35%;
 
-  /* Radius - Subtle, refined */
+  /* Radius */
   --radius: 0.5rem;
 
-  /* Success - Forest green */
-  --success: 150 30% 40%;
-  --success-foreground: 40 40% 99%;
+  /* Success — Clean green */
+  --success: 152 48% 38%;                 /* #329460 */
+  --success-foreground: 0 0% 100%;
 
-  /* Warning - Warm honey */
-  --warning: 38 70% 55%;
-  --warning-foreground: 30 10% 15%;
+  /* Warning — Clear amber */
+  --warning: 38 92% 50%;                  /* #F59E0B */
+  --warning-foreground: 224 12% 13%;
 
   /* Custom tokens */
   --font-display: var(--font-fraunces), Georgia, serif;
   --font-body: var(--font-geist-sans), system-ui, sans-serif;
 
-  /* Refined shadows */
-  --shadow-sm: 0 1px 2px rgba(30, 25, 20, 0.04);
-  --shadow-md: 0 4px 12px rgba(30, 25, 20, 0.06);
-  --shadow-lg: 0 12px 40px rgba(30, 25, 20, 0.08);
+  /* Shadows — cool-toned */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 12px 40px rgba(15, 23, 42, 0.08);
 
   /* Animation */
   --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -151,7 +150,7 @@ body {
 h1, h2, h3 {
   font-family: var(--font-display);
   font-weight: 500;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
   font-optical-sizing: auto;
 }
 
@@ -244,13 +243,13 @@ h1, h2, h3 {
 
 /* Refined hover effects */
 .hover-lift {
-  transition: transform var(--duration-base) var(--ease-out),
-              box-shadow var(--duration-base) var(--ease-out);
+  transition: transform var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .hover-lift:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
 }
 
 /* Soft focus states */

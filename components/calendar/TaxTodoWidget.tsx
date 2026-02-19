@@ -112,11 +112,11 @@ export function TaxTodoWidget({ deadlines, onStatusChange }: TaxTodoWidgetProps)
   }
 
   return (
-    <Card className="border-orange-200 bg-orange-50/30">
+    <Card className="border-warning/30 bg-warning/5">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
-            <FileText className="h-5 w-5 text-orange-600" />
+            <FileText className="h-5 w-5 text-warning-foreground" />
             Att göra - Skatt
           </CardTitle>
           <div className="flex gap-2">
@@ -143,7 +143,7 @@ export function TaxTodoWidget({ deadlines, onStatusChange }: TaxTodoWidgetProps)
                 isOverdue
                   ? 'border-destructive/50 bg-destructive/5'
                   : isActionNeeded
-                  ? 'border-orange-300 bg-orange-50'
+                  ? 'border-warning/40 bg-warning/10'
                   : 'border-border bg-background'
               }`}
             >
@@ -152,7 +152,7 @@ export function TaxTodoWidget({ deadlines, onStatusChange }: TaxTodoWidgetProps)
                   {isOverdue ? (
                     <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
                   ) : (
-                    <Clock className="h-4 w-4 text-orange-600 flex-shrink-0 mt-0.5" />
+                    <Clock className="h-4 w-4 text-warning-foreground flex-shrink-0 mt-0.5" />
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium">{deadline.title}</p>

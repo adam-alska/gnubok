@@ -25,6 +25,8 @@ export default function ChartOfAccounts() {
   const [loading, setLoading] = useState(true)
   const [expandedClasses, setExpandedClasses] = useState<Set<number>>(new Set())
   const [searchQuery, setSearchQuery] = useState('')
+  const [editingSRU, setEditingSRU] = useState<string | null>(null)
+  const [sruValue, setSruValue] = useState('')
 
   useEffect(() => {
     fetchAccounts()
@@ -35,6 +37,20 @@ export default function ChartOfAccounts() {
     const { data } = await res.json()
     setAccounts(data || [])
     setLoading(false)
+  }
+
+  async function updateSRUCode(accountId: string, newSruCode: string) {
+    const supabase = createClient()
+    const trimmed = newSruCode.trim() || null
+    await supabase
+      .from('chart_of_accounts')
+      .update({ sru_code: trimmed })
+      .eq('id', accountId)
+
+    setAccounts((prev) =>
+      prev.map((a) => (a.id === accountId ? { ...a, sru_code: trimmed } : a))
+    )
+    setEditingSRU(null)
   }
 
   const toggleClass = (cls: number) => {
@@ -121,6 +137,7 @@ export default function ChartOfAccounts() {
                         <tr className="border-b text-left text-muted-foreground">
                           <th className="py-2 w-24">Konto</th>
                           <th className="py-2">Namn</th>
+                          <th className="py-2 w-20 text-center">SRU</th>
                           <th className="py-2 w-24 text-center">Typ</th>
                           <th className="py-2 w-24 text-center">Normal</th>
                         </tr>
@@ -135,6 +152,32 @@ export default function ChartOfAccounts() {
                           >
                             <td className="py-2 font-mono">{account.account_number}</td>
                             <td className="py-2">{account.account_name}</td>
+                            <td className="py-2 text-center">
+                              {editingSRU === account.id ? (
+                                <Input
+                                  value={sruValue}
+                                  onChange={(e) => setSruValue(e.target.value)}
+                                  onBlur={() => updateSRUCode(account.id, sruValue)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') updateSRUCode(account.id, sruValue)
+                                    if (e.key === 'Escape') setEditingSRU(null)
+                                  }}
+                                  className="h-7 w-16 text-xs text-center px-1"
+                                  autoFocus
+                                />
+                              ) : (
+                                <button
+                                  className="text-xs font-mono text-muted-foreground hover:text-foreground cursor-pointer min-w-[2rem]"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setEditingSRU(account.id)
+                                    setSruValue(account.sru_code || '')
+                                  }}
+                                >
+                                  {account.sru_code || '—'}
+                                </button>
+                              )}
+                            </td>
                             <td className="py-2 text-center">
                               <Badge variant="outline" className="text-xs">
                                 {account.account_type === 'asset'

@@ -45,7 +45,7 @@ export default function JournalEntryList({ periodId }: Props) {
   const statusLabel = (status: string) => {
     switch (status) {
       case 'posted':
-        return <Badge className="bg-green-100 text-green-800">Bokförd</Badge>
+        return <Badge variant="success">Bokförd</Badge>
       case 'draft':
         return <Badge variant="secondary">Utkast</Badge>
       case 'reversed':

@@ -86,13 +86,6 @@ export default async function RootPage() {
     (inv) => inv.status === 'overdue'
   ).length
 
-  // Fetch mileage entries for schablonavdrag
-  const { data: mileageEntries } = await supabase
-    .from('mileage_entries')
-    .select('*')
-    .eq('user_id', user.id)
-    .gte('date', startOfYear.split('T')[0])
-
   // Fetch bank balance (if connected)
   const { data: bankConnections } = await supabase
     .from('bank_connections')
@@ -192,7 +185,6 @@ export default async function RootPage() {
               unpaidVatTotal,
               overdueInvoicesCount: overdueCount,
               bankBalance,
-              mileageEntries: mileageEntries || [],
               deadlines: (deadlines || []) as Deadline[],
               receiptQueue,
             }}

@@ -239,6 +239,21 @@ create table extension_data (
 
 The base never imports from `extensions/`. Dependency flows one direction: extensions import from `lib/core/`, `lib/events/`, `lib/extensions/`.
 
+### Type ownership
+
+Extension-specific types live in their extension directory (e.g. `extensions/ne-bilaga/types.ts`). For convenience, `types/index.ts` re-exports them so existing importers continue to work with `import type { NEDeclaration } from '@/types'`. The canonical source is always the extension file.
+
+| Extension | Type file | Types |
+|-----------|-----------|-------|
+| `push-notifications` | `extensions/push-notifications/types.ts` | `PushSubscription`, `NotificationSettings`, `NotificationType`, `NotificationLog` |
+| `receipt-ocr` | `extensions/receipt-ocr/types.ts` | `Receipt`, `ReceiptLineItem`, `ReceiptExtractionResult`, `ExtractedLineItem`, `ReceiptMatchCandidate`, `ReceiptQueueSummary`, `CameraQualityFeedback`, etc. |
+| `ne-bilaga` | `extensions/ne-bilaga/types.ts` | `NEDeclaration`, `NEDeclarationRutor`, `NEAccountMapping`, `SRURecord`, `SRUFile`, `NE_RUTA_LABELS` |
+| `sru-export` | `extensions/sru-export/types.ts` | `SRUExportResult`, `SRUCoverageStats` |
+
+### API route convention
+
+All extension API routes live under `app/api/extensions/<extension-name>/`. No extension routes should exist outside this namespace.
+
 ---
 
 ## Add-ons

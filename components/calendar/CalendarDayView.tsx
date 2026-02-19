@@ -120,14 +120,14 @@ export function CalendarDayView({
               {paidInvoices.map((invoice) => (
                 <div
                   key={invoice.id}
-                  className="p-2 rounded-md bg-green-500/10 border border-green-500/30"
+                  className="p-2 rounded-md bg-success/10 border border-success/30"
                 >
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" />
+                    <div className="w-3 h-3 rounded-full bg-success flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-green-700">
+                      <div className="text-sm font-medium text-success">
                         Faktura {invoice.invoice_number}
-                        <span className="ml-2 text-xs bg-green-500/20 px-1.5 py-0.5 rounded">
+                        <span className="ml-2 text-xs bg-success/20 px-1.5 py-0.5 rounded">
                           Betald
                         </span>
                       </div>
@@ -151,18 +151,18 @@ export function CalendarDayView({
                     'p-2 rounded-md',
                     isDeadlineOverdue(deadline)
                       ? 'bg-destructive/10 border border-destructive/30'
-                      : 'bg-orange-500/10 border border-orange-500/30'
+                      : 'bg-warning/10 border border-warning/30'
                   )}
                 >
                   <div className="flex items-center gap-2">
                     <div className={cn(
                       'w-3 h-3 rounded-sm flex-shrink-0',
-                      isDeadlineOverdue(deadline) ? 'bg-destructive' : 'bg-orange-500'
+                      isDeadlineOverdue(deadline) ? 'bg-destructive' : 'bg-warning'
                     )} />
                     <div className="flex-1 min-w-0">
                       <div className={cn(
                         'text-sm font-medium',
-                        isDeadlineOverdue(deadline) ? 'text-destructive' : 'text-orange-700'
+                        isDeadlineOverdue(deadline) ? 'text-destructive' : 'text-warning-foreground'
                       )}>
                         {deadline.title}
                         {isDeadlineOverdue(deadline) && (
@@ -197,17 +197,17 @@ export function CalendarDayView({
               {completedDeadlines.map((deadline) => (
                 <div
                   key={deadline.id}
-                  className="p-2 rounded-md bg-green-500/10 border border-green-500/30 opacity-60"
+                  className="p-2 rounded-md bg-success/10 border border-success/30 opacity-60"
                 >
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-sm bg-green-500 flex-shrink-0" />
+                    <div className="w-3 h-3 rounded-sm bg-success flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-green-700 line-through">
+                      <div className="text-sm font-medium text-success line-through">
                         {deadline.title}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {DEADLINE_TYPE_LABELS[deadline.deadline_type] || deadline.deadline_type}
-                        <span className="ml-2 bg-green-500/20 px-1.5 py-0.5 rounded">Klar</span>
+                        <span className="ml-2 bg-success/20 px-1.5 py-0.5 rounded">Klar</span>
                       </div>
                     </div>
                   </div>

@@ -42,7 +42,7 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => makeClient()),
 }))
 
-vi.mock('@/lib/receipts/receipt-analyzer', () => ({
+vi.mock('../lib/receipt-analyzer', () => ({
   analyzeReceipt: vi.fn().mockResolvedValue({
     merchant: { name: 'ICA', orgNumber: null, vatNumber: null, isForeign: false },
     receipt: { date: '2024-06-15', time: '14:30', currency: 'SEK' },
@@ -55,13 +55,13 @@ vi.mock('@/lib/receipts/receipt-analyzer', () => ({
   }),
 }))
 
-vi.mock('@/lib/receipts/receipt-matcher', () => ({
+vi.mock('../lib/receipt-matcher', () => ({
   autoMatchReceipts: vi.fn().mockReturnValue([]),
 }))
 
 import { createClient } from '@/lib/supabase/server'
-import { analyzeReceipt } from '@/lib/receipts/receipt-analyzer'
-import { autoMatchReceipts } from '@/lib/receipts/receipt-matcher'
+import { analyzeReceipt } from '../lib/receipt-analyzer'
+import { autoMatchReceipts } from '../lib/receipt-matcher'
 import { getSettings, saveSettings, receiptOcrExtension } from '../index'
 import { extensionRegistry } from '@/lib/extensions/registry'
 

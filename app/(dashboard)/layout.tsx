@@ -42,8 +42,8 @@ export default async function DashboardLayout({
         companyName={settings.company_name || 'Min verksamhet'}
         entityType={entityType}
       />
-      <main id="main-content" className="pb-20 md:pb-0 md:pl-60" role="main">
-        <div className="max-w-4xl mx-auto px-6 py-10 md:py-12">
+      <main id="main-content" className="pb-20 md:pb-0 md:pl-[232px]" role="main">
+        <div className="max-w-5xl mx-auto px-5 py-8 md:px-8 md:py-10">
           {children}
         </div>
       </main>

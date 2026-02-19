@@ -44,9 +44,9 @@ export default function FSkattWarningCard({
     },
     info: {
       icon: Info,
-      iconColor: 'text-blue-500',
-      bgColor: 'bg-blue-50 dark:bg-blue-950/20',
-      borderColor: 'border-blue-200 dark:border-blue-800',
+      iconColor: 'text-primary',
+      bgColor: 'bg-primary/5',
+      borderColor: 'border-primary/20',
       badgeVariant: 'outline' as const,
     },
     warning: {

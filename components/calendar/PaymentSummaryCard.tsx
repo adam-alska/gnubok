@@ -26,8 +26,8 @@ export function PaymentSummaryCard({ invoices, year, month }: PaymentSummaryCard
         {/* Expected */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <TrendingUp className="h-4 w-4 text-primary" />
+            <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Förväntat</p>
@@ -41,8 +41,8 @@ export function PaymentSummaryCard({ invoices, year, month }: PaymentSummaryCard
         {summary.overdueCount > 0 && (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center">
-                <AlertTriangle className="h-4 w-4 text-destructive" />
+              <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
+                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Förfallen</p>
@@ -60,8 +60,8 @@ export function PaymentSummaryCard({ invoices, year, month }: PaymentSummaryCard
         {/* Paid */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-success/10 flex items-center justify-center">
-              <CheckCircle className="h-4 w-4 text-success" />
+            <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
+              <CheckCircle className="h-4 w-4 text-muted-foreground" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Betald</p>
@@ -77,8 +77,8 @@ export function PaymentSummaryCard({ invoices, year, month }: PaymentSummaryCard
         {summary.pendingCount > 0 && summary.overdueCount < summary.pendingCount && (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-warning/10 flex items-center justify-center">
-                <Clock className="h-4 w-4 text-warning" />
+              <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
+                <Clock className="h-4 w-4 text-muted-foreground" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Väntande</p>

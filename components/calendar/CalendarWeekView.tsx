@@ -114,7 +114,7 @@ export function CalendarWeekView({
                     'text-xs p-1 mb-1 rounded truncate',
                     isDeadlineOverdue(deadline)
                       ? 'bg-destructive/20 text-destructive'
-                      : 'bg-orange-500/20 text-orange-700'
+                      : 'bg-warning/20 text-warning-foreground'
                   )}
                   title={deadline.title}
                 >

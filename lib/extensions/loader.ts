@@ -1,6 +1,10 @@
 import { extensionRegistry } from './registry'
 import { receiptOcrExtension } from '@/extensions/receipt-ocr'
 import { aiCategorizationExtension } from '@/extensions/ai-categorization'
+import { pushNotificationsExtension } from '@/extensions/push-notifications'
+import { sruExportExtension } from '@/extensions/sru-export'
+import { neBilagaExtension } from '@/extensions/ne-bilaga'
+import { aiChatExtension } from '@/extensions/ai-chat'
 import type { Extension } from './types'
 
 /**
@@ -12,6 +16,10 @@ import type { Extension } from './types'
 const FIRST_PARTY_EXTENSIONS: Extension[] = [
   receiptOcrExtension,
   aiCategorizationExtension,
+  pushNotificationsExtension,
+  sruExportExtension,
+  neBilagaExtension,
+  aiChatExtension,
 ]
 
 let loaded = false

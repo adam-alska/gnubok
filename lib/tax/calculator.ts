@@ -1,4 +1,4 @@
-import type { EntityType, TaxEstimate, TaxWarningLevel, TaxWarningStatus, SchablonavdragSummary } from '@/types'
+import type { EntityType, TaxEstimate, TaxWarningLevel, TaxWarningStatus } from '@/types'
 
 // Current Swedish tax rates (2026)
 const TAX_RATES = {
@@ -71,20 +71,16 @@ export function calculateGrundavdrag(taxableIncome: number): number {
  * Calculate tax estimates for Enskild Firma
  * @param netIncome - Net income after expenses
  * @param preliminaryTaxPaidYTD - Preliminary tax paid year to date
- * @param schablonavdrag - Optional schablonavdrag summary for deductions
+ * @param _reserved - Reserved for future use (deductions extension)
  * @param momsFromUnpaidInvoices - VAT from unpaid invoices that needs to be paid
  */
 export function calculateEFTax(
   netIncome: number,
   preliminaryTaxPaidYTD: number = 0,
-  schablonavdrag?: SchablonavdragSummary | null,
+  _reserved?: unknown,
   momsFromUnpaidInvoices: number = 0
 ): TaxEstimate {
-  // Apply schablonavdrag deductions to net income
-  const schablonavdragDeduction = schablonavdrag?.total_deduction || 0
-  const adjustedNetIncome = netIncome - schablonavdragDeduction
-
-  if (adjustedNetIncome <= 0) {
+  if (netIncome <= 0) {
     return {
       egenavgifter: 0,
       income_tax: 0,
@@ -93,17 +89,16 @@ export function calculateEFTax(
       total_tax_liability: momsFromUnpaidInvoices,
       preliminary_paid_ytd: preliminaryTaxPaidYTD,
       difference: momsFromUnpaidInvoices - preliminaryTaxPaidYTD,
-      schablonavdrag_deduction: schablonavdragDeduction,
     }
   }
 
   // Egenavgifter (self-employment contributions) - 28.97%
-  const egenavgifter = adjustedNetIncome * TAX_RATES.egenavgifter
+  const egenavgifter = netIncome * TAX_RATES.egenavgifter
 
   // Taxable income (after egenavgifter deduction)
   // 25% of egenavgifter is deductible from taxable income
   const egenavgifterDeduction = egenavgifter * 0.25
-  const taxableIncome = adjustedNetIncome - egenavgifterDeduction
+  const taxableIncome = netIncome - egenavgifterDeduction
 
   // Calculate progressive grundavdrag based on income level
   const grundavdrag = calculateGrundavdrag(taxableIncome)
@@ -128,7 +123,6 @@ export function calculateEFTax(
     total_tax_liability: Math.round(totalTax),
     preliminary_paid_ytd: preliminaryTaxPaidYTD,
     difference: Math.round(totalTax - preliminaryTaxPaidYTD),
-    schablonavdrag_deduction: schablonavdragDeduction,
     grundavdrag: Math.round(grundavdrag),
   }
 }

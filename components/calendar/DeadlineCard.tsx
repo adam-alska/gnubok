@@ -76,7 +76,7 @@ export function DeadlineCard({
           <div
             className={cn(
               'w-2 h-2 rounded-full flex-shrink-0',
-              deadline.priority === 'critical' ? 'bg-destructive' : 'bg-orange-500'
+              deadline.priority === 'critical' ? 'bg-destructive' : 'bg-warning'
             )}
           />
         )}

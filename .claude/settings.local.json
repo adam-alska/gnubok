@@ -4,7 +4,8 @@
       "mcp__ide__getDiagnostics",
       "Bash(grep:*)",
       "Bash(xargs:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(find:*)"
     ]
   }
 }

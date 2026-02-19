@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import type { CompanySettings, BankConnection } from '@/types'
 import { BankSelector, type Bank } from '@/components/banking/BankSelector'
-import { NotificationSettings } from '@/components/settings/NotificationSettings'
+import { NotificationSettings } from '@/extensions/push-notifications/NotificationSettings'
 import { CalendarFeedSettings } from '@/components/settings/CalendarFeedSettings'
 
 export default function SettingsPage() {

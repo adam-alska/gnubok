@@ -477,8 +477,6 @@ export interface TaxEstimate {
   preliminary_paid_ytd: number
   difference: number  // Positive = underpaying
 
-  // Schablonavdrag (if applied)
-  schablonavdrag_deduction?: number
 }
 
 // ============================================================
@@ -753,64 +751,6 @@ export interface CreateFiscalPeriodInput {
   period_end: string
 }
 
-// ============================================================
-// Schablonavdrag (Standard Deductions) Types
-// ============================================================
-
-// Housing type for hemmakontor deduction
-export type HousingType = 'villa' | 'apartment' // villa = 2000 kr/year, apartment = 4000 kr/year
-
-// Schablonavdrag settings stored in company_settings
-export interface SchablonavdragSettings {
-  hemmakontor_enabled: boolean
-  hemmakontor_housing_type?: HousingType // 'villa' or 'apartment' (default: apartment)
-  bil_enabled: boolean
-}
-
-// Mileage entry for bil schablonavdrag
-export interface MileageEntry {
-  id: string
-  user_id: string
-  date: string
-  distance_km: number
-  purpose: string
-  from_location: string | null
-  to_location: string | null
-  rate_per_km: number
-  total_deduction: number
-  created_at: string
-  updated_at: string
-}
-
-// Input for creating mileage entries
-export interface CreateMileageEntryInput {
-  date: string
-  distance_km: number
-  purpose: string
-  from_location?: string
-  to_location?: string
-}
-
-// Schablonavdrag summary for a year
-export interface SchablonavdragSummary {
-  year: number
-  hemmakontor: {
-    enabled: boolean
-    housing_type: HousingType
-    months_active: number
-    annual_amount: number // 2000 for villa, 4000 for apartment
-    deduction: number
-  }
-  mileage: {
-    enabled: boolean
-    total_km: number
-    rate_per_km: number // 2.50 kr/km (25 kr/mil)
-    total_deduction: number
-    entries_count: number
-  }
-  total_deduction: number
-}
-
 // Tax warning levels
 export type TaxWarningLevel = 'safe' | 'info' | 'warning' | 'danger'
 
@@ -963,49 +903,9 @@ export interface CreateDeadlineInput {
 }
 
 // ============================================================
-// Push Notification Types
+// Push Notification Types (canonical source: extensions/push-notifications/types.ts)
 // ============================================================
-
-// Push subscription for Web Push API
-export interface PushSubscription {
-  id: string
-  user_id: string
-  endpoint: string
-  p256dh: string
-  auth: string
-  user_agent: string | null
-  is_active: boolean
-  last_used_at: string | null
-  created_at: string
-}
-
-// Notification settings per user
-export interface NotificationSettings {
-  id: string
-  user_id: string
-  tax_deadlines_enabled: boolean
-  invoice_reminders_enabled: boolean
-  quiet_start: string // time format "HH:MM"
-  quiet_end: string   // time format "HH:MM"
-  email_enabled: boolean
-  push_enabled: boolean
-  created_at: string
-  updated_at: string
-}
-
-// Notification type for logging
-export type NotificationType = 'tax_deadline' | 'invoice_due' | 'invoice_overdue'
-
-// Notification log entry
-export interface NotificationLog {
-  id: string
-  user_id: string
-  notification_type: NotificationType
-  reference_id: string
-  days_before: number
-  sent_at: string
-  delivery_status: 'sent' | 'delivered' | 'failed'
-}
+export type { PushSubscription, NotificationSettings, NotificationType, NotificationLog } from '@/extensions/push-notifications/types'
 
 // ============================================================
 // Calendar Feed Types (ICS)
@@ -1099,178 +999,10 @@ export interface SIEAccountMapping {
 }
 
 // ============================================================
-// Receipt Types (Kvittohantering)
+// Receipt Types (canonical source: extensions/receipt-ocr/types.ts)
 // ============================================================
-
-// Receipt extraction status
-export type ReceiptStatus = 'pending' | 'processing' | 'extracted' | 'confirmed' | 'error'
-
-// Receipt record
-export interface Receipt {
-  id: string
-  user_id: string
-
-  // Image storage
-  image_url: string
-  image_thumbnail_url: string | null
-
-  // Extraction status
-  status: ReceiptStatus
-  extraction_confidence: number | null
-
-  // Extracted header data
-  merchant_name: string | null
-  merchant_org_number: string | null
-  merchant_vat_number: string | null
-  receipt_date: string | null
-  receipt_time: string | null
-  total_amount: number | null
-  currency: string
-  vat_amount: number | null
-
-  // Special flags
-  is_restaurant: boolean
-  is_systembolaget: boolean
-  is_foreign_merchant: boolean
-
-  // Restaurant representation data
-  representation_persons: number | null
-  representation_purpose: string | null
-
-  // Transaction matching
-  matched_transaction_id: string | null
-  match_confidence: number | null
-
-  // Raw extraction data
-  raw_extraction: ReceiptExtractionResult | null
-
-  created_at: string
-  updated_at: string
-
-  // Relations (populated when fetched)
-  line_items?: ReceiptLineItem[]
-  matched_transaction?: Transaction
-}
-
-// Receipt line item record
-export interface ReceiptLineItem {
-  id: string
-  receipt_id: string
-
-  // Extracted data
-  description: string
-  quantity: number
-  unit_price: number | null
-  line_total: number
-  vat_rate: number | null
-  vat_amount: number | null
-
-  // Classification
-  is_business: boolean | null
-  category: TransactionCategory | null
-  bas_account: string | null
-
-  // Confidence
-  extraction_confidence: number | null
-  suggested_category: string | null
-
-  sort_order: number
-  created_at: string
-}
-
-// AI extraction result from Claude Vision
-export interface ReceiptExtractionResult {
-  merchant: {
-    name: string | null
-    orgNumber: string | null
-    vatNumber: string | null
-    isForeign: boolean
-  }
-  receipt: {
-    date: string | null
-    time: string | null
-    currency: string
-  }
-  lineItems: ExtractedLineItem[]
-  totals: {
-    subtotal: number | null
-    vatAmount: number | null
-    total: number | null
-  }
-  flags: {
-    isRestaurant: boolean
-    isSystembolaget: boolean
-    isForeignMerchant: boolean
-  }
-  confidence: number
-}
-
-// Extracted line item from AI
-export interface ExtractedLineItem {
-  description: string
-  quantity: number
-  unitPrice: number | null
-  lineTotal: number
-  vatRate: number | null
-  suggestedCategory: string | null
-  confidence?: number
-}
-
-// Match candidate for receipt-to-transaction matching
-export interface ReceiptMatchCandidate {
-  transaction: Transaction
-  confidence: number
-  matchReasons: string[]
-  dateVariance: number
-  amountVariance: number
-}
-
-// Input for creating a receipt
-export interface CreateReceiptInput {
-  image_url: string
-  image_thumbnail_url?: string
-}
-
-// Input for confirming receipt line items
-export interface ConfirmReceiptInput {
-  line_items: ConfirmLineItemInput[]
-  matched_transaction_id?: string
-  representation_persons?: number
-  representation_purpose?: string
-}
-
-export interface ConfirmLineItemInput {
-  id: string
-  is_business: boolean
-  category?: TransactionCategory
-  bas_account?: string
-}
-
-// Receipt queue summary
-export interface ReceiptQueueSummary {
-  unmatched_receipts_count: number
-  unmatched_transactions_count: number
-  pending_review_count: number
-  streak_count: number
-}
-
-// Camera quality feedback
-export interface CameraQualityFeedback {
-  lightingOk: boolean
-  distanceOk: boolean
-  focusOk: boolean
-  readyToCapture: boolean
-  message?: string
-}
-
-// Swedish labels for receipt status
-export const RECEIPT_STATUS_LABELS: Record<ReceiptStatus, string> = {
-  pending: 'Väntar',
-  processing: 'Analyserar',
-  extracted: 'Extraherat',
-  confirmed: 'Bekräftat',
-  error: 'Fel'
-}
+export type { ReceiptStatus, Receipt, ReceiptLineItem, ReceiptExtractionResult, ExtractedLineItem, ReceiptMatchCandidate, CreateReceiptInput, ConfirmReceiptInput, ConfirmLineItemInput, ReceiptQueueSummary, CameraQualityFeedback } from '@/extensions/receipt-ocr/types'
+export { RECEIPT_STATUS_LABELS } from '@/extensions/receipt-ocr/types'
 
 // ============================================================
 // VAT Declaration Types (Momsdeklaration)
@@ -1344,89 +1076,15 @@ export interface VatDeclarationRequest {
 }
 
 // ============================================================
-// NE Declaration Types (Enskild Firma - Sole Proprietorship)
+// NE Declaration Types (canonical source: extensions/ne-bilaga/types.ts)
 // ============================================================
+export type { NEDeclarationRutor, NEAccountMapping, NEDeclaration, SRURecord, SRUFile } from '@/extensions/ne-bilaga/types'
+export { NE_RUTA_LABELS } from '@/extensions/ne-bilaga/types'
 
-// NE-bilaga rutor (NE appendix boxes)
-export interface NEDeclarationRutor {
-  R1: number   // Försäljning med 25% moms (3000-3499 excl 3100)
-  R2: number   // Momsfria intäkter (3100, 3970, 3980)
-  R3: number   // Bil/bostadsförmån (3200)
-  R4: number   // Ränteintäkter (8310-8330)
-  R5: number   // Varuinköp (4000-4990)
-  R6: number   // Övriga kostnader (5000-6990, 7970)
-  R7: number   // Lönekostnader (7000-7699)
-  R8: number   // Räntekostnader (8400-8499)
-  R9: number   // Avskrivningar fastighet (7820)
-  R10: number  // Avskrivningar övrigt (7700-7899 excl 7820)
-  R11: number  // Årets resultat (beräknat)
-}
-
-// NE account mapping configuration
-export interface NEAccountMapping {
-  ruta: keyof NEDeclarationRutor
-  description: string
-  accountRanges: Array<{
-    start: string
-    end: string
-    exclude?: string[]
-  }>
-  isExpense: boolean  // true = debit normal, false = credit normal
-}
-
-// NE declaration response
-export interface NEDeclaration {
-  fiscalYear: {
-    id: string
-    name: string
-    start: string
-    end: string
-    isClosed: boolean
-  }
-  rutor: NEDeclarationRutor
-  // Detailed breakdown per ruta
-  breakdown: Record<keyof NEDeclarationRutor, {
-    accounts: Array<{
-      accountNumber: string
-      accountName: string
-      amount: number
-    }>
-    total: number
-  }>
-  // Company info for SRU
-  companyInfo: {
-    companyName: string
-    orgNumber: string | null
-  }
-  // Warnings
-  warnings: string[]
-}
-
-// SRU file format types
-export interface SRURecord {
-  fieldCode: string
-  value: string | number
-}
-
-export interface SRUFile {
-  records: SRURecord[]
-  generatedAt: string
-}
-
-// Labels for NE rutor
-export const NE_RUTA_LABELS: Record<keyof NEDeclarationRutor, string> = {
-  R1: 'Försäljning med moms (25%)',
-  R2: 'Momsfria intäkter',
-  R3: 'Bil/bostadsförmån',
-  R4: 'Ränteintäkter',
-  R5: 'Varuinköp',
-  R6: 'Övriga kostnader',
-  R7: 'Lönekostnader',
-  R8: 'Räntekostnader',
-  R9: 'Avskrivningar fastighet',
-  R10: 'Avskrivningar övriga tillgångar',
-  R11: 'Årets resultat'
-}
+// ============================================================
+// SRU Export Types (canonical source: extensions/sru-export/types.ts)
+// ============================================================
+export type { SRUExportResult, SRUCoverageStats } from '@/extensions/sru-export/types'
 
 // Labels for VAT rutor
 export const VAT_RUTA_LABELS: Record<keyof VatDeclarationRutor, string> = {

@@ -47,11 +47,8 @@ export function EmptyState({
   return (
     <div className={cn('flex flex-col items-center justify-center py-12 px-4 text-center', className)}>
       {Icon && (
-        <div className="relative mb-6">
-          {/* Background pattern */}
-          <div className="absolute inset-0 -m-4 rounded-full bg-gradient-to-br from-secondary/60 to-muted/30 blur-xl" />
-          {/* Icon container */}
-          <div className="relative p-5 rounded-full bg-gradient-to-br from-muted/80 to-secondary/50 ring-1 ring-border/20">
+        <div className="mb-6">
+          <div className="p-5 rounded-full bg-muted">
             <Icon className="h-8 w-8 text-muted-foreground" />
           </div>
         </div>
@@ -63,7 +60,7 @@ export function EmptyState({
         <div className="flex flex-col sm:flex-row items-center gap-3">
           {actionHref && actionLabel && (
             <Link href={actionHref}>
-              <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">
+              <Button>
                 <Plus className="mr-2 h-4 w-4" />
                 {actionLabel}
               </Button>

@@ -341,13 +341,13 @@ export default function SwipeCategorizationView({
 
                 {/* Potential Invoice Match */}
                 {currentTransaction.potential_invoice && (
-                  <div className="p-4 rounded-lg border-2 border-green-500/50 bg-green-50/50 dark:bg-green-950/20 space-y-2">
+                  <div className="p-4 rounded-lg border-2 border-success/40 bg-success/5 space-y-2">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-green-600">
+                      <div className="flex items-center gap-2 text-success">
                         <FileText className="h-5 w-5" />
                         <span className="font-semibold text-sm">Fakturamatchning hittad</span>
                       </div>
-                      <Badge variant="outline" className="text-green-600 border-green-600">
+                      <Badge variant="outline" className="text-success border-success">
                         Match
                       </Badge>
                     </div>
@@ -358,7 +358,7 @@ export default function SwipeCategorizationView({
                       <p className="text-muted-foreground">
                         {currentTransaction.potential_invoice.customer?.name || 'Okänd kund'}
                       </p>
-                      <p className="font-medium text-green-600">
+                      <p className="font-medium text-success">
                         {formatCurrency(
                           currentTransaction.potential_invoice.total,
                           currentTransaction.potential_invoice.currency
@@ -410,7 +410,7 @@ export default function SwipeCategorizationView({
           {/* Invoice match button - primary action when there's a match */}
           {currentTransaction.potential_invoice && onMatchInvoice && (
             <Button
-              className="w-full bg-green-600 hover:bg-green-700 text-white"
+              className="w-full bg-success hover:bg-success/90 text-success-foreground"
               onClick={handleMatchInvoice}
               disabled={isProcessing}
             >
