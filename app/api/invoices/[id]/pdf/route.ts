@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { InvoicePDF } from '@/lib/invoice/pdf-template'
 import type { Invoice, InvoiceItem, Customer, CompanySettings } from '@/types'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
 
 export async function GET(
   request: Request,
@@ -16,6 +17,9 @@ export async function GET(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
 
   // Fetch invoice with customer and items
   const { data: invoice, error: invoiceError } = await supabase

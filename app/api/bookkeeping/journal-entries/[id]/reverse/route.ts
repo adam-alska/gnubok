@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { reverseEntry } from '@/lib/bookkeeping/engine'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
 
 export async function POST(
   request: Request,
@@ -13,6 +14,9 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
 
   try {
     const reversalEntry = await reverseEntry(user.id, id)

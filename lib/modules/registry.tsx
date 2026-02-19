@@ -1,5 +1,7 @@
 import type { ComponentType } from 'react'
+import dynamic from 'next/dynamic'
 import type { ModuleItem } from '@/lib/modules-data'
+import { ModuleLoadingSkeleton } from '@/components/modules/shared/ModuleLoadingSkeleton'
 
 export interface ModuleWorkspaceProps {
   module: ModuleItem
@@ -20,840 +22,1060 @@ export function getWorkspaceComponent(sector: string, slug: string): WorkspaceCo
   return registry[`${sector}/${slug}`] ?? null
 }
 
-// ── Restaurang: Bokföring ────────────────────────────────────
-import { RestaurangkontoplanWorkspace } from '@/components/modules/restaurang/RestaurangkontoplanWorkspace'
-import { MomssplitWorkspace } from '@/components/modules/restaurang/MomssplitWorkspace'
-import { DagskassaavstamningWorkspace } from '@/components/modules/restaurang/DagskassaavstamningWorkspace'
-import { TipsbokforingWorkspace } from '@/components/modules/restaurang/TipsbokforingWorkspace'
-import { PersonalliggareWorkspace } from '@/components/modules/restaurang/PersonalliggareWorkspace'
-import { AlkoholpunktskattWorkspace } from '@/components/modules/restaurang/AlkoholpunktskattWorkspace'
-import { RepresentationsbokforingWorkspace } from '@/components/modules/restaurang/RepresentationsbokforingWorkspace'
 
-registerWorkspace('restaurang', 'restaurangkontoplan', RestaurangkontoplanWorkspace)
-registerWorkspace('restaurang', 'momssplit-mat-dryck', MomssplitWorkspace)
-registerWorkspace('restaurang', 'dagskassaavstamning', DagskassaavstamningWorkspace)
-registerWorkspace('restaurang', 'tipsbokforing', TipsbokforingWorkspace)
-registerWorkspace('restaurang', 'personalliggare', PersonalliggareWorkspace)
-registerWorkspace('restaurang', 'alkoholpunktskatt', AlkoholpunktskattWorkspace)
-registerWorkspace('restaurang', 'representationsbokforing', RepresentationsbokforingWorkspace)
+// ── Restaurang: Bokföring ────────────────────────────────────
+registerWorkspace('restaurang', 'restaurangkontoplan',
+  dynamic(() => import('@/components/modules/restaurang/RestaurangkontoplanWorkspace').then(m => m.RestaurangkontoplanWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('restaurang', 'momssplit-mat-dryck',
+  dynamic(() => import('@/components/modules/restaurang/MomssplitWorkspace').then(m => m.MomssplitWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('restaurang', 'dagskassaavstamning',
+  dynamic(() => import('@/components/modules/restaurang/DagskassaavstamningWorkspace').then(m => m.DagskassaavstamningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('restaurang', 'tipsbokforing',
+  dynamic(() => import('@/components/modules/restaurang/TipsbokforingWorkspace').then(m => m.TipsbokforingWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('restaurang', 'personalliggare',
+  dynamic(() => import('@/components/modules/restaurang/PersonalliggareWorkspace').then(m => m.PersonalliggareWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('restaurang', 'alkoholpunktskatt',
+  dynamic(() => import('@/components/modules/restaurang/AlkoholpunktskattWorkspace').then(m => m.AlkoholpunktskattWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('restaurang', 'representationsbokforing',
+  dynamic(() => import('@/components/modules/restaurang/RepresentationsbokforingWorkspace').then(m => m.RepresentationsbokforingWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Restaurang: Rapport ──────────────────────────────────────
-import { MatkostnadWorkspace } from '@/components/modules/restaurang/MatkostnadWorkspace'
-import { PersonalkostnadWorkspace } from '@/components/modules/restaurang/PersonalkostnadWorkspace'
-import { SvinnrapportWorkspace } from '@/components/modules/restaurang/SvinnrapportWorkspace'
-import { RevpashWorkspace } from '@/components/modules/restaurang/RevpashWorkspace'
-
-registerWorkspace('restaurang', 'matkostnad', MatkostnadWorkspace)
-registerWorkspace('restaurang', 'personalkostnad-vs-omsattning', PersonalkostnadWorkspace)
-registerWorkspace('restaurang', 'svinnrapport', SvinnrapportWorkspace)
-registerWorkspace('restaurang', 'revpash', RevpashWorkspace)
+registerWorkspace('restaurang', 'matkostnad',
+  dynamic(() => import('@/components/modules/restaurang/MatkostnadWorkspace').then(m => m.MatkostnadWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('restaurang', 'personalkostnad-vs-omsattning',
+  dynamic(() => import('@/components/modules/restaurang/PersonalkostnadWorkspace').then(m => m.PersonalkostnadWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('restaurang', 'svinnrapport',
+  dynamic(() => import('@/components/modules/restaurang/SvinnrapportWorkspace').then(m => m.SvinnrapportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('restaurang', 'revpash',
+  dynamic(() => import('@/components/modules/restaurang/RevpashWorkspace').then(m => m.RevpashWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Restaurang: Import ───────────────────────────────────────
-import { ZrapportImportWorkspace } from '@/components/modules/restaurang/ZrapportImportWorkspace'
-import { LeverantorsfakturaImportWorkspace } from '@/components/modules/restaurang/LeverantorsfakturaImportWorkspace'
-
-registerWorkspace('restaurang', 'z-rapport-import', ZrapportImportWorkspace)
-registerWorkspace('restaurang', 'leverantorsfaktura-import', LeverantorsfakturaImportWorkspace)
+registerWorkspace('restaurang', 'z-rapport-import',
+  dynamic(() => import('@/components/modules/restaurang/ZrapportImportWorkspace').then(m => m.ZrapportImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('restaurang', 'leverantorsfaktura-import',
+  dynamic(() => import('@/components/modules/restaurang/LeverantorsfakturaImportWorkspace').then(m => m.LeverantorsfakturaImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Restaurang: Operativ ─────────────────────────────────────
-import { MenyhanteringWorkspace } from '@/components/modules/restaurang/MenyhanteringWorkspace'
-import { BordsbokningWorkspace } from '@/components/modules/restaurang/BordsbokningWorkspace'
-import { ReceptkalkylWorkspace } from '@/components/modules/restaurang/ReceptkalkylWorkspace'
-import { PersonalschemaWorkspace } from '@/components/modules/restaurang/PersonalschemaWorkspace'
-import { LeverantorsbestallningWorkspace } from '@/components/modules/restaurang/LeverantorsbestallningWorkspace'
-
-registerWorkspace('restaurang', 'menyhantering', MenyhanteringWorkspace)
-registerWorkspace('restaurang', 'bordsbokning', BordsbokningWorkspace)
-registerWorkspace('restaurang', 'receptkalkyl', ReceptkalkylWorkspace)
-registerWorkspace('restaurang', 'personalschema', PersonalschemaWorkspace)
-registerWorkspace('restaurang', 'leverantorsbestallning', LeverantorsbestallningWorkspace)
+registerWorkspace('restaurang', 'menyhantering',
+  dynamic(() => import('@/components/modules/restaurang/MenyhanteringWorkspace').then(m => m.MenyhanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('restaurang', 'bordsbokning',
+  dynamic(() => import('@/components/modules/restaurang/BordsbokningWorkspace').then(m => m.BordsbokningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('restaurang', 'receptkalkyl',
+  dynamic(() => import('@/components/modules/restaurang/ReceptkalkylWorkspace').then(m => m.ReceptkalkylWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('restaurang', 'personalschema',
+  dynamic(() => import('@/components/modules/restaurang/PersonalschemaWorkspace').then(m => m.PersonalschemaWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('restaurang', 'leverantorsbestallning',
+  dynamic(() => import('@/components/modules/restaurang/LeverantorsbestallningWorkspace').then(m => m.LeverantorsbestallningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Hotell: Bokföring ────────────────────────────────────────
-import { HotellkontoplanWorkspace } from '@/components/modules/hotell/HotellkontoplanWorkspace'
-import { MomssplitBoendeTjanstWorkspace } from '@/components/modules/hotell/MomssplitBoendeTjanstWorkspace'
-import { ForskottsbetalningWorkspace } from '@/components/modules/hotell/ForskottsbetalningWorkspace'
-import { ProvisionshanteringWorkspace } from '@/components/modules/hotell/ProvisionshanteringWorkspace'
-import { NattrevisionWorkspace } from '@/components/modules/hotell/NattrevisionWorkspace'
-
-registerWorkspace('hotell', 'hotellkontoplan', HotellkontoplanWorkspace)
-registerWorkspace('hotell', 'momssplit-boende-tjanst', MomssplitBoendeTjanstWorkspace)
-registerWorkspace('hotell', 'forskottsbetalning', ForskottsbetalningWorkspace)
-registerWorkspace('hotell', 'provisionshantering', ProvisionshanteringWorkspace)
-registerWorkspace('hotell', 'nattrevision', NattrevisionWorkspace)
+registerWorkspace('hotell', 'hotellkontoplan',
+  dynamic(() => import('@/components/modules/hotell/HotellkontoplanWorkspace').then(m => m.HotellkontoplanWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('hotell', 'momssplit-boende-tjanst',
+  dynamic(() => import('@/components/modules/hotell/MomssplitBoendeTjanstWorkspace').then(m => m.MomssplitBoendeTjanstWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('hotell', 'forskottsbetalning',
+  dynamic(() => import('@/components/modules/hotell/ForskottsbetalningWorkspace').then(m => m.ForskottsbetalningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('hotell', 'provisionshantering',
+  dynamic(() => import('@/components/modules/hotell/ProvisionshanteringWorkspace').then(m => m.ProvisionshanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('hotell', 'nattrevision',
+  dynamic(() => import('@/components/modules/hotell/NattrevisionWorkspace').then(m => m.NattrevisionWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Hotell: Rapport ──────────────────────────────────────────
-import { RevparWorkspace } from '@/components/modules/hotell/RevparWorkspace'
-import { AdrWorkspace } from '@/components/modules/hotell/AdrWorkspace'
-import { BelaggningsgradWorkspace } from '@/components/modules/hotell/BelaggningsgradWorkspace'
-import { KanallonsamhetWorkspace } from '@/components/modules/hotell/KanallonsamhetWorkspace'
-
-registerWorkspace('hotell', 'revpar', RevparWorkspace)
-registerWorkspace('hotell', 'adr', AdrWorkspace)
-registerWorkspace('hotell', 'belaggningsgrad', BelaggningsgradWorkspace)
-registerWorkspace('hotell', 'kanallonsamhet', KanallonsamhetWorkspace)
+registerWorkspace('hotell', 'revpar',
+  dynamic(() => import('@/components/modules/hotell/RevparWorkspace').then(m => m.RevparWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('hotell', 'adr',
+  dynamic(() => import('@/components/modules/hotell/AdrWorkspace').then(m => m.AdrWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('hotell', 'belaggningsgrad',
+  dynamic(() => import('@/components/modules/hotell/BelaggningsgradWorkspace').then(m => m.BelaggningsgradWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('hotell', 'kanallonsamhet',
+  dynamic(() => import('@/components/modules/hotell/KanallonsamhetWorkspace').then(m => m.KanallonsamhetWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Hotell: Import ───────────────────────────────────────────
-import { PmsImportWorkspace } from '@/components/modules/hotell/PmsImportWorkspace'
-import { ChannelManagerRapportWorkspace } from '@/components/modules/hotell/ChannelManagerRapportWorkspace'
-
-registerWorkspace('hotell', 'pms-import', PmsImportWorkspace)
-registerWorkspace('hotell', 'channel-manager-rapport', ChannelManagerRapportWorkspace)
+registerWorkspace('hotell', 'pms-import',
+  dynamic(() => import('@/components/modules/hotell/PmsImportWorkspace').then(m => m.PmsImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('hotell', 'channel-manager-rapport',
+  dynamic(() => import('@/components/modules/hotell/ChannelManagerRapportWorkspace').then(m => m.ChannelManagerRapportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Hotell: Operativ ─────────────────────────────────────────
-import { RumsbokningWorkspace } from '@/components/modules/hotell/RumsbokningWorkspace'
-import { GastregisterWorkspace } from '@/components/modules/hotell/GastregisterWorkspace'
-import { StadschemaWorkspace } from '@/components/modules/hotell/StadschemaWorkspace'
-import { SasongsplaneringWorkspace } from '@/components/modules/hotell/SasongsplaneringWorkspace'
-import { GastkommunikationWorkspace } from '@/components/modules/hotell/GastkommunikationWorkspace'
-
-registerWorkspace('hotell', 'rumsbokning', RumsbokningWorkspace)
-registerWorkspace('hotell', 'gastregister', GastregisterWorkspace)
-registerWorkspace('hotell', 'stadschema', StadschemaWorkspace)
-registerWorkspace('hotell', 'sasongsplanering', SasongsplaneringWorkspace)
-registerWorkspace('hotell', 'gastkommunikation', GastkommunikationWorkspace)
+registerWorkspace('hotell', 'rumsbokning',
+  dynamic(() => import('@/components/modules/hotell/RumsbokningWorkspace').then(m => m.RumsbokningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('hotell', 'gastregister',
+  dynamic(() => import('@/components/modules/hotell/GastregisterWorkspace').then(m => m.GastregisterWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('hotell', 'stadschema',
+  dynamic(() => import('@/components/modules/hotell/StadschemaWorkspace').then(m => m.StadschemaWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('hotell', 'sasongsplanering',
+  dynamic(() => import('@/components/modules/hotell/SasongsplaneringWorkspace').then(m => m.SasongsplaneringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('hotell', 'gastkommunikation',
+  dynamic(() => import('@/components/modules/hotell/GastkommunikationWorkspace').then(m => m.GastkommunikationWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Tech: Bokföring ──────────────────────────────────────────
-import { ItKontoplanWorkspace } from '@/components/modules/tech/ItKontoplanWorkspace'
-import { ProjektredovisningWorkspace } from '@/components/modules/tech/ProjektredovisningWorkspace'
-import { FouAvdragWorkspace } from '@/components/modules/tech/FouAvdragWorkspace'
-import { LicensavskrivningWorkspace } from '@/components/modules/tech/LicensavskrivningWorkspace'
-import { EuTjanstmomsWorkspace } from '@/components/modules/tech/EuTjanstmomsWorkspace'
-
-registerWorkspace('tech', 'it-kontoplan', ItKontoplanWorkspace)
-registerWorkspace('tech', 'projektredovisning', ProjektredovisningWorkspace)
-registerWorkspace('tech', 'fou-avdrag', FouAvdragWorkspace)
-registerWorkspace('tech', 'licensavskrivning', LicensavskrivningWorkspace)
-registerWorkspace('tech', 'eu-tjanstmoms', EuTjanstmomsWorkspace)
+registerWorkspace('tech', 'it-kontoplan',
+  dynamic(() => import('@/components/modules/tech/ItKontoplanWorkspace').then(m => m.ItKontoplanWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('tech', 'projektredovisning',
+  dynamic(() => import('@/components/modules/tech/ProjektredovisningWorkspace').then(m => m.ProjektredovisningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('tech', 'fou-avdrag',
+  dynamic(() => import('@/components/modules/tech/FouAvdragWorkspace').then(m => m.FouAvdragWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('tech', 'licensavskrivning',
+  dynamic(() => import('@/components/modules/tech/LicensavskrivningWorkspace').then(m => m.LicensavskrivningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('tech', 'eu-tjanstmoms',
+  dynamic(() => import('@/components/modules/tech/EuTjanstmomsWorkspace').then(m => m.EuTjanstmomsWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Tech: Rapport ────────────────────────────────────────────
-import { DebiteringsgradWorkspace } from '@/components/modules/tech/DebiteringsgradWorkspace'
-import { ProjektlonsamhetWorkspace } from '@/components/modules/tech/ProjektlonsamhetWorkspace'
-import { MrrArrWorkspace } from '@/components/modules/tech/MrrArrWorkspace'
-
-registerWorkspace('tech', 'debiteringsgrad', DebiteringsgradWorkspace)
-registerWorkspace('tech', 'projektlonsamhet', ProjektlonsamhetWorkspace)
-registerWorkspace('tech', 'mrr-arr', MrrArrWorkspace)
+registerWorkspace('tech', 'debiteringsgrad',
+  dynamic(() => import('@/components/modules/tech/DebiteringsgradWorkspace').then(m => m.DebiteringsgradWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('tech', 'projektlonsamhet',
+  dynamic(() => import('@/components/modules/tech/ProjektlonsamhetWorkspace').then(m => m.ProjektlonsamhetWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('tech', 'mrr-arr',
+  dynamic(() => import('@/components/modules/tech/MrrArrWorkspace').then(m => m.MrrArrWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Tech: Import ─────────────────────────────────────────────
-import { TidrapportImportWorkspace } from '@/components/modules/tech/TidrapportImportWorkspace'
-
-registerWorkspace('tech', 'tidrapport-import', TidrapportImportWorkspace)
+registerWorkspace('tech', 'tidrapport-import',
+  dynamic(() => import('@/components/modules/tech/TidrapportImportWorkspace').then(m => m.TidrapportImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Tech: Operativ ───────────────────────────────────────────
-import { ProjekthanteringWorkspace } from '@/components/modules/tech/ProjekthanteringWorkspace'
-import { TidrapporteringWorkspace } from '@/components/modules/tech/TidrapporteringWorkspace'
-import { ArendehanteringWorkspace } from '@/components/modules/tech/ArendehanteringWorkspace'
-import { ResursplaneringWorkspace } from '@/components/modules/tech/ResursplaneringWorkspace'
-
-registerWorkspace('tech', 'projekthantering', ProjekthanteringWorkspace)
-registerWorkspace('tech', 'tidrapportering', TidrapporteringWorkspace)
-registerWorkspace('tech', 'arendehantering', ArendehanteringWorkspace)
-registerWorkspace('tech', 'resursplanering', ResursplaneringWorkspace)
+registerWorkspace('tech', 'projekthantering',
+  dynamic(() => import('@/components/modules/tech/ProjekthanteringWorkspace').then(m => m.ProjekthanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('tech', 'tidrapportering',
+  dynamic(() => import('@/components/modules/tech/TidrapporteringWorkspace').then(m => m.TidrapporteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('tech', 'arendehantering',
+  dynamic(() => import('@/components/modules/tech/ArendehanteringWorkspace').then(m => m.ArendehanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('tech', 'resursplanering',
+  dynamic(() => import('@/components/modules/tech/ResursplaneringWorkspace').then(m => m.ResursplaneringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Bygg: Bokföring ──────────────────────────────────────────
-import { ByggkontoplanWorkspace } from '@/components/modules/bygg/ByggkontoplanWorkspace'
-import { OmvandSkattskyldighetByggWorkspace } from '@/components/modules/bygg/OmvandSkattskyldighetByggWorkspace'
-import { RotAvdragWorkspace } from '@/components/modules/bygg/RotAvdragWorkspace'
-import { SuccessivVinstavrakningWorkspace } from '@/components/modules/bygg/SuccessivVinstavrakningWorkspace'
-import { UeAttesteringWorkspace } from '@/components/modules/bygg/UeAttesteringWorkspace'
-import { PersonalliggareByggWorkspace } from '@/components/modules/bygg/PersonalliggareByggWorkspace'
-import { AtaBokforingWorkspace } from '@/components/modules/bygg/AtaBokforingWorkspace'
-
-registerWorkspace('bygg', 'byggkontoplan', ByggkontoplanWorkspace)
-registerWorkspace('bygg', 'omvand-skattskyldighet-bygg', OmvandSkattskyldighetByggWorkspace)
-registerWorkspace('bygg', 'rot-avdrag', RotAvdragWorkspace)
-registerWorkspace('bygg', 'successiv-vinstavrakning', SuccessivVinstavrakningWorkspace)
-registerWorkspace('bygg', 'ue-attestering', UeAttesteringWorkspace)
-registerWorkspace('bygg', 'personalliggare-bygg', PersonalliggareByggWorkspace)
-registerWorkspace('bygg', 'ata-bokforing', AtaBokforingWorkspace)
+registerWorkspace('bygg', 'byggkontoplan',
+  dynamic(() => import('@/components/modules/bygg/ByggkontoplanWorkspace').then(m => m.ByggkontoplanWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bygg', 'omvand-skattskyldighet-bygg',
+  dynamic(() => import('@/components/modules/bygg/OmvandSkattskyldighetByggWorkspace').then(m => m.OmvandSkattskyldighetByggWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bygg', 'rot-avdrag',
+  dynamic(() => import('@/components/modules/bygg/RotAvdragWorkspace').then(m => m.RotAvdragWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bygg', 'successiv-vinstavrakning',
+  dynamic(() => import('@/components/modules/bygg/SuccessivVinstavrakningWorkspace').then(m => m.SuccessivVinstavrakningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bygg', 'ue-attestering',
+  dynamic(() => import('@/components/modules/bygg/UeAttesteringWorkspace').then(m => m.UeAttesteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bygg', 'personalliggare-bygg',
+  dynamic(() => import('@/components/modules/bygg/PersonalliggareByggWorkspace').then(m => m.PersonalliggareByggWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bygg', 'ata-bokforing',
+  dynamic(() => import('@/components/modules/bygg/AtaBokforingWorkspace').then(m => m.AtaBokforingWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Bygg: Rapport ────────────────────────────────────────────
-import { ProjektmarginalWorkspace } from '@/components/modules/bygg/ProjektmarginalWorkspace'
-import { AtaAnalysWorkspace } from '@/components/modules/bygg/AtaAnalysWorkspace'
-import { LikviditetPerProjektWorkspace } from '@/components/modules/bygg/LikviditetPerProjektWorkspace'
-
-registerWorkspace('bygg', 'projektmarginal', ProjektmarginalWorkspace)
-registerWorkspace('bygg', 'ata-analys', AtaAnalysWorkspace)
-registerWorkspace('bygg', 'likviditet-per-projekt', LikviditetPerProjektWorkspace)
+registerWorkspace('bygg', 'projektmarginal',
+  dynamic(() => import('@/components/modules/bygg/ProjektmarginalWorkspace').then(m => m.ProjektmarginalWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bygg', 'ata-analys',
+  dynamic(() => import('@/components/modules/bygg/AtaAnalysWorkspace').then(m => m.AtaAnalysWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bygg', 'likviditet-per-projekt',
+  dynamic(() => import('@/components/modules/bygg/LikviditetPerProjektWorkspace').then(m => m.LikviditetPerProjektWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Bygg: Import ─────────────────────────────────────────────
-import { UeFakturaimportWorkspace } from '@/components/modules/bygg/UeFakturaimportWorkspace'
-import { MaterialkostnadsimportWorkspace } from '@/components/modules/bygg/MaterialkostnadsimportWorkspace'
-
-registerWorkspace('bygg', 'ue-fakturaimport', UeFakturaimportWorkspace)
-registerWorkspace('bygg', 'materialkostnadsimport', MaterialkostnadsimportWorkspace)
+registerWorkspace('bygg', 'ue-fakturaimport',
+  dynamic(() => import('@/components/modules/bygg/UeFakturaimportWorkspace').then(m => m.UeFakturaimportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bygg', 'materialkostnadsimport',
+  dynamic(() => import('@/components/modules/bygg/MaterialkostnadsimportWorkspace').then(m => m.MaterialkostnadsimportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Bygg: Operativ ───────────────────────────────────────────
-import { ProjektkalkylWorkspace } from '@/components/modules/bygg/ProjektkalkylWorkspace'
-import { AtaHanteringWorkspace } from '@/components/modules/bygg/AtaHanteringWorkspace'
-import { ByggdagbokWorkspace } from '@/components/modules/bygg/ByggdagbokWorkspace'
-import { RitningshanteringWorkspace } from '@/components/modules/bygg/RitningshanteringWorkspace'
-import { MaterialbestallningWorkspace } from '@/components/modules/bygg/MaterialbestallningWorkspace'
-
-registerWorkspace('bygg', 'projektkalkyl', ProjektkalkylWorkspace)
-registerWorkspace('bygg', 'ata-hantering', AtaHanteringWorkspace)
-registerWorkspace('bygg', 'byggdagbok', ByggdagbokWorkspace)
-registerWorkspace('bygg', 'ritningshantering', RitningshanteringWorkspace)
-registerWorkspace('bygg', 'materialbestallning', MaterialbestallningWorkspace)
+registerWorkspace('bygg', 'projektkalkyl',
+  dynamic(() => import('@/components/modules/bygg/ProjektkalkylWorkspace').then(m => m.ProjektkalkylWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bygg', 'ata-hantering',
+  dynamic(() => import('@/components/modules/bygg/AtaHanteringWorkspace').then(m => m.AtaHanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bygg', 'byggdagbok',
+  dynamic(() => import('@/components/modules/bygg/ByggdagbokWorkspace').then(m => m.ByggdagbokWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bygg', 'ritningshantering',
+  dynamic(() => import('@/components/modules/bygg/RitningshanteringWorkspace').then(m => m.RitningshanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bygg', 'materialbestallning',
+  dynamic(() => import('@/components/modules/bygg/MaterialbestallningWorkspace').then(m => m.MaterialbestallningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Hälsa: Bokföring ─────────────────────────────────────────
-import { VardkontoplanWorkspace } from '@/components/modules/halsa/VardkontoplanWorkspace'
-import { MomsfrihetSjukvardWorkspace } from '@/components/modules/halsa/MomsfrihetSjukvardWorkspace'
-import { ForsakringsersattningWorkspace } from '@/components/modules/halsa/ForsakringsersattningWorkspace'
-import { FrikortHogkostnadsskyddWorkspace } from '@/components/modules/halsa/FrikortHogkostnadsskyddWorkspace'
-
-registerWorkspace('halsa', 'vardkontoplan', VardkontoplanWorkspace)
-registerWorkspace('halsa', 'momsfrihet-sjukvard', MomsfrihetSjukvardWorkspace)
-registerWorkspace('halsa', 'forsakringsersattning', ForsakringsersattningWorkspace)
-registerWorkspace('halsa', 'frikort-hogkostnadsskydd', FrikortHogkostnadsskyddWorkspace)
+registerWorkspace('halsa', 'vardkontoplan',
+  dynamic(() => import('@/components/modules/halsa/VardkontoplanWorkspace').then(m => m.VardkontoplanWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('halsa', 'momsfrihet-sjukvard',
+  dynamic(() => import('@/components/modules/halsa/MomsfrihetSjukvardWorkspace').then(m => m.MomsfrihetSjukvardWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('halsa', 'forsakringsersattning',
+  dynamic(() => import('@/components/modules/halsa/ForsakringsersattningWorkspace').then(m => m.ForsakringsersattningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('halsa', 'frikort-hogkostnadsskydd',
+  dynamic(() => import('@/components/modules/halsa/FrikortHogkostnadsskyddWorkspace').then(m => m.FrikortHogkostnadsskyddWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Hälsa: Rapport ───────────────────────────────────────────
-import { IntaktPerBehandlareWorkspace } from '@/components/modules/halsa/IntaktPerBehandlareWorkspace'
-import { PatientmixWorkspace } from '@/components/modules/halsa/PatientmixWorkspace'
-
-registerWorkspace('halsa', 'intakt-per-behandlare', IntaktPerBehandlareWorkspace)
-registerWorkspace('halsa', 'patientmix', PatientmixWorkspace)
+registerWorkspace('halsa', 'intakt-per-behandlare',
+  dynamic(() => import('@/components/modules/halsa/IntaktPerBehandlareWorkspace').then(m => m.IntaktPerBehandlareWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('halsa', 'patientmix',
+  dynamic(() => import('@/components/modules/halsa/PatientmixWorkspace').then(m => m.PatientmixWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Hälsa: Import ────────────────────────────────────────────
-import { RegionersattningsimportWorkspace } from '@/components/modules/halsa/RegionersattningsimportWorkspace'
-import { ForsakringsrapportImportWorkspace } from '@/components/modules/halsa/ForsakringsrapportImportWorkspace'
-
-registerWorkspace('halsa', 'regionersattningsimport', RegionersattningsimportWorkspace)
-registerWorkspace('halsa', 'forsakringsrapport-import', ForsakringsrapportImportWorkspace)
+registerWorkspace('halsa', 'regionersattningsimport',
+  dynamic(() => import('@/components/modules/halsa/RegionersattningsimportWorkspace').then(m => m.RegionersattningsimportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('halsa', 'forsakringsrapport-import',
+  dynamic(() => import('@/components/modules/halsa/ForsakringsrapportImportWorkspace').then(m => m.ForsakringsrapportImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Hälsa: Operativ ──────────────────────────────────────────
-import { PatientbokningWorkspace } from '@/components/modules/halsa/PatientbokningWorkspace'
-import { JournalhanteringWorkspace } from '@/components/modules/halsa/JournalhanteringWorkspace'
-import { RemisshanteringWorkspace } from '@/components/modules/halsa/RemisshanteringWorkspace'
-import { KassasystemPatientavgifterWorkspace } from '@/components/modules/halsa/KassasystemPatientavgifterWorkspace'
-
-registerWorkspace('halsa', 'patientbokning', PatientbokningWorkspace)
-registerWorkspace('halsa', 'journalhantering', JournalhanteringWorkspace)
-registerWorkspace('halsa', 'remisshantering', RemisshanteringWorkspace)
-registerWorkspace('halsa', 'kassasystem-patientavgifter', KassasystemPatientavgifterWorkspace)
+registerWorkspace('halsa', 'patientbokning',
+  dynamic(() => import('@/components/modules/halsa/PatientbokningWorkspace').then(m => m.PatientbokningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('halsa', 'journalhantering',
+  dynamic(() => import('@/components/modules/halsa/JournalhanteringWorkspace').then(m => m.JournalhanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('halsa', 'remisshantering',
+  dynamic(() => import('@/components/modules/halsa/RemisshanteringWorkspace').then(m => m.RemisshanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('halsa', 'kassasystem-patientavgifter',
+  dynamic(() => import('@/components/modules/halsa/KassasystemPatientavgifterWorkspace').then(m => m.KassasystemPatientavgifterWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Detaljhandel: Bokföring ──────────────────────────────────
-import { DetaljhandelskontoplanWorkspace } from '@/components/modules/detaljhandel/DetaljhandelskontoplanWorkspace'
-import { LagervaderingWorkspace } from '@/components/modules/detaljhandel/LagervaderingWorkspace'
-import { KassaavstamningButikWorkspace } from '@/components/modules/detaljhandel/KassaavstamningButikWorkspace'
-import { SvinnbokforingWorkspace } from '@/components/modules/detaljhandel/SvinnbokforingWorkspace'
-import { PersonalliggareButikWorkspace } from '@/components/modules/detaljhandel/PersonalliggareButikWorkspace'
-
-registerWorkspace('detaljhandel', 'detaljhandelskontoplan', DetaljhandelskontoplanWorkspace)
-registerWorkspace('detaljhandel', 'lagervardering', LagervaderingWorkspace)
-registerWorkspace('detaljhandel', 'kassaavstamning-butik', KassaavstamningButikWorkspace)
-registerWorkspace('detaljhandel', 'svinnbokforing', SvinnbokforingWorkspace)
-registerWorkspace('detaljhandel', 'personalliggare-butik', PersonalliggareButikWorkspace)
+registerWorkspace('detaljhandel', 'detaljhandelskontoplan',
+  dynamic(() => import('@/components/modules/detaljhandel/DetaljhandelskontoplanWorkspace').then(m => m.DetaljhandelskontoplanWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('detaljhandel', 'lagervardering',
+  dynamic(() => import('@/components/modules/detaljhandel/LagervaderingWorkspace').then(m => m.LagervaderingWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('detaljhandel', 'kassaavstamning-butik',
+  dynamic(() => import('@/components/modules/detaljhandel/KassaavstamningButikWorkspace').then(m => m.KassaavstamningButikWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('detaljhandel', 'svinnbokforing',
+  dynamic(() => import('@/components/modules/detaljhandel/SvinnbokforingWorkspace').then(m => m.SvinnbokforingWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('detaljhandel', 'personalliggare-butik',
+  dynamic(() => import('@/components/modules/detaljhandel/PersonalliggareButikWorkspace').then(m => m.PersonalliggareButikWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Detaljhandel: Rapport ────────────────────────────────────
-import { BruttomarginalPerVarugruppWorkspace } from '@/components/modules/detaljhandel/BruttomarginalPerVarugruppWorkspace'
-import { LageromsattningshastighetWorkspace } from '@/components/modules/detaljhandel/LageromsattningshastighetWorkspace'
-import { SvinnprocentWorkspace } from '@/components/modules/detaljhandel/SvinnprocentWorkspace'
-import { ForsaljningPerM2Workspace } from '@/components/modules/detaljhandel/ForsaljningPerM2Workspace'
-
-registerWorkspace('detaljhandel', 'bruttomarginal-per-varugrupp', BruttomarginalPerVarugruppWorkspace)
-registerWorkspace('detaljhandel', 'lageromsattningshastighet', LageromsattningshastighetWorkspace)
-registerWorkspace('detaljhandel', 'svinnprocent', SvinnprocentWorkspace)
-registerWorkspace('detaljhandel', 'forsaljning-per-m2', ForsaljningPerM2Workspace)
+registerWorkspace('detaljhandel', 'bruttomarginal-per-varugrupp',
+  dynamic(() => import('@/components/modules/detaljhandel/BruttomarginalPerVarugruppWorkspace').then(m => m.BruttomarginalPerVarugruppWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('detaljhandel', 'lageromsattningshastighet',
+  dynamic(() => import('@/components/modules/detaljhandel/LageromsattningshastighetWorkspace').then(m => m.LageromsattningshastighetWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('detaljhandel', 'svinnprocent',
+  dynamic(() => import('@/components/modules/detaljhandel/SvinnprocentWorkspace').then(m => m.SvinnprocentWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('detaljhandel', 'forsaljning-per-m2',
+  dynamic(() => import('@/components/modules/detaljhandel/ForsaljningPerM2Workspace').then(m => m.ForsaljningPerM2Workspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Detaljhandel: Import ─────────────────────────────────────
-import { PosZrapportImportWorkspace } from '@/components/modules/detaljhandel/PosZrapportImportWorkspace'
-import { InventeringsimportWorkspace } from '@/components/modules/detaljhandel/InventeringsimportWorkspace'
-import { LeverantorsfakturaImportButikWorkspace } from '@/components/modules/detaljhandel/LeverantorsfakturaImportButikWorkspace'
-
-registerWorkspace('detaljhandel', 'pos-z-rapport-import', PosZrapportImportWorkspace)
-registerWorkspace('detaljhandel', 'inventeringsimport', InventeringsimportWorkspace)
-registerWorkspace('detaljhandel', 'leverantorsfaktura-import-butik', LeverantorsfakturaImportButikWorkspace)
+registerWorkspace('detaljhandel', 'pos-z-rapport-import',
+  dynamic(() => import('@/components/modules/detaljhandel/PosZrapportImportWorkspace').then(m => m.PosZrapportImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('detaljhandel', 'inventeringsimport',
+  dynamic(() => import('@/components/modules/detaljhandel/InventeringsimportWorkspace').then(m => m.InventeringsimportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('detaljhandel', 'leverantorsfaktura-import-butik',
+  dynamic(() => import('@/components/modules/detaljhandel/LeverantorsfakturaImportButikWorkspace').then(m => m.LeverantorsfakturaImportButikWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Detaljhandel: Operativ ───────────────────────────────────
-import { LagerhanteringWorkspace } from '@/components/modules/detaljhandel/LagerhanteringWorkspace'
-import { KampanjerRabatterWorkspace } from '@/components/modules/detaljhandel/KampanjerRabatterWorkspace'
-import { KundklubbWorkspace } from '@/components/modules/detaljhandel/KundklubbWorkspace'
-import { PrishanteringWorkspace } from '@/components/modules/detaljhandel/PrishanteringWorkspace'
-import { ButiksdriftSchemaWorkspace } from '@/components/modules/detaljhandel/ButiksdriftSchemaWorkspace'
-
-registerWorkspace('detaljhandel', 'lagerhantering', LagerhanteringWorkspace)
-registerWorkspace('detaljhandel', 'kampanjer-rabatter', KampanjerRabatterWorkspace)
-registerWorkspace('detaljhandel', 'kundklubb', KundklubbWorkspace)
-registerWorkspace('detaljhandel', 'prishantering', PrishanteringWorkspace)
-registerWorkspace('detaljhandel', 'butiksdrift-schema', ButiksdriftSchemaWorkspace)
+registerWorkspace('detaljhandel', 'lagerhantering',
+  dynamic(() => import('@/components/modules/detaljhandel/LagerhanteringWorkspace').then(m => m.LagerhanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('detaljhandel', 'kampanjer-rabatter',
+  dynamic(() => import('@/components/modules/detaljhandel/KampanjerRabatterWorkspace').then(m => m.KampanjerRabatterWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('detaljhandel', 'kundklubb',
+  dynamic(() => import('@/components/modules/detaljhandel/KundklubbWorkspace').then(m => m.KundklubbWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('detaljhandel', 'prishantering',
+  dynamic(() => import('@/components/modules/detaljhandel/PrishanteringWorkspace').then(m => m.PrishanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('detaljhandel', 'butiksdrift-schema',
+  dynamic(() => import('@/components/modules/detaljhandel/ButiksdriftSchemaWorkspace').then(m => m.ButiksdriftSchemaWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── E-handel: Bokföring ──────────────────────────────────────
-import { EhandelskontoplanWorkspace } from '@/components/modules/ehandel/EhandelskontoplanWorkspace'
-import { LagervaderingEhandelWorkspace } from '@/components/modules/ehandel/LagervaderingEhandelWorkspace'
-import { ReturbokforingWorkspace } from '@/components/modules/ehandel/ReturbokforingWorkspace'
-import { MultiCurrencyWorkspace } from '@/components/modules/ehandel/MultiCurrencyWorkspace'
-import { EuMomsOssWorkspace } from '@/components/modules/ehandel/EuMomsOssWorkspace'
-import { PlattformsavgifterWorkspace } from '@/components/modules/ehandel/PlattformsavgifterWorkspace'
-
-registerWorkspace('ehandel', 'ehandelskontoplan', EhandelskontoplanWorkspace)
-registerWorkspace('ehandel', 'lagervardering-ehandel', LagervaderingEhandelWorkspace)
-registerWorkspace('ehandel', 'returbokforing', ReturbokforingWorkspace)
-registerWorkspace('ehandel', 'multi-currency', MultiCurrencyWorkspace)
-registerWorkspace('ehandel', 'eu-moms-oss', EuMomsOssWorkspace)
-registerWorkspace('ehandel', 'plattformsavgifter', PlattformsavgifterWorkspace)
+registerWorkspace('ehandel', 'ehandelskontoplan',
+  dynamic(() => import('@/components/modules/ehandel/EhandelskontoplanWorkspace').then(m => m.EhandelskontoplanWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('ehandel', 'lagervardering-ehandel',
+  dynamic(() => import('@/components/modules/ehandel/LagervaderingEhandelWorkspace').then(m => m.LagervaderingEhandelWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('ehandel', 'returbokforing',
+  dynamic(() => import('@/components/modules/ehandel/ReturbokforingWorkspace').then(m => m.ReturbokforingWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('ehandel', 'multi-currency',
+  dynamic(() => import('@/components/modules/ehandel/MultiCurrencyWorkspace').then(m => m.MultiCurrencyWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('ehandel', 'eu-moms-oss',
+  dynamic(() => import('@/components/modules/ehandel/EuMomsOssWorkspace').then(m => m.EuMomsOssWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('ehandel', 'plattformsavgifter',
+  dynamic(() => import('@/components/modules/ehandel/PlattformsavgifterWorkspace').then(m => m.PlattformsavgifterWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── E-handel: Rapport ────────────────────────────────────────
-import { ReturprocentWorkspace } from '@/components/modules/ehandel/ReturprocentWorkspace'
-import { GenomsnittligtOrdervardeWorkspace } from '@/components/modules/ehandel/GenomsnittligtOrdervardeWorkspace'
-import { KanalfordelningWorkspace } from '@/components/modules/ehandel/KanalfordelningWorkspace'
-import { FraktkostnadVsIntaktWorkspace } from '@/components/modules/ehandel/FraktkostnadVsIntaktWorkspace'
-
-registerWorkspace('ehandel', 'returprocent', ReturprocentWorkspace)
-registerWorkspace('ehandel', 'genomsnittligt-ordervarde', GenomsnittligtOrdervardeWorkspace)
-registerWorkspace('ehandel', 'kanalfordelning', KanalfordelningWorkspace)
-registerWorkspace('ehandel', 'fraktkostnad-vs-intakt', FraktkostnadVsIntaktWorkspace)
+registerWorkspace('ehandel', 'returprocent',
+  dynamic(() => import('@/components/modules/ehandel/ReturprocentWorkspace').then(m => m.ReturprocentWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('ehandel', 'genomsnittligt-ordervarde',
+  dynamic(() => import('@/components/modules/ehandel/GenomsnittligtOrdervardeWorkspace').then(m => m.GenomsnittligtOrdervardeWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('ehandel', 'kanalfordelning',
+  dynamic(() => import('@/components/modules/ehandel/KanalfordelningWorkspace').then(m => m.KanalfordelningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('ehandel', 'fraktkostnad-vs-intakt',
+  dynamic(() => import('@/components/modules/ehandel/FraktkostnadVsIntaktWorkspace').then(m => m.FraktkostnadVsIntaktWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── E-handel: Import ─────────────────────────────────────────
-import { ShopifyWooImportWorkspace } from '@/components/modules/ehandel/ShopifyWooImportWorkspace'
-import { KlarnaRapportImportWorkspace } from '@/components/modules/ehandel/KlarnaRapportImportWorkspace'
-import { FraktrapportImportWorkspace } from '@/components/modules/ehandel/FraktrapportImportWorkspace'
-
-registerWorkspace('ehandel', 'shopify-woo-import', ShopifyWooImportWorkspace)
-registerWorkspace('ehandel', 'klarna-rapport-import', KlarnaRapportImportWorkspace)
-registerWorkspace('ehandel', 'fraktrapport-import', FraktrapportImportWorkspace)
+registerWorkspace('ehandel', 'shopify-woo-import',
+  dynamic(() => import('@/components/modules/ehandel/ShopifyWooImportWorkspace').then(m => m.ShopifyWooImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('ehandel', 'klarna-rapport-import',
+  dynamic(() => import('@/components/modules/ehandel/KlarnaRapportImportWorkspace').then(m => m.KlarnaRapportImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('ehandel', 'fraktrapport-import',
+  dynamic(() => import('@/components/modules/ehandel/FraktrapportImportWorkspace').then(m => m.FraktrapportImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── E-handel: Operativ ───────────────────────────────────────
-import { OrderhanteringWorkspace } from '@/components/modules/ehandel/OrderhanteringWorkspace'
-import { FrakthanteringWorkspace } from '@/components/modules/ehandel/FrakthanteringWorkspace'
-import { ReturhanteringOperativWorkspace } from '@/components/modules/ehandel/ReturhanteringOperativWorkspace'
-import { ProduktdatahanteringWorkspace } from '@/components/modules/ehandel/ProduktdatahanteringWorkspace'
-
-registerWorkspace('ehandel', 'orderhantering', OrderhanteringWorkspace)
-registerWorkspace('ehandel', 'frakthantering', FrakthanteringWorkspace)
-registerWorkspace('ehandel', 'returhantering-operativ', ReturhanteringOperativWorkspace)
-registerWorkspace('ehandel', 'produktdatahantering', ProduktdatahanteringWorkspace)
+registerWorkspace('ehandel', 'orderhantering',
+  dynamic(() => import('@/components/modules/ehandel/OrderhanteringWorkspace').then(m => m.OrderhanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('ehandel', 'frakthantering',
+  dynamic(() => import('@/components/modules/ehandel/FrakthanteringWorkspace').then(m => m.FrakthanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('ehandel', 'returhantering-operativ',
+  dynamic(() => import('@/components/modules/ehandel/ReturhanteringOperativWorkspace').then(m => m.ReturhanteringOperativWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('ehandel', 'produktdatahantering',
+  dynamic(() => import('@/components/modules/ehandel/ProduktdatahanteringWorkspace').then(m => m.ProduktdatahanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Frisör: Bokföring ────────────────────────────────────────
-import { SalongkontoplanWorkspace } from '@/components/modules/frisor/SalongkontoplanWorkspace'
-import { ProvisionsberakningWorkspace } from '@/components/modules/frisor/ProvisionsberakningWorkspace'
-import { PresentkortSomSkuldWorkspace } from '@/components/modules/frisor/PresentkortSomSkuldWorkspace'
-import { KassaavstamningSalongWorkspace } from '@/components/modules/frisor/KassaavstamningSalongWorkspace'
-import { PersonalliggareSalongWorkspace } from '@/components/modules/frisor/PersonalliggareSalongWorkspace'
-
-registerWorkspace('frisor', 'salongkontoplan', SalongkontoplanWorkspace)
-registerWorkspace('frisor', 'provisionsberakning', ProvisionsberakningWorkspace)
-registerWorkspace('frisor', 'presentkort-som-skuld', PresentkortSomSkuldWorkspace)
-registerWorkspace('frisor', 'kassaavstamning-salong', KassaavstamningSalongWorkspace)
-registerWorkspace('frisor', 'personalliggare-salong', PersonalliggareSalongWorkspace)
+registerWorkspace('frisor', 'salongkontoplan',
+  dynamic(() => import('@/components/modules/frisor/SalongkontoplanWorkspace').then(m => m.SalongkontoplanWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('frisor', 'provisionsberakning',
+  dynamic(() => import('@/components/modules/frisor/ProvisionsberakningWorkspace').then(m => m.ProvisionsberakningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('frisor', 'presentkort-som-skuld',
+  dynamic(() => import('@/components/modules/frisor/PresentkortSomSkuldWorkspace').then(m => m.PresentkortSomSkuldWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('frisor', 'kassaavstamning-salong',
+  dynamic(() => import('@/components/modules/frisor/KassaavstamningSalongWorkspace').then(m => m.KassaavstamningSalongWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('frisor', 'personalliggare-salong',
+  dynamic(() => import('@/components/modules/frisor/PersonalliggareSalongWorkspace').then(m => m.PersonalliggareSalongWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Frisör: Rapport ──────────────────────────────────────────
-import { IntaktPerStolWorkspace } from '@/components/modules/frisor/IntaktPerStolWorkspace'
-import { ProvisionsandelWorkspace } from '@/components/modules/frisor/ProvisionsandelWorkspace'
-import { ProduktforsaljningPerBesokWorkspace } from '@/components/modules/frisor/ProduktforsaljningPerBesokWorkspace'
-
-registerWorkspace('frisor', 'intakt-per-stol', IntaktPerStolWorkspace)
-registerWorkspace('frisor', 'provisionsandel', ProvisionsandelWorkspace)
-registerWorkspace('frisor', 'produktforsaljning-per-besok', ProduktforsaljningPerBesokWorkspace)
+registerWorkspace('frisor', 'intakt-per-stol',
+  dynamic(() => import('@/components/modules/frisor/IntaktPerStolWorkspace').then(m => m.IntaktPerStolWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('frisor', 'provisionsandel',
+  dynamic(() => import('@/components/modules/frisor/ProvisionsandelWorkspace').then(m => m.ProvisionsandelWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('frisor', 'produktforsaljning-per-besok',
+  dynamic(() => import('@/components/modules/frisor/ProduktforsaljningPerBesokWorkspace').then(m => m.ProduktforsaljningPerBesokWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Frisör: Import ───────────────────────────────────────────
-import { KassarapportImportSalongWorkspace } from '@/components/modules/frisor/KassarapportImportSalongWorkspace'
-import { BokningssystemImportWorkspace } from '@/components/modules/frisor/BokningssystemImportWorkspace'
-
-registerWorkspace('frisor', 'kassarapport-import-salong', KassarapportImportSalongWorkspace)
-registerWorkspace('frisor', 'bokningssystem-import', BokningssystemImportWorkspace)
+registerWorkspace('frisor', 'kassarapport-import-salong',
+  dynamic(() => import('@/components/modules/frisor/KassarapportImportSalongWorkspace').then(m => m.KassarapportImportSalongWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('frisor', 'bokningssystem-import',
+  dynamic(() => import('@/components/modules/frisor/BokningssystemImportWorkspace').then(m => m.BokningssystemImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Frisör: Operativ ─────────────────────────────────────────
-import { TidsbokningWorkspace } from '@/components/modules/frisor/TidsbokningWorkspace'
-import { KundkortWorkspace } from '@/components/modules/frisor/KundkortWorkspace'
-import { SmsPaminnelserWorkspace } from '@/components/modules/frisor/SmsPaminnelserWorkspace'
-import { SkiftschemaSalongWorkspace } from '@/components/modules/frisor/SkiftschemaSalongWorkspace'
-
-registerWorkspace('frisor', 'tidsbokning', TidsbokningWorkspace)
-registerWorkspace('frisor', 'kundkort', KundkortWorkspace)
-registerWorkspace('frisor', 'sms-paminnelser', SmsPaminnelserWorkspace)
-registerWorkspace('frisor', 'skiftschema-salong', SkiftschemaSalongWorkspace)
+registerWorkspace('frisor', 'tidsbokning',
+  dynamic(() => import('@/components/modules/frisor/TidsbokningWorkspace').then(m => m.TidsbokningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('frisor', 'kundkort',
+  dynamic(() => import('@/components/modules/frisor/KundkortWorkspace').then(m => m.KundkortWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('frisor', 'sms-paminnelser',
+  dynamic(() => import('@/components/modules/frisor/SmsPaminnelserWorkspace').then(m => m.SmsPaminnelserWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('frisor', 'skiftschema-salong',
+  dynamic(() => import('@/components/modules/frisor/SkiftschemaSalongWorkspace').then(m => m.SkiftschemaSalongWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Transport: Bokföring ─────────────────────────────────────
-import { TransportkontoplanWorkspace } from '@/components/modules/transport/TransportkontoplanWorkspace'
-import { FordonsavskrivningWorkspace } from '@/components/modules/transport/FordonsavskrivningWorkspace'
-import { LeasinghanteringWorkspace } from '@/components/modules/transport/LeasinghanteringWorkspace'
-import { TrangselskattWorkspace } from '@/components/modules/transport/TrangselskattWorkspace'
-import { MilersattningVsFaktiskKostnadWorkspace } from '@/components/modules/transport/MilersattningVsFaktiskKostnadWorkspace'
-
-registerWorkspace('transport', 'transportkontoplan', TransportkontoplanWorkspace)
-registerWorkspace('transport', 'fordonsavskrivning', FordonsavskrivningWorkspace)
-registerWorkspace('transport', 'leasinghantering', LeasinghanteringWorkspace)
-registerWorkspace('transport', 'trangselskatt', TrangselskattWorkspace)
-registerWorkspace('transport', 'milersattning-vs-faktisk-kostnad', MilersattningVsFaktiskKostnadWorkspace)
+registerWorkspace('transport', 'transportkontoplan',
+  dynamic(() => import('@/components/modules/transport/TransportkontoplanWorkspace').then(m => m.TransportkontoplanWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('transport', 'fordonsavskrivning',
+  dynamic(() => import('@/components/modules/transport/FordonsavskrivningWorkspace').then(m => m.FordonsavskrivningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('transport', 'leasinghantering',
+  dynamic(() => import('@/components/modules/transport/LeasinghanteringWorkspace').then(m => m.LeasinghanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('transport', 'trangselskatt',
+  dynamic(() => import('@/components/modules/transport/TrangselskattWorkspace').then(m => m.TrangselskattWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('transport', 'milersattning-vs-faktisk-kostnad',
+  dynamic(() => import('@/components/modules/transport/MilersattningVsFaktiskKostnadWorkspace').then(m => m.MilersattningVsFaktiskKostnadWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Transport: Rapport ───────────────────────────────────────
-import { KostnadPerMilWorkspace } from '@/components/modules/transport/KostnadPerMilWorkspace'
-import { IntaktPerFordonWorkspace } from '@/components/modules/transport/IntaktPerFordonWorkspace'
-import { BransleeffektivitetWorkspace } from '@/components/modules/transport/BransleeffektivitetWorkspace'
-
-registerWorkspace('transport', 'kostnad-per-mil', KostnadPerMilWorkspace)
-registerWorkspace('transport', 'intakt-per-fordon', IntaktPerFordonWorkspace)
-registerWorkspace('transport', 'bransleeffektivitet', BransleeffektivitetWorkspace)
+registerWorkspace('transport', 'kostnad-per-mil',
+  dynamic(() => import('@/components/modules/transport/KostnadPerMilWorkspace').then(m => m.KostnadPerMilWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('transport', 'intakt-per-fordon',
+  dynamic(() => import('@/components/modules/transport/IntaktPerFordonWorkspace').then(m => m.IntaktPerFordonWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('transport', 'bransleeffektivitet',
+  dynamic(() => import('@/components/modules/transport/BransleeffektivitetWorkspace').then(m => m.BransleeffektivitetWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Transport: Import ────────────────────────────────────────
-import { BranslekortImportWorkspace } from '@/components/modules/transport/BranslekortImportWorkspace'
-import { VagtullsImportWorkspace } from '@/components/modules/transport/VagtullsImportWorkspace'
-
-registerWorkspace('transport', 'branslekort-import', BranslekortImportWorkspace)
-registerWorkspace('transport', 'vagtulls-import', VagtullsImportWorkspace)
+registerWorkspace('transport', 'branslekort-import',
+  dynamic(() => import('@/components/modules/transport/BranslekortImportWorkspace').then(m => m.BranslekortImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('transport', 'vagtulls-import',
+  dynamic(() => import('@/components/modules/transport/VagtullsImportWorkspace').then(m => m.VagtullsImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Transport: Operativ ──────────────────────────────────────
-import { FlottahanteringWorkspace } from '@/components/modules/transport/FlottahanteringWorkspace'
-import { RuttplaneringWorkspace } from '@/components/modules/transport/RuttplaneringWorkspace'
-import { LeveranssparningWorkspace } from '@/components/modules/transport/LeveranssparningWorkspace'
-import { FordonsunderhallWorkspace } from '@/components/modules/transport/FordonsunderhallWorkspace'
-import { ChauforshanteringWorkspace } from '@/components/modules/transport/ChauforshanteringWorkspace'
-import { FraktsedlarDokumentWorkspace } from '@/components/modules/transport/FraktsedlarDokumentWorkspace'
-
-registerWorkspace('transport', 'flottahantering', FlottahanteringWorkspace)
-registerWorkspace('transport', 'ruttplanering', RuttplaneringWorkspace)
-registerWorkspace('transport', 'leveranssparning', LeveranssparningWorkspace)
-registerWorkspace('transport', 'fordonsunderhall', FordonsunderhallWorkspace)
-registerWorkspace('transport', 'chauforshantering', ChauforshanteringWorkspace)
-registerWorkspace('transport', 'fraktsedlar-dokument', FraktsedlarDokumentWorkspace)
+registerWorkspace('transport', 'flottahantering',
+  dynamic(() => import('@/components/modules/transport/FlottahanteringWorkspace').then(m => m.FlottahanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('transport', 'ruttplanering',
+  dynamic(() => import('@/components/modules/transport/RuttplaneringWorkspace').then(m => m.RuttplaneringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('transport', 'leveranssparning',
+  dynamic(() => import('@/components/modules/transport/LeveranssparningWorkspace').then(m => m.LeveranssparningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('transport', 'fordonsunderhall',
+  dynamic(() => import('@/components/modules/transport/FordonsunderhallWorkspace').then(m => m.FordonsunderhallWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('transport', 'chauforshantering',
+  dynamic(() => import('@/components/modules/transport/ChauforshanteringWorkspace').then(m => m.ChauforshanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('transport', 'fraktsedlar-dokument',
+  dynamic(() => import('@/components/modules/transport/FraktsedlarDokumentWorkspace').then(m => m.FraktsedlarDokumentWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Juridik: Bokföring ───────────────────────────────────────
-import { JuristkontoplanWorkspace } from '@/components/modules/juridik/JuristkontoplanWorkspace'
-import { KlientmedelskontoWorkspace } from '@/components/modules/juridik/KlientmedelskontoWorkspace'
-import { WipVarderingWorkspace } from '@/components/modules/juridik/WipVarderingWorkspace'
-import { AContoBokforingWorkspace } from '@/components/modules/juridik/AContoBokforingWorkspace'
-
-registerWorkspace('juridik', 'juristkontoplan', JuristkontoplanWorkspace)
-registerWorkspace('juridik', 'klientmedelskonto', KlientmedelskontoWorkspace)
-registerWorkspace('juridik', 'wip-vardering', WipVarderingWorkspace)
-registerWorkspace('juridik', 'a-conto-bokforing', AContoBokforingWorkspace)
+registerWorkspace('juridik', 'juristkontoplan',
+  dynamic(() => import('@/components/modules/juridik/JuristkontoplanWorkspace').then(m => m.JuristkontoplanWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('juridik', 'klientmedelskonto',
+  dynamic(() => import('@/components/modules/juridik/KlientmedelskontoWorkspace').then(m => m.KlientmedelskontoWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('juridik', 'wip-vardering',
+  dynamic(() => import('@/components/modules/juridik/WipVarderingWorkspace').then(m => m.WipVarderingWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('juridik', 'a-conto-bokforing',
+  dynamic(() => import('@/components/modules/juridik/AContoBokforingWorkspace').then(m => m.AContoBokforingWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Juridik: Rapport ─────────────────────────────────────────
-import { DebiteringsgradJuridikWorkspace } from '@/components/modules/juridik/DebiteringsgradJuridikWorkspace'
-import { RealisationsgradWorkspace } from '@/components/modules/juridik/RealisationsgradWorkspace'
-import { GenomsnittligTimintaktWorkspace } from '@/components/modules/juridik/GenomsnittligTimintaktWorkspace'
-import { WipRapportWorkspace } from '@/components/modules/juridik/WipRapportWorkspace'
-
-registerWorkspace('juridik', 'debiteringsgrad-juridik', DebiteringsgradJuridikWorkspace)
-registerWorkspace('juridik', 'realisationsgrad', RealisationsgradWorkspace)
-registerWorkspace('juridik', 'genomsnittlig-timintakt', GenomsnittligTimintaktWorkspace)
-registerWorkspace('juridik', 'wip-rapport', WipRapportWorkspace)
+registerWorkspace('juridik', 'debiteringsgrad-juridik',
+  dynamic(() => import('@/components/modules/juridik/DebiteringsgradJuridikWorkspace').then(m => m.DebiteringsgradJuridikWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('juridik', 'realisationsgrad',
+  dynamic(() => import('@/components/modules/juridik/RealisationsgradWorkspace').then(m => m.RealisationsgradWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('juridik', 'genomsnittlig-timintakt',
+  dynamic(() => import('@/components/modules/juridik/GenomsnittligTimintaktWorkspace').then(m => m.GenomsnittligTimintaktWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('juridik', 'wip-rapport',
+  dynamic(() => import('@/components/modules/juridik/WipRapportWorkspace').then(m => m.WipRapportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Juridik: Import ──────────────────────────────────────────
-import { TidrapportImportJuridikWorkspace } from '@/components/modules/juridik/TidrapportImportJuridikWorkspace'
-
-registerWorkspace('juridik', 'tidrapport-import-juridik', TidrapportImportJuridikWorkspace)
+registerWorkspace('juridik', 'tidrapport-import-juridik',
+  dynamic(() => import('@/components/modules/juridik/TidrapportImportJuridikWorkspace').then(m => m.TidrapportImportJuridikWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Juridik: Operativ ────────────────────────────────────────
-import { ArendehanteringJuridikWorkspace } from '@/components/modules/juridik/ArendehanteringJuridikWorkspace'
-import { TidrapporteringJuridikWorkspace } from '@/components/modules/juridik/TidrapporteringJuridikWorkspace'
-import { DokumenthanteringWorkspace } from '@/components/modules/juridik/DokumenthanteringWorkspace'
-import { DeadlinebevakningWorkspace } from '@/components/modules/juridik/DeadlinebevakningWorkspace'
-import { IntressekonfliktskontrollWorkspace } from '@/components/modules/juridik/IntressekonfliktskontrollWorkspace'
-
-registerWorkspace('juridik', 'arendehantering-juridik', ArendehanteringJuridikWorkspace)
-registerWorkspace('juridik', 'tidrapportering-juridik', TidrapporteringJuridikWorkspace)
-registerWorkspace('juridik', 'dokumenthantering', DokumenthanteringWorkspace)
-registerWorkspace('juridik', 'deadlinebevakning', DeadlinebevakningWorkspace)
-registerWorkspace('juridik', 'intressekonfliktskontroll', IntressekonfliktskontrollWorkspace)
+registerWorkspace('juridik', 'arendehantering-juridik',
+  dynamic(() => import('@/components/modules/juridik/ArendehanteringJuridikWorkspace').then(m => m.ArendehanteringJuridikWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('juridik', 'tidrapportering-juridik',
+  dynamic(() => import('@/components/modules/juridik/TidrapporteringJuridikWorkspace').then(m => m.TidrapporteringJuridikWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('juridik', 'dokumenthantering',
+  dynamic(() => import('@/components/modules/juridik/DokumenthanteringWorkspace').then(m => m.DokumenthanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('juridik', 'deadlinebevakning',
+  dynamic(() => import('@/components/modules/juridik/DeadlinebevakningWorkspace').then(m => m.DeadlinebevakningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('juridik', 'intressekonfliktskontroll',
+  dynamic(() => import('@/components/modules/juridik/IntressekonfliktskontrollWorkspace').then(m => m.IntressekonfliktskontrollWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Utbildning: Bokföring ────────────────────────────────────
-import { UtbildningskontoplanWorkspace } from '@/components/modules/utbildning/UtbildningskontoplanWorkspace'
-import { MaxtaxaFaktureringWorkspace } from '@/components/modules/utbildning/MaxtaxaFaktureringWorkspace'
-import { StatsbidragsperiodiseringWorkspace } from '@/components/modules/utbildning/StatsbidragsperiodiseringWorkspace'
-import { MomsfrihetUtbildningWorkspace } from '@/components/modules/utbildning/MomsfrihetUtbildningWorkspace'
-
-registerWorkspace('utbildning', 'utbildningskontoplan', UtbildningskontoplanWorkspace)
-registerWorkspace('utbildning', 'maxtaxa-fakturering', MaxtaxaFaktureringWorkspace)
-registerWorkspace('utbildning', 'statsbidragsperiodisering', StatsbidragsperiodiseringWorkspace)
-registerWorkspace('utbildning', 'momsfrihet-utbildning', MomsfrihetUtbildningWorkspace)
+registerWorkspace('utbildning', 'utbildningskontoplan',
+  dynamic(() => import('@/components/modules/utbildning/UtbildningskontoplanWorkspace').then(m => m.UtbildningskontoplanWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('utbildning', 'maxtaxa-fakturering',
+  dynamic(() => import('@/components/modules/utbildning/MaxtaxaFaktureringWorkspace').then(m => m.MaxtaxaFaktureringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('utbildning', 'statsbidragsperiodisering',
+  dynamic(() => import('@/components/modules/utbildning/StatsbidragsperiodiseringWorkspace').then(m => m.StatsbidragsperiodiseringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('utbildning', 'momsfrihet-utbildning',
+  dynamic(() => import('@/components/modules/utbildning/MomsfrihetUtbildningWorkspace').then(m => m.MomsfrihetUtbildningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Utbildning: Rapport ──────────────────────────────────────
-import { KostnadPerBarnElevWorkspace } from '@/components/modules/utbildning/KostnadPerBarnElevWorkspace'
-import { PersonaltathetWorkspace } from '@/components/modules/utbildning/PersonaltathetWorkspace'
-
-registerWorkspace('utbildning', 'kostnad-per-barn-elev', KostnadPerBarnElevWorkspace)
-registerWorkspace('utbildning', 'personaltathet', PersonaltathetWorkspace)
+registerWorkspace('utbildning', 'kostnad-per-barn-elev',
+  dynamic(() => import('@/components/modules/utbildning/KostnadPerBarnElevWorkspace').then(m => m.KostnadPerBarnElevWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('utbildning', 'personaltathet',
+  dynamic(() => import('@/components/modules/utbildning/PersonaltathetWorkspace').then(m => m.PersonaltathetWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Utbildning: Import ───────────────────────────────────────
-import { KommunalPengImportWorkspace } from '@/components/modules/utbildning/KommunalPengImportWorkspace'
-
-registerWorkspace('utbildning', 'kommunal-peng-import', KommunalPengImportWorkspace)
+registerWorkspace('utbildning', 'kommunal-peng-import',
+  dynamic(() => import('@/components/modules/utbildning/KommunalPengImportWorkspace').then(m => m.KommunalPengImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Utbildning: Operativ ─────────────────────────────────────
-import { SchemalagggningWorkspace } from '@/components/modules/utbildning/SchemalagggningWorkspace'
-import { ElevregisterWorkspace } from '@/components/modules/utbildning/ElevregisterWorkspace'
-import { NarvarohanteringWorkspace } from '@/components/modules/utbildning/NarvarohanteringWorkspace'
-import { ForaldrakommunikationWorkspace } from '@/components/modules/utbildning/ForaldrakommunikationWorkspace'
-import { MatsedelAllergikostWorkspace } from '@/components/modules/utbildning/MatsedelAllergikostWorkspace'
-import { VikariebokningWorkspace } from '@/components/modules/utbildning/VikariebokningWorkspace'
-
-registerWorkspace('utbildning', 'schemalaeggning', SchemalagggningWorkspace)
-registerWorkspace('utbildning', 'elevregister', ElevregisterWorkspace)
-registerWorkspace('utbildning', 'narvarohantering', NarvarohanteringWorkspace)
-registerWorkspace('utbildning', 'foraldrakommunikation', ForaldrakommunikationWorkspace)
-registerWorkspace('utbildning', 'matsedel-allergikost', MatsedelAllergikostWorkspace)
-registerWorkspace('utbildning', 'vikariebokning', VikariebokningWorkspace)
+registerWorkspace('utbildning', 'schemalaeggning',
+  dynamic(() => import('@/components/modules/utbildning/SchemalagggningWorkspace').then(m => m.SchemalagggningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('utbildning', 'elevregister',
+  dynamic(() => import('@/components/modules/utbildning/ElevregisterWorkspace').then(m => m.ElevregisterWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('utbildning', 'narvarohantering',
+  dynamic(() => import('@/components/modules/utbildning/NarvarohanteringWorkspace').then(m => m.NarvarohanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('utbildning', 'foraldrakommunikation',
+  dynamic(() => import('@/components/modules/utbildning/ForaldrakommunikationWorkspace').then(m => m.ForaldrakommunikationWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('utbildning', 'matsedel-allergikost',
+  dynamic(() => import('@/components/modules/utbildning/MatsedelAllergikostWorkspace').then(m => m.MatsedelAllergikostWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('utbildning', 'vikariebokning',
+  dynamic(() => import('@/components/modules/utbildning/VikariebokningWorkspace').then(m => m.VikariebokningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Jordbruk: Bokföring ──────────────────────────────────────
-import { JordbrukskontoplanWorkspace } from '@/components/modules/jordbruk/JordbrukskontoplanWorkspace'
-import { SkogskontoWorkspace } from '@/components/modules/jordbruk/SkogskontoWorkspace'
-import { ExpansionsfondWorkspace } from '@/components/modules/jordbruk/ExpansionsfondWorkspace'
-import { RantefordelningWorkspace } from '@/components/modules/jordbruk/RantefordelningWorkspace'
-import { EuStodSomIntaktWorkspace } from '@/components/modules/jordbruk/EuStodSomIntaktWorkspace'
-import { BiologiskaTillgangarWorkspace } from '@/components/modules/jordbruk/BiologiskaTillgangarWorkspace'
-import { MomssplitLivsmedelWorkspace } from '@/components/modules/jordbruk/MomssplitLivsmedelWorkspace'
-
-registerWorkspace('jordbruk', 'jordbrukskontoplan', JordbrukskontoplanWorkspace)
-registerWorkspace('jordbruk', 'skogskonto', SkogskontoWorkspace)
-registerWorkspace('jordbruk', 'expansionsfond', ExpansionsfondWorkspace)
-registerWorkspace('jordbruk', 'rantefordelning', RantefordelningWorkspace)
-registerWorkspace('jordbruk', 'eu-stod-som-intakt', EuStodSomIntaktWorkspace)
-registerWorkspace('jordbruk', 'biologiska-tillgangar', BiologiskaTillgangarWorkspace)
-registerWorkspace('jordbruk', 'momssplit-livsmedel', MomssplitLivsmedelWorkspace)
+registerWorkspace('jordbruk', 'jordbrukskontoplan',
+  dynamic(() => import('@/components/modules/jordbruk/JordbrukskontoplanWorkspace').then(m => m.JordbrukskontoplanWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('jordbruk', 'skogskonto',
+  dynamic(() => import('@/components/modules/jordbruk/SkogskontoWorkspace').then(m => m.SkogskontoWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('jordbruk', 'expansionsfond',
+  dynamic(() => import('@/components/modules/jordbruk/ExpansionsfondWorkspace').then(m => m.ExpansionsfondWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('jordbruk', 'rantefordelning',
+  dynamic(() => import('@/components/modules/jordbruk/RantefordelningWorkspace').then(m => m.RantefordelningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('jordbruk', 'eu-stod-som-intakt',
+  dynamic(() => import('@/components/modules/jordbruk/EuStodSomIntaktWorkspace').then(m => m.EuStodSomIntaktWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('jordbruk', 'biologiska-tillgangar',
+  dynamic(() => import('@/components/modules/jordbruk/BiologiskaTillgangarWorkspace').then(m => m.BiologiskaTillgangarWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('jordbruk', 'momssplit-livsmedel',
+  dynamic(() => import('@/components/modules/jordbruk/MomssplitLivsmedelWorkspace').then(m => m.MomssplitLivsmedelWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Jordbruk: Rapport ────────────────────────────────────────
-import { AvkastningPerHektarWorkspace } from '@/components/modules/jordbruk/AvkastningPerHektarWorkspace'
-import { BidragsberoendeWorkspace } from '@/components/modules/jordbruk/BidragsberoendeWorkspace'
-import { DjurkostnadPerEnhetWorkspace } from '@/components/modules/jordbruk/DjurkostnadPerEnhetWorkspace'
-
-registerWorkspace('jordbruk', 'avkastning-per-hektar', AvkastningPerHektarWorkspace)
-registerWorkspace('jordbruk', 'bidragsberoende', BidragsberoendeWorkspace)
-registerWorkspace('jordbruk', 'djurkostnad-per-enhet', DjurkostnadPerEnhetWorkspace)
+registerWorkspace('jordbruk', 'avkastning-per-hektar',
+  dynamic(() => import('@/components/modules/jordbruk/AvkastningPerHektarWorkspace').then(m => m.AvkastningPerHektarWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('jordbruk', 'bidragsberoende',
+  dynamic(() => import('@/components/modules/jordbruk/BidragsberoendeWorkspace').then(m => m.BidragsberoendeWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('jordbruk', 'djurkostnad-per-enhet',
+  dynamic(() => import('@/components/modules/jordbruk/DjurkostnadPerEnhetWorkspace').then(m => m.DjurkostnadPerEnhetWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Jordbruk: Import ─────────────────────────────────────────
-import { SamUtbetalningsimportWorkspace } from '@/components/modules/jordbruk/SamUtbetalningsimportWorkspace'
-
-registerWorkspace('jordbruk', 'sam-utbetalningsimport', SamUtbetalningsimportWorkspace)
+registerWorkspace('jordbruk', 'sam-utbetalningsimport',
+  dynamic(() => import('@/components/modules/jordbruk/SamUtbetalningsimportWorkspace').then(m => m.SamUtbetalningsimportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Jordbruk: Operativ ───────────────────────────────────────
-import { SkordeplaneringWorkspace } from '@/components/modules/jordbruk/SkordeplaneringWorkspace'
-import { DjurhallningWorkspace } from '@/components/modules/jordbruk/DjurhallningWorkspace'
-import { SparbarhetWorkspace } from '@/components/modules/jordbruk/SparbarhetWorkspace'
-import { MaskinloggWorkspace } from '@/components/modules/jordbruk/MaskinloggWorkspace'
-import { CertifieringarWorkspace } from '@/components/modules/jordbruk/CertifieringarWorkspace'
-
-registerWorkspace('jordbruk', 'skordeplanering', SkordeplaneringWorkspace)
-registerWorkspace('jordbruk', 'djurhallning', DjurhallningWorkspace)
-registerWorkspace('jordbruk', 'sparbarhet', SparbarhetWorkspace)
-registerWorkspace('jordbruk', 'maskinlogg', MaskinloggWorkspace)
-registerWorkspace('jordbruk', 'certifieringar', CertifieringarWorkspace)
+registerWorkspace('jordbruk', 'skordeplanering',
+  dynamic(() => import('@/components/modules/jordbruk/SkordeplaneringWorkspace').then(m => m.SkordeplaneringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('jordbruk', 'djurhallning',
+  dynamic(() => import('@/components/modules/jordbruk/DjurhallningWorkspace').then(m => m.DjurhallningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('jordbruk', 'sparbarhet',
+  dynamic(() => import('@/components/modules/jordbruk/SparbarhetWorkspace').then(m => m.SparbarhetWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('jordbruk', 'maskinlogg',
+  dynamic(() => import('@/components/modules/jordbruk/MaskinloggWorkspace').then(m => m.MaskinloggWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('jordbruk', 'certifieringar',
+  dynamic(() => import('@/components/modules/jordbruk/CertifieringarWorkspace').then(m => m.CertifieringarWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Media: Bokföring ─────────────────────────────────────────
-import { MediakontoplanWorkspace } from '@/components/modules/media/MediakontoplanWorkspace'
-import { ProjektredovisningMediaWorkspace } from '@/components/modules/media/ProjektredovisningMediaWorkspace'
-import { FreelancerBokforingWorkspace } from '@/components/modules/media/FreelancerBokforingWorkspace'
-import { KulturmomsWorkspace } from '@/components/modules/media/KulturmomsWorkspace'
-import { IpTillgangarWorkspace } from '@/components/modules/media/IpTillgangarWorkspace'
-
-registerWorkspace('media', 'mediakontoplan', MediakontoplanWorkspace)
-registerWorkspace('media', 'projektredovisning-media', ProjektredovisningMediaWorkspace)
-registerWorkspace('media', 'freelancer-bokforing', FreelancerBokforingWorkspace)
-registerWorkspace('media', 'kulturmoms', KulturmomsWorkspace)
-registerWorkspace('media', 'ip-tillgangar', IpTillgangarWorkspace)
+registerWorkspace('media', 'mediakontoplan',
+  dynamic(() => import('@/components/modules/media/MediakontoplanWorkspace').then(m => m.MediakontoplanWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('media', 'projektredovisning-media',
+  dynamic(() => import('@/components/modules/media/ProjektredovisningMediaWorkspace').then(m => m.ProjektredovisningMediaWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('media', 'freelancer-bokforing',
+  dynamic(() => import('@/components/modules/media/FreelancerBokforingWorkspace').then(m => m.FreelancerBokforingWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('media', 'kulturmoms',
+  dynamic(() => import('@/components/modules/media/KulturmomsWorkspace').then(m => m.KulturmomsWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('media', 'ip-tillgangar',
+  dynamic(() => import('@/components/modules/media/IpTillgangarWorkspace').then(m => m.IpTillgangarWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Media: Rapport ───────────────────────────────────────────
-import { ProjektlonsamhetMediaWorkspace } from '@/components/modules/media/ProjektlonsamhetMediaWorkspace'
-import { FreelancerandelWorkspace } from '@/components/modules/media/FreelancerandelWorkspace'
-import { KundlonsamhetWorkspace } from '@/components/modules/media/KundlonsamhetWorkspace'
-
-registerWorkspace('media', 'projektlonsamhet-media', ProjektlonsamhetMediaWorkspace)
-registerWorkspace('media', 'freelancerandel', FreelancerandelWorkspace)
-registerWorkspace('media', 'kundlonsamhet', KundlonsamhetWorkspace)
+registerWorkspace('media', 'projektlonsamhet-media',
+  dynamic(() => import('@/components/modules/media/ProjektlonsamhetMediaWorkspace').then(m => m.ProjektlonsamhetMediaWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('media', 'freelancerandel',
+  dynamic(() => import('@/components/modules/media/FreelancerandelWorkspace').then(m => m.FreelancerandelWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('media', 'kundlonsamhet',
+  dynamic(() => import('@/components/modules/media/KundlonsamhetWorkspace').then(m => m.KundlonsamhetWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Media: Import ────────────────────────────────────────────
-import { FreelancerFakturaimportWorkspace } from '@/components/modules/media/FreelancerFakturaimportWorkspace'
-import { KampanjrapportImportWorkspace } from '@/components/modules/media/KampanjrapportImportWorkspace'
-
-registerWorkspace('media', 'freelancer-fakturaimport', FreelancerFakturaimportWorkspace)
-registerWorkspace('media', 'kampanjrapport-import', KampanjrapportImportWorkspace)
+registerWorkspace('media', 'freelancer-fakturaimport',
+  dynamic(() => import('@/components/modules/media/FreelancerFakturaimportWorkspace').then(m => m.FreelancerFakturaimportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('media', 'kampanjrapport-import',
+  dynamic(() => import('@/components/modules/media/KampanjrapportImportWorkspace').then(m => m.KampanjrapportImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Media: Operativ ──────────────────────────────────────────
-import { ProjekthanteringMediaWorkspace } from '@/components/modules/media/ProjekthanteringMediaWorkspace'
-import { InnehallsplaneringWorkspace } from '@/components/modules/media/InnehallsplaneringWorkspace'
-import { MediebankWorkspace } from '@/components/modules/media/MediebankWorkspace'
-import { TidrapportDebiteringMediaWorkspace } from '@/components/modules/media/TidrapportDebiteringMediaWorkspace'
-
-registerWorkspace('media', 'projekthantering-media', ProjekthanteringMediaWorkspace)
-registerWorkspace('media', 'innehallsplanering', InnehallsplaneringWorkspace)
-registerWorkspace('media', 'mediebank', MediebankWorkspace)
-registerWorkspace('media', 'tidrapport-debitering-media', TidrapportDebiteringMediaWorkspace)
+registerWorkspace('media', 'projekthantering-media',
+  dynamic(() => import('@/components/modules/media/ProjekthanteringMediaWorkspace').then(m => m.ProjekthanteringMediaWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('media', 'innehallsplanering',
+  dynamic(() => import('@/components/modules/media/InnehallsplaneringWorkspace').then(m => m.InnehallsplaneringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('media', 'mediebank',
+  dynamic(() => import('@/components/modules/media/MediebankWorkspace').then(m => m.MediebankWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('media', 'tidrapport-debitering-media',
+  dynamic(() => import('@/components/modules/media/TidrapportDebiteringMediaWorkspace').then(m => m.TidrapportDebiteringMediaWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Fitness: Bokföring ───────────────────────────────────────
-import { FitnesskontoplanWorkspace } from '@/components/modules/fitness/FitnesskontoplanWorkspace'
-import { MomssplitIdrottPtWorkspace } from '@/components/modules/fitness/MomssplitIdrottPtWorkspace'
-import { AutogiroPeriodiseringWorkspace } from '@/components/modules/fitness/AutogiroPeriodiseringWorkspace'
-import { KlippkortSomSkuldWorkspace } from '@/components/modules/fitness/KlippkortSomSkuldWorkspace'
-import { FriskvardsbidragWorkspace } from '@/components/modules/fitness/FriskvardsbidragWorkspace'
-
-registerWorkspace('fitness', 'fitnesskontoplan', FitnesskontoplanWorkspace)
-registerWorkspace('fitness', 'momssplit-idrott-pt', MomssplitIdrottPtWorkspace)
-registerWorkspace('fitness', 'autogiro-periodisering', AutogiroPeriodiseringWorkspace)
-registerWorkspace('fitness', 'klippkort-som-skuld', KlippkortSomSkuldWorkspace)
-registerWorkspace('fitness', 'friskvardsbidrag', FriskvardsbidragWorkspace)
+registerWorkspace('fitness', 'fitnesskontoplan',
+  dynamic(() => import('@/components/modules/fitness/FitnesskontoplanWorkspace').then(m => m.FitnesskontoplanWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fitness', 'momssplit-idrott-pt',
+  dynamic(() => import('@/components/modules/fitness/MomssplitIdrottPtWorkspace').then(m => m.MomssplitIdrottPtWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fitness', 'autogiro-periodisering',
+  dynamic(() => import('@/components/modules/fitness/AutogiroPeriodiseringWorkspace').then(m => m.AutogiroPeriodiseringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fitness', 'klippkort-som-skuld',
+  dynamic(() => import('@/components/modules/fitness/KlippkortSomSkuldWorkspace').then(m => m.KlippkortSomSkuldWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fitness', 'friskvardsbidrag',
+  dynamic(() => import('@/components/modules/fitness/FriskvardsbidragWorkspace').then(m => m.FriskvardsbidragWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Fitness: Rapport ─────────────────────────────────────────
-import { ChurnRateWorkspace } from '@/components/modules/fitness/ChurnRateWorkspace'
-import { IntaktPerMedlemWorkspace } from '@/components/modules/fitness/IntaktPerMedlemWorkspace'
-import { BelaggningsgradKlasserWorkspace } from '@/components/modules/fitness/BelaggningsgradKlasserWorkspace'
-
-registerWorkspace('fitness', 'churn-rate', ChurnRateWorkspace)
-registerWorkspace('fitness', 'intakt-per-medlem', IntaktPerMedlemWorkspace)
-registerWorkspace('fitness', 'belaggningsgrad-klasser', BelaggningsgradKlasserWorkspace)
+registerWorkspace('fitness', 'churn-rate',
+  dynamic(() => import('@/components/modules/fitness/ChurnRateWorkspace').then(m => m.ChurnRateWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fitness', 'intakt-per-medlem',
+  dynamic(() => import('@/components/modules/fitness/IntaktPerMedlemWorkspace').then(m => m.IntaktPerMedlemWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fitness', 'belaggningsgrad-klasser',
+  dynamic(() => import('@/components/modules/fitness/BelaggningsgradKlasserWorkspace').then(m => m.BelaggningsgradKlasserWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Fitness: Import ──────────────────────────────────────────
-import { AutogiroRapportImportWorkspace } from '@/components/modules/fitness/AutogiroRapportImportWorkspace'
-import { KassarapportImportFitnessWorkspace } from '@/components/modules/fitness/KassarapportImportFitnessWorkspace'
-
-registerWorkspace('fitness', 'autogiro-rapport-import', AutogiroRapportImportWorkspace)
-registerWorkspace('fitness', 'kassarapport-import-fitness', KassarapportImportFitnessWorkspace)
+registerWorkspace('fitness', 'autogiro-rapport-import',
+  dynamic(() => import('@/components/modules/fitness/AutogiroRapportImportWorkspace').then(m => m.AutogiroRapportImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fitness', 'kassarapport-import-fitness',
+  dynamic(() => import('@/components/modules/fitness/KassarapportImportFitnessWorkspace').then(m => m.KassarapportImportFitnessWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Fitness: Operativ ────────────────────────────────────────
-import { MedlemshanteringWorkspace } from '@/components/modules/fitness/MedlemshanteringWorkspace'
-import { KlassbokningWorkspace } from '@/components/modules/fitness/KlassbokningWorkspace'
-import { PtBokningWorkspace } from '@/components/modules/fitness/PtBokningWorkspace'
-import { TilltradeskontrollWorkspace } from '@/components/modules/fitness/TilltradeskontrollWorkspace'
-
-registerWorkspace('fitness', 'medlemshantering', MedlemshanteringWorkspace)
-registerWorkspace('fitness', 'klassbokning', KlassbokningWorkspace)
-registerWorkspace('fitness', 'pt-bokning', PtBokningWorkspace)
-registerWorkspace('fitness', 'tilltradeskontroll', TilltradeskontrollWorkspace)
+registerWorkspace('fitness', 'medlemshantering',
+  dynamic(() => import('@/components/modules/fitness/MedlemshanteringWorkspace').then(m => m.MedlemshanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fitness', 'klassbokning',
+  dynamic(() => import('@/components/modules/fitness/KlassbokningWorkspace').then(m => m.KlassbokningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fitness', 'pt-bokning',
+  dynamic(() => import('@/components/modules/fitness/PtBokningWorkspace').then(m => m.PtBokningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fitness', 'tilltradeskontroll',
+  dynamic(() => import('@/components/modules/fitness/TilltradeskontrollWorkspace').then(m => m.TilltradeskontrollWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Fordon: Bokföring ────────────────────────────────────────
-import { VerkstadskontoplanWorkspace } from '@/components/modules/fordon/VerkstadskontoplanWorkspace'
-import { ArbetsorderTillFakturaWorkspace } from '@/components/modules/fordon/ArbetsorderTillFakturaWorkspace'
-import { ReservdelslagerWorkspace } from '@/components/modules/fordon/ReservdelslagerWorkspace'
-import { VmbBegagnadeDelarWorkspace } from '@/components/modules/fordon/VmbBegagnadeDelarWorkspace'
-import { GarantiavsattningWorkspace } from '@/components/modules/fordon/GarantiavsattningWorkspace'
-
-registerWorkspace('fordon', 'verkstadskontoplan', VerkstadskontoplanWorkspace)
-registerWorkspace('fordon', 'arbetsorder-till-faktura', ArbetsorderTillFakturaWorkspace)
-registerWorkspace('fordon', 'reservdelslager', ReservdelslagerWorkspace)
-registerWorkspace('fordon', 'vmb-begagnade-delar', VmbBegagnadeDelarWorkspace)
-registerWorkspace('fordon', 'garantiavsattning', GarantiavsattningWorkspace)
+registerWorkspace('fordon', 'verkstadskontoplan',
+  dynamic(() => import('@/components/modules/fordon/VerkstadskontoplanWorkspace').then(m => m.VerkstadskontoplanWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fordon', 'arbetsorder-till-faktura',
+  dynamic(() => import('@/components/modules/fordon/ArbetsorderTillFakturaWorkspace').then(m => m.ArbetsorderTillFakturaWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fordon', 'reservdelslager',
+  dynamic(() => import('@/components/modules/fordon/ReservdelslagerWorkspace').then(m => m.ReservdelslagerWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fordon', 'vmb-begagnade-delar',
+  dynamic(() => import('@/components/modules/fordon/VmbBegagnadeDelarWorkspace').then(m => m.VmbBegagnadeDelarWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fordon', 'garantiavsattning',
+  dynamic(() => import('@/components/modules/fordon/GarantiavsattningWorkspace').then(m => m.GarantiavsattningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Fordon: Rapport ──────────────────────────────────────────
-import { GenomsnittligtOrdervardeFordonWorkspace } from '@/components/modules/fordon/GenomsnittligtOrdervardeFordonWorkspace'
-import { ReservdelsmarginalWorkspace } from '@/components/modules/fordon/ReservdelsmarginalWorkspace'
-import { VerkstadsbelaggningWorkspace } from '@/components/modules/fordon/VerkstadsbelaggningWorkspace'
-
-registerWorkspace('fordon', 'genomsnittligt-ordervarde', GenomsnittligtOrdervardeFordonWorkspace)
-registerWorkspace('fordon', 'reservdelsmarginal', ReservdelsmarginalWorkspace)
-registerWorkspace('fordon', 'verkstadsbelaggning', VerkstadsbelaggningWorkspace)
+registerWorkspace('fordon', 'genomsnittligt-ordervarde',
+  dynamic(() => import('@/components/modules/fordon/GenomsnittligtOrdervardeFordonWorkspace').then(m => m.GenomsnittligtOrdervardeFordonWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fordon', 'reservdelsmarginal',
+  dynamic(() => import('@/components/modules/fordon/ReservdelsmarginalWorkspace').then(m => m.ReservdelsmarginalWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fordon', 'verkstadsbelaggning',
+  dynamic(() => import('@/components/modules/fordon/VerkstadsbelaggningWorkspace').then(m => m.VerkstadsbelaggningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Fordon: Import ───────────────────────────────────────────
-import { ReservdelsleverantorImportWorkspace } from '@/components/modules/fordon/ReservdelsleverantorImportWorkspace'
-
-registerWorkspace('fordon', 'reservdelsleverantor-import', ReservdelsleverantorImportWorkspace)
+registerWorkspace('fordon', 'reservdelsleverantor-import',
+  dynamic(() => import('@/components/modules/fordon/ReservdelsleverantorImportWorkspace').then(m => m.ReservdelsleverantorImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Fordon: Operativ ─────────────────────────────────────────
-import { ArbetsorderWorkspace } from '@/components/modules/fordon/ArbetsorderWorkspace'
-import { FordonsregisterWorkspace } from '@/components/modules/fordon/FordonsregisterWorkspace'
-import { VerkstadsplaneringWorkspace } from '@/components/modules/fordon/VerkstadsplaneringWorkspace'
-import { BesiktningspaminmelseWorkspace } from '@/components/modules/fordon/BesiktningspaminmelseWorkspace'
-
-registerWorkspace('fordon', 'arbetsorder', ArbetsorderWorkspace)
-registerWorkspace('fordon', 'fordonsregister', FordonsregisterWorkspace)
-registerWorkspace('fordon', 'verkstadsplanering', VerkstadsplaneringWorkspace)
-registerWorkspace('fordon', 'besiktningspaminnelse', BesiktningspaminmelseWorkspace)
+registerWorkspace('fordon', 'arbetsorder',
+  dynamic(() => import('@/components/modules/fordon/ArbetsorderWorkspace').then(m => m.ArbetsorderWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fordon', 'fordonsregister',
+  dynamic(() => import('@/components/modules/fordon/FordonsregisterWorkspace').then(m => m.FordonsregisterWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fordon', 'verkstadsplanering',
+  dynamic(() => import('@/components/modules/fordon/VerkstadsplaneringWorkspace').then(m => m.VerkstadsplaneringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fordon', 'besiktningspaminnelse',
+  dynamic(() => import('@/components/modules/fordon/BesiktningspaminmelseWorkspace').then(m => m.BesiktningspaminmelseWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Bemanning: Bokföring ─────────────────────────────────────
-import { BemanningskontoplanWorkspace } from '@/components/modules/bemanning/BemanningskontoplanWorkspace'
-import { TidrapportDubbelbokforingWorkspace } from '@/components/modules/bemanning/TidrapportDubbelbokforingWorkspace'
-import { ArbetsgivaravgifterPeriodiseringWorkspace } from '@/components/modules/bemanning/ArbetsgivaravgifterPeriodiseringWorkspace'
-import { UeVerifieringBemanningWorkspace } from '@/components/modules/bemanning/UeVerifieringBemanningWorkspace'
-import { TraktamenteVidUthyrningWorkspace } from '@/components/modules/bemanning/TraktamenteVidUthyrningWorkspace'
-
-registerWorkspace('bemanning', 'bemanningskontoplan', BemanningskontoplanWorkspace)
-registerWorkspace('bemanning', 'tidrapport-dubbelbokforing', TidrapportDubbelbokforingWorkspace)
-registerWorkspace('bemanning', 'arbetsgivaravgifter-periodisering', ArbetsgivaravgifterPeriodiseringWorkspace)
-registerWorkspace('bemanning', 'ue-verifiering-bemanning', UeVerifieringBemanningWorkspace)
-registerWorkspace('bemanning', 'traktamente-vid-uthyrning', TraktamenteVidUthyrningWorkspace)
+registerWorkspace('bemanning', 'bemanningskontoplan',
+  dynamic(() => import('@/components/modules/bemanning/BemanningskontoplanWorkspace').then(m => m.BemanningskontoplanWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bemanning', 'tidrapport-dubbelbokforing',
+  dynamic(() => import('@/components/modules/bemanning/TidrapportDubbelbokforingWorkspace').then(m => m.TidrapportDubbelbokforingWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bemanning', 'arbetsgivaravgifter-periodisering',
+  dynamic(() => import('@/components/modules/bemanning/ArbetsgivaravgifterPeriodiseringWorkspace').then(m => m.ArbetsgivaravgifterPeriodiseringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bemanning', 'ue-verifiering-bemanning',
+  dynamic(() => import('@/components/modules/bemanning/UeVerifieringBemanningWorkspace').then(m => m.UeVerifieringBemanningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bemanning', 'traktamente-vid-uthyrning',
+  dynamic(() => import('@/components/modules/bemanning/TraktamenteVidUthyrningWorkspace').then(m => m.TraktamenteVidUthyrningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Bemanning: Rapport ───────────────────────────────────────
-import { MarginalPerKonsultWorkspace } from '@/components/modules/bemanning/MarginalPerKonsultWorkspace'
-import { BelaggningsgradBemanningWorkspace } from '@/components/modules/bemanning/BelaggningsgradBemanningWorkspace'
-import { FaktureratPerKonsultWorkspace } from '@/components/modules/bemanning/FaktureratPerKonsultWorkspace'
-
-registerWorkspace('bemanning', 'marginal-per-konsult', MarginalPerKonsultWorkspace)
-registerWorkspace('bemanning', 'belaggningsgrad-bemanning', BelaggningsgradBemanningWorkspace)
-registerWorkspace('bemanning', 'fakturerat-per-konsult', FaktureratPerKonsultWorkspace)
+registerWorkspace('bemanning', 'marginal-per-konsult',
+  dynamic(() => import('@/components/modules/bemanning/MarginalPerKonsultWorkspace').then(m => m.MarginalPerKonsultWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bemanning', 'belaggningsgrad-bemanning',
+  dynamic(() => import('@/components/modules/bemanning/BelaggningsgradBemanningWorkspace').then(m => m.BelaggningsgradBemanningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bemanning', 'fakturerat-per-konsult',
+  dynamic(() => import('@/components/modules/bemanning/FaktureratPerKonsultWorkspace').then(m => m.FaktureratPerKonsultWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Bemanning: Import ────────────────────────────────────────
-import { TidrapportImportBemanningWorkspace } from '@/components/modules/bemanning/TidrapportImportBemanningWorkspace'
-import { LonesystemImportWorkspace } from '@/components/modules/bemanning/LonesystemImportWorkspace'
-
-registerWorkspace('bemanning', 'tidrapport-import-bemanning', TidrapportImportBemanningWorkspace)
-registerWorkspace('bemanning', 'lonesystem-import', LonesystemImportWorkspace)
+registerWorkspace('bemanning', 'tidrapport-import-bemanning',
+  dynamic(() => import('@/components/modules/bemanning/TidrapportImportBemanningWorkspace').then(m => m.TidrapportImportBemanningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bemanning', 'lonesystem-import',
+  dynamic(() => import('@/components/modules/bemanning/LonesystemImportWorkspace').then(m => m.LonesystemImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Bemanning: Operativ ──────────────────────────────────────
-import { KandidatregisterWorkspace } from '@/components/modules/bemanning/KandidatregisterWorkspace'
-import { UppdragshanteringBemanningWorkspace } from '@/components/modules/bemanning/UppdragshanteringBemanningWorkspace'
-import { AvtalshanteringBemanningWorkspace } from '@/components/modules/bemanning/AvtalshanteringBemanningWorkspace'
-import { KompetensregisterWorkspace } from '@/components/modules/bemanning/KompetensregisterWorkspace'
-import { ComplianceBemanningWorkspace } from '@/components/modules/bemanning/ComplianceBemanningWorkspace'
-
-registerWorkspace('bemanning', 'kandidatregister', KandidatregisterWorkspace)
-registerWorkspace('bemanning', 'uppdragshantering-bemanning', UppdragshanteringBemanningWorkspace)
-registerWorkspace('bemanning', 'avtalshantering-bemanning', AvtalshanteringBemanningWorkspace)
-registerWorkspace('bemanning', 'kompetensregister', KompetensregisterWorkspace)
-registerWorkspace('bemanning', 'compliance-bemanning', ComplianceBemanningWorkspace)
+registerWorkspace('bemanning', 'kandidatregister',
+  dynamic(() => import('@/components/modules/bemanning/KandidatregisterWorkspace').then(m => m.KandidatregisterWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bemanning', 'uppdragshantering-bemanning',
+  dynamic(() => import('@/components/modules/bemanning/UppdragshanteringBemanningWorkspace').then(m => m.UppdragshanteringBemanningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bemanning', 'avtalshantering-bemanning',
+  dynamic(() => import('@/components/modules/bemanning/AvtalshanteringBemanningWorkspace').then(m => m.AvtalshanteringBemanningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bemanning', 'kompetensregister',
+  dynamic(() => import('@/components/modules/bemanning/KompetensregisterWorkspace').then(m => m.KompetensregisterWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('bemanning', 'compliance-bemanning',
+  dynamic(() => import('@/components/modules/bemanning/ComplianceBemanningWorkspace').then(m => m.ComplianceBemanningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Tillverkning: Bokföring ──────────────────────────────────
-import { TillverkningskontoplanWorkspace } from '@/components/modules/tillverkning/TillverkningskontoplanWorkspace'
-import { TrestegslagervarderingWorkspace } from '@/components/modules/tillverkning/TrestegslagervarderingWorkspace'
-import { BomKalkylLagervardeWorkspace } from '@/components/modules/tillverkning/BomKalkylLagervardeWorkspace'
-import { ProduktionsavvikelseWorkspace } from '@/components/modules/tillverkning/ProduktionsavvikelseWorkspace'
-import { MaskinavskrivningIndustriWorkspace } from '@/components/modules/tillverkning/MaskinavskrivningIndustriWorkspace'
-import { EnergiskatteavdragWorkspace } from '@/components/modules/tillverkning/EnergiskatteavdragWorkspace'
-
-registerWorkspace('tillverkning', 'tillverkningskontoplan', TillverkningskontoplanWorkspace)
-registerWorkspace('tillverkning', 'trestegslagervarderin', TrestegslagervarderingWorkspace)
-registerWorkspace('tillverkning', 'bom-kalkyl-lagervarde', BomKalkylLagervardeWorkspace)
-registerWorkspace('tillverkning', 'produktionsavvikelse', ProduktionsavvikelseWorkspace)
-registerWorkspace('tillverkning', 'maskinavskrivning-industri', MaskinavskrivningIndustriWorkspace)
-registerWorkspace('tillverkning', 'energiskatteavdrag', EnergiskatteavdragWorkspace)
+registerWorkspace('tillverkning', 'tillverkningskontoplan',
+  dynamic(() => import('@/components/modules/tillverkning/TillverkningskontoplanWorkspace').then(m => m.TillverkningskontoplanWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('tillverkning', 'trestegslagervarderin',
+  dynamic(() => import('@/components/modules/tillverkning/TrestegslagervarderingWorkspace').then(m => m.TrestegslagervarderingWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('tillverkning', 'bom-kalkyl-lagervarde',
+  dynamic(() => import('@/components/modules/tillverkning/BomKalkylLagervardeWorkspace').then(m => m.BomKalkylLagervardeWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('tillverkning', 'produktionsavvikelse',
+  dynamic(() => import('@/components/modules/tillverkning/ProduktionsavvikelseWorkspace').then(m => m.ProduktionsavvikelseWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('tillverkning', 'maskinavskrivning-industri',
+  dynamic(() => import('@/components/modules/tillverkning/MaskinavskrivningIndustriWorkspace').then(m => m.MaskinavskrivningIndustriWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('tillverkning', 'energiskatteavdrag',
+  dynamic(() => import('@/components/modules/tillverkning/EnergiskatteavdragWorkspace').then(m => m.EnergiskatteavdragWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Tillverkning: Rapport ────────────────────────────────────
-import { MaterialeffektivitetWorkspace } from '@/components/modules/tillverkning/MaterialeffektivitetWorkspace'
-import { KostnadPerProduceradEnhetWorkspace } from '@/components/modules/tillverkning/KostnadPerProduceradEnhetWorkspace'
-import { OeeWorkspace } from '@/components/modules/tillverkning/OeeWorkspace'
-
-registerWorkspace('tillverkning', 'materialeffektivitet', MaterialeffektivitetWorkspace)
-registerWorkspace('tillverkning', 'kostnad-per-producerad-enhet', KostnadPerProduceradEnhetWorkspace)
-registerWorkspace('tillverkning', 'oee', OeeWorkspace)
+registerWorkspace('tillverkning', 'materialeffektivitet',
+  dynamic(() => import('@/components/modules/tillverkning/MaterialeffektivitetWorkspace').then(m => m.MaterialeffektivitetWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('tillverkning', 'kostnad-per-producerad-enhet',
+  dynamic(() => import('@/components/modules/tillverkning/KostnadPerProduceradEnhetWorkspace').then(m => m.KostnadPerProduceradEnhetWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('tillverkning', 'oee',
+  dynamic(() => import('@/components/modules/tillverkning/OeeWorkspace').then(m => m.OeeWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Tillverkning: Import ─────────────────────────────────────
-import { ProduktionsrapportImportWorkspace } from '@/components/modules/tillverkning/ProduktionsrapportImportWorkspace'
-import { LagerexportImportWorkspace } from '@/components/modules/tillverkning/LagerexportImportWorkspace'
-
-registerWorkspace('tillverkning', 'produktionsrapport-import', ProduktionsrapportImportWorkspace)
-registerWorkspace('tillverkning', 'lagerexport-import', LagerexportImportWorkspace)
+registerWorkspace('tillverkning', 'produktionsrapport-import',
+  dynamic(() => import('@/components/modules/tillverkning/ProduktionsrapportImportWorkspace').then(m => m.ProduktionsrapportImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('tillverkning', 'lagerexport-import',
+  dynamic(() => import('@/components/modules/tillverkning/LagerexportImportWorkspace').then(m => m.LagerexportImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Tillverkning: Operativ ───────────────────────────────────
-import { ProduktionsplaneringWorkspace } from '@/components/modules/tillverkning/ProduktionsplaneringWorkspace'
-import { StrukturlistaBomWorkspace } from '@/components/modules/tillverkning/StrukturlistaBomWorkspace'
-import { KvalitetskontrollWorkspace } from '@/components/modules/tillverkning/KvalitetskontrollWorkspace'
-import { MaskinunderhallWorkspace } from '@/components/modules/tillverkning/MaskinunderhallWorkspace'
-import { SparbarhetBatchWorkspace } from '@/components/modules/tillverkning/SparbarhetBatchWorkspace'
-
-registerWorkspace('tillverkning', 'produktionsplanering', ProduktionsplaneringWorkspace)
-registerWorkspace('tillverkning', 'strukturlista-bom', StrukturlistaBomWorkspace)
-registerWorkspace('tillverkning', 'kvalitetskontroll', KvalitetskontrollWorkspace)
-registerWorkspace('tillverkning', 'maskinunderhall', MaskinunderhallWorkspace)
-registerWorkspace('tillverkning', 'sparbarhet-batch', SparbarhetBatchWorkspace)
+registerWorkspace('tillverkning', 'produktionsplanering',
+  dynamic(() => import('@/components/modules/tillverkning/ProduktionsplaneringWorkspace').then(m => m.ProduktionsplaneringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('tillverkning', 'strukturlista-bom',
+  dynamic(() => import('@/components/modules/tillverkning/StrukturlistaBomWorkspace').then(m => m.StrukturlistaBomWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('tillverkning', 'kvalitetskontroll',
+  dynamic(() => import('@/components/modules/tillverkning/KvalitetskontrollWorkspace').then(m => m.KvalitetskontrollWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('tillverkning', 'maskinunderhall',
+  dynamic(() => import('@/components/modules/tillverkning/MaskinunderhallWorkspace').then(m => m.MaskinunderhallWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('tillverkning', 'sparbarhet-batch',
+  dynamic(() => import('@/components/modules/tillverkning/SparbarhetBatchWorkspace').then(m => m.SparbarhetBatchWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Konsult: Bokföring ───────────────────────────────────────
-import { KonsultkontoplanWorkspace } from '@/components/modules/konsult/KonsultkontoplanWorkspace'
-import { TraktamenteWorkspace } from '@/components/modules/konsult/TraktamenteWorkspace'
-import { HemmakontorAvdragWorkspace } from '@/components/modules/konsult/HemmakontorAvdragWorkspace'
-import { WipBevakningKonsultWorkspace } from '@/components/modules/konsult/WipBevakningKonsultWorkspace'
-
-registerWorkspace('konsult', 'konsultkontoplan', KonsultkontoplanWorkspace)
-registerWorkspace('konsult', 'traktamente', TraktamenteWorkspace)
-registerWorkspace('konsult', 'hemmakontor-avdrag', HemmakontorAvdragWorkspace)
-registerWorkspace('konsult', 'wip-bevakning-konsult', WipBevakningKonsultWorkspace)
+registerWorkspace('konsult', 'konsultkontoplan',
+  dynamic(() => import('@/components/modules/konsult/KonsultkontoplanWorkspace').then(m => m.KonsultkontoplanWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('konsult', 'traktamente',
+  dynamic(() => import('@/components/modules/konsult/TraktamenteWorkspace').then(m => m.TraktamenteWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('konsult', 'hemmakontor-avdrag',
+  dynamic(() => import('@/components/modules/konsult/HemmakontorAvdragWorkspace').then(m => m.HemmakontorAvdragWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('konsult', 'wip-bevakning-konsult',
+  dynamic(() => import('@/components/modules/konsult/WipBevakningKonsultWorkspace').then(m => m.WipBevakningKonsultWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Konsult: Rapport ─────────────────────────────────────────
-import { DebiteringsgradKonsultWorkspace } from '@/components/modules/konsult/DebiteringsgradKonsultWorkspace'
-import { IntaktPerKonsultWorkspace } from '@/components/modules/konsult/IntaktPerKonsultWorkspace'
-
-registerWorkspace('konsult', 'debiteringsgrad-konsult', DebiteringsgradKonsultWorkspace)
-registerWorkspace('konsult', 'intakt-per-konsult', IntaktPerKonsultWorkspace)
+registerWorkspace('konsult', 'debiteringsgrad-konsult',
+  dynamic(() => import('@/components/modules/konsult/DebiteringsgradKonsultWorkspace').then(m => m.DebiteringsgradKonsultWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('konsult', 'intakt-per-konsult',
+  dynamic(() => import('@/components/modules/konsult/IntaktPerKonsultWorkspace').then(m => m.IntaktPerKonsultWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Konsult: Import ──────────────────────────────────────────
-import { TidrapportImportKonsultWorkspace } from '@/components/modules/konsult/TidrapportImportKonsultWorkspace'
-
-registerWorkspace('konsult', 'tidrapport-import-konsult', TidrapportImportKonsultWorkspace)
+registerWorkspace('konsult', 'tidrapport-import-konsult',
+  dynamic(() => import('@/components/modules/konsult/TidrapportImportKonsultWorkspace').then(m => m.TidrapportImportKonsultWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Konsult: Operativ ────────────────────────────────────────
-import { UppdragshanteringKonsultWorkspace } from '@/components/modules/konsult/UppdragshanteringKonsultWorkspace'
-import { TidrapporteringKonsultWorkspace } from '@/components/modules/konsult/TidrapporteringKonsultWorkspace'
-import { OffertAvtalWorkspace } from '@/components/modules/konsult/OffertAvtalWorkspace'
-
-registerWorkspace('konsult', 'uppdragshantering-konsult', UppdragshanteringKonsultWorkspace)
-registerWorkspace('konsult', 'tidrapportering-konsult', TidrapporteringKonsultWorkspace)
-registerWorkspace('konsult', 'offert-avtal', OffertAvtalWorkspace)
+registerWorkspace('konsult', 'uppdragshantering-konsult',
+  dynamic(() => import('@/components/modules/konsult/UppdragshanteringKonsultWorkspace').then(m => m.UppdragshanteringKonsultWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('konsult', 'tidrapportering-konsult',
+  dynamic(() => import('@/components/modules/konsult/TidrapporteringKonsultWorkspace').then(m => m.TidrapporteringKonsultWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('konsult', 'offert-avtal',
+  dynamic(() => import('@/components/modules/konsult/OffertAvtalWorkspace').then(m => m.OffertAvtalWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Event: Bokföring ─────────────────────────────────────────
-import { EventkontoplanWorkspace } from '@/components/modules/event/EventkontoplanWorkspace'
-import { BiljettintaktSomForskottWorkspace } from '@/components/modules/event/BiljettintaktSomForskottWorkspace'
-import { KulturmomsEventWorkspace } from '@/components/modules/event/KulturmomsEventWorkspace'
-import { ArtistskattSinkWorkspace } from '@/components/modules/event/ArtistskattSinkWorkspace'
-import { SponsorintaktsbokforingWorkspace } from '@/components/modules/event/SponsorintaktsbokforingWorkspace'
-
-registerWorkspace('event', 'eventkontoplan', EventkontoplanWorkspace)
-registerWorkspace('event', 'biljettintakt-som-forskott', BiljettintaktSomForskottWorkspace)
-registerWorkspace('event', 'kulturmoms-event', KulturmomsEventWorkspace)
-registerWorkspace('event', 'artistskatt-sink', ArtistskattSinkWorkspace)
-registerWorkspace('event', 'sponsorintaktsbokforing', SponsorintaktsbokforingWorkspace)
+registerWorkspace('event', 'eventkontoplan',
+  dynamic(() => import('@/components/modules/event/EventkontoplanWorkspace').then(m => m.EventkontoplanWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('event', 'biljettintakt-som-forskott',
+  dynamic(() => import('@/components/modules/event/BiljettintaktSomForskottWorkspace').then(m => m.BiljettintaktSomForskottWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('event', 'kulturmoms-event',
+  dynamic(() => import('@/components/modules/event/KulturmomsEventWorkspace').then(m => m.KulturmomsEventWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('event', 'artistskatt-sink',
+  dynamic(() => import('@/components/modules/event/ArtistskattSinkWorkspace').then(m => m.ArtistskattSinkWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('event', 'sponsorintaktsbokforing',
+  dynamic(() => import('@/components/modules/event/SponsorintaktsbokforingWorkspace').then(m => m.SponsorintaktsbokforingWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Event: Rapport ───────────────────────────────────────────
-import { IntaktPerBesokareWorkspace } from '@/components/modules/event/IntaktPerBesokareWorkspace'
-import { BudgetVsUtfallWorkspace } from '@/components/modules/event/BudgetVsUtfallWorkspace'
-import { SponsorandelWorkspace } from '@/components/modules/event/SponsorandelWorkspace'
-
-registerWorkspace('event', 'intakt-per-besokare', IntaktPerBesokareWorkspace)
-registerWorkspace('event', 'budget-vs-utfall', BudgetVsUtfallWorkspace)
-registerWorkspace('event', 'sponsorandel', SponsorandelWorkspace)
+registerWorkspace('event', 'intakt-per-besokare',
+  dynamic(() => import('@/components/modules/event/IntaktPerBesokareWorkspace').then(m => m.IntaktPerBesokareWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('event', 'budget-vs-utfall',
+  dynamic(() => import('@/components/modules/event/BudgetVsUtfallWorkspace').then(m => m.BudgetVsUtfallWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('event', 'sponsorandel',
+  dynamic(() => import('@/components/modules/event/SponsorandelWorkspace').then(m => m.SponsorandelWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Event: Import ────────────────────────────────────────────
-import { BiljettsystemImportWorkspace } from '@/components/modules/event/BiljettsystemImportWorkspace'
-import { PosRapportImportEventWorkspace } from '@/components/modules/event/PosRapportImportEventWorkspace'
-
-registerWorkspace('event', 'biljettsystem-import', BiljettsystemImportWorkspace)
-registerWorkspace('event', 'pos-rapport-import-event', PosRapportImportEventWorkspace)
+registerWorkspace('event', 'biljettsystem-import',
+  dynamic(() => import('@/components/modules/event/BiljettsystemImportWorkspace').then(m => m.BiljettsystemImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('event', 'pos-rapport-import-event',
+  dynamic(() => import('@/components/modules/event/PosRapportImportEventWorkspace').then(m => m.PosRapportImportEventWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Event: Operativ ──────────────────────────────────────────
-import { EvenemangsplaneringWorkspace } from '@/components/modules/event/EvenemangsplaneringWorkspace'
-import { BiljettforsaljningWorkspace } from '@/components/modules/event/BiljettforsaljningWorkspace'
-import { ArtistTalangbokningWorkspace } from '@/components/modules/event/ArtistTalangbokningWorkspace'
-import { SponsorhanteringWorkspace } from '@/components/modules/event/SponsorhanteringWorkspace'
-import { VolontarhanteringWorkspace } from '@/components/modules/event/VolontarhanteringWorkspace'
-
-registerWorkspace('event', 'evenemangsplanering', EvenemangsplaneringWorkspace)
-registerWorkspace('event', 'biljettforsaljning', BiljettforsaljningWorkspace)
-registerWorkspace('event', 'artist-talangbokning', ArtistTalangbokningWorkspace)
-registerWorkspace('event', 'sponsorhantering', SponsorhanteringWorkspace)
-registerWorkspace('event', 'volontarhantering', VolontarhanteringWorkspace)
+registerWorkspace('event', 'evenemangsplanering',
+  dynamic(() => import('@/components/modules/event/EvenemangsplaneringWorkspace').then(m => m.EvenemangsplaneringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('event', 'biljettforsaljning',
+  dynamic(() => import('@/components/modules/event/BiljettforsaljningWorkspace').then(m => m.BiljettforsaljningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('event', 'artist-talangbokning',
+  dynamic(() => import('@/components/modules/event/ArtistTalangbokningWorkspace').then(m => m.ArtistTalangbokningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('event', 'sponsorhantering',
+  dynamic(() => import('@/components/modules/event/SponsorhanteringWorkspace').then(m => m.SponsorhanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('event', 'volontarhantering',
+  dynamic(() => import('@/components/modules/event/VolontarhanteringWorkspace').then(m => m.VolontarhanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Fastighet: Bokföring ─────────────────────────────────────
-import { FastighetskontoplanWorkspace } from '@/components/modules/fastighet/FastighetskontoplanWorkspace'
-import { HyresintaktPeriodiseringWorkspace } from '@/components/modules/fastighet/HyresintaktPeriodiseringWorkspace'
-import { FastighetsskattWorkspace } from '@/components/modules/fastighet/FastighetsskattWorkspace'
-import { FastighetsavskrivningWorkspace } from '@/components/modules/fastighet/FastighetsavskrivningWorkspace'
-import { UnderhallsfondWorkspace } from '@/components/modules/fastighet/UnderhallsfondWorkspace'
-import { RotVidRenoveringWorkspace } from '@/components/modules/fastighet/RotVidRenoveringWorkspace'
-import { IndexupprakningWorkspace } from '@/components/modules/fastighet/IndexupprakningWorkspace'
-
-registerWorkspace('fastighet', 'fastighetskontoplan', FastighetskontoplanWorkspace)
-registerWorkspace('fastighet', 'hyresintakt-periodisering', HyresintaktPeriodiseringWorkspace)
-registerWorkspace('fastighet', 'fastighetsskatt', FastighetsskattWorkspace)
-registerWorkspace('fastighet', 'fastighetsavskrivning', FastighetsavskrivningWorkspace)
-registerWorkspace('fastighet', 'underhallsfond', UnderhallsfondWorkspace)
-registerWorkspace('fastighet', 'rot-vid-renovering', RotVidRenoveringWorkspace)
-registerWorkspace('fastighet', 'indexupprakning', IndexupprakningWorkspace)
+registerWorkspace('fastighet', 'fastighetskontoplan',
+  dynamic(() => import('@/components/modules/fastighet/FastighetskontoplanWorkspace').then(m => m.FastighetskontoplanWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fastighet', 'hyresintakt-periodisering',
+  dynamic(() => import('@/components/modules/fastighet/HyresintaktPeriodiseringWorkspace').then(m => m.HyresintaktPeriodiseringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fastighet', 'fastighetsskatt',
+  dynamic(() => import('@/components/modules/fastighet/FastighetsskattWorkspace').then(m => m.FastighetsskattWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fastighet', 'fastighetsavskrivning',
+  dynamic(() => import('@/components/modules/fastighet/FastighetsavskrivningWorkspace').then(m => m.FastighetsavskrivningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fastighet', 'underhallsfond',
+  dynamic(() => import('@/components/modules/fastighet/UnderhallsfondWorkspace').then(m => m.UnderhallsfondWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fastighet', 'rot-vid-renovering',
+  dynamic(() => import('@/components/modules/fastighet/RotVidRenoveringWorkspace').then(m => m.RotVidRenoveringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fastighet', 'indexupprakning',
+  dynamic(() => import('@/components/modules/fastighet/IndexupprakningWorkspace').then(m => m.IndexupprakningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Fastighet: Rapport ───────────────────────────────────────
-import { DriftnettoPerFastighetWorkspace } from '@/components/modules/fastighet/DriftnettoPerFastighetWorkspace'
-import { VakansgradWorkspace } from '@/components/modules/fastighet/VakansgradWorkspace'
-import { UnderhallskostnadPerM2Workspace } from '@/components/modules/fastighet/UnderhallskostnadPerM2Workspace'
-
-registerWorkspace('fastighet', 'driftnetto-per-fastighet', DriftnettoPerFastighetWorkspace)
-registerWorkspace('fastighet', 'vakansgrad', VakansgradWorkspace)
-registerWorkspace('fastighet', 'underhallskostnad-per-m2', UnderhallskostnadPerM2Workspace)
+registerWorkspace('fastighet', 'driftnetto-per-fastighet',
+  dynamic(() => import('@/components/modules/fastighet/DriftnettoPerFastighetWorkspace').then(m => m.DriftnettoPerFastighetWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fastighet', 'vakansgrad',
+  dynamic(() => import('@/components/modules/fastighet/VakansgradWorkspace').then(m => m.VakansgradWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fastighet', 'underhallskostnad-per-m2',
+  dynamic(() => import('@/components/modules/fastighet/UnderhallskostnadPerM2Workspace').then(m => m.UnderhallskostnadPerM2Workspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Fastighet: Import ────────────────────────────────────────
-import { HyresreskontraImportWorkspace } from '@/components/modules/fastighet/HyresreskontraImportWorkspace'
-import { EnergirapportImportWorkspace } from '@/components/modules/fastighet/EnergirapportImportWorkspace'
-
-registerWorkspace('fastighet', 'hyresreskontra-import', HyresreskontraImportWorkspace)
-registerWorkspace('fastighet', 'energirapport-import', EnergirapportImportWorkspace)
+registerWorkspace('fastighet', 'hyresreskontra-import',
+  dynamic(() => import('@/components/modules/fastighet/HyresreskontraImportWorkspace').then(m => m.HyresreskontraImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fastighet', 'energirapport-import',
+  dynamic(() => import('@/components/modules/fastighet/EnergirapportImportWorkspace').then(m => m.EnergirapportImportWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
 
 // ── Fastighet: Operativ ──────────────────────────────────────
-import { ObjektregisterWorkspace } from '@/components/modules/fastighet/ObjektregisterWorkspace'
-import { HyresgasthanteringWorkspace } from '@/components/modules/fastighet/HyresgasthanteringWorkspace'
-import { HyresavierWorkspace } from '@/components/modules/fastighet/HyresavierWorkspace'
-import { FelanmalanWorkspace } from '@/components/modules/fastighet/FelanmalanWorkspace'
-import { UnderhallsplaneringWorkspace } from '@/components/modules/fastighet/UnderhallsplaneringWorkspace'
-import { BesiktningRonderingWorkspace } from '@/components/modules/fastighet/BesiktningRonderingWorkspace'
-import { EnergiovervaningWorkspace } from '@/components/modules/fastighet/EnergiovervaningWorkspace'
-
-registerWorkspace('fastighet', 'objektregister', ObjektregisterWorkspace)
-registerWorkspace('fastighet', 'hyresgasthantering', HyresgasthanteringWorkspace)
-registerWorkspace('fastighet', 'hyresavier', HyresavierWorkspace)
-registerWorkspace('fastighet', 'felanmalan', FelanmalanWorkspace)
-registerWorkspace('fastighet', 'underhallsplanering', UnderhallsplaneringWorkspace)
-registerWorkspace('fastighet', 'besiktning-rondering', BesiktningRonderingWorkspace)
-registerWorkspace('fastighet', 'energiovervakning', EnergiovervaningWorkspace)
+registerWorkspace('fastighet', 'objektregister',
+  dynamic(() => import('@/components/modules/fastighet/ObjektregisterWorkspace').then(m => m.ObjektregisterWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fastighet', 'hyresgasthantering',
+  dynamic(() => import('@/components/modules/fastighet/HyresgasthanteringWorkspace').then(m => m.HyresgasthanteringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fastighet', 'hyresavier',
+  dynamic(() => import('@/components/modules/fastighet/HyresavierWorkspace').then(m => m.HyresavierWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fastighet', 'felanmalan',
+  dynamic(() => import('@/components/modules/fastighet/FelanmalanWorkspace').then(m => m.FelanmalanWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fastighet', 'underhallsplanering',
+  dynamic(() => import('@/components/modules/fastighet/UnderhallsplaneringWorkspace').then(m => m.UnderhallsplaneringWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fastighet', 'besiktning-rondering',
+  dynamic(() => import('@/components/modules/fastighet/BesiktningRonderingWorkspace').then(m => m.BesiktningRonderingWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerWorkspace('fastighet', 'energiovervakning',
+  dynamic(() => import('@/components/modules/fastighet/EnergiovervaningWorkspace').then(m => m.EnergiovervaningWorkspace), { loading: () => <ModuleLoadingSkeleton /> })
+)

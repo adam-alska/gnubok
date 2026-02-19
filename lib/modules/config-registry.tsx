@@ -1,4 +1,6 @@
 import type { ComponentType } from 'react'
+import dynamic from 'next/dynamic'
+import { ModuleLoadingSkeleton } from '@/components/modules/shared/ModuleLoadingSkeleton'
 
 export interface ModuleConfigProps {
   sectorSlug: string
@@ -17,19 +19,26 @@ export function getConfigComponent(sector: string, slug: string): ConfigComponen
   return configRegistry[`${sector}/${slug}`] ?? null
 }
 
-// ── Restaurang: Bokföring config panels ──
-import { RestaurangkontoplanConfig } from '@/components/modules/restaurang/config/RestaurangkontoplanConfig'
-import { MomssplitConfig } from '@/components/modules/restaurang/config/MomssplitConfig'
-import { DagskassaConfig } from '@/components/modules/restaurang/config/DagskassaConfig'
-import { TipsbokforingConfig } from '@/components/modules/restaurang/config/TipsbokforingConfig'
-import { PersonalliggareConfig } from '@/components/modules/restaurang/config/PersonalliggareConfig'
-import { AlkoholAccisConfig } from '@/components/modules/restaurang/config/AlkoholAccisConfig'
-import { RepresentationConfig } from '@/components/modules/restaurang/config/RepresentationConfig'
 
-registerConfig('restaurang', 'restaurangkontoplan', RestaurangkontoplanConfig)
-registerConfig('restaurang', 'momssplit-mat-dryck', MomssplitConfig)
-registerConfig('restaurang', 'dagskassaavstamning', DagskassaConfig)
-registerConfig('restaurang', 'tipsbokforing', TipsbokforingConfig)
-registerConfig('restaurang', 'personalliggare', PersonalliggareConfig)
-registerConfig('restaurang', 'alkoholpunktskatt', AlkoholAccisConfig)
-registerConfig('restaurang', 'representationsbokforing', RepresentationConfig)
+// ── Restaurang: Bokföring config panels ──
+registerConfig('restaurang', 'restaurangkontoplan',
+  dynamic(() => import('@/components/modules/restaurang/config/RestaurangkontoplanConfig').then(m => m.RestaurangkontoplanConfig), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerConfig('restaurang', 'momssplit-mat-dryck',
+  dynamic(() => import('@/components/modules/restaurang/config/MomssplitConfig').then(m => m.MomssplitConfig), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerConfig('restaurang', 'dagskassaavstamning',
+  dynamic(() => import('@/components/modules/restaurang/config/DagskassaConfig').then(m => m.DagskassaConfig), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerConfig('restaurang', 'tipsbokforing',
+  dynamic(() => import('@/components/modules/restaurang/config/TipsbokforingConfig').then(m => m.TipsbokforingConfig), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerConfig('restaurang', 'personalliggare',
+  dynamic(() => import('@/components/modules/restaurang/config/PersonalliggareConfig').then(m => m.PersonalliggareConfig), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerConfig('restaurang', 'alkoholpunktskatt',
+  dynamic(() => import('@/components/modules/restaurang/config/AlkoholAccisConfig').then(m => m.AlkoholAccisConfig), { loading: () => <ModuleLoadingSkeleton /> })
+)
+registerConfig('restaurang', 'representationsbokforing',
+  dynamic(() => import('@/components/modules/restaurang/config/RepresentationConfig').then(m => m.RepresentationConfig), { loading: () => <ModuleLoadingSkeleton /> })
+)

@@ -9,6 +9,7 @@ import {
   generateInvoiceEmailSubject
 } from '@/lib/email/invoice-templates'
 import type { Invoice, InvoiceItem, Customer, CompanySettings } from '@/types'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
 
 export async function POST(
   request: Request,
@@ -22,6 +23,9 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
 
   // Check if Resend is configured
   if (!isResendConfigured()) {

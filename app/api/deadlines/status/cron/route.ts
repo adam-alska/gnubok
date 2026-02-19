@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { updateDeadlineStatuses } from '@/lib/deadlines/status-engine'
+import { logger } from '@/lib/logger'
 
 /**
  * GET /api/deadlines/status/cron
@@ -34,10 +35,7 @@ export async function GET(request: Request) {
   try {
     const result = await updateDeadlineStatuses(supabase)
 
-    console.log(
-      `Deadline status cron completed: ${result.updated} updated, ` +
-        `${result.newlyOverdue} newly overdue, ${result.newlyActionNeeded} newly action_needed`
-    )
+    logger.info('deadline-status-cron', 'Deadline status cron completed', { updated: result.updated, newlyOverdue: result.newlyOverdue, newlyActionNeeded: result.newlyActionNeeded })
 
     return NextResponse.json({
       success: true,
@@ -46,7 +44,7 @@ export async function GET(request: Request) {
       newlyActionNeeded: result.newlyActionNeeded,
     })
   } catch (error) {
-    console.error('Error in deadline status cron:', error)
+    logger.error('deadline-status-cron', 'Error in deadline status cron', { error: error instanceof Error ? error.message : String(error) })
     return NextResponse.json(
       { error: 'Failed to update deadline statuses' },
       { status: 500 }

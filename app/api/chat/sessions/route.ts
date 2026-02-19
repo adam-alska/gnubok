@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
+import { validateBody, CreateChatSessionSchema } from '@/lib/validation'
 
 /**
  * GET /api/chat/sessions
@@ -16,16 +18,21 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
+
   const { searchParams } = new URL(request.url)
-  const limit = parseInt(searchParams.get('limit') || '20')
-  const offset = parseInt(searchParams.get('offset') || '0')
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+  const per_page = Math.min(100, Math.max(1, parseInt(searchParams.get('per_page') || '20')))
+  const from = (page - 1) * per_page
+  const to = from + per_page - 1
 
   const { data, error, count } = await supabase
     .from('chat_sessions')
     .select('*', { count: 'exact' })
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1)
+    .range(from, to)
 
   if (error) {
     console.error('Error fetching sessions:', error)
@@ -35,7 +42,17 @@ export async function GET(request: Request) {
     )
   }
 
-  return NextResponse.json({ data, count })
+  const total = count ?? 0
+
+  return NextResponse.json({
+    data,
+    pagination: {
+      page,
+      per_page,
+      total,
+      total_pages: Math.ceil(total / per_page),
+    },
+  })
 }
 
 /**
@@ -53,9 +70,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const { success: postRl, remaining: postRem, reset: postReset } = apiLimiter.check(user.id)
+  if (!postRl) return rateLimitResponse(postReset)
+
   try {
-    const body = await request.json()
-    const { title } = body
+    const raw = await request.json()
+    const validation = validateBody(CreateChatSessionSchema, raw)
+    if (!validation.success) return validation.response
+    const { title } = validation.data
 
     const { data, error } = await supabase
       .from('chat_sessions')

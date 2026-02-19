@@ -4,6 +4,8 @@ import { buildMappingResultFromCategory } from '@/lib/bookkeeping/category-mappi
 import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-entries'
 import { saveUserMappingRule } from '@/lib/bookkeeping/mapping-engine'
 import type { Transaction, TransactionCategory, EntityType } from '@/types'
+import { validateBody, CategorizeTransactionInputSchema } from '@/lib/validation'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
 
 interface CategorizeRequest {
   is_business: boolean
@@ -71,9 +73,14 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Parse request body
-  const body: CategorizeRequest = await request.json()
-  const { is_business, category } = body
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
+
+  // Parse and validate request body
+  const raw = await request.json()
+  const validation = validateBody(CategorizeTransactionInputSchema, raw)
+  if (!validation.success) return validation.response
+  const { is_business, category } = validation.data
 
   // Fetch the transaction (validates ownership)
   const { data: transaction, error: fetchError } = await supabase

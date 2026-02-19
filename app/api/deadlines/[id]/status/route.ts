@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { updateDeadlineStatus, isValidTransition } from '@/lib/deadlines/status-engine'
 import type { DeadlineStatus } from '@/types'
+import { validateBody, UpdateDeadlineStatusInputSchema } from '@/lib/validation'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
 
 /**
  * PATCH /api/deadlines/[id]/status
@@ -19,27 +21,15 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
+
   const { id } = await params
 
-  const body = await request.json()
-  const newStatus = body.status as DeadlineStatus
-
-  if (!newStatus) {
-    return NextResponse.json({ error: 'Status is required' }, { status: 400 })
-  }
-
-  const validStatuses: DeadlineStatus[] = [
-    'upcoming',
-    'action_needed',
-    'in_progress',
-    'submitted',
-    'confirmed',
-    'overdue',
-  ]
-
-  if (!validStatuses.includes(newStatus)) {
-    return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
-  }
+  const raw = await request.json()
+  const validation = validateBody(UpdateDeadlineStatusInputSchema, raw)
+  if (!validation.success) return validation.response
+  const newStatus = validation.data.status as DeadlineStatus
 
   const result = await updateDeadlineStatus(supabase, id, user.id, newStatus)
 
@@ -65,6 +55,9 @@ export async function GET(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success: getRl, remaining: getRem, reset: getReset } = apiLimiter.check(user.id)
+  if (!getRl) return rateLimitResponse(getReset)
 
   const { id } = await params
 

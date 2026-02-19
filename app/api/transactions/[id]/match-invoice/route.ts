@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { createJournalEntry, findFiscalPeriod } from '@/lib/bookkeeping/engine'
 import type { Transaction, Invoice, CreateJournalEntryInput } from '@/types'
+import { validateBody, MatchInvoiceInputSchema } from '@/lib/validation'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
 
 interface MatchInvoiceRequest {
   invoice_id: string
@@ -73,13 +75,14 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Parse request body
-  const body: MatchInvoiceRequest = await request.json()
-  const { invoice_id } = body
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
 
-  if (!invoice_id) {
-    return NextResponse.json({ error: 'invoice_id is required' }, { status: 400 })
-  }
+  // Parse and validate request body
+  const raw = await request.json()
+  const validation = validateBody(MatchInvoiceInputSchema, raw)
+  if (!validation.success) return validation.response
+  const { invoice_id } = validation.data
 
   // Fetch the transaction (validates ownership)
   const { data: transaction, error: fetchTxError } = await supabase

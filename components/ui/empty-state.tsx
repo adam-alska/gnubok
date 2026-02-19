@@ -98,7 +98,7 @@ export function EmptyInvoices() {
       actionLabel="Skapa faktura"
       actionHref="/invoices/new"
       secondaryActionLabel="Lägg till kund först"
-      secondaryActionHref="/customers/new"
+      secondaryActionHref="/customers?new=1"
     />
   )
 }
@@ -110,7 +110,7 @@ export function EmptyCustomers() {
       title="Inga kunder ännu"
       description="Lägg till dina kunder för att enkelt skapa fakturor och hålla koll på betalningar."
       actionLabel="Lägg till kund"
-      actionHref="/customers/new"
+      actionHref="/customers?new=1"
     />
   )
 }

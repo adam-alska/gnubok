@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { processOverdueReminders } from '@/lib/invoices/reminder-processor'
 import { isResendConfigured } from '@/lib/email/resend'
+import { logger } from '@/lib/logger'
 
 // Verify cron secret for security
 function verifyCronSecret(request: Request): boolean {
@@ -8,7 +9,7 @@ function verifyCronSecret(request: Request): boolean {
   const cronSecret = process.env.CRON_SECRET
 
   if (!cronSecret) {
-    console.error('CRON_SECRET not configured')
+    logger.error('invoice-reminder-cron', 'CRON_SECRET not configured')
     return false
   }
 
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
 
   // Check if email service is configured
   if (!isResendConfigured()) {
-    console.error('Resend not configured, skipping reminder cron')
+    logger.error('invoice-reminder-cron', 'Resend not configured, skipping reminder cron')
     return NextResponse.json({
       success: false,
       error: 'Email service not configured'
@@ -40,11 +41,11 @@ export async function GET(request: Request) {
   }
 
   try {
-    console.log('Starting invoice reminder cron job...')
+    logger.info('invoice-reminder-cron', 'Starting invoice reminder cron job')
 
     const result = await processOverdueReminders()
 
-    console.log(`Reminder cron completed: ${result.sent} sent, ${result.failed} failed out of ${result.processed} processed`)
+    logger.info('invoice-reminder-cron', 'Reminder cron completed', { sent: result.sent, failed: result.failed, processed: result.processed })
 
     return NextResponse.json({
       success: true,
@@ -59,7 +60,7 @@ export async function GET(request: Request) {
       }))
     })
   } catch (error) {
-    console.error('Invoice reminder cron job error:', error)
+    logger.error('invoice-reminder-cron', 'Invoice reminder cron job error', { error: error instanceof Error ? error.message : String(error) })
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Cron job failed' },
       { status: 500 }

@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { saveMappings } from '@/lib/import/sie-import'
 import type { AccountMapping } from '@/lib/import/types'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
+import { validateBody, SaveMappingsInputSchema, UpdateMappingInputSchema } from '@/lib/validation'
 
 /**
  * GET /api/import/sie/mappings
@@ -17,6 +19,9 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
 
   const { data, error } = await supabase
     .from('sie_account_mappings')
@@ -46,12 +51,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json()
-  const mappings: AccountMapping[] = body.mappings
+  const { success: postRl, remaining: postRem, reset: postReset } = apiLimiter.check(user.id)
+  if (!postRl) return rateLimitResponse(postReset)
 
-  if (!mappings || !Array.isArray(mappings)) {
-    return NextResponse.json({ error: 'Invalid mappings data' }, { status: 400 })
-  }
+  const raw = await request.json()
+  const validation = validateBody(SaveMappingsInputSchema, raw)
+  if (!validation.success) return validation.response
+  const mappings = validation.data.mappings as unknown as AccountMapping[]
 
   try {
     await saveMappings(user.id, mappings)
@@ -79,15 +85,13 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json()
-  const { sourceAccount, targetAccount } = body
+  const { success: putRl, remaining: putRem, reset: putReset } = apiLimiter.check(user.id)
+  if (!putRl) return rateLimitResponse(putReset)
 
-  if (!sourceAccount || !targetAccount) {
-    return NextResponse.json(
-      { error: 'sourceAccount and targetAccount are required' },
-      { status: 400 }
-    )
-  }
+  const raw = await request.json()
+  const validation = validateBody(UpdateMappingInputSchema, raw)
+  if (!validation.success) return validation.response
+  const { sourceAccount, targetAccount } = validation.data
 
   const { data, error } = await supabase
     .from('sie_account_mappings')
@@ -124,6 +128,9 @@ export async function DELETE(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success: delRl, remaining: delRem, reset: delReset } = apiLimiter.check(user.id)
+  if (!delRl) return rateLimitResponse(delReset)
 
   const { searchParams } = new URL(request.url)
   const sourceAccount = searchParams.get('sourceAccount')

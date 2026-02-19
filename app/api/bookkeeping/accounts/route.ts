@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
+import { validateBody, CreateAccountInputSchema } from '@/lib/validation'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -8,6 +10,9 @@ export async function GET(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
 
   const { searchParams } = new URL(request.url)
   const accountClass = searchParams.get('class')
@@ -44,7 +49,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json()
+  const { success: postRl, remaining: postRem, reset: postReset } = apiLimiter.check(user.id)
+  if (!postRl) return rateLimitResponse(postReset)
+
+  const raw = await request.json()
+  const validation = validateBody(CreateAccountInputSchema, raw)
+  if (!validation.success) return validation.response
+  const body = validation.data
 
   const { data, error } = await supabase
     .from('chart_of_accounts')

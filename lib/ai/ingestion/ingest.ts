@@ -15,6 +15,7 @@ import { OpenAIEmbeddings } from '@langchain/openai'
 import * as fs from 'fs'
 import * as path from 'path'
 import * as crypto from 'crypto'
+import { logger } from '@/lib/logger'
 
 // Configuration
 const DOCS_DIR = path.join(process.cwd(), 'dev_docs', 'ai_knowledge_base')
@@ -252,8 +253,8 @@ function processFile(filePath: string): DocumentChunk[] {
  * Main ingestion function
  */
 async function ingest() {
-  console.log('Starting knowledge base ingestion...')
-  console.log(`Reading files from: ${DOCS_DIR}`)
+  logger.info('ingestion', 'Starting knowledge base ingestion')
+  logger.info('ingestion', `Reading files from: ${DOCS_DIR}`)
 
   // Get all markdown files
   const files = fs
@@ -261,29 +262,29 @@ async function ingest() {
     .filter((f) => f.endsWith('.md'))
     .sort()
 
-  console.log(`Found ${files.length} markdown files`)
+  logger.info('ingestion', 'Found markdown files', { count: files.length })
 
   // Process all files
   const allChunks: DocumentChunk[] = []
   for (const file of files) {
     const filePath = path.join(DOCS_DIR, file)
-    console.log(`Processing: ${file}`)
+    logger.info('ingestion', `Processing: ${file}`)
     const chunks = processFile(filePath)
     allChunks.push(...chunks)
-    console.log(`  -> ${chunks.length} chunks`)
+    logger.info('ingestion', `Chunks created`, { file, chunks: chunks.length })
   }
 
-  console.log(`Total chunks: ${allChunks.length}`)
+  logger.info('ingestion', 'Total chunks', { count: allChunks.length })
 
   // Clear existing documents (optional - comment out for incremental updates)
-  console.log('Clearing existing documents...')
+  logger.info('ingestion', 'Clearing existing documents')
   const { error: deleteError } = await supabase
     .from('knowledge_documents')
     .delete()
     .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all
 
   if (deleteError) {
-    console.error('Error clearing documents:', deleteError)
+    logger.error('ingestion', 'Error clearing documents', { error: deleteError.message })
     // Continue anyway
   }
 
@@ -295,9 +296,7 @@ async function ingest() {
     const batch = allChunks.slice(i, i + BATCH_SIZE)
     const contents = batch.map((c) => c.content)
 
-    console.log(
-      `Generating embeddings for batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(allChunks.length / BATCH_SIZE)}...`
-    )
+    logger.info('ingestion', 'Generating embeddings for batch', { batch: Math.floor(i / BATCH_SIZE) + 1, totalBatches: Math.ceil(allChunks.length / BATCH_SIZE) })
 
     // Generate embeddings
     const embeddingVectors = await embeddings.embedDocuments(contents)
@@ -319,27 +318,26 @@ async function ingest() {
       .insert(records)
 
     if (insertError) {
-      console.error('Error inserting batch:', insertError)
+      logger.error('ingestion', 'Error inserting batch', { error: insertError.message })
       throw insertError
     }
 
     processed += batch.length
-    console.log(`  Inserted ${processed}/${allChunks.length} documents`)
+    logger.info('ingestion', 'Inserted documents', { processed, total: allChunks.length })
   }
 
-  console.log('\nIngestion complete!')
-  console.log(`Total documents inserted: ${allChunks.length}`)
+  logger.info('ingestion', 'Ingestion complete', { totalInserted: allChunks.length })
 
   // Verify
   const { count } = await supabase
     .from('knowledge_documents')
     .select('*', { count: 'exact', head: true })
 
-  console.log(`Documents in database: ${count}`)
+  logger.info('ingestion', 'Documents in database', { count })
 }
 
 // Run if called directly
 ingest().catch((error) => {
-  console.error('Ingestion failed:', error)
+  logger.error('ingestion', 'Ingestion failed', { error: error instanceof Error ? error.message : String(error) })
   process.exit(1)
 })

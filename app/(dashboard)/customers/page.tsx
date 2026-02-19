@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -29,10 +30,11 @@ const customerTypeIcons: Record<CustomerType, React.ElementType> = {
 }
 
 export default function CustomersPage() {
+  const searchParams = useSearchParams()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isDialogOpen, setIsDialogOpen] = useState(searchParams.get('new') === '1')
   const [isCreating, setIsCreating] = useState(false)
   const { toast } = useToast()
   const supabase = createClient()

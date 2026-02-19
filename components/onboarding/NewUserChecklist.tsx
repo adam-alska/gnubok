@@ -68,7 +68,7 @@ export default function NewUserChecklist({
       id: 'customer',
       label: 'Lägg till din första kund',
       description: 'Spara kunduppgifter för enkel fakturering',
-      href: '/customers/new',
+      href: '/customers?new=1',
       icon: Users,
       completed: hasCustomers,
     },

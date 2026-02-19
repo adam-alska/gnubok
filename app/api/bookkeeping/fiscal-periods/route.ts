@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { CreateFiscalPeriodInput } from '@/types'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
+import { validateBody, CreateFiscalPeriodInputSchema } from '@/lib/validation'
 
 export async function GET() {
   const supabase = await createClient()
@@ -9,6 +11,9 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
 
   const { data, error } = await supabase
     .from('fiscal_periods')
@@ -31,7 +36,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json() as CreateFiscalPeriodInput
+  const { success: postRl, remaining: postRem, reset: postReset } = apiLimiter.check(user.id)
+  if (!postRl) return rateLimitResponse(postReset)
+
+  const raw = await request.json()
+  const validation = validateBody(CreateFiscalPeriodInputSchema, raw)
+  if (!validation.success) return validation.response
+  const body = validation.data
 
   const { data, error } = await supabase
     .from('fiscal_periods')

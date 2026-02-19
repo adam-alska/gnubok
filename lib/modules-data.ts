@@ -480,3 +480,28 @@ export function getModuleBySlug(sectorSlug: string, moduleSlug: string): { secto
   if (!module) return undefined
   return { sector, module }
 }
+
+/**
+ * Build a pre-indexed lookup map for batch module lookups.
+ * Avoids O(n*m) when looking up many modules in a loop.
+ */
+export function buildModuleLookupMap(): Map<string, { sector: Sector; module: ModuleItem }> {
+  const map = new Map<string, { sector: Sector; module: ModuleItem }>()
+  for (const sector of sectors) {
+    for (const mod of sector.modules) {
+      map.set(`${sector.slug}/${mod.slug}`, { sector, module: mod })
+    }
+  }
+  return map
+}
+
+/**
+ * Build a pre-indexed sector lookup map for batch sector lookups.
+ */
+export function buildSectorLookupMap(): Map<string, Sector> {
+  const map = new Map<string, Sector>()
+  for (const sector of sectors) {
+    map.set(sector.slug, sector)
+  }
+  return map
+}

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
 
 /**
  * POST /api/deadlines/[id]/complete
@@ -19,6 +20,9 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
 
   // First, get current deadline state
   const { data: existing, error: fetchError } = await supabase

@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { CreateCustomerInput } from '@/types'
+import { validateBody, UpdateCustomerInputSchema } from '@/lib/validation'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
 
 export async function GET(
   request: Request,
@@ -17,9 +19,12 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
+
   const { data, error } = await supabase
     .from('customers')
-    .select('*')
+    .select(`*, invoices:invoices(id, invoice_number, invoice_date, due_date, status, total, currency)`)
     .eq('id', id)
     .eq('user_id', user.id)
     .single()
@@ -31,20 +36,7 @@ export async function GET(
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Fetch related invoices
-  const { data: invoices } = await supabase
-    .from('invoices')
-    .select('id, invoice_number, invoice_date, due_date, status, total, currency')
-    .eq('customer_id', id)
-    .eq('user_id', user.id)
-    .order('invoice_date', { ascending: false })
-
-  return NextResponse.json({
-    data: {
-      ...data,
-      invoices: invoices || [],
-    },
-  })
+  return NextResponse.json({ data })
 }
 
 export async function PATCH(
@@ -62,7 +54,13 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body: Partial<CreateCustomerInput> = await request.json()
+  const { success: patchRl, remaining: patchRem, reset: patchReset } = apiLimiter.check(user.id)
+  if (!patchRl) return rateLimitResponse(patchReset)
+
+  const raw = await request.json()
+  const validation = validateBody(UpdateCustomerInputSchema, raw)
+  if (!validation.success) return validation.response
+  const body = validation.data
 
   const updateData: Record<string, unknown> = {}
 
@@ -109,6 +107,9 @@ export async function DELETE(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success: delRl, remaining: delRem, reset: delReset } = apiLimiter.check(user.id)
+  if (!delRl) return rateLimitResponse(delReset)
 
   const { error } = await supabase
     .from('customers')

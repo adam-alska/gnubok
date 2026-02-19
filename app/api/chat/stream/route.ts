@@ -2,29 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { streamChatResponse } from '@/lib/ai/chatbot/chain'
 import { CHATBOT_CONFIG } from '@/lib/ai/chatbot/config'
 import type { ChatMessage, ChatRequest, SourceReference } from '@/types/chat'
-
-// Simple in-memory rate limiting (per user)
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
-
-function checkRateLimit(userId: string): boolean {
-  const now = Date.now()
-  const limit = rateLimitMap.get(userId)
-
-  if (!limit || now > limit.resetTime) {
-    rateLimitMap.set(userId, {
-      count: 1,
-      resetTime: now + 60000,
-    })
-    return true
-  }
-
-  if (limit.count >= CHATBOT_CONFIG.rateLimitPerMinute) {
-    return false
-  }
-
-  limit.count++
-  return true
-}
+import { apiLimiter } from '@/lib/rate-limit'
+import { ChatRequestSchema } from '@/lib/validation'
 
 /**
  * POST /api/chat/stream
@@ -44,23 +23,31 @@ export async function POST(request: Request) {
     )
   }
 
-  if (!checkRateLimit(user.id)) {
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) {
     return new Response(
-      JSON.stringify({ error: 'Rate limit exceeded' }),
-      { status: 429, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: 'Too many requests' }),
+      {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': String(Math.ceil((reset - Date.now()) / 1000)),
+          'X-RateLimit-Reset': String(reset),
+        },
+      }
     )
   }
 
   try {
-    const body: ChatRequest = await request.json()
-    const { message, session_id } = body
-
-    if (!message || typeof message !== 'string' || message.trim().length === 0) {
+    const raw = await request.json()
+    const result = ChatRequestSchema.safeParse(raw)
+    if (!result.success) {
       return new Response(
-        JSON.stringify({ error: 'Message is required' }),
+        JSON.stringify({ error: 'Validation failed', details: result.error.flatten().fieldErrors }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       )
     }
+    const { message, session_id } = result.data
 
     let sessionId = session_id
 

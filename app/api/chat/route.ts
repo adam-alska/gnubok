@@ -3,29 +3,8 @@ import { NextResponse } from 'next/server'
 import { generateChatResponse } from '@/lib/ai/chatbot/chain'
 import { CHATBOT_CONFIG } from '@/lib/ai/chatbot/config'
 import type { ChatMessage, ChatRequest } from '@/types/chat'
-
-// Simple in-memory rate limiting (per user)
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
-
-function checkRateLimit(userId: string): boolean {
-  const now = Date.now()
-  const limit = rateLimitMap.get(userId)
-
-  if (!limit || now > limit.resetTime) {
-    rateLimitMap.set(userId, {
-      count: 1,
-      resetTime: now + 60000, // 1 minute window
-    })
-    return true
-  }
-
-  if (limit.count >= CHATBOT_CONFIG.rateLimitPerMinute) {
-    return false
-  }
-
-  limit.count++
-  return true
-}
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
+import { validateBody, ChatRequestSchema } from '@/lib/validation'
 
 /**
  * POST /api/chat
@@ -42,24 +21,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Rate limiting
-  if (!checkRateLimit(user.id)) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded. Please wait a moment.' },
-      { status: 429 }
-    )
-  }
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
 
   try {
-    const body: ChatRequest = await request.json()
-    const { message, session_id } = body
-
-    if (!message || typeof message !== 'string' || message.trim().length === 0) {
-      return NextResponse.json(
-        { error: 'Message is required' },
-        { status: 400 }
-      )
-    }
+    const raw = await request.json()
+    const validation = validateBody(ChatRequestSchema, raw)
+    if (!validation.success) return validation.response
+    const { message, session_id } = validation.data
 
     let sessionId = session_id
 

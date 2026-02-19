@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
+import { validateBody, UpdateAccountInputSchema } from '@/lib/validation'
 
 export async function PUT(
   request: Request,
@@ -13,7 +15,13 @@ export async function PUT(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json()
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
+
+  const raw = await request.json()
+  const validation = validateBody(UpdateAccountInputSchema, raw)
+  if (!validation.success) return validation.response
+  const body = validation.data
 
   const { data, error } = await supabase
     .from('chart_of_accounts')

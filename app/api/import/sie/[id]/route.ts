@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
 
 /**
  * GET /api/import/sie/[id]
@@ -19,6 +20,9 @@ export async function GET(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
 
   const { data, error } = await supabase
     .from('sie_imports')
@@ -56,6 +60,9 @@ export async function DELETE(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success: delRl, remaining: delRem, reset: delReset } = apiLimiter.check(user.id)
+  if (!delRl) return rateLimitResponse(delReset)
 
   const { error } = await supabase
     .from('sie_imports')

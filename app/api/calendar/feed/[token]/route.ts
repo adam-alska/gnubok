@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { generateCalendarFeed } from '@/lib/calendar/ics-generator'
+import { calendarLimiter } from '@/lib/rate-limit'
 
 /**
  * GET /api/calendar/feed/[token]
@@ -13,10 +14,25 @@ export async function GET(
 ) {
   const { token } = await params
 
-  // Validate token format (UUID)
+  // Validate token format: accept both legacy UUID tokens and new hex tokens (64 chars)
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  if (!uuidRegex.test(token)) {
+  const hexTokenRegex = /^[0-9a-f]{64}$/i
+  if (!uuidRegex.test(token) && !hexTokenRegex.test(token)) {
     return new NextResponse('Invalid token', { status: 400 })
+  }
+
+  // Rate limit by token
+  const { success: rlSuccess, remaining: rlRemaining, reset: rlReset } = calendarLimiter.check(token)
+  if (!rlSuccess) {
+    return new NextResponse(JSON.stringify({ error: 'Too many requests' }), {
+      status: 429,
+      headers: {
+        'Content-Type': 'application/json',
+        'Retry-After': String(Math.ceil((rlReset - Date.now()) / 1000)),
+        'X-RateLimit-Reset': String(rlReset),
+        'X-RateLimit-Remaining': '0',
+      },
+    })
   }
 
   // Create service client (no user auth required)
@@ -39,6 +55,11 @@ export async function GET(
 
   if (feedError || !feed) {
     return new NextResponse('Feed not found or inactive', { status: 404 })
+  }
+
+  // Check token expiry
+  if (feed.expires_at && new Date(feed.expires_at) < new Date()) {
+    return new NextResponse('Feed token has expired', { status: 403 })
   }
 
   // Update access tracking
@@ -104,6 +125,7 @@ export async function GET(
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0',
+        'X-RateLimit-Remaining': String(rlRemaining),
       },
     })
   } catch (error) {

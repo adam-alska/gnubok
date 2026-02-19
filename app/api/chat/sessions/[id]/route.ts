@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
+import { validateBody, UpdateChatSessionSchema } from '@/lib/validation'
 
 /**
  * GET /api/chat/sessions/[id]
@@ -18,6 +20,9 @@ export async function GET(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
 
   const { id } = await params
 
@@ -72,11 +77,16 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const { success: patchRl, remaining: patchRem, reset: patchReset } = apiLimiter.check(user.id)
+  if (!patchRl) return rateLimitResponse(patchReset)
+
   const { id } = await params
 
   try {
-    const body = await request.json()
-    const { title } = body
+    const raw = await request.json()
+    const validation = validateBody(UpdateChatSessionSchema, raw)
+    if (!validation.success) return validation.response
+    const { title } = validation.data
 
     const { data, error } = await supabase
       .from('chat_sessions')
@@ -124,6 +134,9 @@ export async function DELETE(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success: delRl, remaining: delRem, reset: delReset } = apiLimiter.check(user.id)
+  if (!delRl) return rateLimitResponse(delReset)
 
   const { id } = await params
 

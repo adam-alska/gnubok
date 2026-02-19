@@ -7,10 +7,20 @@ import {
   createInvoiceJournalEntry,
   createCreditNoteJournalEntry,
 } from '@/lib/bookkeeping/invoice-entries'
+import { validateBody, CreateInvoiceInputSchema, CreateCreditNoteInputSchema } from '@/lib/validation'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
 
 interface CreateCreditNoteInput {
   credited_invoice_id: string
   reason?: string
+}
+
+function getPaginationParams(searchParams: URLSearchParams) {
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+  const per_page = Math.min(100, Math.max(1, parseInt(searchParams.get('per_page') || '50')))
+  const from = (page - 1) * per_page
+  const to = from + per_page - 1
+  return { page, per_page, from, to }
 }
 
 export async function GET(request: Request) {
@@ -22,17 +32,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
+
   const { searchParams } = new URL(request.url)
+  const { page, per_page, from, to } = getPaginationParams(searchParams)
   const status = searchParams.get('status')
-  const limit = parseInt(searchParams.get('limit') || '50')
-  const offset = parseInt(searchParams.get('offset') || '0')
 
   let query = supabase
     .from('invoices')
     .select('*, customer:customers(*)', { count: 'exact' })
     .eq('user_id', user.id)
     .order('invoice_date', { ascending: false })
-    .range(offset, offset + limit - 1)
+    .range(from, to)
 
   if (status) {
     query = query.eq('status', status)
@@ -44,7 +56,17 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ data, count })
+  const total = count ?? 0
+
+  return NextResponse.json({
+    data,
+    pagination: {
+      page,
+      per_page,
+      total,
+      total_pages: Math.ceil(total / per_page),
+    },
+  })
 }
 
 export async function POST(request: Request) {
@@ -56,14 +78,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const { success: postRl, remaining: postRem, reset: postReset } = apiLimiter.check(user.id)
+  if (!postRl) return rateLimitResponse(postReset)
+
   const body = await request.json()
 
   // Check if this is a credit note creation request
   if (body.credited_invoice_id) {
-    return createCreditNote(supabase, user.id, body as CreateCreditNoteInput)
+    const validation = validateBody(CreateCreditNoteInputSchema, body)
+    if (!validation.success) return validation.response
+    return createCreditNote(supabase, user.id, validation.data)
   }
 
-  const invoiceInput = body as CreateInvoiceInput
+  const validation = validateBody(CreateInvoiceInputSchema, body)
+  if (!validation.success) return validation.response
+  const invoiceInput = validation.data
 
   // Get customer for VAT calculation
   const { data: customer, error: customerError } = await supabase
@@ -106,47 +135,32 @@ export async function POST(request: Request) {
     }
   }
 
-  // Generate invoice number
-  const { data: invoiceNumber } = await supabase.rpc('generate_invoice_number', {
-    p_user_id: user.id,
-  })
-
-  // Create invoice
-  const { data: invoice, error: invoiceError } = await supabase
-    .from('invoices')
-    .insert({
-      user_id: user.id,
-      customer_id: invoiceInput.customer_id,
-      invoice_number: invoiceNumber,
-      invoice_date: invoiceInput.invoice_date,
-      due_date: invoiceInput.due_date,
-      currency: invoiceInput.currency,
-      exchange_rate: exchangeRate,
-      exchange_rate_date: exchangeRateDate,
-      subtotal,
-      subtotal_sek: subtotalSek,
-      vat_amount: vatAmount,
-      vat_amount_sek: vatAmountSek,
-      total,
-      total_sek: totalSek,
-      vat_treatment: vatRules.treatment,
-      vat_rate: vatRules.rate,
-      moms_ruta: vatRules.momsRuta,
-      reverse_charge_text: vatRules.reverseChargeText || null,
-      your_reference: invoiceInput.your_reference,
-      our_reference: invoiceInput.our_reference,
-      notes: invoiceInput.notes,
-    })
-    .select()
-    .single()
-
-  if (invoiceError) {
-    return NextResponse.json({ error: invoiceError.message }, { status: 500 })
+  // Prepare invoice data for atomic RPC call
+  const invoiceData = {
+    user_id: user.id,
+    customer_id: invoiceInput.customer_id,
+    invoice_date: invoiceInput.invoice_date,
+    due_date: invoiceInput.due_date,
+    currency: invoiceInput.currency,
+    exchange_rate: exchangeRate,
+    exchange_rate_date: exchangeRateDate,
+    subtotal,
+    subtotal_sek: subtotalSek,
+    vat_amount: vatAmount,
+    vat_amount_sek: vatAmountSek,
+    total,
+    total_sek: totalSek,
+    vat_treatment: vatRules.treatment,
+    vat_rate: vatRules.rate,
+    moms_ruta: vatRules.momsRuta,
+    reverse_charge_text: vatRules.reverseChargeText || null,
+    your_reference: invoiceInput.your_reference || null,
+    our_reference: invoiceInput.our_reference || null,
+    notes: invoiceInput.notes || null,
   }
 
-  // Create invoice items
-  const items = invoiceInput.items.map((item, index) => ({
-    invoice_id: invoice.id,
+  // Prepare items data for atomic RPC call
+  const itemsData = invoiceInput.items.map((item, index) => ({
     sort_order: index,
     description: item.description,
     quantity: item.quantity,
@@ -155,21 +169,21 @@ export async function POST(request: Request) {
     line_total: item.quantity * item.unit_price,
   }))
 
-  const { error: itemsError } = await supabase
-    .from('invoice_items')
-    .insert(items)
+  // Atomically create invoice and items in a single transaction via RPC
+  const { data: invoiceResult, error: rpcError } = await supabase.rpc('create_invoice_with_items', {
+    p_invoice: invoiceData,
+    p_items: itemsData,
+  })
 
-  if (itemsError) {
-    // Rollback invoice creation
-    await supabase.from('invoices').delete().eq('id', invoice.id)
-    return NextResponse.json({ error: itemsError.message }, { status: 500 })
+  if (rpcError) {
+    return NextResponse.json({ error: rpcError.message }, { status: 500 })
   }
 
-  // Fetch complete invoice with items
+  // Fetch the full invoice with all relations for the journal entry and response
   const { data: completeInvoice } = await supabase
     .from('invoices')
     .select('*, customer:customers(*), items:invoice_items(*)')
-    .eq('id', invoice.id)
+    .eq('id', invoiceResult.id)
     .single()
 
   // Create journal entry for the invoice (non-blocking)
@@ -183,7 +197,7 @@ export async function POST(request: Request) {
         await supabase
           .from('invoices')
           .update({ journal_entry_id: journalEntry.id })
-          .eq('id', invoice.id)
+          .eq('id', completeInvoice.id)
       }
     } catch (err) {
       console.error('Failed to create invoice journal entry:', err)

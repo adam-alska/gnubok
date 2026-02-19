@@ -1,13 +1,22 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
+
+function getPaginationParams(searchParams: URLSearchParams) {
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+  const per_page = Math.min(100, Math.max(1, parseInt(searchParams.get('per_page') || '50')))
+  const from = (page - 1) * per_page
+  const to = from + per_page - 1
+  return { page, per_page, from, to }
+}
 
 /**
  * GET /api/receipts
  * List receipts for the authenticated user
  * Query params:
  *   - status: filter by status
- *   - limit: max results (default 50)
- *   - offset: pagination offset
+ *   - page: page number (default 1)
+ *   - per_page: items per page (default 50, max 100)
  */
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -20,10 +29,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
+
   const { searchParams } = new URL(request.url)
+  const { page, per_page, from, to } = getPaginationParams(searchParams)
   const status = searchParams.get('status')
-  const limit = parseInt(searchParams.get('limit') || '50', 10)
-  const offset = parseInt(searchParams.get('offset') || '0', 10)
 
   let query = supabase
     .from('receipts')
@@ -33,7 +44,7 @@ export async function GET(request: Request) {
     `, { count: 'exact' })
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1)
+    .range(from, to)
 
   if (status) {
     query = query.eq('status', status)
@@ -46,10 +57,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
+  const total = count ?? 0
+
   return NextResponse.json({
     data,
-    count,
-    limit,
-    offset,
+    pagination: {
+      page,
+      per_page,
+      total,
+      total_pages: Math.ceil(total / per_page),
+    },
   })
 }

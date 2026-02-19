@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getSuggestedCategories, type SuggestedCategory } from '@/lib/transactions/category-suggestions'
 import type { Transaction, TransactionCategory } from '@/types'
+import { validateBody, SuggestCategoriesInputSchema } from '@/lib/validation'
 
 /**
  * POST /api/transactions/suggest-categories
@@ -16,14 +17,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { transaction_ids } = await request.json()
+  const raw = await request.json()
+  const validation = validateBody(SuggestCategoriesInputSchema, raw)
+  if (!validation.success) return validation.response
+  const { transaction_ids } = validation.data
 
-  if (!Array.isArray(transaction_ids) || transaction_ids.length === 0) {
-    return NextResponse.json({ error: 'transaction_ids is required' }, { status: 400 })
-  }
-
-  // Limit batch size
-  const ids = transaction_ids.slice(0, 50)
+  const ids = transaction_ids
 
   // Fetch transactions
   const { data: transactions, error: txError } = await supabase

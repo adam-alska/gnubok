@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { evaluateMappingRules } from '@/lib/bookkeeping/mapping-engine'
 import type { Transaction } from '@/types'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
+import { validateBody, EvaluateMappingRuleInputSchema } from '@/lib/validation'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -11,7 +13,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json()
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
+
+  const raw = await request.json()
+  const validation = validateBody(EvaluateMappingRuleInputSchema, raw)
+  if (!validation.success) return validation.response
+  const body = validation.data
 
   // Accept either a transaction ID or raw transaction data
   let transaction: Transaction

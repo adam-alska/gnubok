@@ -1,8 +1,37 @@
 import type { Currency, ExchangeRate } from '@/types'
+import { logger } from '@/lib/logger'
+
+// --- TTL Cache for exchange rates ---
+interface CachedRate {
+  rate: ExchangeRate
+  fetchedAt: number
+}
+
+const rateCache = new Map<string, CachedRate>()
+const CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours
+
+/**
+ * Get a cached exchange rate if still valid, or null if expired/missing.
+ */
+function getCachedRate(cacheKey: string): ExchangeRate | null {
+  const cached = rateCache.get(cacheKey)
+  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL) {
+    return cached.rate
+  }
+  return null
+}
+
+/**
+ * Store an exchange rate in the cache.
+ */
+function setCachedRate(cacheKey: string, rate: ExchangeRate): void {
+  rateCache.set(cacheKey, { rate, fetchedAt: Date.now() })
+}
 
 /**
  * Fetch exchange rates from Riksbanken API
- * Uses their public API for daily exchange rates
+ * Uses their public API for daily exchange rates.
+ * Results are cached for 24 hours per currency+date combination.
  */
 export async function fetchExchangeRate(
   currency: Currency,
@@ -19,6 +48,14 @@ export async function fetchExchangeRate(
   const targetDate = date || new Date()
   const formattedDate = targetDate.toISOString().split('T')[0]
 
+  // Check cache first
+  const cacheKey = `${currency}_${formattedDate}`
+  const cached = getCachedRate(cacheKey)
+  if (cached) {
+    logger.debug('riksbanken', 'Returning cached exchange rate', { currency, date: formattedDate })
+    return cached
+  }
+
   // Riksbanken uses specific series IDs for each currency
   const seriesIds: Record<Currency, string> = {
     SEK: '',
@@ -31,7 +68,7 @@ export async function fetchExchangeRate(
 
   const seriesId = seriesIds[currency]
   if (!seriesId) {
-    console.error(`Unknown currency: ${currency}`)
+    logger.error('riksbanken', `Unknown currency: ${currency}`)
     return null
   }
 
@@ -63,11 +100,13 @@ export async function fetchExchangeRate(
       const fallbackData = await fallbackResponse.json()
       if (fallbackData && fallbackData.length > 0) {
         const latest = fallbackData[fallbackData.length - 1]
-        return {
+        const result: ExchangeRate = {
           currency,
           rate: parseFloat(latest.value),
           date: latest.date,
         }
+        setCachedRate(cacheKey, result)
+        return result
       }
 
       return null
@@ -75,18 +114,22 @@ export async function fetchExchangeRate(
 
     const data = await response.json()
     if (data && data.length > 0) {
-      return {
+      const result: ExchangeRate = {
         currency,
         rate: parseFloat(data[0].value),
         date: data[0].date,
       }
+      setCachedRate(cacheKey, result)
+      return result
     }
 
     return null
   } catch (error) {
-    console.error('Error fetching exchange rate:', error)
+    logger.error('riksbanken', 'Error fetching exchange rate', { currency, error: error instanceof Error ? error.message : String(error) })
     // Return fallback rates for development/testing
-    return getFallbackRate(currency)
+    const fallback = getFallbackRate(currency)
+    setCachedRate(cacheKey, fallback)
+    return fallback
   }
 }
 

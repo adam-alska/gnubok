@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { syncAccountTransactions } from '@/lib/banking/sync-transactions'
 import { isConsentExpiringSoon, getDaysUntilExpiry } from '@/lib/banking/enable-banking'
+import { logger } from '@/lib/logger'
 
 interface StoredAccount {
   uid: string
@@ -50,7 +51,7 @@ export async function GET(request: Request) {
     .limit(10)
 
   if (connError) {
-    console.error('Failed to fetch bank connections:', connError)
+    logger.error('bank-sync-cron', 'Failed to fetch bank connections', { error: connError.message })
     return NextResponse.json({ error: 'Failed to fetch connections' }, { status: 500 })
   }
 
@@ -144,7 +145,7 @@ export async function GET(request: Request) {
         daysUntilExpiry: daysLeft,
       })
     } catch (error) {
-      console.error(`Sync failed for connection ${connection.id}:`, error)
+      logger.error('bank-sync-cron', `Sync failed for connection ${connection.id}`, { error: error instanceof Error ? error.message : String(error) })
       results.push({
         connectionId: connection.id,
         userId: connection.user_id,
@@ -163,7 +164,7 @@ export async function GET(request: Request) {
   const totalExpiringSoon = results.filter(r => r.status === 'expiring_soon').length
   const totalFailed = results.filter(r => r.status === 'error').length
 
-  console.log(`[bank-sync-cron] Processed ${results.length} connections: ${totalImported} imported, ${totalExpired} expired, ${totalExpiringSoon} expiring soon, ${totalFailed} failed`)
+  logger.info('bank-sync-cron', 'Processed connections', { total: results.length, imported: totalImported, expired: totalExpired, expiringSoon: totalExpiringSoon, failed: totalFailed })
 
   return NextResponse.json({
     processed: results.length,

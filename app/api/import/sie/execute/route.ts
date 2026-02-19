@@ -4,6 +4,7 @@ import { parseSIEFile, detectEncoding, decodeBuffer } from '@/lib/import/sie-par
 import { suggestMappings } from '@/lib/import/account-mapper'
 import { executeSIEImport } from '@/lib/import/sie-import'
 import type { AccountMapping, SIEAccountMappingRecord } from '@/lib/import/types'
+import { uploadLimiter, rateLimitResponse } from '@/lib/rate-limit'
 
 /**
  * POST /api/import/sie/execute
@@ -19,6 +20,9 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success, remaining, reset } = uploadLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
 
   try {
     // Get form data with file and options

@@ -1,5 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
+import { logger } from '@/lib/logger'
+import { validateBody, ReminderActionInputSchema } from '@/lib/validation'
 
 // Create a service client (no auth needed - public endpoint with token validation)
 function createServiceClient() {
@@ -17,16 +19,10 @@ function createServiceClient() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
-    const { token, action } = body
-
-    if (!token) {
-      return NextResponse.json({ error: 'Token saknas' }, { status: 400 })
-    }
-
-    if (!action || !['marked_paid', 'disputed'].includes(action)) {
-      return NextResponse.json({ error: 'Ogiltig åtgärd' }, { status: 400 })
-    }
+    const raw = await request.json()
+    const validation = validateBody(ReminderActionInputSchema, raw)
+    if (!validation.success) return validation.response
+    const { token, action } = validation.data
 
     const supabase = createServiceClient()
 
@@ -71,7 +67,7 @@ export async function POST(request: Request) {
       .eq('id', reminder.id)
 
     if (updateError) {
-      console.error('Failed to update reminder:', updateError)
+      logger.error('reminder-action', 'Failed to update reminder', { error: updateError.message })
       return NextResponse.json(
         { error: 'Kunde inte spara ditt svar' },
         { status: 500 }
@@ -83,7 +79,7 @@ export async function POST(request: Request) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const invoiceData = reminder.invoice as any
     const invoice = Array.isArray(invoiceData) ? invoiceData[0] : invoiceData
-    console.log(`Customer responded to invoice ${invoice?.invoice_number}: ${action}`)
+    logger.info('reminder-action', `Customer responded to invoice`, { invoiceNumber: invoice?.invoice_number, action })
 
     return NextResponse.json({
       success: true,
@@ -92,7 +88,7 @@ export async function POST(request: Request) {
         : 'Tack! Vi har noterat din invändning och kommer att kontakta dig.'
     })
   } catch (error) {
-    console.error('Action handler error:', error)
+    logger.error('reminder-action', 'Action handler error', { error: error instanceof Error ? error.message : String(error) })
     return NextResponse.json(
       { error: 'Ett fel uppstod' },
       { status: 500 }

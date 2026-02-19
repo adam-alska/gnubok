@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { validateBody, UpdateReceiptInputSchema } from '@/lib/validation'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
 
 /**
  * GET /api/receipts/[id]
@@ -19,6 +21,9 @@ export async function GET(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
 
   const { data, error } = await supabase
     .from('receipts')
@@ -60,38 +65,17 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json()
+  const { success: patchRl, remaining: patchRem, reset: patchReset } = apiLimiter.check(user.id)
+  if (!patchRl) return rateLimitResponse(patchReset)
 
-  // Allowed update fields
-  const allowedFields = [
-    'merchant_name',
-    'receipt_date',
-    'receipt_time',
-    'total_amount',
-    'currency',
-    'vat_amount',
-    'is_restaurant',
-    'is_systembolaget',
-    'is_foreign_merchant',
-    'representation_persons',
-    'representation_purpose',
-    'status',
-  ]
-
-  const updates: Record<string, unknown> = {}
-  for (const field of allowedFields) {
-    if (body[field] !== undefined) {
-      updates[field] = body[field]
-    }
-  }
-
-  if (Object.keys(updates).length === 0) {
-    return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
-  }
+  const raw = await request.json()
+  const validation = validateBody(UpdateReceiptInputSchema, raw)
+  if (!validation.success) return validation.response
+  const body = validation.data
 
   const { data, error } = await supabase
     .from('receipts')
-    .update(updates)
+    .update(body as Record<string, unknown>)
     .eq('id', id)
     .eq('user_id', user.id)
     .select(`
@@ -128,6 +112,9 @@ export async function DELETE(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success: delRl, remaining: delRem, reset: delReset } = apiLimiter.check(user.id)
+  if (!delRl) return rateLimitResponse(delReset)
 
   // Get receipt to find image URL for cleanup
   const { data: receipt } = await supabase

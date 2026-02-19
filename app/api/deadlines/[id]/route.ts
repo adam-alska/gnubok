@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { CreateDeadlineInput } from '@/types'
+import { validateBody, UpdateDeadlineInputSchema } from '@/lib/validation'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
 
 /**
  * GET /api/deadlines/[id]
@@ -20,6 +22,9 @@ export async function GET(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
 
   const { data, error } = await supabase
     .from('deadlines')
@@ -57,7 +62,13 @@ export async function PUT(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body: Partial<CreateDeadlineInput> = await request.json()
+  const { success: putRl, remaining: putRem, reset: putReset } = apiLimiter.check(user.id)
+  if (!putRl) return rateLimitResponse(putReset)
+
+  const raw = await request.json()
+  const validation = validateBody(UpdateDeadlineInputSchema, raw)
+  if (!validation.success) return validation.response
+  const body = validation.data
 
   // First, get existing deadline to verify ownership
   const { data: existing, error: fetchError } = await supabase
@@ -118,6 +129,9 @@ export async function DELETE(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success: delRl, remaining: delRem, reset: delReset } = apiLimiter.check(user.id)
+  if (!delRl) return rateLimitResponse(delReset)
 
   const { error } = await supabase
     .from('deadlines')

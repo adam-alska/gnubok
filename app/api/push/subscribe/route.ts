@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getVapidPublicKey } from '@/lib/push/web-push'
+import { validateBody, PushSubscribeInputSchema, PushUnsubscribeInputSchema } from '@/lib/validation'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
 
 /**
  * GET /api/push/subscribe
@@ -32,15 +34,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json()
-  const { endpoint, keys } = body
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
 
-  if (!endpoint || !keys?.p256dh || !keys?.auth) {
-    return NextResponse.json(
-      { error: 'Invalid subscription data' },
-      { status: 400 }
-    )
-  }
+  const raw = await request.json()
+  const validation = validateBody(PushSubscribeInputSchema, raw)
+  if (!validation.success) return validation.response
+  const { endpoint, keys } = validation.data
 
   // Get user agent for debugging
   const userAgent = request.headers.get('user-agent') || null
@@ -108,15 +108,13 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json()
-  const { endpoint } = body
+  const { success: delRl, remaining: delRem, reset: delReset } = apiLimiter.check(user.id)
+  if (!delRl) return rateLimitResponse(delReset)
 
-  if (!endpoint) {
-    return NextResponse.json(
-      { error: 'Endpoint is required' },
-      { status: 400 }
-    )
-  }
+  const raw = await request.json()
+  const validation = validateBody(PushUnsubscribeInputSchema, raw)
+  if (!validation.success) return validation.response
+  const { endpoint } = validation.data
 
   const { error } = await supabase
     .from('push_subscriptions')

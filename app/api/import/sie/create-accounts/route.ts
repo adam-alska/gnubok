@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { SIEAccount } from '@/lib/import/types'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
+import { validateBody, CreateAccountsFromSIEInputSchema } from '@/lib/validation'
 
 /**
  * Determine account type based on account class (first digit)
@@ -63,13 +65,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  try {
-    const body = await request.json()
-    const accounts: SIEAccount[] = body.accounts
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
 
-    if (!accounts || !Array.isArray(accounts) || accounts.length === 0) {
-      return NextResponse.json({ error: 'No accounts provided' }, { status: 400 })
-    }
+  try {
+    const raw = await request.json()
+    const validation = validateBody(CreateAccountsFromSIEInputSchema, raw)
+    if (!validation.success) return validation.response
+    const accounts = validation.data.accounts as unknown as SIEAccount[]
 
     // Fetch existing accounts to avoid duplicates
     const { data: existingAccounts } = await supabase

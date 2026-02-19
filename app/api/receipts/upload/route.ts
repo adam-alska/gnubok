@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { analyzeReceipt } from '@/lib/receipts/receipt-analyzer'
 import { processLineItems } from '@/lib/receipts/receipt-categorizer'
+import { uploadLimiter, rateLimitResponse } from '@/lib/rate-limit'
 
 /**
  * POST /api/receipts/upload
@@ -20,6 +21,9 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success, remaining, reset } = uploadLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
 
   try {
     const formData = await request.formData()

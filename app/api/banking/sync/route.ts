@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { syncAccountTransactions } from '@/lib/banking/sync-transactions'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
+import { validateBody, SyncBankInputSchema } from '@/lib/validation'
 
 interface StoredAccount {
   uid: string
@@ -19,7 +21,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { connection_id, days_back = 30 } = await request.json()
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
+
+  const raw = await request.json()
+  const validation = validateBody(SyncBankInputSchema, raw)
+  if (!validation.success) return validation.response
+  const { connection_id, days_back } = validation.data
 
   // Get the bank connection
   const { data: connection, error: connectionError } = await supabase

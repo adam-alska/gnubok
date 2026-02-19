@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { startAuthorization, getASPSPs, type ASPSP } from '@/lib/banking/enable-banking'
+import { apiLimiter, authLimiter, rateLimitResponse } from '@/lib/rate-limit'
+import { validateBody, ConnectBankInputSchema } from '@/lib/validation'
 
 export async function GET() {
   try {
@@ -38,14 +40,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { aspsp_name, aspsp_country } = await request.json()
+  const { success, remaining, reset } = authLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
 
-  if (!aspsp_name || !aspsp_country) {
-    return NextResponse.json(
-      { error: 'aspsp_name and aspsp_country are required' },
-      { status: 400 }
-    )
-  }
+  const raw = await request.json()
+  const validation = validateBody(ConnectBankInputSchema, raw)
+  if (!validation.success) return validation.response
+  const { aspsp_name, aspsp_country } = validation.data
 
   try {
     const redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/banking/callback`

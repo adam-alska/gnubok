@@ -4,6 +4,7 @@ import {
   sendTaxDeadlineNotifications,
   sendInvoiceNotifications,
 } from '@/lib/push/notification-scheduler'
+import { logger } from '@/lib/logger'
 
 /**
  * GET /api/push/cron
@@ -44,15 +45,7 @@ export async function GET(request: Request) {
     const totalSent = taxResult.sent + invoiceResult.sent
     const totalSkipped = taxResult.skipped + invoiceResult.skipped
 
-    console.log(
-      `Push notification cron completed: ${totalSent} sent, ${totalSkipped} skipped`
-    )
-    console.log(
-      `  Tax: ${taxResult.sent} sent, ${taxResult.skipped} skipped`
-    )
-    console.log(
-      `  Invoice: ${invoiceResult.sent} sent, ${invoiceResult.skipped} skipped`
-    )
+    logger.info('push-cron', 'Push notification cron completed', { totalSent, totalSkipped, taxSent: taxResult.sent, taxSkipped: taxResult.skipped, invoiceSent: invoiceResult.sent, invoiceSkipped: invoiceResult.skipped })
 
     return NextResponse.json({
       success: true,
@@ -64,7 +57,7 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
-    console.error('Error in push notification cron:', error)
+    logger.error('push-cron', 'Error in push notification cron', { error: error instanceof Error ? error.message : String(error) })
     return NextResponse.json(
       { error: 'Failed to send push notifications' },
       { status: 500 }

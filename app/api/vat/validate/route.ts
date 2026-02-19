@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { validateBody, VatValidateInputSchema } from '@/lib/validation'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
 
 /**
  * Validate EU VAT number using VIES (VAT Information Exchange System)
@@ -16,11 +18,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { vat_number, customer_id } = await request.json()
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
 
-  if (!vat_number) {
-    return NextResponse.json({ error: 'VAT number is required' }, { status: 400 })
-  }
+  const raw = await request.json()
+  const validation = validateBody(VatValidateInputSchema, raw)
+  if (!validation.success) return validation.response
+  const { vat_number, customer_id } = validation.data
 
   // Extract country code and number
   const countryCode = vat_number.substring(0, 2).toUpperCase()

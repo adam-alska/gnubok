@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { findTransactionMatches } from '@/lib/receipts/receipt-matcher'
 import type { Receipt, Transaction } from '@/types'
+import { validateBody, ReceiptMatchInputSchema } from '@/lib/validation'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
 
 /**
  * POST /api/receipts/[id]/match
@@ -21,6 +23,9 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
 
   // Fetch receipt
   const { data: receipt, error: receiptError } = await supabase
@@ -90,12 +95,13 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json()
-  const { transaction_id, match_confidence } = body
+  const { success: patchRl, remaining: patchRem, reset: patchReset } = apiLimiter.check(user.id)
+  if (!patchRl) return rateLimitResponse(patchReset)
 
-  if (!transaction_id) {
-    return NextResponse.json({ error: 'transaction_id is required' }, { status: 400 })
-  }
+  const raw = await request.json()
+  const validation = validateBody(ReceiptMatchInputSchema, raw)
+  if (!validation.success) return validation.response
+  const { transaction_id, match_confidence } = validation.data
 
   // Verify receipt ownership
   const { data: receipt, error: receiptError } = await supabase
@@ -172,6 +178,9 @@ export async function DELETE(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { success: delRl, remaining: delRem, reset: delReset } = apiLimiter.check(user.id)
+  if (!delRl) return rateLimitResponse(delReset)
 
   // Verify receipt ownership and get current transaction link
   const { data: receipt, error: receiptError } = await supabase

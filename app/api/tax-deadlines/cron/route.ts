@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { generateNewYearDeadlines } from '@/lib/tax/deadline-generator'
+import { logger } from '@/lib/logger'
 
 /**
  * GET /api/tax-deadlines/cron
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
   try {
     const result = await generateNewYearDeadlines(supabase)
 
-    console.log(`Tax deadlines cron completed: ${result.usersProcessed} users, ${result.totalCreated} deadlines created`)
+    logger.info('tax-deadlines-cron', 'Tax deadlines cron completed', { usersProcessed: result.usersProcessed, totalCreated: result.totalCreated })
 
     return NextResponse.json({
       success: true,
@@ -42,7 +43,7 @@ export async function GET(request: Request) {
       totalCreated: result.totalCreated,
     })
   } catch (error) {
-    console.error('Error in tax deadlines cron:', error)
+    logger.error('tax-deadlines-cron', 'Error in tax deadlines cron', { error: error instanceof Error ? error.message : String(error) })
     return NextResponse.json(
       { error: 'Failed to generate tax deadlines' },
       { status: 500 }

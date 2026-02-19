@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { ConfirmReceiptInput } from '@/types'
+import { validateBody, ConfirmReceiptInputSchema } from '@/lib/validation'
+import { apiLimiter, rateLimitResponse } from '@/lib/rate-limit'
 
 /**
  * POST /api/receipts/[id]/confirm
@@ -21,6 +23,9 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const { success, remaining, reset } = apiLimiter.check(user.id)
+  if (!success) return rateLimitResponse(reset)
+
   // Verify receipt ownership
   const { data: receipt, error: fetchError } = await supabase
     .from('receipts')
@@ -33,7 +38,10 @@ export async function POST(
     return NextResponse.json({ error: 'Receipt not found' }, { status: 404 })
   }
 
-  const body: ConfirmReceiptInput = await request.json()
+  const raw = await request.json()
+  const validation = validateBody(ConfirmReceiptInputSchema, raw)
+  if (!validation.success) return validation.response
+  const body = validation.data
 
   // Update line items with classifications
   if (body.line_items && body.line_items.length > 0) {

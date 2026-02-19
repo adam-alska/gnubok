@@ -1,6 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { getTransactions, getAccountBalance } from '@/lib/banking/enable-banking'
-import { evaluateMappingRules } from '@/lib/bookkeeping/mapping-engine'
+import { fetchMappingRules, evaluateMappingRulesWithCache } from '@/lib/bookkeeping/mapping-engine'
 import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-entries'
 import { getBestInvoiceMatch } from '@/lib/invoice/invoice-matching'
 import type { Transaction } from '@/types'
@@ -39,6 +39,9 @@ export async function syncAccountTransactions(
     toDate,
     account.currency
   )
+
+  // Fetch mapping rules once before the loop to avoid N+1 queries
+  const mappingRules = await fetchMappingRules(userId)
 
   for (const tx of bankTransactions) {
     const externalId = `${connectionId}_${tx.id}`
@@ -102,10 +105,10 @@ export async function syncAccountTransactions(
       }
     }
 
-    // Evaluate mapping rules for auto-categorization
+    // Evaluate mapping rules for auto-categorization (using pre-fetched rules)
     try {
-      const mappingResult = await evaluateMappingRules(
-        userId,
+      const mappingResult = evaluateMappingRulesWithCache(
+        mappingRules,
         newTransaction as Transaction
       )
 

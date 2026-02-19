@@ -17,6 +17,49 @@ import type {
 const CAPITALIZATION_THRESHOLD = 29400
 
 /**
+ * Fetch all active mapping rules for a user (user-specific + system defaults).
+ * Call this once and pass the result to evaluateMappingRulesWithCache() for
+ * batch processing to avoid N+1 queries.
+ */
+export async function fetchMappingRules(userId: string): Promise<MappingRule[]> {
+  const supabase = await createClient()
+
+  const { data: rules, error } = await supabase
+    .from('mapping_rules')
+    .select('*')
+    .eq('is_active', true)
+    .or(`user_id.eq.${userId},user_id.is.null`)
+    .order('priority', { ascending: true })
+
+  if (error || !rules || rules.length === 0) {
+    return []
+  }
+
+  return rules as MappingRule[]
+}
+
+/**
+ * Evaluate pre-fetched mapping rules against a transaction.
+ * Use with fetchMappingRules() for batch processing to avoid N+1 queries.
+ */
+export function evaluateMappingRulesWithCache(
+  rules: MappingRule[],
+  transaction: Transaction
+): MappingResult {
+  if (rules.length === 0) {
+    return getDefaultResult(transaction)
+  }
+
+  for (const rule of rules) {
+    if (matchesRule(rule, transaction)) {
+      return buildResult(rule, transaction)
+    }
+  }
+
+  return getDefaultResult(transaction)
+}
+
+/**
  * Evaluate all mapping rules against a transaction and return the best match
  *
  * Evaluation order (by priority):
@@ -30,28 +73,8 @@ export async function evaluateMappingRules(
   userId: string,
   transaction: Transaction
 ): Promise<MappingResult> {
-  const supabase = await createClient()
-
-  // Fetch all active rules (user-specific + system defaults), ordered by priority
-  const { data: rules, error } = await supabase
-    .from('mapping_rules')
-    .select('*')
-    .eq('is_active', true)
-    .or(`user_id.eq.${userId},user_id.is.null`)
-    .order('priority', { ascending: true })
-
-  if (error || !rules || rules.length === 0) {
-    return getDefaultResult(transaction)
-  }
-
-  // Evaluate each rule in priority order
-  for (const rule of rules as MappingRule[]) {
-    if (matchesRule(rule, transaction)) {
-      return buildResult(rule, transaction)
-    }
-  }
-
-  return getDefaultResult(transaction)
+  const rules = await fetchMappingRules(userId)
+  return evaluateMappingRulesWithCache(rules, transaction)
 }
 
 /**
