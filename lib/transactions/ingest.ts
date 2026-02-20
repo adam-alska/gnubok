@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { evaluateMappingRules } from '@/lib/bookkeeping/mapping-engine'
 import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-entries'
-import { getBestInvoiceMatch } from '@/lib/invoice/invoice-matching'
+import { getBestInvoiceMatch } from '@/lib/invoices/invoice-matching'
 import type { Transaction } from '@/types'
 
 /**

@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { getVatTreatmentLabel } from '@/lib/invoice/vat-rules'
+import { getVatTreatmentLabel } from '@/lib/invoices/vat-rules'
 import { Loader2, ArrowLeft, AlertTriangle } from 'lucide-react'
 import type { Invoice, InvoiceItem, Customer } from '@/types'
 

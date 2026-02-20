@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency } from '@/lib/utils'
-import { getVatRules, getVatTreatmentLabel } from '@/lib/invoice/vat-rules'
+import { getVatRules, getVatTreatmentLabel } from '@/lib/invoices/vat-rules'
 import { Loader2, Plus, Trash2, ArrowLeft } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { InvoiceReviewContent } from '@/components/invoices/InvoiceReviewContent'

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { eventBus } from '@/lib/events'
 import { ensureInitialized } from '@/lib/init'
 import type { CreateInvoiceInput, EntityType, Invoice, CreditNote } from '@/types'
-import { getVatRules, calculateVat, calculateTotal } from '@/lib/invoice/vat-rules'
+import { getVatRules, calculateVat, calculateTotal } from '@/lib/invoices/vat-rules'
 import { fetchExchangeRate, convertToSEK } from '@/lib/currency/riksbanken'
 import {
   createCreditNoteJournalEntry,
