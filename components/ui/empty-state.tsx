@@ -100,14 +100,14 @@ export function EmptyInvoices() {
   )
 }
 
-export function EmptyCustomers() {
+export function EmptyCustomers({ onAction }: { onAction?: () => void } = {}) {
   return (
     <EmptyState
       icon={Users}
       title="Inga kunder ännu"
       description="Lägg till dina kunder för att enkelt skapa fakturor och hålla koll på betalningar."
       actionLabel="Lägg till kund"
-      actionHref="/customers/new"
+      onAction={onAction}
     />
   )
 }

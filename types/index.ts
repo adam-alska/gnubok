@@ -30,6 +30,12 @@ export type CustomerType =
 // Invoice status
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled' | 'credited'
 
+// Supplier types
+export type SupplierType = 'swedish_business' | 'eu_business' | 'non_eu_business'
+
+// Supplier invoice status
+export type SupplierInvoiceStatus = 'registered' | 'approved' | 'paid' | 'partially_paid' | 'overdue' | 'disputed' | 'credited'
+
 // VAT treatment
 export type VatTreatment =
   | 'standard_25'       // 25% Swedish VAT
@@ -38,6 +44,9 @@ export type VatTreatment =
   | 'reverse_charge'    // EU reverse charge (0%)
   | 'export'            // Non-EU export (0%)
   | 'exempt'            // VAT exempt
+
+// Accounting method (bokföringsmetod)
+export type AccountingMethod = 'accrual' | 'cash'
 
 // Moms reporting period
 export type MomsPeriod = 'monthly' | 'quarterly' | 'yearly'
@@ -97,6 +106,14 @@ export interface CompanySettings {
   iban: string | null
   bic: string | null
 
+  // Accounting method
+  accounting_method: AccountingMethod
+
+  // Invoice settings
+  invoice_prefix: string | null
+  next_invoice_number: number
+  invoice_default_days: number
+
   // Onboarding
   onboarding_step: number
   onboarding_complete: boolean
@@ -112,20 +129,20 @@ export interface BankConnection {
   user_id: string
 
   bank_name: string
-  bank_id: string
+  provider: string
 
   // Enable Banking specific
   session_id: string | null
   authorization_id: string | null
 
   // Account info
-  accounts: BankAccount[]
+  accounts_data: BankAccount[]
 
   // Status
   status: BankConnectionStatus
 
   // Consent
-  consent_expires_at: string | null
+  consent_expires: string | null
   last_synced_at: string | null
 
   created_at: string
@@ -166,6 +183,9 @@ export interface Transaction {
 
   // Linked invoice (for matching)
   invoice_id: string | null
+
+  // Linked supplier invoice (for matching)
+  supplier_invoice_id: string | null
 
   // Potential invoice match (suggested, not confirmed)
   potential_invoice_id: string | null
@@ -219,6 +239,135 @@ export interface Customer {
 
   created_at: string
   updated_at: string
+}
+
+// Supplier
+export interface Supplier {
+  id: string
+  user_id: string
+
+  name: string
+  supplier_type: SupplierType
+
+  email: string | null
+  phone: string | null
+
+  address_line1: string | null
+  address_line2: string | null
+  postal_code: string | null
+  city: string | null
+  country: string
+
+  org_number: string | null
+  vat_number: string | null
+
+  bankgiro: string | null
+  plusgiro: string | null
+  bank_account: string | null
+  iban: string | null
+  bic: string | null
+
+  default_expense_account: string | null
+  default_payment_terms: number
+  default_currency: string
+
+  notes: string | null
+
+  created_at: string
+  updated_at: string
+}
+
+// Supplier Invoice
+export interface SupplierInvoice {
+  id: string
+  user_id: string
+  supplier_id: string
+
+  arrival_number: number
+  supplier_invoice_number: string
+
+  invoice_date: string
+  due_date: string
+  received_date: string
+  delivery_date: string | null
+
+  status: SupplierInvoiceStatus
+
+  currency: string
+  exchange_rate: number | null
+  exchange_rate_date: string | null
+
+  subtotal: number
+  subtotal_sek: number | null
+  vat_amount: number
+  vat_amount_sek: number | null
+  total: number
+  total_sek: number | null
+
+  vat_treatment: VatTreatment
+  reverse_charge: boolean
+
+  payment_reference: string | null
+  paid_at: string | null
+  paid_amount: number
+  remaining_amount: number
+
+  is_credit_note: boolean
+  credited_invoice_id: string | null
+
+  registration_journal_entry_id: string | null
+  payment_journal_entry_id: string | null
+
+  transaction_id: string | null
+  document_id: string | null
+
+  notes: string | null
+
+  created_at: string
+  updated_at: string
+
+  // Relations (populated when fetched)
+  supplier?: Supplier
+  items?: SupplierInvoiceItem[]
+  payments?: SupplierInvoicePayment[]
+}
+
+// Supplier Invoice Item
+export interface SupplierInvoiceItem {
+  id: string
+  supplier_invoice_id: string
+
+  sort_order: number
+  description: string
+  quantity: number
+  unit: string
+  unit_price: number
+  line_total: number
+
+  account_number: string
+  vat_code: string | null
+  vat_rate: number
+  vat_amount: number
+
+  created_at: string
+}
+
+// Supplier Invoice Payment (partial payments)
+export interface SupplierInvoicePayment {
+  id: string
+  supplier_invoice_id: string
+
+  payment_date: string
+  amount: number
+  currency: string
+  exchange_rate: number | null
+  exchange_rate_difference: number
+
+  journal_entry_id: string | null
+  transaction_id: string | null
+  notes: string | null
+
+  created_at: string
 }
 
 // Invoice
@@ -372,6 +521,54 @@ export interface CreateCustomerInput {
   notes?: string
 }
 
+export interface CreateSupplierInput {
+  name: string
+  supplier_type: SupplierType
+  email?: string
+  phone?: string
+  address_line1?: string
+  address_line2?: string
+  postal_code?: string
+  city?: string
+  country?: string
+  org_number?: string
+  vat_number?: string
+  bankgiro?: string
+  plusgiro?: string
+  bank_account?: string
+  iban?: string
+  bic?: string
+  default_expense_account?: string
+  default_payment_terms?: number
+  default_currency?: string
+  notes?: string
+}
+
+export interface CreateSupplierInvoiceInput {
+  supplier_id: string
+  supplier_invoice_number: string
+  invoice_date: string
+  due_date: string
+  delivery_date?: string
+  currency?: string
+  exchange_rate?: number
+  vat_treatment?: VatTreatment
+  reverse_charge?: boolean
+  payment_reference?: string
+  notes?: string
+  items: CreateSupplierInvoiceItemInput[]
+}
+
+export interface CreateSupplierInvoiceItemInput {
+  description: string
+  quantity: number
+  unit?: string
+  unit_price: number
+  account_number: string
+  vat_code?: string
+  vat_rate?: number
+}
+
 export interface CreateInvoiceInput {
   customer_id: string
   invoice_date: string
@@ -497,6 +694,7 @@ export type JournalEntrySourceType =
   | 'bank_transaction'
   | 'invoice_created'
   | 'invoice_paid'
+  | 'invoice_cash_payment'
   | 'credit_note'
   | 'salary_payment'
   | 'opening_balance'
@@ -505,6 +703,10 @@ export type JournalEntrySourceType =
   | 'correction'
   | 'import'
   | 'system'
+  | 'supplier_invoice_registered'
+  | 'supplier_invoice_paid'
+  | 'supplier_invoice_cash_payment'
+  | 'supplier_credit_note'
 
 // Journal entry status
 export type JournalEntryStatus = 'draft' | 'posted' | 'reversed'
@@ -1203,6 +1405,8 @@ export interface DocumentAttachment {
   digitization_date: string | null
   journal_entry_id: string | null
   journal_entry_line_id: string | null
+  prev_version_hash: string | null
+  last_integrity_check_at: string | null
   created_at: string
   updated_at: string
 }
@@ -1234,6 +1438,7 @@ export type AuditAction =
   | 'DOCUMENT_DELETE_BLOCKED'
   | 'RETENTION_BLOCK'
   | 'SECURITY_EVENT'
+  | 'INTEGRITY_FAILURE'
 
 export interface AuditLogEntry {
   id: string

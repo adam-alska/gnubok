@@ -188,9 +188,70 @@ export async function createCreditNoteJournalEntry(
 }
 
 /**
+ * Create journal entry for kontantmetoden (cash method) when payment is received.
+ * Combined entry: revenue + VAT recognised at payment.
+ *
+ *   Debit  1930 Företagskonto       [total]
+ *   Credit 30xx Försäljning         [subtotal]
+ *   Credit 26xx Utgående moms       [vat_amount]  (if applicable)
+ */
+export async function createInvoiceCashEntry(
+  userId: string,
+  invoice: Invoice,
+  paymentDate: string
+): Promise<JournalEntry | null> {
+  const fiscalPeriodId = await findFiscalPeriod(userId, paymentDate)
+  if (!fiscalPeriodId) {
+    console.warn('No open fiscal period found for payment date:', paymentDate)
+    return null
+  }
+
+  const revenueAccount = getRevenueAccount(invoice.vat_treatment)
+  const lines: CreateJournalEntryLineInput[] = []
+
+  // Debit: Företagskonto (total received)
+  lines.push({
+    account_number: '1930',
+    debit_amount: invoice.total,
+    credit_amount: 0,
+    line_description: `Betalning faktura ${invoice.invoice_number}`,
+  })
+
+  // Credit: Revenue account (subtotal excl VAT)
+  lines.push({
+    account_number: revenueAccount,
+    debit_amount: 0,
+    credit_amount: invoice.subtotal,
+    line_description: `Försäljning faktura ${invoice.invoice_number}`,
+  })
+
+  // Credit: Output VAT (if applicable)
+  if (invoice.vat_amount > 0) {
+    const vatAccount = getOutputVatAccount(invoice.vat_treatment)
+    lines.push({
+      account_number: vatAccount,
+      debit_amount: 0,
+      credit_amount: invoice.vat_amount,
+      line_description: `Utgående moms faktura ${invoice.invoice_number}`,
+    })
+  }
+
+  const input: CreateJournalEntryInput = {
+    fiscal_period_id: fiscalPeriodId,
+    entry_date: paymentDate,
+    description: `Betalning faktura ${invoice.invoice_number} (kontantmetoden)`,
+    source_type: 'invoice_cash_payment',
+    source_id: invoice.id,
+    lines,
+  }
+
+  return createJournalEntry(userId, input)
+}
+
+/**
  * Get the appropriate revenue account based on VAT treatment
  */
-function getRevenueAccount(vatTreatment: VatTreatment): string {
+export function getRevenueAccount(vatTreatment: VatTreatment): string {
   switch (vatTreatment) {
     case 'standard_25':
       return '3001' // Försäljning 25%
@@ -212,7 +273,7 @@ function getRevenueAccount(vatTreatment: VatTreatment): string {
 /**
  * Get the output VAT account based on VAT treatment
  */
-function getOutputVatAccount(vatTreatment: VatTreatment): string {
+export function getOutputVatAccount(vatTreatment: VatTreatment): string {
   switch (vatTreatment) {
     case 'standard_25':
       return '2611'

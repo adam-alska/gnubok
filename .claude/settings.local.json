@@ -5,7 +5,18 @@
       "Bash(grep:*)",
       "Bash(xargs:*)",
       "Bash(ls:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "WebFetch(domain:www.skatteverket.se)",
+      "WebSearch",
+      "mcp__plugin_supabase_supabase__apply_migration",
+      "Bash(cat:*)",
+      "Bash(wc:*)",
+      "Bash(git -C /Users/jakobwennberg/erp-base log --oneline)",
+      "mcp__plugin_supabase_supabase__list_projects",
+      "Bash(python3:*)",
+      "Bash(git -C /Users/jakobwennberg/erp-base status --porcelain)",
+      "Bash(__NEW_LINE_421a23f44da9923d__ echo '=== Checking which index exports are used ===' grep -r @/components/calendar /Users/jakobwennberg/erp-base/app --include=*.tsx --include=*.ts 2)",
+      "Bash(/dev/null __NEW_LINE_421a23f44da9923d__ echo -e '\\\\n=== Checking which calendar deadline components are directly imported ===' grep -rE \"DeadlineList|DeadlineCard|DeadlineForm|DeadlineFilters|PaymentSummaryCard|TaxTodoWidget|UpcomingDeadlinesWidget\" /Users/jakobwennberg/erp-base --include=*.tsx --include=*.ts)"
     ]
   }
 }

@@ -50,16 +50,16 @@ export async function createTransactionJournalEntry(
   const lines: CreateJournalEntryLineInput[] = []
 
   if (mappingResult.default_private) {
-    // Private expense
+    // Private expense — use entity-specific account from mappingResult
     lines.push(
       {
-        account_number: '2013', // Övriga egna uttag
+        account_number: mappingResult.debit_account,
         debit_amount: absAmount,
         credit_amount: 0,
         line_description: `Privat: ${transaction.description}`,
       },
       {
-        account_number: '1930', // Företagskonto
+        account_number: mappingResult.credit_account || '1930',
         debit_amount: 0,
         credit_amount: absAmount,
         line_description: transaction.description,
@@ -116,20 +116,53 @@ export async function createTransactionJournalEntry(
     const debitAccount = mappingResult.debit_account || '1930'
     const creditAccount = mappingResult.credit_account
 
-    lines.push(
-      {
+    if (mappingResult.vat_lines.length > 0) {
+      // Has output VAT
+      const vatCredit = mappingResult.vat_lines
+        .filter(l => l.credit_amount > 0)
+        .reduce((sum, l) => sum + l.credit_amount, 0)
+      const netAmount = Math.round((absAmount - vatCredit) * 100) / 100
+
+      // Debit bank for gross amount
+      lines.push({
         account_number: debitAccount,
         debit_amount: absAmount,
         credit_amount: 0,
         line_description: transaction.description,
-      },
-      {
+      })
+      // Credit revenue for net amount
+      lines.push({
         account_number: creditAccount,
         debit_amount: 0,
-        credit_amount: absAmount,
+        credit_amount: netAmount,
         line_description: transaction.description,
+      })
+      // Credit output VAT
+      for (const vatLine of mappingResult.vat_lines) {
+        lines.push({
+          account_number: vatLine.account_number,
+          debit_amount: vatLine.debit_amount,
+          credit_amount: vatLine.credit_amount,
+          line_description: vatLine.description,
+        })
       }
-    )
+    } else {
+      // No VAT - simple two-line entry
+      lines.push(
+        {
+          account_number: debitAccount,
+          debit_amount: absAmount,
+          credit_amount: 0,
+          line_description: transaction.description,
+        },
+        {
+          account_number: creditAccount,
+          debit_amount: 0,
+          credit_amount: absAmount,
+          line_description: transaction.description,
+        }
+      )
+    }
   }
 
   const input: CreateJournalEntryInput = {

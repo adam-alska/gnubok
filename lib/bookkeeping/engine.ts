@@ -125,9 +125,8 @@ function buildLineInserts(
     amount_in_currency: line.amount_in_currency ? Math.round(line.amount_in_currency * 100) / 100 : null,
     exchange_rate: line.exchange_rate || null,
     line_description: line.line_description || null,
-    tax_code: line.tax_code || null,
-    cost_center: line.cost_center || null,
-    project: line.project || null,
+    cost_center_id: line.cost_center || null,
+    project_id: line.project || null,
     sort_order: index,
   }))
 }

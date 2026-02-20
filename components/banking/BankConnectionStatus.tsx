@@ -27,8 +27,8 @@ export function BankConnectionStatus({
   onDisconnect,
   isSyncing = false,
 }: BankConnectionStatusProps) {
-  const daysUntilExpiry = getDaysUntilExpiry(connection.consent_expires_at)
-  const isExpiring = isConsentExpiringSoon(connection.consent_expires_at)
+  const daysUntilExpiry = getDaysUntilExpiry(connection.consent_expires)
+  const isExpiring = isConsentExpiringSoon(connection.consent_expires)
 
   const statusConfig = {
     active: {
@@ -61,7 +61,7 @@ export function BankConnectionStatus({
   const StatusIcon = status.icon
 
   // Parse accounts from connection
-  const accounts = (connection.accounts as Array<{
+  const accounts = (connection.accounts_data as Array<{
     uid: string
     iban?: string
     name?: string

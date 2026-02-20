@@ -10,6 +10,7 @@ import {
   generateInvoiceEmailText,
   generateInvoiceEmailSubject
 } from '@/lib/email/invoice-templates'
+import { createInvoiceJournalEntry } from '@/lib/bookkeeping/invoice-entries'
 import type { Invoice, InvoiceItem, Customer, CompanySettings } from '@/types'
 
 ensureInitialized()
@@ -156,6 +157,25 @@ export async function POST(
     if (updateError) {
       console.error('Failed to update invoice status:', updateError)
       // Don't fail the request - the email was sent successfully
+    }
+
+    // Faktureringsmetoden: create journal entry when invoice is issued
+    if ((company as Record<string, unknown>).accounting_method === 'accrual' || !(company as Record<string, unknown>).accounting_method) {
+      try {
+        const journalEntry = await createInvoiceJournalEntry(
+          user.id,
+          invoice as Invoice
+        )
+        if (journalEntry) {
+          await supabase
+            .from('invoices')
+            .update({ journal_entry_id: journalEntry.id })
+            .eq('id', id)
+        }
+      } catch (err) {
+        console.error('Failed to create invoice journal entry on send:', err)
+        // Non-blocking — don't fail the send
+      }
     }
 
     await eventBus.emit({

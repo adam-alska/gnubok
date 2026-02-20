@@ -4,6 +4,7 @@ import { analyzeReceipt } from '@/extensions/receipt-ocr/lib/receipt-analyzer'
 import { processLineItems } from '@/extensions/receipt-ocr/lib/receipt-categorizer'
 import { eventBus } from '@/lib/events/bus'
 import { ensureInitialized } from '@/lib/init'
+import { uploadDocument } from '@/lib/core/documents/document-service'
 
 ensureInitialized()
 
@@ -61,6 +62,17 @@ export async function POST(request: Request) {
     if (uploadError) {
       console.error('Storage upload error:', uploadError)
       return NextResponse.json({ error: 'Failed to upload image' }, { status: 500 })
+    }
+
+    // WORM archive copy (non-blocking — receipt flow continues even if this fails)
+    try {
+      await uploadDocument(user.id, {
+        name: imageFile.name,
+        buffer: arrayBuffer,
+        type: imageFile.type,
+      }, { upload_source: 'camera' })
+    } catch (archiveErr) {
+      console.error('[receipt-upload] WORM archive copy failed:', archiveErr)
     }
 
     // Get public URL

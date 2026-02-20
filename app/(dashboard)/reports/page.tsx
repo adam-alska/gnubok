@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Download, FileText, FileDown, TrendingUp, Scale, AlertCircle, Receipt, Briefcase } from 'lucide-react'
+import { Download, FileText, FileDown, TrendingUp, Scale, AlertCircle, Receipt, Briefcase, Building2 } from 'lucide-react'
 import { NEDeclarationView } from '@/extensions/ne-bilaga/NEDeclarationView'
 import { SRUExportView } from '@/extensions/sru-export/SRUExportView'
 import type {
@@ -124,6 +124,10 @@ export default function ReportsPage() {
               <FileDown className="h-4 w-4 mr-1" />
               SRU-export
             </TabsTrigger>
+            <TabsTrigger value="supplier-ledger">
+              <Building2 className="h-4 w-4 mr-1" />
+              Lev.reskontra
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="trial-balance">
@@ -145,6 +149,9 @@ export default function ReportsPage() {
           )}
           <TabsContent value="sru-export">
             <SRUExportView periodId={selectedPeriod} />
+          </TabsContent>
+          <TabsContent value="supplier-ledger">
+            <SupplierLedgerView periodId={selectedPeriod} />
           </TabsContent>
         </Tabs>
       ) : (
@@ -896,5 +903,206 @@ function VatRutaRow({
         <td className="py-1 text-right text-xs">{formatAmount(baseAmount)} kr</td>
       </tr>
     </>
+  )
+}
+
+interface SupplierLedgerData {
+  ledger: {
+    entries: {
+      supplier_id: string
+      supplier_name: string
+      current: number
+      days_1_30: number
+      days_31_60: number
+      days_61_90: number
+      days_90_plus: number
+      total_outstanding: number
+    }[]
+    total_outstanding: number
+    total_current: number
+    total_overdue: number
+    unpaid_count: number
+  }
+  reconciliation: {
+    supplier_ledger_total: number
+    account_2440_balance: number
+    difference: number
+    is_reconciled: boolean
+  } | null
+}
+
+function SupplierLedgerView({ periodId }: { periodId: string }) {
+  const [data, setData] = useState<SupplierLedgerData | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchData = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/reports/supplier-ledger?period_id=${periodId}`)
+      const result = await res.json()
+      if (result.error) {
+        setError(result.error)
+      } else {
+        setData(result.data)
+      }
+    } catch {
+      setError('Kunde inte hämta leverantörsreskontra')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (periodId) fetchData()
+  }, [periodId])
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-muted-foreground">
+          Laddar leverantörsreskontra...
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-destructive">
+          <AlertCircle className="h-6 w-6 mx-auto mb-2" />
+          {error}
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!data || !data.ledger) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-muted-foreground">
+          Ingen data tillgänglig.
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const { ledger, reconciliation } = data
+
+  return (
+    <div className="space-y-4">
+      {/* Summary cards */}
+      <div className="grid md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">Totalt utestående</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{formatAmount(ledger.total_outstanding)} kr</p>
+            <p className="text-xs text-muted-foreground">{ledger.unpaid_count} fakturor</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">Ej förfallet</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-green-600">{formatAmount(ledger.total_current)} kr</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">Förfallet</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-red-600">{formatAmount(ledger.total_overdue)} kr</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Aging table */}
+      {ledger.entries.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Ålderfördelning per leverantör</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-muted-foreground">
+                  <th className="py-2">Leverantör</th>
+                  <th className="py-2 text-right">Ej förfallet</th>
+                  <th className="py-2 text-right">1-30 dagar</th>
+                  <th className="py-2 text-right">31-60 dagar</th>
+                  <th className="py-2 text-right">61-90 dagar</th>
+                  <th className="py-2 text-right">90+ dagar</th>
+                  <th className="py-2 text-right font-semibold">Totalt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ledger.entries.map((entry) => (
+                  <tr key={entry.supplier_id} className="border-b last:border-0">
+                    <td className="py-2">{entry.supplier_name}</td>
+                    <td className="py-2 text-right">{entry.current > 0 ? formatAmount(entry.current) : ''}</td>
+                    <td className="py-2 text-right">{entry.days_1_30 > 0 ? formatAmount(entry.days_1_30) : ''}</td>
+                    <td className="py-2 text-right">{entry.days_31_60 > 0 ? formatAmount(entry.days_31_60) : ''}</td>
+                    <td className="py-2 text-right">{entry.days_61_90 > 0 ? formatAmount(entry.days_61_90) : ''}</td>
+                    <td className="py-2 text-right text-red-600">{entry.days_90_plus > 0 ? formatAmount(entry.days_90_plus) : ''}</td>
+                    <td className="py-2 text-right font-semibold">{formatAmount(entry.total_outstanding)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="font-semibold border-t-2">
+                  <td className="py-2">Summa</td>
+                  <td className="py-2 text-right">{formatAmount(ledger.entries.reduce((s, e) => s + e.current, 0))}</td>
+                  <td className="py-2 text-right">{formatAmount(ledger.entries.reduce((s, e) => s + e.days_1_30, 0))}</td>
+                  <td className="py-2 text-right">{formatAmount(ledger.entries.reduce((s, e) => s + e.days_31_60, 0))}</td>
+                  <td className="py-2 text-right">{formatAmount(ledger.entries.reduce((s, e) => s + e.days_61_90, 0))}</td>
+                  <td className="py-2 text-right text-red-600">{formatAmount(ledger.entries.reduce((s, e) => s + e.days_90_plus, 0))}</td>
+                  <td className="py-2 text-right">{formatAmount(ledger.total_outstanding)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Reconciliation */}
+      {reconciliation && (
+        <Card className="border-2">
+          <CardHeader>
+            <CardTitle>Avstämning mot konto 2440</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span>Leverantörsreskontra (summa utestående)</span>
+                <span className="font-mono">{formatAmount(reconciliation.supplier_ledger_total)} kr</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Konto 2440 saldo (huvudbok)</span>
+                <span className="font-mono">{formatAmount(reconciliation.account_2440_balance)} kr</span>
+              </div>
+              <div className="flex justify-between pt-2 border-t font-semibold">
+                <span>Differens</span>
+                <span className={reconciliation.is_reconciled ? 'text-green-600' : 'text-red-600'}>
+                  {formatAmount(reconciliation.difference)} kr
+                </span>
+              </div>
+              <div className="pt-2">
+                {reconciliation.is_reconciled ? (
+                  <Badge className="bg-green-100 text-green-800">Avstämd</Badge>
+                ) : (
+                  <Badge variant="destructive">Ej avstämd - kontrollera bokföring</Badge>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   )
 }

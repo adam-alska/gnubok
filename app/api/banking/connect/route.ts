@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       .from('bank_connections')
       .insert({
         user_id: user.id,
-        bank_id: `${aspsp_name.toLowerCase().replace(/\s+/g, '-')}-${aspsp_country.toLowerCase()}`,
+        provider: `${aspsp_name.toLowerCase().replace(/\s+/g, '-')}-${aspsp_country.toLowerCase()}`,
         bank_name: aspsp_name,
         authorization_id,
         status: 'pending',

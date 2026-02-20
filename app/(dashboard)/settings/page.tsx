@@ -115,6 +115,10 @@ export default function SettingsPage() {
       clearing_number: formData.get('clearing_number') as string,
       account_number: formData.get('account_number') as string,
       preliminary_tax_monthly: parseFloat(formData.get('preliminary_tax_monthly') as string) || null,
+      invoice_prefix: formData.get('invoice_prefix') as string || null,
+      next_invoice_number: parseInt(formData.get('next_invoice_number') as string) || 1,
+      invoice_default_days: parseInt(formData.get('invoice_default_days') as string) || 30,
+      accounting_method: formData.get('accounting_method') as string || 'accrual',
     }
 
     try {
@@ -365,6 +369,75 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="pt-4 border-t">
+                    <h3 className="font-medium mb-4">Fakturainställningar</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="invoice_prefix">Fakturaprefix</Label>
+                        <Input
+                          id="invoice_prefix"
+                          name="invoice_prefix"
+                          placeholder="t.ex. F-"
+                          defaultValue={settings?.invoice_prefix || ''}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="next_invoice_number">Nästa fakturanummer</Label>
+                        <Input
+                          id="next_invoice_number"
+                          name="next_invoice_number"
+                          type="number"
+                          min="1"
+                          defaultValue={settings?.next_invoice_number || 1}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="invoice_default_days">Betalningsvillkor (dagar)</Label>
+                        <Input
+                          id="invoice_default_days"
+                          name="invoice_default_days"
+                          type="number"
+                          min="0"
+                          defaultValue={settings?.invoice_default_days || 30}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                      <Label htmlFor="accounting_method">Bokföringsmetod</Label>
+                      {settings?.entity_type === 'aktiebolag' ? (
+                        <>
+                          <input type="hidden" name="accounting_method" value="accrual" />
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value="Faktureringsmetoden"
+                              disabled
+                              className="max-w-xs"
+                            />
+                            <span className="text-sm text-muted-foreground">
+                              Obligatorisk för aktiebolag
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <select
+                          id="accounting_method"
+                          name="accounting_method"
+                          defaultValue={settings?.accounting_method || 'accrual'}
+                          className="flex h-10 w-full max-w-xs rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        >
+                          <option value="accrual">Faktureringsmetoden</option>
+                          <option value="cash">Kontantmetoden</option>
+                        </select>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {settings?.entity_type === 'aktiebolag'
+                          ? 'Aktiebolag måste använda faktureringsmetoden enligt BFL.'
+                          : 'Kontantmetoden är tillgänglig för enskild firma med omsättning under 3 MSEK.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t">
                     <h3 className="font-medium mb-4">Skatteinställningar</h3>
                     <div className="space-y-2">
                       <Label htmlFor="preliminary_tax_monthly">
@@ -406,8 +479,8 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {activeConnections.map((connection) => {
-                  const daysUntilExpiry = getDaysUntilExpiry(connection.consent_expires_at)
-                  const isExpiring = isConsentExpiringSoon(connection.consent_expires_at)
+                  const daysUntilExpiry = getDaysUntilExpiry(connection.consent_expires)
+                  const isExpiring = isConsentExpiringSoon(connection.consent_expires)
 
                   return (
                     <div

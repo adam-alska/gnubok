@@ -147,29 +147,45 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
     setIsUpdating(true)
 
-    const updates: Partial<Invoice> = { status }
-    if (status === 'paid') {
-      updates.paid_at = new Date().toISOString()
-      updates.paid_amount = invoice.total
-    }
+    try {
+      if (status === 'sent') {
+        // Use mark-sent API for proper bookkeeping
+        const response = await fetch(`/api/invoices/${invoice.id}/mark-sent`, {
+          method: 'POST',
+        })
+        if (!response.ok) {
+          const data = await response.json()
+          throw new Error(data.error || 'Kunde inte markera som skickad')
+        }
+      } else if (status === 'paid') {
+        // Use mark-paid API for proper bookkeeping
+        const response = await fetch(`/api/invoices/${invoice.id}/mark-paid`, {
+          method: 'POST',
+        })
+        if (!response.ok) {
+          const data = await response.json()
+          throw new Error(data.error || 'Kunde inte markera som betald')
+        }
+      } else {
+        // Other status changes (cancelled) — direct update is fine
+        const { error } = await supabase
+          .from('invoices')
+          .update({ status })
+          .eq('id', invoice.id)
+        if (error) throw new Error(error.message)
+      }
 
-    const { error } = await supabase
-      .from('invoices')
-      .update(updates)
-      .eq('id', invoice.id)
-
-    if (error) {
-      toast({
-        title: 'Fel',
-        description: 'Kunde inte uppdatera status',
-        variant: 'destructive',
-      })
-    } else {
       toast({
         title: 'Uppdaterad',
         description: `Fakturan är nu markerad som ${statusConfig[status].label.toLowerCase()}`,
       })
       fetchInvoice()
+    } catch (error) {
+      toast({
+        title: 'Fel',
+        description: error instanceof Error ? error.message : 'Kunde inte uppdatera status',
+        variant: 'destructive',
+      })
     }
 
     setIsUpdating(false)

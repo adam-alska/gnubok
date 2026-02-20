@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const accounts = (connection.accounts as StoredAccount[] || []).map(a => ({ ...a }))
+    const accounts = (connection.accounts_data as StoredAccount[] || []).map(a => ({ ...a }))
 
     const toDate = new Date().toISOString().split('T')[0]
     const fromDate = new Date(Date.now() - days_back * 24 * 60 * 60 * 1000)
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     await supabase
       .from('bank_connections')
       .update({
-        accounts,
+        accounts_data: accounts,
         last_synced_at: syncedAt,
       })
       .eq('id', connection.id)

@@ -161,7 +161,7 @@ export default function CustomersPage() {
                 </p>
               </div>
             ) : (
-              <EmptyCustomers />
+              <EmptyCustomers onAction={() => setIsDialogOpen(true)} />
             )}
           </CardContent>
         </Card>

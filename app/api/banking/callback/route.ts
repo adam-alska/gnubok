@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { createSession, getAccountBalance, type AccountInfo } from '@/lib/banking/enable-banking'
 
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${baseUrl}/settings?bank_error=missing_parameters`)
   }
 
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
 
   try {
     // Create session from authorization code
@@ -88,16 +88,17 @@ export async function GET(request: Request) {
         .from('bank_connections')
         .insert({
           user_id: state,
-          bank_id: `${aspsp.name.toLowerCase().replace(/\s+/g, '-')}-${aspsp.country.toLowerCase()}`,
+          provider: `${aspsp.name.toLowerCase().replace(/\s+/g, '-')}-${aspsp.country.toLowerCase()}`,
           bank_name: aspsp.name,
           session_id,
           status: 'active',
-          accounts: accountsWithBalances,
-          consent_expires_at: consentExpiresAt,
+          accounts_data: accountsWithBalances,
+          consent_expires: consentExpiresAt,
           last_synced_at: new Date().toISOString(),
         })
 
       if (insertError) {
+        console.error('Insert error:', insertError)
         throw new Error('Failed to create connection')
       }
     } else {
@@ -107,8 +108,8 @@ export async function GET(request: Request) {
         .update({
           session_id,
           status: 'active',
-          accounts: accountsWithBalances,
-          consent_expires_at: consentExpiresAt,
+          accounts_data: accountsWithBalances,
+          consent_expires: consentExpiresAt,
           last_synced_at: new Date().toISOString(),
         })
         .eq('id', pendingConnection.id)

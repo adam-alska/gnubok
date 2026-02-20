@@ -1,0 +1,103 @@
+import { createClient } from '@/lib/supabase/server'
+
+export interface SupplierLedgerEntry {
+  supplier_id: string
+  supplier_name: string
+  current: number
+  days_1_30: number
+  days_31_60: number
+  days_61_90: number
+  days_90_plus: number
+  total_outstanding: number
+}
+
+export interface SupplierLedgerReport {
+  entries: SupplierLedgerEntry[]
+  total_outstanding: number
+  total_current: number
+  total_overdue: number
+  unpaid_count: number
+}
+
+/**
+ * Generate supplier ledger (leverantörsreskontra) with aging analysis
+ */
+export async function generateSupplierLedger(
+  userId: string,
+  asOfDate?: string
+): Promise<SupplierLedgerReport> {
+  const supabase = await createClient()
+  const refDate = asOfDate ? new Date(asOfDate) : new Date()
+
+  // Fetch all unpaid/partially_paid supplier invoices
+  const { data: invoices, error } = await supabase
+    .from('supplier_invoices')
+    .select('*, supplier:suppliers(id, name)')
+    .eq('user_id', userId)
+    .in('status', ['registered', 'approved', 'partially_paid', 'overdue'])
+
+  if (error || !invoices) {
+    return {
+      entries: [],
+      total_outstanding: 0,
+      total_current: 0,
+      total_overdue: 0,
+      unpaid_count: 0,
+    }
+  }
+
+  // Group by supplier and calculate aging
+  const bySupplier = new Map<string, SupplierLedgerEntry>()
+
+  for (const inv of invoices) {
+    const supplierId = inv.supplier_id
+    const supplierName = inv.supplier?.name || 'Okänd leverantör'
+
+    if (!bySupplier.has(supplierId)) {
+      bySupplier.set(supplierId, {
+        supplier_id: supplierId,
+        supplier_name: supplierName,
+        current: 0,
+        days_1_30: 0,
+        days_31_60: 0,
+        days_61_90: 0,
+        days_90_plus: 0,
+        total_outstanding: 0,
+      })
+    }
+
+    const entry = bySupplier.get(supplierId)!
+    const dueDate = new Date(inv.due_date)
+    const daysOverdue = Math.floor((refDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
+    const amount = inv.remaining_amount || 0
+
+    if (daysOverdue <= 0) {
+      entry.current += amount
+    } else if (daysOverdue <= 30) {
+      entry.days_1_30 += amount
+    } else if (daysOverdue <= 60) {
+      entry.days_31_60 += amount
+    } else if (daysOverdue <= 90) {
+      entry.days_61_90 += amount
+    } else {
+      entry.days_90_plus += amount
+    }
+
+    entry.total_outstanding += amount
+  }
+
+  const entries = Array.from(bySupplier.values())
+    .sort((a, b) => b.total_outstanding - a.total_outstanding)
+
+  const total_outstanding = entries.reduce((sum, e) => sum + e.total_outstanding, 0)
+  const total_current = entries.reduce((sum, e) => sum + e.current, 0)
+  const total_overdue = total_outstanding - total_current
+
+  return {
+    entries,
+    total_outstanding: Math.round(total_outstanding * 100) / 100,
+    total_current: Math.round(total_current * 100) / 100,
+    total_overdue: Math.round(total_overdue * 100) / 100,
+    unpaid_count: invoices.length,
+  }
+}

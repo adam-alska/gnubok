@@ -5,13 +5,14 @@ import { ensureInitialized } from '@/lib/init'
 import { buildMappingResultFromCategory } from '@/lib/bookkeeping/category-mapping'
 import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-entries'
 import { saveUserMappingRule } from '@/lib/bookkeeping/mapping-engine'
-import type { Transaction, TransactionCategory, EntityType } from '@/types'
+import type { Transaction, TransactionCategory, EntityType, VatTreatment } from '@/types'
 
 ensureInitialized()
 
 interface CategorizeRequest {
   is_business: boolean
   category?: TransactionCategory
+  vat_treatment?: VatTreatment
 }
 
 /**
@@ -20,7 +21,8 @@ interface CategorizeRequest {
 async function ensureFiscalPeriod(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
-  date: string
+  date: string,
+  fiscalYearStartMonth: number = 1
 ): Promise<boolean> {
   // Check if a fiscal period already covers this date
   const { data: existing } = await supabase
@@ -36,18 +38,38 @@ async function ensureFiscalPeriod(
     return true
   }
 
-  // No fiscal period exists - create one for the year of the transaction
-  const transactionDate = new Date(date)
-  const year = transactionDate.getFullYear()
+  // Compute fiscal year period based on start month
+  const txDate = new Date(date)
+  const txMonth = txDate.getMonth() + 1
+  const txYear = txDate.getFullYear()
 
-  const periodStart = `${year}-01-01`
-  const periodEnd = `${year}-12-31`
+  let periodStartYear: number
+  if (fiscalYearStartMonth === 1) {
+    periodStartYear = txYear
+  } else if (txMonth >= fiscalYearStartMonth) {
+    periodStartYear = txYear
+  } else {
+    periodStartYear = txYear - 1
+  }
+
+  const startMonth = String(fiscalYearStartMonth).padStart(2, '0')
+  const periodStart = `${periodStartYear}-${startMonth}-01`
+
+  // Period ends the day before the next fiscal year starts
+  const endYear = fiscalYearStartMonth === 1 ? periodStartYear : periodStartYear + 1
+  const endMonth = fiscalYearStartMonth === 1 ? 12 : fiscalYearStartMonth - 1
+  const lastDay = new Date(endYear, endMonth, 0).getDate()
+  const periodEnd = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+
+  const periodName = fiscalYearStartMonth === 1
+    ? `Räkenskapsår ${periodStartYear}`
+    : `Räkenskapsår ${periodStartYear}/${endYear}`
 
   const { error } = await supabase
     .from('fiscal_periods')
     .upsert({
       user_id: userId,
-      name: `Räkenskapsår ${year}`,
+      name: periodName,
       period_start: periodStart,
       period_end: periodEnd,
     }, {
@@ -122,14 +144,15 @@ export async function POST(
     })
   }
 
-  // Fetch company settings to get entity type
+  // Fetch company settings to get entity type and fiscal year start
   const { data: settings } = await supabase
     .from('company_settings')
-    .select('entity_type')
+    .select('entity_type, fiscal_year_start_month')
     .eq('user_id', user.id)
     .single()
 
   const entityType: EntityType = (settings?.entity_type as EntityType) || 'enskild_firma'
+  const fiscalYearStartMonth: number = settings?.fiscal_year_start_month ?? 1
 
   // Determine the category to use
   const finalCategory: TransactionCategory = is_business
@@ -141,11 +164,12 @@ export async function POST(
     finalCategory,
     transaction as Transaction,
     is_business,
-    entityType
+    entityType,
+    body.vat_treatment
   )
 
   // Ensure fiscal period exists for the transaction date
-  await ensureFiscalPeriod(supabase, user.id, transaction.date)
+  await ensureFiscalPeriod(supabase, user.id, transaction.date, fiscalYearStartMonth)
 
   // Try to create journal entry
   let journalEntryCreated = false

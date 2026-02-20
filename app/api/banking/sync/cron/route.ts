@@ -72,7 +72,7 @@ export async function GET(request: Request) {
   for (const connection of connections) {
     try {
       // Check consent expiry
-      const daysLeft = getDaysUntilExpiry(connection.consent_expires_at)
+      const daysLeft = getDaysUntilExpiry(connection.consent_expires)
       const isExpired = daysLeft !== null && daysLeft <= 0
 
       if (isExpired) {
@@ -95,7 +95,7 @@ export async function GET(request: Request) {
         continue
       }
 
-      const expiringSoon = isConsentExpiringSoon(connection.consent_expires_at)
+      const expiringSoon = isConsentExpiringSoon(connection.consent_expires)
 
       // Sync last 7 days (daily cron, with overlap for safety)
       const toDate = new Date().toISOString().split('T')[0]
@@ -103,7 +103,7 @@ export async function GET(request: Request) {
         .toISOString()
         .split('T')[0]
 
-      const accounts = (connection.accounts as StoredAccount[] || []).map(a => ({ ...a }))
+      const accounts = (connection.accounts_data as StoredAccount[] || []).map(a => ({ ...a }))
 
       let totalImported = 0
       let totalDuplicates = 0
@@ -128,7 +128,7 @@ export async function GET(request: Request) {
       await supabase
         .from('bank_connections')
         .update({
-          accounts,
+          accounts_data: accounts,
           last_synced_at: new Date().toISOString(),
         })
         .eq('id', connection.id)

@@ -1,4 +1,5 @@
-import type { TransactionCategory, MappingResult, VatJournalLine, Transaction, EntityType } from '@/types'
+import type { TransactionCategory, MappingResult, VatJournalLine, Transaction, EntityType, VatTreatment } from '@/types'
+import { getVatRate } from './vat-entries'
 
 /**
  * Maps TransactionCategory to BAS accounts for journal entry creation
@@ -45,7 +46,8 @@ export function getCategoryAccountMapping(
   category: TransactionCategory,
   amount: number,
   isBusiness: boolean,
-  entityType: EntityType = 'enskild_firma'
+  entityType: EntityType = 'enskild_firma',
+  vatTreatment?: VatTreatment
 ): CategoryAccountMapping {
   // Private/owner transactions use entity-specific accounts
   if (!isBusiness) {
@@ -77,7 +79,7 @@ export function getCategoryAccountMapping(
   // Business income categories
   const incomeMapping: Record<string, string> = {
     income_services: '3001', // Försäljning tjänster 25%
-    income_products: '3001', // Försäljning varor 25%
+    income_products: '3002', // Försäljning varor 25%
     income_other: '3900', // Övriga rörelseintäkter
   }
 
@@ -89,11 +91,14 @@ export function getCategoryAccountMapping(
     const vatExemptCategories = ['expense_bank_fees', 'expense_card_fees', 'expense_currency_exchange']
     const isVatExempt = vatExemptCategories.includes(category)
 
+    // Use provided vatTreatment, or default based on category
+    const resolvedVat = vatTreatment ?? (isVatExempt ? null : 'standard_25')
+
     return {
       debitAccount: expenseAccount,
       creditAccount: BANK_ACCOUNT,
-      vatTreatment: isVatExempt ? null : 'standard_25',
-      vatDebitAccount: isVatExempt ? null : '2641', // Debiterad ingående moms
+      vatTreatment: resolvedVat,
+      vatDebitAccount: resolvedVat ? '2641' : null, // Debiterad ingående moms
       vatCreditAccount: null,
     }
   }
@@ -101,12 +106,33 @@ export function getCategoryAccountMapping(
   // Check if it's an income category
   if (category.startsWith('income_')) {
     const incomeAccount = incomeMapping[category] || '3900'
+
+    // Use provided vatTreatment, or default to standard_25
+    const resolvedVat = vatTreatment ?? 'standard_25'
+
+    // Determine output VAT account based on rate
+    let outputVatAccount: string | null = null
+    switch (resolvedVat) {
+      case 'standard_25':
+        outputVatAccount = '2611' // Utgående moms försäljning 25%
+        break
+      case 'reduced_12':
+        outputVatAccount = '2621' // Utgående moms försäljning 12%
+        break
+      case 'reduced_6':
+        outputVatAccount = '2631' // Utgående moms försäljning 6%
+        break
+      default:
+        outputVatAccount = null
+        break
+    }
+
     return {
       debitAccount: BANK_ACCOUNT,
       creditAccount: incomeAccount,
-      vatTreatment: 'standard_25',
+      vatTreatment: resolvedVat,
       vatDebitAccount: null,
-      vatCreditAccount: '2610', // Utgående moms
+      vatCreditAccount: outputVatAccount,
     }
   }
 
@@ -138,34 +164,38 @@ export function buildMappingResultFromCategory(
   category: TransactionCategory,
   transaction: Transaction,
   isBusiness: boolean,
-  entityType: EntityType = 'enskild_firma'
+  entityType: EntityType = 'enskild_firma',
+  vatTreatment?: VatTreatment
 ): MappingResult {
-  const mapping = getCategoryAccountMapping(category, transaction.amount, isBusiness, entityType)
+  const mapping = getCategoryAccountMapping(category, transaction.amount, isBusiness, entityType, vatTreatment)
 
   const vatLines: VatJournalLine[] = []
 
-  // Calculate VAT if applicable (Swedish standard: gross amount includes 25% VAT)
-  // VAT = gross * 0.25 / 1.25 = gross * 0.20
-  if (isBusiness && mapping.vatTreatment === 'standard_25') {
-    const grossAmount = Math.abs(transaction.amount)
-    const vatAmount = Math.round((grossAmount * 0.20) * 100) / 100 // Round to öre
+  // Calculate VAT if applicable using the resolved treatment from mapping
+  const treatment = mapping.vatTreatment as VatTreatment | null
+  if (isBusiness && treatment) {
+    const vatRate = getVatRate(treatment)
+    if (vatRate > 0) {
+      const grossAmount = Math.abs(transaction.amount)
+      const vatAmount = Math.round((grossAmount * vatRate / (1 + vatRate)) * 100) / 100
 
-    if (transaction.amount < 0 && mapping.vatDebitAccount) {
-      // Expense: Ingående moms (deductible VAT)
-      vatLines.push({
-        account_number: mapping.vatDebitAccount,
-        debit_amount: vatAmount,
-        credit_amount: 0,
-        description: 'Ingående moms 25%',
-      })
-    } else if (transaction.amount > 0 && mapping.vatCreditAccount) {
-      // Income: Utgående moms (output VAT)
-      vatLines.push({
-        account_number: mapping.vatCreditAccount,
-        debit_amount: 0,
-        credit_amount: vatAmount,
-        description: 'Utgående moms 25%',
-      })
+      if (transaction.amount < 0 && mapping.vatDebitAccount) {
+        // Expense: Ingående moms (deductible VAT)
+        vatLines.push({
+          account_number: mapping.vatDebitAccount,
+          debit_amount: vatAmount,
+          credit_amount: 0,
+          description: `Ingående moms ${vatRate * 100}%`,
+        })
+      } else if (transaction.amount > 0 && mapping.vatCreditAccount) {
+        // Income: Utgående moms (output VAT)
+        vatLines.push({
+          account_number: mapping.vatCreditAccount,
+          debit_amount: 0,
+          credit_amount: vatAmount,
+          description: `Utgående moms ${vatRate * 100}%`,
+        })
+      }
     }
   }
 

@@ -1,0 +1,444 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useToast } from '@/components/ui/use-toast'
+import { ArrowLeft, CheckCircle, CreditCard, FileText, Trash2 } from 'lucide-react'
+import Link from 'next/link'
+import type { SupplierInvoice, SupplierInvoiceItem, SupplierInvoicePayment } from '@/types'
+
+function formatAmount(amount: number): string {
+  return amount.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+const statusColors: Record<string, string> = {
+  registered: 'bg-blue-100 text-blue-800',
+  approved: 'bg-yellow-100 text-yellow-800',
+  paid: 'bg-green-100 text-green-800',
+  partially_paid: 'bg-orange-100 text-orange-800',
+  overdue: 'bg-red-100 text-red-800',
+  disputed: 'bg-purple-100 text-purple-800',
+  credited: 'bg-gray-100 text-gray-800',
+}
+
+const statusLabels: Record<string, string> = {
+  registered: 'Registrerad',
+  approved: 'Godkänd',
+  paid: 'Betald',
+  partially_paid: 'Delbetald',
+  overdue: 'Förfallen',
+  disputed: 'Tvist',
+  credited: 'Krediterad',
+}
+
+export default function SupplierInvoiceDetailPage() {
+  const params = useParams()
+  const router = useRouter()
+  const { toast } = useToast()
+  const [invoice, setInvoice] = useState<SupplierInvoice | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isPayDialogOpen, setIsPayDialogOpen] = useState(false)
+  const [payAmount, setPayAmount] = useState('')
+  const [isProcessing, setIsProcessing] = useState(false)
+
+  useEffect(() => {
+    fetchInvoice()
+  }, [params.id])
+
+  async function fetchInvoice() {
+    setIsLoading(true)
+    const res = await fetch(`/api/supplier-invoices/${params.id}`)
+    const { data, error } = await res.json()
+    if (error) {
+      toast({ title: 'Fel', description: error, variant: 'destructive' })
+    } else {
+      setInvoice(data)
+      setPayAmount(String(data.remaining_amount))
+    }
+    setIsLoading(false)
+  }
+
+  async function handleApprove() {
+    setIsProcessing(true)
+    const res = await fetch(`/api/supplier-invoices/${params.id}/approve`, { method: 'POST' })
+    const result = await res.json()
+    if (!res.ok) {
+      toast({ title: 'Fel', description: result.error, variant: 'destructive' })
+    } else {
+      toast({ title: 'Godkänd', description: 'Fakturan har godkänts' })
+      fetchInvoice()
+    }
+    setIsProcessing(false)
+  }
+
+  async function handleMarkPaid() {
+    setIsProcessing(true)
+    const res = await fetch(`/api/supplier-invoices/${params.id}/mark-paid`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: parseFloat(payAmount) }),
+    })
+    const result = await res.json()
+    if (!res.ok) {
+      toast({ title: 'Fel', description: result.error, variant: 'destructive' })
+    } else {
+      toast({
+        title: result.status === 'paid' ? 'Betald' : 'Delbetalning registrerad',
+        description: `${formatAmount(parseFloat(payAmount))} kr registrerat`,
+      })
+      setIsPayDialogOpen(false)
+      fetchInvoice()
+    }
+    setIsProcessing(false)
+  }
+
+  async function handleCredit() {
+    if (!confirm('Vill du registrera en kreditfaktura för denna faktura?')) return
+    setIsProcessing(true)
+    const res = await fetch(`/api/supplier-invoices/${params.id}/credit`, { method: 'POST' })
+    const result = await res.json()
+    if (!res.ok) {
+      toast({ title: 'Fel', description: result.error, variant: 'destructive' })
+    } else {
+      toast({ title: 'Kreditfaktura registrerad' })
+      fetchInvoice()
+    }
+    setIsProcessing(false)
+  }
+
+  async function handleDelete() {
+    if (!confirm('Vill du ta bort denna faktura?')) return
+    const res = await fetch(`/api/supplier-invoices/${params.id}`, { method: 'DELETE' })
+    const result = await res.json()
+    if (!res.ok) {
+      toast({ title: 'Fel', description: result.error, variant: 'destructive' })
+    } else {
+      toast({ title: 'Borttagen' })
+      router.push('/supplier-invoices')
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-8 bg-muted rounded w-48 animate-pulse" />
+        <Card className="animate-pulse"><CardContent className="h-48" /></Card>
+      </div>
+    )
+  }
+
+  if (!invoice) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-muted-foreground">Fakturan hittades inte</p>
+        <Button variant="outline" className="mt-4" onClick={() => router.push('/supplier-invoices')}>
+          Tillbaka
+        </Button>
+      </div>
+    )
+  }
+
+  const items = (invoice.items || []) as SupplierInvoiceItem[]
+  const payments = (invoice.payments || []) as SupplierInvoicePayment[]
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => router.push('/supplier-invoices')}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold tracking-tight">
+                Ankomst #{invoice.arrival_number}
+              </h1>
+              <Badge className={statusColors[invoice.status] || ''}>
+                {statusLabels[invoice.status] || invoice.status}
+              </Badge>
+            </div>
+            <p className="text-muted-foreground">
+              {invoice.supplier?.name} | Faktura {invoice.supplier_invoice_number}
+            </p>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2">
+          {invoice.status === 'registered' && (
+            <>
+              <Button onClick={handleApprove} disabled={isProcessing}>
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Godkänn
+              </Button>
+              <Button variant="destructive" size="icon" onClick={handleDelete} disabled={isProcessing}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+          {['approved', 'overdue', 'partially_paid'].includes(invoice.status) && (
+            <>
+              <Button onClick={() => setIsPayDialogOpen(true)} disabled={isProcessing}>
+                <CreditCard className="mr-2 h-4 w-4" />
+                Markera betald
+              </Button>
+              {invoice.status !== 'partially_paid' && (
+                <Button variant="outline" onClick={handleCredit} disabled={isProcessing}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Kreditfaktura
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Invoice details */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Fakturainformation</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Ankomstnummer</span>
+              <span className="font-mono">{invoice.arrival_number}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Fakturanummer</span>
+              <span>{invoice.supplier_invoice_number}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Fakturadatum</span>
+              <span>{invoice.invoice_date}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Förfallodatum</span>
+              <span>{invoice.due_date}</span>
+            </div>
+            {invoice.delivery_date && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Leveransdatum</span>
+                <span>{invoice.delivery_date}</span>
+              </div>
+            )}
+            {invoice.payment_reference && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">OCR/referens</span>
+                <span className="font-mono">{invoice.payment_reference}</span>
+              </div>
+            )}
+            {invoice.reverse_charge && (
+              <div className="mt-2">
+                <Badge className="bg-purple-100 text-purple-800">Omvänd skattskyldighet</Badge>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Belopp</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Netto (exkl. moms)</span>
+              <span className="font-mono">{formatAmount(invoice.subtotal)} {invoice.currency}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Moms</span>
+              <span className="font-mono">{formatAmount(invoice.vat_amount)} {invoice.currency}</span>
+            </div>
+            <div className="flex justify-between font-bold text-base pt-2 border-t">
+              <span>Totalt</span>
+              <span className="font-mono">{formatAmount(invoice.total)} {invoice.currency}</span>
+            </div>
+            <div className="flex justify-between pt-2">
+              <span className="text-muted-foreground">Betalt</span>
+              <span className="font-mono text-green-600">{formatAmount(invoice.paid_amount)} {invoice.currency}</span>
+            </div>
+            <div className="flex justify-between font-semibold">
+              <span>Kvar att betala</span>
+              <span className="font-mono">{formatAmount(invoice.remaining_amount)} {invoice.currency}</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Supplier info */}
+      {invoice.supplier && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Leverantör</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm">
+            <Link href={`/suppliers/${invoice.supplier.id}`} className="text-primary hover:underline font-medium">
+              {invoice.supplier.name}
+            </Link>
+            <div className="text-muted-foreground mt-1">
+              {invoice.supplier.org_number && <span>Org.nr: {invoice.supplier.org_number} | </span>}
+              {invoice.supplier.email}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Line items */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Rader</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-muted-foreground">
+                <th className="pb-2">Beskrivning</th>
+                <th className="pb-2 w-16 text-right">Antal</th>
+                <th className="pb-2 w-16">Enhet</th>
+                <th className="pb-2 w-28 text-right">À-pris</th>
+                <th className="pb-2 w-20">Konto</th>
+                <th className="pb-2 w-16 text-right">Moms%</th>
+                <th className="pb-2 w-28 text-right">Belopp</th>
+                <th className="pb-2 w-24 text-right">Moms</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.id} className="border-b last:border-0">
+                  <td className="py-2">{item.description}</td>
+                  <td className="py-2 text-right">{item.quantity}</td>
+                  <td className="py-2">{item.unit}</td>
+                  <td className="py-2 text-right font-mono">{formatAmount(item.unit_price)}</td>
+                  <td className="py-2 font-mono">{item.account_number}</td>
+                  <td className="py-2 text-right">{Math.round(item.vat_rate * 100)}%</td>
+                  <td className="py-2 text-right font-mono">{formatAmount(item.line_total)}</td>
+                  <td className="py-2 text-right font-mono">{formatAmount(item.vat_amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+
+      {/* Payment history */}
+      {payments.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Betalningshistorik</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-muted-foreground">
+                  <th className="pb-2">Datum</th>
+                  <th className="pb-2 text-right">Belopp</th>
+                  <th className="pb-2">Verifikation</th>
+                  <th className="pb-2">Anteckning</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payments.map((p) => (
+                  <tr key={p.id} className="border-b last:border-0">
+                    <td className="py-2">{p.payment_date}</td>
+                    <td className="py-2 text-right font-mono">{formatAmount(p.amount)} {p.currency}</td>
+                    <td className="py-2">
+                      {p.journal_entry_id ? (
+                        <Link href={`/bookkeeping?entry=${p.journal_entry_id}`} className="text-primary hover:underline font-mono text-xs">
+                          {p.journal_entry_id.substring(0, 8)}...
+                        </Link>
+                      ) : '-'}
+                    </td>
+                    <td className="py-2 text-muted-foreground">{p.notes || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Journal entries (sambandskrav) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Verifikationer (sambandskrav)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          {invoice.registration_journal_entry_id ? (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Registreringsverifikation</span>
+              <Link
+                href={`/bookkeeping?entry=${invoice.registration_journal_entry_id}`}
+                className="text-primary hover:underline font-mono"
+              >
+                {invoice.registration_journal_entry_id.substring(0, 8)}...
+              </Link>
+            </div>
+          ) : (
+            <p className="text-muted-foreground">Ingen registreringsverifikation (kontantmetoden)</p>
+          )}
+          {invoice.payment_journal_entry_id && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Betalningsverifikation</span>
+              <Link
+                href={`/bookkeeping?entry=${invoice.payment_journal_entry_id}`}
+                className="text-primary hover:underline font-mono"
+              >
+                {invoice.payment_journal_entry_id.substring(0, 8)}...
+              </Link>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Notes */}
+      {invoice.notes && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Anteckningar</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">{invoice.notes}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pay Dialog */}
+      <Dialog open={isPayDialogOpen} onOpenChange={setIsPayDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Markera som betald</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Belopp att betala</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={payAmount}
+                onChange={(e) => setPayAmount(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Kvar att betala: {formatAmount(invoice.remaining_amount)} {invoice.currency}
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsPayDialogOpen(false)}>
+                Avbryt
+              </Button>
+              <Button onClick={handleMarkPaid} disabled={isProcessing}>
+                {isProcessing ? 'Bearbetar...' : 'Registrera betalning'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}

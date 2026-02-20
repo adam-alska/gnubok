@@ -13,7 +13,7 @@ import type { DocumentAttachment, CreateDocumentAttachmentInput, DocumentUploadS
 /**
  * Compute SHA-256 hash of a file buffer
  */
-async function computeSHA256(buffer: ArrayBuffer): Promise<string> {
+export async function computeSHA256(buffer: ArrayBuffer): Promise<string> {
   const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
@@ -91,6 +91,11 @@ export async function uploadDocument(
 
 /**
  * Create a new version of an existing document (WORM: old version is superseded)
+ *
+ * Uses the create_document_version RPC for atomic versioning with:
+ * - Row-level locking (prevents concurrent versioning race condition)
+ * - Cryptographic hash chain (prev_version_hash links to previous version)
+ * - Single transaction (insert new + mark old superseded)
  */
 export async function createNewVersion(
   userId: string,
@@ -99,28 +104,12 @@ export async function createNewVersion(
 ): Promise<DocumentAttachment> {
   const supabase = await createClient()
 
-  // Fetch the original/current version
-  const { data: current, error: fetchError } = await supabase
-    .from('document_attachments')
-    .select('*')
-    .eq('id', originalId)
-    .eq('user_id', userId)
-    .eq('is_current_version', true)
-    .single()
-
-  if (fetchError || !current) {
-    throw new Error('Original document not found or not the current version')
-  }
-
-  const rootOriginalId = current.original_id || current.id
-  const newVersion = current.version + 1
-
   // Compute SHA-256 hash
   const sha256Hash = await computeSHA256(file.buffer)
 
-  // Upload new file
+  // Upload new file to Storage
   const timestamp = Date.now()
-  const storagePath = `documents/${userId}/${timestamp}_v${newVersion}_${file.name}`
+  const storagePath = `documents/${userId}/${timestamp}_${file.name}`
 
   const { error: uploadError } = await supabase.storage
     .from('documents')
@@ -133,41 +122,33 @@ export async function createNewVersion(
     throw new Error(`Failed to upload new version: ${uploadError.message}`)
   }
 
-  // Create new version record
-  const { data: newDoc, error: insertError } = await supabase
-    .from('document_attachments')
-    .insert({
-      user_id: userId,
-      storage_path: storagePath,
-      file_name: file.name,
-      file_size_bytes: file.buffer.byteLength,
-      mime_type: file.type || null,
-      sha256_hash: sha256Hash,
-      version: newVersion,
-      original_id: rootOriginalId,
-      is_current_version: true,
-      uploaded_by: userId,
-      upload_source: current.upload_source,
-      digitization_date: new Date().toISOString(),
-      journal_entry_id: current.journal_entry_id,
-      journal_entry_line_id: current.journal_entry_line_id,
-    })
-    .select()
-    .single()
+  // Atomic version creation via RPC (row lock + hash chain + supersede in one tx)
+  const { data: newDocId, error: rpcError } = await supabase.rpc('create_document_version', {
+    p_user_id: userId,
+    p_original_doc_id: originalId,
+    p_storage_path: storagePath,
+    p_file_name: file.name,
+    p_file_size_bytes: file.buffer.byteLength,
+    p_mime_type: file.type || null,
+    p_sha256_hash: sha256Hash,
+  })
 
-  if (insertError) {
+  if (rpcError) {
+    // Clean up uploaded file on RPC failure
     await supabase.storage.from('documents').remove([storagePath])
-    throw new Error(`Failed to create new version record: ${insertError.message}`)
+    throw new Error(`Failed to create new version: ${rpcError.message}`)
   }
 
-  // Mark old version as superseded
-  await supabase
+  // Fetch the complete new version record
+  const { data: newDoc, error: fetchError } = await supabase
     .from('document_attachments')
-    .update({
-      is_current_version: false,
-      superseded_by_id: newDoc.id,
-    })
-    .eq('id', current.id)
+    .select('*')
+    .eq('id', newDocId)
+    .single()
+
+  if (fetchError || !newDoc) {
+    throw new Error('Failed to fetch new version record')
+  }
 
   return newDoc as DocumentAttachment
 }

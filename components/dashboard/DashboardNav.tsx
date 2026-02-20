@@ -21,6 +21,8 @@ import {
   X,
   HelpCircle,
   ChevronDown,
+  Building2,
+  FileInput,
 } from 'lucide-react'
 import type { EntityType } from '@/types'
 
@@ -43,6 +45,8 @@ const navItems: NavItem[] = [
   { href: '/calendar', label: 'Kalender', icon: Calendar, group: 'main' },
   { href: '/invoices', label: 'Fakturor', icon: Receipt, group: 'finans' },
   { href: '/customers', label: 'Kunder', icon: Users, group: 'finans' },
+  { href: '/suppliers', label: 'Leverantörer', icon: Building2, group: 'finans' },
+  { href: '/supplier-invoices', label: 'Lev.fakturor', icon: FileInput, group: 'finans' },
   { href: '/transactions', label: 'Transaktioner', icon: ArrowLeftRight, group: 'finans' },
   { href: '/bookkeeping', label: 'Bokföring', icon: BookOpen, group: 'finans' },
   { href: '/import', label: 'Importera', icon: Upload, group: 'övrigt' },

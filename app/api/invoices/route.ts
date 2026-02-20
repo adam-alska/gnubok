@@ -6,7 +6,6 @@ import type { CreateInvoiceInput, Invoice, CreditNote } from '@/types'
 import { getVatRules, calculateVat, calculateTotal } from '@/lib/invoice/vat-rules'
 import { fetchExchangeRate, convertToSEK } from '@/lib/currency/riksbanken'
 import {
-  createInvoiceJournalEntry,
   createCreditNoteJournalEntry,
 } from '@/lib/bookkeeping/invoice-entries'
 
@@ -176,24 +175,8 @@ export async function POST(request: Request) {
     .eq('id', invoice.id)
     .single()
 
-  // Create journal entry for the invoice (non-blocking)
+  // Emit event (no journal entry at draft — booking happens at send/payment based on accounting method)
   if (completeInvoice) {
-    try {
-      const journalEntry = await createInvoiceJournalEntry(
-        user.id,
-        completeInvoice as Invoice
-      )
-      if (journalEntry) {
-        await supabase
-          .from('invoices')
-          .update({ journal_entry_id: journalEntry.id })
-          .eq('id', invoice.id)
-      }
-    } catch (err) {
-      console.error('Failed to create invoice journal entry:', err)
-      // Don't fail the invoice creation
-    }
-
     await eventBus.emit({
       type: 'invoice.created',
       payload: { invoice: completeInvoice as Invoice, userId: user.id },

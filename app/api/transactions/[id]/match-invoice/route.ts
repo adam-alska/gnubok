@@ -1,7 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { createJournalEntry, findFiscalPeriod } from '@/lib/bookkeeping/engine'
-import type { Transaction, Invoice, CreateJournalEntryInput } from '@/types'
+import {
+  getRevenueAccount,
+  getOutputVatAccount,
+} from '@/lib/bookkeeping/invoice-entries'
+import type { Transaction, Invoice, CreateJournalEntryInput, VatTreatment } from '@/types'
 
 interface MatchInvoiceRequest {
   invoice_id: string
@@ -132,7 +136,16 @@ export async function POST(
   const now = new Date().toISOString()
   const paidAmount = transaction.amount
 
-  // Create journal entry for payment receipt
+  // Fetch accounting method
+  const { data: settings } = await supabase
+    .from('company_settings')
+    .select('accounting_method')
+    .eq('user_id', user.id)
+    .single()
+
+  const accountingMethod = settings?.accounting_method || 'accrual'
+
+  // Create journal entry for payment receipt (method-aware)
   let journalEntryId: string | null = null
   let journalEntryError: string | null = null
 
@@ -140,26 +153,69 @@ export async function POST(
     const fiscalPeriodId = await ensureFiscalPeriod(supabase, user.id, transaction.date)
 
     if (fiscalPeriodId) {
-      const journalInput: CreateJournalEntryInput = {
-        fiscal_period_id: fiscalPeriodId,
-        entry_date: transaction.date,
-        description: `Betalning mottagen: Faktura ${invoice.invoice_number}`,
-        source_type: 'invoice_paid',
-        source_id: invoice.id,
-        lines: [
+      let journalInput: CreateJournalEntryInput
+
+      if (accountingMethod === 'cash') {
+        // Kontantmetoden: combined revenue entry at payment
+        // Debit 1930 Företagskonto, Credit 30xx Försäljning, Credit 26xx Utgående moms
+        const revenueAccount = getRevenueAccount(invoice.vat_treatment as VatTreatment)
+        const lines: CreateJournalEntryInput['lines'] = [
           {
-            account_number: '1930', // Företagskonto (Bank)
-            debit_amount: paidAmount,
+            account_number: '1930',
+            debit_amount: invoice.total,
             credit_amount: 0,
             line_description: `Inbetalning faktura ${invoice.invoice_number}`,
           },
           {
-            account_number: '1510', // Kundfordringar (Accounts Receivable)
+            account_number: revenueAccount,
             debit_amount: 0,
-            credit_amount: paidAmount,
-            line_description: `Faktura ${invoice.invoice_number} betald`,
+            credit_amount: invoice.subtotal,
+            line_description: `Försäljning faktura ${invoice.invoice_number}`,
           },
-        ],
+        ]
+
+        if (invoice.vat_amount > 0) {
+          const vatAccount = getOutputVatAccount(invoice.vat_treatment as VatTreatment)
+          lines.push({
+            account_number: vatAccount,
+            debit_amount: 0,
+            credit_amount: invoice.vat_amount,
+            line_description: `Utgående moms faktura ${invoice.invoice_number}`,
+          })
+        }
+
+        journalInput = {
+          fiscal_period_id: fiscalPeriodId,
+          entry_date: transaction.date,
+          description: `Betalning faktura ${invoice.invoice_number} (kontantmetoden)`,
+          source_type: 'invoice_cash_payment',
+          source_id: invoice.id,
+          lines,
+        }
+      } else {
+        // Faktureringsmetoden: clear receivable
+        // Debit 1930 Företagskonto, Credit 1510 Kundfordringar
+        journalInput = {
+          fiscal_period_id: fiscalPeriodId,
+          entry_date: transaction.date,
+          description: `Betalning mottagen: Faktura ${invoice.invoice_number}`,
+          source_type: 'invoice_paid',
+          source_id: invoice.id,
+          lines: [
+            {
+              account_number: '1930',
+              debit_amount: paidAmount,
+              credit_amount: 0,
+              line_description: `Inbetalning faktura ${invoice.invoice_number}`,
+            },
+            {
+              account_number: '1510',
+              debit_amount: 0,
+              credit_amount: paidAmount,
+              line_description: `Faktura ${invoice.invoice_number} betald`,
+            },
+          ],
+        }
       }
 
       const journalEntry = await createJournalEntry(user.id, journalInput)

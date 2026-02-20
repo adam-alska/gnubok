@@ -260,10 +260,14 @@ begin
   insert into public.chart_of_accounts (user_id, account_number, account_name, account_class, account_group, account_type, normal_balance, plan_type, is_system_account, sru_code)
   values
     (p_user_id, '2440', 'Leverantorsskulder', 2, '24', 'liability', 'credit', 'k1', true, '7230'),
-    (p_user_id, '2610', 'Utgaende moms 25%', 2, '26', 'liability', 'credit', 'k1', true, '7231'),
-    (p_user_id, '2611', 'Utgaende moms 12%', 2, '26', 'liability', 'credit', 'k1', true, '7231'),
-    (p_user_id, '2612', 'Utgaende moms 6%', 2, '26', 'liability', 'credit', 'k1', true, '7231'),
+    (p_user_id, '2611', 'Utgaende moms forsaljning 25%', 2, '26', 'liability', 'credit', 'k1', true, '7231'),
+    (p_user_id, '2621', 'Utgaende moms forsaljning 12%', 2, '26', 'liability', 'credit', 'k1', true, '7231'),
+    (p_user_id, '2631', 'Utgaende moms forsaljning 6%', 2, '26', 'liability', 'credit', 'k1', true, '7231'),
+    (p_user_id, '2614', 'Utg moms omvand skattskyldighet 25%', 2, '26', 'liability', 'credit', 'k1', true, '7231'),
+    (p_user_id, '2624', 'Utg moms omvand skattskyldighet 12%', 2, '26', 'liability', 'credit', 'k1', true, '7231'),
+    (p_user_id, '2634', 'Utg moms omvand skattskyldighet 6%', 2, '26', 'liability', 'credit', 'k1', true, '7231'),
     (p_user_id, '2641', 'Debiterad ingaende moms', 2, '26', 'liability', 'credit', 'k1', true, '7231'),
+    (p_user_id, '2645', 'Beraknad ingaende moms forvarv utlandet', 2, '26', 'liability', 'credit', 'k1', true, '7231'),
     (p_user_id, '2650', 'Redovisningskonto for moms', 2, '26', 'liability', 'credit', 'k1', true, '7231'),
     (p_user_id, '2710', 'Personalskatt', 2, '27', 'liability', 'credit', 'k1', true, '7231'),
     (p_user_id, '2731', 'Avrakning socialavgifter', 2, '27', 'liability', 'credit', 'k1', true, '7231');
@@ -282,7 +286,10 @@ begin
   values
     (p_user_id, '3001', 'Forsaljning tjanster 25%', 3, '30', 'revenue', 'credit', 'k1', true, '7310'),
     (p_user_id, '3002', 'Forsaljning varor 25%', 3, '30', 'revenue', 'credit', 'k1', true, '7310'),
+    (p_user_id, '3003', 'Forsaljning tjanster 6%', 3, '30', 'revenue', 'credit', 'k1', true, '7310'),
     (p_user_id, '3100', 'Momsfri forsaljning', 3, '31', 'revenue', 'credit', 'k1', true, '7311'),
+    (p_user_id, '3305', 'Forsaljning tjanst export', 3, '33', 'revenue', 'credit', 'k1', true, '7310'),
+    (p_user_id, '3308', 'Forsaljning tjanst EU', 3, '33', 'revenue', 'credit', 'k1', true, '7310'),
     (p_user_id, '3900', 'Ovriga rorelseintakter', 3, '39', 'revenue', 'credit', 'k1', true, '7311'),
     (p_user_id, '3960', 'Valutakursvinster', 3, '39', 'revenue', 'credit', 'k1', true, '7310');
 
