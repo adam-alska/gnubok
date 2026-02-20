@@ -157,6 +157,17 @@ export interface BankAccount {
   balance: number | null
 }
 
+// Import source identifiers
+export type ImportSource =
+  | 'enable_banking'
+  | 'csv_nordea'
+  | 'csv_seb'
+  | 'csv_swedbank'
+  | 'csv_handelsbanken'
+  | 'csv_generic'
+  | 'camt053'
+  | 'manual'
+
 // Transaction
 export interface Transaction {
   id: string
@@ -198,9 +209,34 @@ export interface Transaction {
   // Receipt link
   receipt_id: string | null
 
+  // Import tracking
+  import_source: string | null
+  reference: string | null  // OCR number, Bankgiro reference
+
   // Notes
   notes: string | null
 
+  created_at: string
+  updated_at: string
+}
+
+// Bank File Import (tracking table for file-based imports)
+export type BankFileImportStatus = 'pending' | 'processing' | 'completed' | 'failed'
+
+export interface BankFileImport {
+  id: string
+  user_id: string
+  filename: string
+  file_hash: string
+  file_format: string
+  transaction_count: number
+  imported_count: number
+  duplicate_count: number
+  matched_count: number
+  date_from: string | null
+  date_to: string | null
+  status: BankFileImportStatus
+  error_message: string | null
   created_at: string
   updated_at: string
 }

@@ -7,6 +7,12 @@ import { neBilagaExtension } from '@/extensions/ne-bilaga'
 import { aiChatExtension } from '@/extensions/ai-chat'
 import type { Extension } from './types'
 
+// ── Enable Banking (PSD2) — opt-in extension ───────────────────────────
+// Uncomment the following line to enable automatic PSD2 bank transaction sync.
+// Requires ENABLE_BANKING_APP_ID and ENABLE_BANKING_PRIVATE_KEY env vars.
+//
+// import { enableBankingExtension } from '@/extensions/enable-banking'
+
 /**
  * Explicit list of first-party extensions.
  *
@@ -20,6 +26,7 @@ const FIRST_PARTY_EXTENSIONS: Extension[] = [
   sruExportExtension,
   neBilagaExtension,
   aiChatExtension,
+  // enableBankingExtension,  // Uncomment to activate PSD2 bank sync
 ]
 
 let loaded = false

@@ -47,17 +47,16 @@ export default async function DashboardPage() {
     .select('*', { count: 'exact', head: true })
     .eq('user_id', user.id)
 
-  const { count: bankConnectionCount } = await supabase
-    .from('bank_connections')
+  const { count: transactionCount } = await supabase
+    .from('transactions')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', user.id)
-    .eq('status', 'active')
 
   const onboardingProgress: OnboardingProgress = {
     hasCustomers: (customerCount || 0) > 0,
     hasInvoices: (invoiceCount || 0) > 0,
     hasReceipts: (receiptCount || 0) > 0,
-    hasBankConnected: (bankConnectionCount || 0) > 0,
+    hasBankConnected: (transactionCount || 0) > 0,
   }
 
   // Fetch current year transactions summary

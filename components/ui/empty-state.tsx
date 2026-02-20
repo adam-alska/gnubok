@@ -117,8 +117,8 @@ export function EmptyTransactions() {
     <EmptyState
       icon={ArrowLeftRight}
       title="Inga transaktioner"
-      description="Koppla din bank för att automatiskt importera transaktioner, eller lägg till dem manuellt."
-      actionLabel="Koppla bank"
+      description="Importera kontoutdrag från din bank eller lägg till transaktioner manuellt."
+      actionLabel="Importera transaktioner"
       actionHref="/import"
       secondaryActionLabel="Lägg till manuellt"
       secondaryActionHref="/transactions/new"
@@ -152,9 +152,9 @@ export function NoBankConnected() {
   return (
     <EmptyState
       icon={Building2}
-      title="Ingen bank kopplad"
-      description="Koppla din bank för att automatiskt importera transaktioner och få bättre koll på ekonomin."
-      actionLabel="Koppla bank"
+      title="Inga transaktioner importerade"
+      description="Importera kontoutdrag från din bank för att automatiskt bokföra och få bättre koll på ekonomin."
+      actionLabel="Importera transaktioner"
       actionHref="/import"
     />
   )

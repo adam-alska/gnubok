@@ -1,0 +1,161 @@
+/**
+ * Generic CSV format parser
+ *
+ * Fallback parser that requires the user to map columns manually.
+ * Supports configurable delimiter, decimal separator, and column mapping.
+ */
+
+import type { BankFileFormat, BankFileParseResult, ParsedBankTransaction, BankFileParseIssue, GenericCSVColumnMapping } from '../types'
+import { prepareContent } from '../encoding'
+import { parseCSVLine } from './nordea'
+
+/**
+ * Parse a generic CSV with user-provided column mapping
+ */
+export function parseGenericCSV(
+  content: string,
+  mapping: GenericCSVColumnMapping
+): BankFileParseResult {
+  const prepared = prepareContent(content)
+  const lines = prepared.split('\n').filter((line) => line.trim() !== '')
+
+  const transactions: ParsedBankTransaction[] = []
+  const issues: BankFileParseIssue[] = []
+  let skippedRows = 0
+
+  // Skip configured number of header/metadata rows
+  const startRow = mapping.skip_rows
+
+  for (let i = startRow; i < lines.length; i++) {
+    const line = lines[i].trim()
+    if (!line) continue
+
+    const fields = parseCSVLine(line, mapping.delimiter).map((f) =>
+      f.trim().replace(/^"|"$/g, '')
+    )
+
+    const dateStr = fields[mapping.date]
+    const description = fields[mapping.description] || 'Unknown'
+    const amountStr = fields[mapping.amount]
+    const referenceStr = mapping.reference !== undefined ? fields[mapping.reference] : undefined
+    const counterpartyStr = mapping.counterparty !== undefined ? fields[mapping.counterparty] : undefined
+    const balanceStr = mapping.balance !== undefined ? fields[mapping.balance] : undefined
+
+    if (!dateStr || !amountStr) {
+      skippedRows++
+      continue
+    }
+
+    // Parse amount based on configured decimal separator
+    let amount: number
+    if (mapping.decimal_separator === ',') {
+      amount = parseFloat(amountStr.replace(/\s/g, '').replace(',', '.'))
+    } else {
+      amount = parseFloat(amountStr.replace(/\s/g, ''))
+    }
+
+    if (isNaN(amount)) {
+      issues.push({ row: i + 1, message: `Invalid amount: ${amountStr}`, severity: 'warning' })
+      skippedRows++
+      continue
+    }
+
+    // Parse date - expect YYYY-MM-DD
+    const date = dateStr.trim()
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      issues.push({ row: i + 1, message: `Invalid date format: ${date} (expected YYYY-MM-DD)`, severity: 'warning' })
+      skippedRows++
+      continue
+    }
+
+    let balance: number | null = null
+    if (balanceStr) {
+      if (mapping.decimal_separator === ',') {
+        balance = parseFloat(balanceStr.replace(/\s/g, '').replace(',', '.'))
+      } else {
+        balance = parseFloat(balanceStr.replace(/\s/g, ''))
+      }
+      if (isNaN(balance)) balance = null
+    }
+
+    transactions.push({
+      date,
+      description: description.trim(),
+      amount,
+      currency: 'SEK',
+      balance,
+      reference: referenceStr?.trim() || null,
+      counterparty: counterpartyStr?.trim() || null,
+      raw_line: line,
+    })
+  }
+
+  const dates = transactions.map((t) => t.date).sort()
+
+  return {
+    format: 'generic_csv',
+    format_name: 'CSV (manuell mappning)',
+    transactions,
+    date_from: dates[0] || null,
+    date_to: dates[dates.length - 1] || null,
+    issues,
+    stats: {
+      total_rows: lines.length - startRow,
+      parsed_rows: transactions.length,
+      skipped_rows: skippedRows,
+      total_income: Math.round(transactions.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0) * 100) / 100,
+      total_expenses: Math.round(transactions.filter((t) => t.amount < 0).reduce((s, t) => s + t.amount, 0) * 100) / 100,
+    },
+  }
+}
+
+/**
+ * Get column headers from a CSV file for the mapping UI
+ */
+export function getCSVHeaders(content: string, delimiter: string = ','): string[] {
+  const prepared = prepareContent(content)
+  const firstLine = prepared.split('\n')[0] || ''
+  return parseCSVLine(firstLine, delimiter).map((h) => h.trim().replace(/^"|"$/g, ''))
+}
+
+/**
+ * Get a preview of the first few rows of a CSV file
+ */
+export function getCSVPreview(content: string, delimiter: string = ',', rows: number = 5): string[][] {
+  const prepared = prepareContent(content)
+  const lines = prepared.split('\n').filter((line) => line.trim() !== '')
+
+  return lines.slice(0, rows).map((line) =>
+    parseCSVLine(line, delimiter).map((f) => f.trim().replace(/^"|"$/g, ''))
+  )
+}
+
+/**
+ * Generic CSV format definition (used for format detection)
+ * Always returns false for detect() since it's a fallback requiring user mapping
+ */
+export const genericCSVFormat: BankFileFormat = {
+  id: 'generic_csv',
+  name: 'CSV (manuell mappning)',
+  description: 'Generisk CSV-fil med manuell kolumnmappning',
+  fileExtensions: ['.csv', '.txt'],
+
+  detect(_content: string, _filename: string): boolean {
+    // Generic CSV never auto-detects — it's the manual fallback
+    return false
+  },
+
+  parse(content: string): BankFileParseResult {
+    // Default mapping for a basic CSV: date, description, amount
+    const defaultMapping: GenericCSVColumnMapping = {
+      date: 0,
+      description: 1,
+      amount: 2,
+      delimiter: ',',
+      decimal_separator: ',',
+      skip_rows: 1,
+      date_format: 'YYYY-MM-DD',
+    }
+    return parseGenericCSV(content, defaultMapping)
+  },
+}

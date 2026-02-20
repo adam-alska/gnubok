@@ -1,18 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { syncAccountTransactions } from '@/lib/banking/sync-transactions'
-import { isConsentExpiringSoon, getDaysUntilExpiry } from '@/lib/banking/enable-banking'
-
-interface StoredAccount {
-  uid: string
-  iban?: string
-  name?: string
-  currency: string
-  balance?: number
-}
+import { syncAccountTransactions } from '@/extensions/enable-banking/lib/sync'
+import { isConsentExpiringSoon, getDaysUntilExpiry } from '@/extensions/enable-banking/lib/api-client'
+import type { StoredAccount } from '@/extensions/enable-banking/types'
 
 /**
- * GET /api/banking/sync/cron
+ * GET /api/extensions/enable-banking/sync/cron
  * Automatic daily bank transaction sync
  * Runs at 05:00 UTC (07:00 Swedish time)
  *
@@ -41,7 +34,6 @@ export async function GET(request: Request) {
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-  // Fetch active bank connections, prioritize least recently synced
   const { data: connections, error: connError } = await supabase
     .from('bank_connections')
     .select('*')
@@ -71,12 +63,10 @@ export async function GET(request: Request) {
 
   for (const connection of connections) {
     try {
-      // Check consent expiry
       const daysLeft = getDaysUntilExpiry(connection.consent_expires)
       const isExpired = daysLeft !== null && daysLeft <= 0
 
       if (isExpired) {
-        // Mark as expired, skip sync
         await supabase
           .from('bank_connections')
           .update({ status: 'expired' })
@@ -97,7 +87,6 @@ export async function GET(request: Request) {
 
       const expiringSoon = isConsentExpiringSoon(connection.consent_expires)
 
-      // Sync last 7 days (daily cron, with overlap for safety)
       const toDate = new Date().toISOString().split('T')[0]
       const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
         .toISOString()
@@ -124,7 +113,6 @@ export async function GET(request: Request) {
         totalErrors += result.errors
       }
 
-      // Update connection with new account balances and sync timestamp
       await supabase
         .from('bank_connections')
         .update({
@@ -154,7 +142,6 @@ export async function GET(request: Request) {
         errors: 1,
         status: 'error',
       })
-      // Continue with other connections
     }
   }
 

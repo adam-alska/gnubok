@@ -15,8 +15,8 @@ import type {
  * tax reporting to Skatteverket.
  *
  * Account mappings:
- * R1:  Försäljning med moms (3000-3499 excl 3100)
- * R2:  Momsfria intäkter (3100, 3900, 3970, 3980) - inkl gåvor utan motprestation
+ * R1:  Försäljning med moms (3000-3599 excl 3100, 3700-3799)
+ * R2:  Momsfria intäkter (3100, 3900-3969, 3970-3980, 3981-3999) - inkl gåvor utan motprestation
  * R3:  Bil/bostadsförmån (3200)
  * R4:  Ränteintäkter (8310-8330)
  * R5:  Varuinköp (4000-4990)
@@ -41,7 +41,8 @@ export const NE_ACCOUNT_MAPPINGS: NEAccountMapping[] = [
     ruta: 'R1',
     description: 'Försäljning med moms (25%)',
     accountRanges: [
-      { start: '3000', end: '3499', exclude: ['3100'] },
+      { start: '3000', end: '3599', exclude: ['3100'] },
+      { start: '3700', end: '3799' },
     ],
     isExpense: false,
   },
@@ -50,8 +51,9 @@ export const NE_ACCOUNT_MAPPINGS: NEAccountMapping[] = [
     description: 'Momsfria intäkter',
     accountRanges: [
       { start: '3100', end: '3100' },
-      { start: '3900', end: '3900' }, // Övriga rörelseintäkter (inkl gåvor utan motprestation)
+      { start: '3900', end: '3969' }, // Övriga rörelseintäkter (inkl gåvor utan motprestation)
       { start: '3970', end: '3980' },
+      { start: '3981', end: '3999' },
     ],
     isExpense: false,
   },

@@ -5,7 +5,7 @@ import {
   getRevenueAccount,
   getOutputVatAccount,
 } from '@/lib/bookkeeping/invoice-entries'
-import type { Transaction, Invoice, CreateJournalEntryInput, VatTreatment } from '@/types'
+import type { Transaction, Invoice, CreateJournalEntryInput, EntityType, VatTreatment } from '@/types'
 
 interface MatchInvoiceRequest {
   invoice_id: string
@@ -139,11 +139,12 @@ export async function POST(
   // Fetch accounting method
   const { data: settings } = await supabase
     .from('company_settings')
-    .select('accounting_method')
+    .select('accounting_method, entity_type')
     .eq('user_id', user.id)
     .single()
 
   const accountingMethod = settings?.accounting_method || 'accrual'
+  const entityType = (settings?.entity_type as EntityType) || 'enskild_firma'
 
   // Create journal entry for payment receipt (method-aware)
   let journalEntryId: string | null = null
@@ -158,7 +159,7 @@ export async function POST(
       if (accountingMethod === 'cash') {
         // Kontantmetoden: combined revenue entry at payment
         // Debit 1930 Företagskonto, Credit 30xx Försäljning, Credit 26xx Utgående moms
-        const revenueAccount = getRevenueAccount(invoice.vat_treatment as VatTreatment)
+        const revenueAccount = getRevenueAccount(invoice.vat_treatment as VatTreatment, entityType)
         const lines: CreateJournalEntryInput['lines'] = [
           {
             account_number: '1930',

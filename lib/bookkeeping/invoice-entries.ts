@@ -3,6 +3,7 @@ import { generateSalesVatLines, generateReverseChargeLines } from './vat-entries
 import type {
   CreateJournalEntryInput,
   CreateJournalEntryLineInput,
+  EntityType,
   Invoice,
   JournalEntry,
   VatTreatment,
@@ -26,7 +27,8 @@ import type {
  */
 export async function createInvoiceJournalEntry(
   userId: string,
-  invoice: Invoice
+  invoice: Invoice,
+  entityType: EntityType = 'enskild_firma'
 ): Promise<JournalEntry | null> {
   const fiscalPeriodId = await findFiscalPeriod(userId, invoice.invoice_date)
   if (!fiscalPeriodId) {
@@ -37,7 +39,7 @@ export async function createInvoiceJournalEntry(
   const lines: CreateJournalEntryLineInput[] = []
 
   // Determine revenue account based on VAT treatment
-  const revenueAccount = getRevenueAccount(invoice.vat_treatment)
+  const revenueAccount = getRevenueAccount(invoice.vat_treatment, entityType)
 
   // Debit: Kundfordringar (total including VAT)
   lines.push({
@@ -133,7 +135,8 @@ export async function createInvoicePaymentJournalEntry(
  */
 export async function createCreditNoteJournalEntry(
   userId: string,
-  creditNote: Invoice
+  creditNote: Invoice,
+  entityType: EntityType = 'enskild_firma'
 ): Promise<JournalEntry | null> {
   const fiscalPeriodId = await findFiscalPeriod(userId, creditNote.invoice_date)
   if (!fiscalPeriodId) {
@@ -141,7 +144,7 @@ export async function createCreditNoteJournalEntry(
     return null
   }
 
-  const revenueAccount = getRevenueAccount(creditNote.vat_treatment)
+  const revenueAccount = getRevenueAccount(creditNote.vat_treatment, entityType)
   const absSubtotal = Math.abs(creditNote.subtotal)
   const absVat = Math.abs(creditNote.vat_amount)
   const absTotal = Math.abs(creditNote.total)
@@ -198,7 +201,8 @@ export async function createCreditNoteJournalEntry(
 export async function createInvoiceCashEntry(
   userId: string,
   invoice: Invoice,
-  paymentDate: string
+  paymentDate: string,
+  entityType: EntityType = 'enskild_firma'
 ): Promise<JournalEntry | null> {
   const fiscalPeriodId = await findFiscalPeriod(userId, paymentDate)
   if (!fiscalPeriodId) {
@@ -206,7 +210,7 @@ export async function createInvoiceCashEntry(
     return null
   }
 
-  const revenueAccount = getRevenueAccount(invoice.vat_treatment)
+  const revenueAccount = getRevenueAccount(invoice.vat_treatment, entityType)
   const lines: CreateJournalEntryLineInput[] = []
 
   // Debit: Företagskonto (total received)
@@ -250,8 +254,11 @@ export async function createInvoiceCashEntry(
 
 /**
  * Get the appropriate revenue account based on VAT treatment
+ *
+ * For 'exempt': AB uses 3004 (Försäljning inom Sverige, momsfri),
+ * EF uses 3100 (Momsfria intäkter, mapped to R2 in NE engine).
  */
-export function getRevenueAccount(vatTreatment: VatTreatment): string {
+export function getRevenueAccount(vatTreatment: VatTreatment, entityType: EntityType = 'enskild_firma'): string {
   switch (vatTreatment) {
     case 'standard_25':
       return '3001' // Försäljning 25%
@@ -264,7 +271,7 @@ export function getRevenueAccount(vatTreatment: VatTreatment): string {
     case 'export':
       return '3305' // Försäljning tjänst Export
     case 'exempt':
-      return '3100' // Momsfria intäkter
+      return entityType === 'aktiebolag' ? '3004' : '3100'
     default:
       return '3001'
   }

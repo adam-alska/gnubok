@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'
-import { getDaysUntilExpiry, isConsentExpiringSoon } from '@/lib/banking/enable-banking'
+import { getDaysUntilExpiry, isConsentExpiringSoon } from '../lib/api-client'
 import {
   CreditCard,
   AlertTriangle,

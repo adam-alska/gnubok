@@ -4,7 +4,7 @@ import {
   createInvoicePaymentJournalEntry,
   createInvoiceCashEntry,
 } from '@/lib/bookkeeping/invoice-entries'
-import type { Invoice } from '@/types'
+import type { EntityType, Invoice } from '@/types'
 
 /**
  * POST /api/invoices/[id]/mark-paid
@@ -70,11 +70,12 @@ export async function POST(
   // Fetch accounting method
   const { data: settings } = await supabase
     .from('company_settings')
-    .select('accounting_method')
+    .select('accounting_method, entity_type')
     .eq('user_id', user.id)
     .single()
 
   const accountingMethod = settings?.accounting_method || 'accrual'
+  const entityType = (settings?.entity_type as EntityType) || 'enskild_firma'
 
   let journalEntryId: string | null = null
 
@@ -92,7 +93,8 @@ export async function POST(
       const journalEntry = await createInvoiceCashEntry(
         user.id,
         invoice as Invoice,
-        paymentDate
+        paymentDate,
+        entityType
       )
       journalEntryId = journalEntry?.id ?? null
     }

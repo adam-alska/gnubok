@@ -1,28 +1,25 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { createSession, getAccountBalance, type AccountInfo } from '@/lib/banking/enable-banking'
+import { createSession, getAccountBalance, type AccountInfo } from '@/extensions/enable-banking/lib/api-client'
+import type { StoredAccount } from '@/extensions/enable-banking/types'
 
-interface StoredAccount {
-  uid: string
-  iban?: string
-  name?: string
-  currency: string
-  balance?: number
-}
-
+/**
+ * GET /api/extensions/enable-banking/callback
+ *
+ * OAuth callback for Enable Banking PSD2 authorization.
+ * Must be a real Next.js route (not extension handler) because
+ * banks redirect to this URL directly.
+ */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
 
-  // Enable Banking returns: ?code=XXX&state=user_id or ?error=XXX&error_description=YYY
   const code = searchParams.get('code')
   const state = searchParams.get('state') // This is the user_id we passed during authorization
   const error = searchParams.get('error')
   const errorDescription = searchParams.get('error_description')
 
-  // Redirect URL for success/error
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
-  // Handle errors from bank authorization
   if (error) {
     const errorMessage = errorDescription || error
     console.error('Bank authorization error:', errorMessage)
@@ -38,14 +35,10 @@ export async function GET(request: Request) {
   const supabase = await createServiceClient()
 
   try {
-    // Create session from authorization code
     const sessionData = await createSession(code)
-
-    // Extract data from session response
     const { session_id, accounts, access, aspsp } = sessionData
     const consentExpiresAt = access.valid_until
 
-    // Get balances for each account
     const accountsWithBalances: StoredAccount[] = await Promise.all(
       accounts.map(async (account: AccountInfo) => {
         try {
@@ -70,8 +63,6 @@ export async function GET(request: Request) {
       })
     )
 
-    // Find the pending connection for this user
-    // We match by user_id (state) and status='pending'
     const { data: pendingConnection, error: findError } = await supabase
       .from('bank_connections')
       .select('id')
@@ -83,7 +74,6 @@ export async function GET(request: Request) {
 
     if (findError || !pendingConnection) {
       console.error('Could not find pending connection:', findError)
-      // Create a new connection if no pending one exists
       const { error: insertError } = await supabase
         .from('bank_connections')
         .insert({
@@ -102,7 +92,6 @@ export async function GET(request: Request) {
         throw new Error('Failed to create connection')
       }
     } else {
-      // Update the pending connection with session data
       const { error: updateError } = await supabase
         .from('bank_connections')
         .update({
@@ -119,7 +108,6 @@ export async function GET(request: Request) {
       }
     }
 
-    // Check if the user has completed onboarding to decide redirect target
     const { data: userSettings } = await supabase
       .from('company_settings')
       .select('onboarding_complete')
@@ -134,7 +122,6 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('Bank callback error:', error)
 
-    // Try to update connection status to error
     try {
       await supabase
         .from('bank_connections')

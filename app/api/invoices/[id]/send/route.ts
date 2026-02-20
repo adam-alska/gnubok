@@ -164,7 +164,8 @@ export async function POST(
       try {
         const journalEntry = await createInvoiceJournalEntry(
           user.id,
-          invoice as Invoice
+          invoice as Invoice,
+          (company as CompanySettings).entity_type
         )
         if (journalEntry) {
           await supabase

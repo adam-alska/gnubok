@@ -62,6 +62,7 @@ export function getCategoryAccountMapping(
   }
 
   // Business expense categories
+  const educationAccount = entityType === 'aktiebolag' ? '7610' : '6991' // Utbildning (AB) / Övriga avdragsgilla kostnader (EF)
   const expenseMapping: Record<string, string> = {
     expense_equipment: '5410', // Förbrukningsinventarier
     expense_software: '5420', // Programvaror
@@ -69,7 +70,7 @@ export function getCategoryAccountMapping(
     expense_office: '5010', // Lokalhyra
     expense_marketing: '5910', // Annonsering
     expense_professional_services: '6530', // Redovisningstjänster
-    expense_education: '6991', // Övriga avdragsgilla kostnader
+    expense_education: educationAccount,
     expense_bank_fees: '6570', // Bankavgifter
     expense_card_fees: '6570', // Kortavgifter
     expense_currency_exchange: '7960', // Valutakursförluster
@@ -79,7 +80,7 @@ export function getCategoryAccountMapping(
   // Business income categories
   const incomeMapping: Record<string, string> = {
     income_services: '3001', // Försäljning tjänster 25%
-    income_products: '3002', // Försäljning varor 25%
+    income_products: '3001', // Försäljning varor 25% moms
     income_other: '3900', // Övriga rörelseintäkter
   }
 

@@ -82,8 +82,8 @@ export default function NewUserChecklist({
     },
     {
       id: 'bank',
-      label: 'Koppla bank',
-      description: 'Se transaktioner automatiskt (valfritt)',
+      label: 'Importera transaktioner',
+      description: 'Importera kontoutdrag från din bank',
       href: '/import',
       icon: Building2,
       completed: hasBankConnected,

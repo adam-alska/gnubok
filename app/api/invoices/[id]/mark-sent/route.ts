@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { createInvoiceJournalEntry } from '@/lib/bookkeeping/invoice-entries'
-import type { Invoice } from '@/types'
+import type { EntityType, Invoice } from '@/types'
 
 /**
  * POST /api/invoices/[id]/mark-sent
@@ -59,7 +59,7 @@ export async function POST(
   // Fetch accounting method
   const { data: settings } = await supabase
     .from('company_settings')
-    .select('accounting_method')
+    .select('accounting_method, entity_type')
     .eq('user_id', user.id)
     .single()
 
@@ -71,7 +71,8 @@ export async function POST(
     try {
       const journalEntry = await createInvoiceJournalEntry(
         user.id,
-        invoice as Invoice
+        invoice as Invoice,
+        (settings?.entity_type as EntityType) || 'enskild_firma'
       )
       if (journalEntry) {
         journalEntryId = journalEntry.id

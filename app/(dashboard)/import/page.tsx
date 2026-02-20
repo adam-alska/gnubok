@@ -3,13 +3,27 @@
 import { useState, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/components/ui/use-toast'
+import { ArrowLeftRight, FileText } from 'lucide-react'
+
+// Bank file import components
+import BankFileUploadStep from '@/components/import/BankFileUploadStep'
+import BankFilePreviewStep from '@/components/import/BankFilePreviewStep'
+import BankFileColumnMappingStep from '@/components/import/BankFileColumnMappingStep'
+import BankFileConfirmStep from '@/components/import/BankFileConfirmStep'
+import BankFileResultStep from '@/components/import/BankFileResultStep'
+
+// SIE import components
 import SIEUploadStep from '@/components/import/SIEUploadStep'
 import SIEPreviewStep from '@/components/import/SIEPreviewStep'
 import AccountMappingStep from '@/components/import/AccountMappingStep'
 import ImportReviewStep, { type ImportExecuteOptions } from '@/components/import/ImportReviewStep'
 import ImportResultStep from '@/components/import/ImportResultStep'
 import { applyMappingOverride } from '@/lib/import/account-mapper'
+import { getCSVHeaders, getCSVPreview } from '@/lib/import/bank-file/formats/generic-csv'
+import type { BankFileParseResult, BankFileFormatId, GenericCSVColumnMapping } from '@/lib/import/bank-file/types'
+import type { IngestResult } from '@/lib/transactions/ingest'
 import type {
   ImportWizardStep,
   ParsedSIEFile,
@@ -20,9 +34,268 @@ import type {
 } from '@/lib/import/types'
 import type { BASAccount } from '@/types'
 
-const STEPS: ImportWizardStep[] = ['upload', 'preview', 'mapping', 'review', 'result']
+// ============================================================
+// Bank File Import Wizard Steps
+// ============================================================
 
-const STEP_LABELS: Record<ImportWizardStep, string> = {
+type BankFileStep = 'upload' | 'preview' | 'column_mapping' | 'confirm' | 'result'
+
+const BANK_STEPS: BankFileStep[] = ['upload', 'preview', 'confirm', 'result']
+const BANK_STEPS_WITH_MAPPING: BankFileStep[] = ['upload', 'preview', 'column_mapping', 'confirm', 'result']
+
+const BANK_STEP_LABELS: Record<BankFileStep, string> = {
+  upload: 'Ladda upp',
+  preview: 'Förhandsgranskning',
+  column_mapping: 'Kolumnmappning',
+  confirm: 'Bekräfta',
+  result: 'Resultat',
+}
+
+function BankFileImportWizard() {
+  const { toast } = useToast()
+
+  const [bankStep, setBankStep] = useState<BankFileStep>('upload')
+  const [bankIsLoading, setBankIsLoading] = useState(false)
+  const [bankError, setBankError] = useState<string | null>(null)
+
+  // Parse results
+  const [parseResult, setParseResult] = useState<BankFileParseResult | null>(null)
+  const [detectedFormat, setDetectedFormat] = useState<string | null>(null)
+  const [detectedFormatName, setDetectedFormatName] = useState<string | null>(null)
+  const [fileHash, setFileHash] = useState<string>('')
+  const [filename, setFilename] = useState<string>('')
+  const [existingTxCount, setExistingTxCount] = useState(0)
+  const [rawFileContent, setRawFileContent] = useState<string>('')
+
+  // Column mapping for generic CSV
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([])
+  const [csvPreview, setCsvPreview] = useState<string[][]>([])
+
+  // Import result
+  const [ingestResult, setIngestResult] = useState<IngestResult | null>(null)
+
+  const steps = parseResult?.format === 'generic_csv' ? BANK_STEPS_WITH_MAPPING : BANK_STEPS
+  const currentStepIndex = steps.indexOf(bankStep)
+  const progress = ((currentStepIndex + 1) / steps.length) * 100
+
+  const handleFileSelect = useCallback(async (file: File, formatOverride?: BankFileFormatId) => {
+    setBankError(null)
+    setBankIsLoading(true)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      if (formatOverride) {
+        formData.append('format', formatOverride)
+      }
+
+      const res = await fetch('/api/import/bank-file/parse', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        if (data.error === 'duplicate') {
+          setBankError(data.message)
+        } else {
+          setBankError(data.error || 'Kunde inte läsa filen')
+        }
+        return
+      }
+
+      setParseResult(data.data.parse_result)
+      setDetectedFormat(data.data.detected_format)
+      setDetectedFormatName(data.data.detected_format_name)
+      setFileHash(data.data.file_hash)
+      setFilename(data.data.filename)
+      setExistingTxCount(data.data.existing_transaction_count)
+
+      // Store headers for generic CSV mapping
+      if (data.data.headers) {
+        setCsvHeaders(data.data.headers)
+      }
+
+      // Read raw file content for CSV preview
+      const text = await file.text()
+      setRawFileContent(text)
+      if (data.data.parse_result.format === 'generic_csv') {
+        setCsvHeaders(getCSVHeaders(text))
+        setCsvPreview(getCSVPreview(text, ',', 6))
+      }
+
+      const txCount = data.data.parse_result.transactions.length
+      if (txCount > 0) {
+        setBankStep('preview')
+        toast({
+          title: 'Fil analyserad',
+          description: `${txCount} transaktioner hittades`,
+        })
+      } else if (data.data.parse_result.format === 'generic_csv' || !data.data.detected_format) {
+        // Unrecognized format — show upload step with error
+        setBankError('Kunde inte identifiera bankformatet. Välj bank manuellt eller använd "Annan CSV".')
+      }
+    } catch (err) {
+      setBankError(err instanceof Error ? err.message : 'Kunde inte läsa filen')
+    } finally {
+      setBankIsLoading(false)
+    }
+  }, [toast])
+
+  const handleColumnMappingConfirm = useCallback(async (mapping: GenericCSVColumnMapping) => {
+    // Re-parse with mapping via the generic CSV parser
+    const { parseGenericCSV } = await import('@/lib/import/bank-file/formats/generic-csv')
+    const result = parseGenericCSV(rawFileContent, mapping)
+    setParseResult(result)
+    setBankStep('confirm')
+  }, [rawFileContent])
+
+  const handleExecuteImport = useCallback(async (options: { skip_duplicates: boolean; auto_categorize: boolean }) => {
+    if (!parseResult) return
+
+    setBankIsLoading(true)
+    setBankError(null)
+
+    try {
+      const res = await fetch('/api/import/bank-file/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactions: parseResult.transactions,
+          format: parseResult.format,
+          filename,
+          file_hash: fileHash,
+          ...options,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setBankError(data.error || 'Importen misslyckades')
+        return
+      }
+
+      setIngestResult(data.data)
+      setBankStep('result')
+
+      toast({
+        title: 'Import genomförd',
+        description: `${data.data.imported} transaktioner importerades`,
+      })
+    } catch (err) {
+      setBankError(err instanceof Error ? err.message : 'Importen misslyckades')
+    } finally {
+      setBankIsLoading(false)
+    }
+  }, [parseResult, filename, fileHash, toast])
+
+  const handleNewImport = () => {
+    setBankStep('upload')
+    setParseResult(null)
+    setDetectedFormat(null)
+    setDetectedFormatName(null)
+    setFileHash('')
+    setFilename('')
+    setExistingTxCount(0)
+    setIngestResult(null)
+    setBankError(null)
+    setCsvHeaders([])
+    setCsvPreview([])
+    setRawFileContent('')
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Progress */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              {steps.map((s, i) => (
+                <span
+                  key={s}
+                  className={
+                    i <= currentStepIndex ? 'text-primary font-medium' : 'text-muted-foreground'
+                  }
+                >
+                  {BANK_STEP_LABELS[s]}
+                </span>
+              ))}
+            </div>
+            <Progress value={progress} className="h-2" />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Step content */}
+      {bankStep === 'upload' && (
+        <BankFileUploadStep
+          onFileSelect={handleFileSelect}
+          isLoading={bankIsLoading}
+          error={bankError}
+          detectedFormat={detectedFormat}
+          detectedFormatName={detectedFormatName}
+        />
+      )}
+
+      {bankStep === 'preview' && parseResult && (
+        <BankFilePreviewStep
+          parseResult={parseResult}
+          existingTransactionCount={existingTxCount}
+          onContinue={() => {
+            if (parseResult.format === 'generic_csv') {
+              setBankStep('column_mapping')
+            } else {
+              setBankStep('confirm')
+            }
+          }}
+          onBack={() => setBankStep('upload')}
+        />
+      )}
+
+      {bankStep === 'column_mapping' && (
+        <BankFileColumnMappingStep
+          headers={csvHeaders}
+          previewRows={csvPreview}
+          onConfirm={handleColumnMappingConfirm}
+          onBack={() => setBankStep('preview')}
+        />
+      )}
+
+      {bankStep === 'confirm' && parseResult && (
+        <BankFileConfirmStep
+          parseResult={parseResult}
+          onExecute={handleExecuteImport}
+          onBack={() => {
+            if (parseResult.format === 'generic_csv') {
+              setBankStep('column_mapping')
+            } else {
+              setBankStep('preview')
+            }
+          }}
+          isLoading={bankIsLoading}
+        />
+      )}
+
+      {bankStep === 'result' && ingestResult && (
+        <BankFileResultStep
+          result={ingestResult}
+          onNewImport={handleNewImport}
+        />
+      )}
+    </div>
+  )
+}
+
+// ============================================================
+// SIE Import Wizard (unchanged, extracted into component)
+// ============================================================
+
+const SIE_STEPS: ImportWizardStep[] = ['upload', 'preview', 'mapping', 'review', 'result']
+
+const SIE_STEP_LABELS: Record<ImportWizardStep, string> = {
   upload: 'Ladda upp',
   preview: 'Förhandsgranskning',
   mapping: 'Kontomappning',
@@ -30,15 +303,13 @@ const STEP_LABELS: Record<ImportWizardStep, string> = {
   result: 'Resultat',
 }
 
-export default function ImportPage() {
+function SIEImportWizard() {
   const { toast } = useToast()
 
-  // Wizard state
   const [step, setStep] = useState<ImportWizardStep>('upload')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Data state
   const [file, setFile] = useState<File | null>(null)
   const [_parsed, setParsed] = useState<ParsedSIEFile | null>(null)
   const [mappings, setMappings] = useState<AccountMapping[]>([])
@@ -49,11 +320,9 @@ export default function ImportPage() {
   const [_sieAccounts, setSieAccounts] = useState<{ number: string; name: string }[]>([])
   const [isCreatingAccounts, setIsCreatingAccounts] = useState(false)
 
-  // Calculate progress
-  const currentStepIndex = STEPS.indexOf(step)
-  const progress = ((currentStepIndex + 1) / STEPS.length) * 100
+  const currentStepIndex = SIE_STEPS.indexOf(step)
+  const progress = ((currentStepIndex + 1) / SIE_STEPS.length) * 100
 
-  // Handle file selection and parsing
   const handleFileSelect = useCallback(async (selectedFile: File) => {
     setFile(selectedFile)
     setError(null)
@@ -81,7 +350,6 @@ export default function ImportPage() {
         return
       }
 
-      // Store parsed data
       setParsed({
         header: data.parsed.header,
         accounts: data.parsed.accounts,
@@ -97,14 +365,12 @@ export default function ImportPage() {
       setIssues(data.parsed.issues)
       setSieAccounts(data.parsed.accounts)
 
-      // Fetch BAS accounts for the mapping step
       const accountsRes = await fetch('/api/bookkeeping/accounts')
       if (accountsRes.ok) {
         const accountsData = await accountsRes.json()
         setBasAccounts(accountsData.data || [])
       }
 
-      // Move to preview step
       setStep('preview')
 
       toast({
@@ -118,11 +384,9 @@ export default function ImportPage() {
     }
   }, [toast])
 
-  // Handle mapping changes
   const handleMappingChange = useCallback((sourceAccount: string, targetAccount: string, targetName: string) => {
     setMappings((prev) => applyMappingOverride(prev, sourceAccount, targetAccount, targetName))
 
-    // Update preview mapping status
     setPreview((prev) => {
       if (!prev) return prev
       const updatedMappings = applyMappingOverride(mappings, sourceAccount, targetAccount, targetName)
@@ -142,12 +406,10 @@ export default function ImportPage() {
     })
   }, [mappings])
 
-  // Calculate missing accounts (unmapped accounts that could be created)
   const missingAccounts = mappings
     .filter((m) => !m.targetAccount)
     .map((m) => ({ number: m.sourceAccount, name: m.sourceName }))
 
-  // Handle creating missing accounts
   const handleCreateAccounts = useCallback(async () => {
     if (missingAccounts.length === 0) return
 
@@ -163,36 +425,23 @@ export default function ImportPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        toast({
-          title: 'Fel',
-          description: data.error || 'Kunde inte skapa konton',
-          variant: 'destructive',
-        })
+        toast({ title: 'Fel', description: data.error || 'Kunde inte skapa konton', variant: 'destructive' })
         return
       }
 
-      toast({
-        title: 'Konton skapade',
-        description: `${data.created} nya konton har lagts till i din kontoplan`,
-      })
+      toast({ title: 'Konton skapade', description: `${data.created} nya konton har lagts till i din kontoplan` })
 
-      // Re-parse the file to get updated mappings
       if (file) {
         const formData = new FormData()
         formData.append('file', file)
 
-        const parseRes = await fetch('/api/import/sie/parse', {
-          method: 'POST',
-          body: formData,
-        })
-
+        const parseRes = await fetch('/api/import/sie/parse', { method: 'POST', body: formData })
         const parseData = await parseRes.json()
 
         if (parseRes.ok) {
           setMappings(parseData.mappings)
           setPreview(parseData.preview)
 
-          // Refresh BAS accounts
           const accountsRes = await fetch('/api/bookkeeping/accounts')
           if (accountsRes.ok) {
             const accountsData = await accountsRes.json()
@@ -201,22 +450,14 @@ export default function ImportPage() {
         }
       }
     } catch (err) {
-      toast({
-        title: 'Fel',
-        description: err instanceof Error ? err.message : 'Kunde inte skapa konton',
-        variant: 'destructive',
-      })
+      toast({ title: 'Fel', description: err instanceof Error ? err.message : 'Kunde inte skapa konton', variant: 'destructive' })
     } finally {
       setIsCreatingAccounts(false)
     }
   }, [missingAccounts, file, toast])
 
-  // Handle import execution
   const handleExecuteImport = useCallback(async (options: ImportExecuteOptions) => {
-    if (!file) {
-      setError('No file selected')
-      return
-    }
+    if (!file) { setError('No file selected'); return }
 
     setIsLoading(true)
     setError(null)
@@ -227,32 +468,19 @@ export default function ImportPage() {
       formData.append('mappings', JSON.stringify(mappings))
       formData.append('options', JSON.stringify(options))
 
-      const res = await fetch('/api/import/sie/execute', {
-        method: 'POST',
-        body: formData,
-      })
-
+      const res = await fetch('/api/import/sie/execute', { method: 'POST', body: formData })
       const data = await res.json()
 
       if (!res.ok) {
-        if (data.result) {
-          setImportResult(data.result)
-        } else {
-          setError(data.error || 'Import failed')
-          return
-        }
+        if (data.result) { setImportResult(data.result) } else { setError(data.error || 'Import failed'); return }
       } else {
         setImportResult(data.result)
       }
 
-      // Move to result step
       setStep('result')
 
       if (data.result?.success) {
-        toast({
-          title: 'Import genomförd',
-          description: `${data.result.journalEntriesCreated} verifikationer skapades`,
-        })
+        toast({ title: 'Import genomförd', description: `${data.result.journalEntriesCreated} verifikationer skapades` })
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed')
@@ -261,56 +489,24 @@ export default function ImportPage() {
     }
   }, [file, mappings, toast])
 
-  // Navigation handlers
-  const goToStep = (targetStep: ImportWizardStep) => {
-    setStep(targetStep)
-    setError(null)
-  }
-
-  const goBack = () => {
-    const currentIndex = STEPS.indexOf(step)
-    if (currentIndex > 0) {
-      setStep(STEPS[currentIndex - 1])
-    }
-  }
+  const goToStep = (targetStep: ImportWizardStep) => { setStep(targetStep); setError(null) }
+  const goBack = () => { const i = SIE_STEPS.indexOf(step); if (i > 0) setStep(SIE_STEPS[i - 1]) }
 
   const handleNewImport = () => {
-    // Reset all state
-    setStep('upload')
-    setFile(null)
-    setParsed(null)
-    setMappings([])
-    setPreview(null)
-    setIssues([])
-    setImportResult(null)
-    setError(null)
-    setSieAccounts([])
-    setIsCreatingAccounts(false)
+    setStep('upload'); setFile(null); setParsed(null); setMappings([])
+    setPreview(null); setIssues([]); setImportResult(null); setError(null)
+    setSieAccounts([]); setIsCreatingAccounts(false)
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Importera bokföring</h1>
-        <p className="text-muted-foreground">
-          Migrera din bokföring från Fortnox, Visma eller annat bokföringssystem via SIE-fil
-        </p>
-      </div>
-
-      {/* Progress */}
       <Card>
         <CardContent className="pt-6">
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              {STEPS.map((s, i) => (
-                <span
-                  key={s}
-                  className={`${
-                    i <= currentStepIndex ? 'text-primary font-medium' : 'text-muted-foreground'
-                  }`}
-                >
-                  {STEP_LABELS[s]}
+              {SIE_STEPS.map((s, i) => (
+                <span key={s} className={i <= currentStepIndex ? 'text-primary font-medium' : 'text-muted-foreground'}>
+                  {SIE_STEP_LABELS[s]}
                 </span>
               ))}
             </div>
@@ -319,53 +515,61 @@ export default function ImportPage() {
         </CardContent>
       </Card>
 
-      {/* Step content */}
-      {step === 'upload' && (
-        <SIEUploadStep
-          onFileSelect={handleFileSelect}
-          isLoading={isLoading}
-          error={error}
-        />
-      )}
-
+      {step === 'upload' && <SIEUploadStep onFileSelect={handleFileSelect} isLoading={isLoading} error={error} />}
       {step === 'preview' && preview && (
-        <SIEPreviewStep
-          preview={preview}
-          issues={issues}
-          missingAccounts={missingAccounts}
-          onCreateAccounts={handleCreateAccounts}
-          isCreatingAccounts={isCreatingAccounts}
-          onContinue={() => goToStep('mapping')}
-          onBack={goBack}
-        />
+        <SIEPreviewStep preview={preview} issues={issues} missingAccounts={missingAccounts}
+          onCreateAccounts={handleCreateAccounts} isCreatingAccounts={isCreatingAccounts}
+          onContinue={() => goToStep('mapping')} onBack={goBack} />
       )}
-
       {step === 'mapping' && (
-        <AccountMappingStep
-          mappings={mappings}
-          basAccounts={basAccounts}
-          onMappingChange={handleMappingChange}
-          onContinue={() => goToStep('review')}
-          onBack={goBack}
-        />
+        <AccountMappingStep mappings={mappings} basAccounts={basAccounts}
+          onMappingChange={handleMappingChange} onContinue={() => goToStep('review')} onBack={goBack} />
       )}
-
       {step === 'review' && preview && (
-        <ImportReviewStep
-          preview={preview}
-          mappings={mappings}
-          onExecute={handleExecuteImport}
-          onBack={goBack}
-          isLoading={isLoading}
-        />
+        <ImportReviewStep preview={preview} mappings={mappings}
+          onExecute={handleExecuteImport} onBack={goBack} isLoading={isLoading} />
       )}
+      {step === 'result' && importResult && <ImportResultStep result={importResult} onNewImport={handleNewImport} />}
+    </div>
+  )
+}
 
-      {step === 'result' && importResult && (
-        <ImportResultStep
-          result={importResult}
-          onNewImport={handleNewImport}
-        />
-      )}
+// ============================================================
+// Import Page with Tabs
+// ============================================================
+
+export default function ImportPage() {
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Importera</h1>
+        <p className="text-muted-foreground">
+          Importera banktransaktioner eller bokföringsdata till ditt företag
+        </p>
+      </div>
+
+      {/* Tabbed layout */}
+      <Tabs defaultValue="bank" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="bank">
+            <ArrowLeftRight className="mr-2 h-4 w-4" />
+            Banktransaktioner
+          </TabsTrigger>
+          <TabsTrigger value="sie">
+            <FileText className="mr-2 h-4 w-4" />
+            Bokföringsdata (SIE)
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="bank">
+          <BankFileImportWizard />
+        </TabsContent>
+
+        <TabsContent value="sie">
+          <SIEImportWizard />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

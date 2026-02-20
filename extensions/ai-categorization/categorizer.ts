@@ -52,22 +52,25 @@ export interface CategorizationProvider {
 // BAS Account + Category Mapping (used in prompt)
 // ============================================================
 
-const CATEGORY_ACCOUNT_MAP: Record<string, { account: string; label: string }> = {
-  income_services: { account: '3001', label: 'Tjänsteförsäljning' },
-  income_products: { account: '3001', label: 'Varuförsäljning' },
-  income_other: { account: '3900', label: 'Övriga intäkter' },
-  expense_equipment: { account: '5410', label: 'Förbrukningsinventarier' },
-  expense_software: { account: '5420', label: 'Programvara' },
-  expense_travel: { account: '5800', label: 'Resekostnader' },
-  expense_office: { account: '5010', label: 'Lokalhyra/kontorskostnad' },
-  expense_marketing: { account: '5910', label: 'Annonsering/marknadsföring' },
-  expense_professional_services: { account: '6530', label: 'Redovisning/konsulttjänster' },
-  expense_education: { account: '6991', label: 'Utbildning' },
-  expense_bank_fees: { account: '6570', label: 'Bankavgifter' },
-  expense_card_fees: { account: '6570', label: 'Kortavgifter' },
-  expense_currency_exchange: { account: '7960', label: 'Valutakursförluster' },
-  expense_other: { account: '6991', label: 'Övriga kostnader' },
-  private: { account: '2013', label: 'Privat uttag (EF) / Skuld till ägare (AB)' },
+function getCategoryAccountMap(entityType: EntityType): Record<string, { account: string; label: string }> {
+  const educationAccount = entityType === 'aktiebolag' ? '7610' : '6991'
+  return {
+    income_services: { account: '3001', label: 'Tjänsteförsäljning' },
+    income_products: { account: '3001', label: 'Varuförsäljning' },
+    income_other: { account: '3900', label: 'Övriga intäkter' },
+    expense_equipment: { account: '5410', label: 'Förbrukningsinventarier' },
+    expense_software: { account: '5420', label: 'Programvara' },
+    expense_travel: { account: '5800', label: 'Resekostnader' },
+    expense_office: { account: '5010', label: 'Lokalhyra/kontorskostnad' },
+    expense_marketing: { account: '5910', label: 'Annonsering/marknadsföring' },
+    expense_professional_services: { account: '6530', label: 'Redovisning/konsulttjänster' },
+    expense_education: { account: educationAccount, label: 'Utbildning' },
+    expense_bank_fees: { account: '6570', label: 'Bankavgifter' },
+    expense_card_fees: { account: '6570', label: 'Kortavgifter' },
+    expense_currency_exchange: { account: '7960', label: 'Valutakursförluster' },
+    expense_other: { account: '6991', label: 'Övriga kostnader' },
+    private: { account: '2013', label: 'Privat uttag (EF) / Skuld till ägare (AB)' },
+  }
 }
 
 const NON_DEDUCTIBLE_RULES = `
@@ -107,12 +110,13 @@ export class AnthropicCategorizationProvider implements CategorizationProvider {
     if (batch.length === 0) return []
 
     const privateAccount = context.entityType === 'aktiebolag' ? '2893' : '2013'
+    const categoryAccountMap = getCategoryAccountMap(context.entityType)
 
     const systemPrompt = `Du är expert på svensk bokföring och kategorisering av banktransaktioner enligt BAS-kontoplanen.
 Din uppgift är att kategorisera varje transaktion till rätt kategori och BAS-konto.
 
 KATEGORIER OCH BAS-KONTON:
-${Object.entries(CATEGORY_ACCOUNT_MAP)
+${Object.entries(categoryAccountMap)
   .map(([cat, info]) => `- ${cat}: ${info.account} (${info.label})`)
   .join('\n')}
 
@@ -209,7 +213,7 @@ Returnera ENDAST JSON-objektet, ingen annan text.`
         jsonText = jsonText.trim()
 
         const parsed = JSON.parse(jsonText)
-        return this.validateSuggestions(parsed.suggestions || [], batch)
+        return this.validateSuggestions(parsed.suggestions || [], batch, context.entityType)
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error')
 
@@ -231,12 +235,14 @@ Returnera ENDAST JSON-objektet, ingen annan text.`
 
   private validateSuggestions(
     raw: unknown[],
-    transactions: TransactionForCategorization[]
+    transactions: TransactionForCategorization[],
+    entityType: EntityType
   ): CategorizationSuggestion[] {
     if (!Array.isArray(raw)) return []
 
+    const categoryAccountMap = getCategoryAccountMap(entityType)
     const validTransactionIds = new Set(transactions.map((t) => t.id))
-    const validCategories = new Set(Object.keys(CATEGORY_ACCOUNT_MAP).concat(['uncategorized']))
+    const validCategories = new Set(Object.keys(categoryAccountMap).concat(['uncategorized']))
 
     return raw
       .filter(
@@ -249,7 +255,7 @@ Returnera ENDAST JSON-objektet, ingen annan text.`
           ? (s.category as TransactionCategory)
           : 'expense_other'
 
-        const accountInfo = CATEGORY_ACCOUNT_MAP[category]
+        const accountInfo = categoryAccountMap[category]
 
         return {
           transactionId: s.transactionId as string,

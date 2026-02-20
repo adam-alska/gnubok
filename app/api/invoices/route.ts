@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { eventBus } from '@/lib/events'
 import { ensureInitialized } from '@/lib/init'
-import type { CreateInvoiceInput, Invoice, CreditNote } from '@/types'
+import type { CreateInvoiceInput, EntityType, Invoice, CreditNote } from '@/types'
 import { getVatRules, calculateVat, calculateTotal } from '@/lib/invoice/vat-rules'
 import { fetchExchangeRate, convertToSEK } from '@/lib/currency/riksbanken'
 import {
@@ -292,12 +292,22 @@ async function createCreditNote(
     .eq('id', creditNote.id)
     .single()
 
+  // Fetch entity type for correct account mapping
+  const { data: creditNoteSettings } = await supabase
+    .from('company_settings')
+    .select('entity_type')
+    .eq('user_id', userId)
+    .single()
+
+  const entityType = (creditNoteSettings?.entity_type as EntityType) || 'enskild_firma'
+
   // Create journal entry for the credit note (non-blocking)
   if (completeCreditNote) {
     try {
       const journalEntry = await createCreditNoteJournalEntry(
         userId,
-        completeCreditNote as Invoice
+        completeCreditNote as Invoice,
+        entityType
       )
       if (journalEntry) {
         await supabase

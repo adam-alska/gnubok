@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { getCategoryDisplayName } from '@/lib/tax/expense-warnings'
-import { Plus, Search, ArrowLeftRight, ArrowUpRight, ArrowDownRight, Sparkles, Check, FileText, Link2 } from 'lucide-react'
+import Link from 'next/link'
+import { Plus, Search, ArrowLeftRight, ArrowUpRight, ArrowDownRight, Sparkles, Check, FileText, Link2, Upload } from 'lucide-react'
 import TransactionForm from '@/components/transactions/TransactionForm'
 import SwipeCategorizationView from '@/components/transactions/SwipeCategorizationView'
 import type { Transaction, TransactionCategory, CreateTransactionInput, Invoice, Customer } from '@/types'
@@ -408,6 +409,12 @@ export default function TransactionsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/import">
+              <Upload className="mr-2 h-4 w-4" />
+              Importera
+            </Link>
+          </Button>
           {uncategorizedTransactions.length > 0 && (
             <Button variant="outline" onClick={openSwipeView} disabled={isLoadingSuggestions}>
               <Sparkles className="mr-2 h-4 w-4" />
@@ -492,13 +499,21 @@ export default function TransactionsPage() {
             <p className="text-muted-foreground text-center mt-1">
               {searchTerm
                 ? 'Inga transaktioner matchar din sökning'
-                : 'Lägg till din första transaktion eller anslut din bank'}
+                : 'Importera transaktioner från din bank eller lägg till manuellt'}
             </p>
             {!searchTerm && (
-              <Button className="mt-4" onClick={() => setIsDialogOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Lägg till transaktion
-              </Button>
+              <div className="flex gap-2 mt-4">
+                <Button asChild>
+                  <Link href="/import">
+                    <Upload className="mr-2 h-4 w-4" />
+                    Importera transaktioner
+                  </Link>
+                </Button>
+                <Button variant="outline" onClick={() => setIsDialogOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Lägg till manuellt
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>

@@ -142,6 +142,8 @@ export function makeTransaction(overrides: Partial<Transaction> = {}): Transacti
     mcc_code: null,
     merchant_name: 'ICA Maxi',
     receipt_id: null,
+    import_source: null,
+    reference: null,
     notes: null,
     created_at: '2024-06-15T14:30:00Z',
     updated_at: '2024-06-15T14:30:00Z',

@@ -11,6 +11,7 @@ export interface InvoiceMatch {
  * Confidence thresholds for invoice matching
  */
 const CONFIDENCE = {
+  OCR_REFERENCE_MATCH: 0.99,
   EXACT_AMOUNT_CUSTOMER: 0.95,
   EXACT_AMOUNT_ONLY: 0.80,
   FUZZY_AMOUNT_CUSTOMER: 0.70,
@@ -143,6 +144,29 @@ export async function findMatchingInvoices(
   }
 
   const matches: InvoiceMatch[] = []
+
+  // OCR/Bankgiro reference matching — highest confidence
+  // Swedish standard: match transaction reference to invoice OCR number
+  const txReference = (transaction as Transaction & { reference?: string | null }).reference
+  if (txReference) {
+    const normalizedRef = txReference.replace(/\s+/g, '')
+    for (const invoice of invoices) {
+      // Match against invoice_number (used as OCR reference in Swedish payments)
+      const invoiceRef = invoice.invoice_number?.replace(/\s+/g, '')
+      if (invoiceRef && normalizedRef === invoiceRef) {
+        matches.push({
+          invoice: invoice as Invoice & { customer?: Customer },
+          confidence: CONFIDENCE.OCR_REFERENCE_MATCH,
+          matchReason: `OCR-referens matchar fakturanummer ${invoice.invoice_number}`,
+        })
+      }
+    }
+
+    // If we found an OCR match, return immediately (highest possible confidence)
+    if (matches.length > 0) {
+      return matches
+    }
+  }
 
   for (const invoice of invoices) {
     // Currency filter - must match or be SEK equivalent
