@@ -1,0 +1,241 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import {
+  createMockRequest,
+  parseJsonResponse,
+  createMockRouteParams,
+  createQueuedMockSupabase,
+  makeInvoice,
+  makeCustomer,
+  makeCompanySettings,
+} from '@/tests/helpers'
+import { eventBus } from '@/lib/events'
+
+const { supabase: mockSupabase, enqueue, reset } = createQueuedMockSupabase()
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: () => Promise.resolve(mockSupabase),
+}))
+
+vi.mock('@/lib/init', () => ({
+  ensureInitialized: vi.fn(),
+}))
+
+const mockRenderToBuffer = vi.fn()
+vi.mock('@react-pdf/renderer', () => ({
+  renderToBuffer: (...args: unknown[]) => mockRenderToBuffer(...args),
+  Document: vi.fn(),
+  Page: vi.fn(),
+  Text: vi.fn(),
+  View: vi.fn(),
+  StyleSheet: { create: (s: unknown) => s },
+}))
+
+vi.mock('@/lib/invoice/pdf-template', () => ({
+  InvoicePDF: vi.fn().mockReturnValue('mock-pdf-element'),
+}))
+
+const mockSendEmail = vi.fn()
+const mockIsResendConfigured = vi.fn()
+vi.mock('@/lib/email/resend', () => ({
+  sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+  isResendConfigured: () => mockIsResendConfigured(),
+}))
+
+vi.mock('@/lib/email/invoice-templates', () => ({
+  generateInvoiceEmailHtml: vi.fn().mockReturnValue('<html>Invoice</html>'),
+  generateInvoiceEmailText: vi.fn().mockReturnValue('Invoice text'),
+  generateInvoiceEmailSubject: vi.fn().mockReturnValue('Faktura F-2024001'),
+}))
+
+const mockCreateInvoiceJournalEntry = vi.fn()
+vi.mock('@/lib/bookkeeping/invoice-entries', () => ({
+  createInvoiceJournalEntry: (...args: unknown[]) =>
+    mockCreateInvoiceJournalEntry(...args),
+}))
+
+import { POST } from '../route'
+
+describe('POST /api/invoices/[id]/send', () => {
+  const mockUser = { id: 'user-1', email: 'test@test.se' }
+  const customer = makeCustomer({ id: 'cust-1', email: 'kund@test.se' })
+  const company = makeCompanySettings({ accounting_method: 'accrual' })
+  const invoice = makeInvoice({
+    id: 'inv-1',
+    status: 'draft',
+    customer,
+    items: [
+      {
+        id: 'item-1',
+        invoice_id: 'inv-1',
+        sort_order: 0,
+        description: 'Consulting',
+        quantity: 10,
+        unit: 'tim',
+        unit_price: 1000,
+        line_total: 10000,
+        created_at: '2024-06-15T14:30:00Z',
+      },
+    ],
+  })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    reset()
+    eventBus.clear()
+    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+    mockIsResendConfigured.mockReturnValue(true)
+    mockRenderToBuffer.mockResolvedValue(Buffer.from('fake-pdf'))
+  })
+
+  it('returns 401 when not authenticated', async () => {
+    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+
+    const request = createMockRequest('/api/invoices/inv-1/send', { method: 'POST' })
+    const response = await POST(request, createMockRouteParams({ id: 'inv-1' }))
+    const { status, body } = await parseJsonResponse(response)
+
+    expect(status).toBe(401)
+    expect(body).toEqual({ error: 'Unauthorized' })
+  })
+
+  it('returns 503 when email service is not configured', async () => {
+    mockIsResendConfigured.mockReturnValue(false)
+
+    const request = createMockRequest('/api/invoices/inv-1/send', { method: 'POST' })
+    const response = await POST(request, createMockRouteParams({ id: 'inv-1' }))
+    const { status } = await parseJsonResponse(response)
+
+    expect(status).toBe(503)
+  })
+
+  it('returns 404 when invoice not found', async () => {
+    enqueue({ data: null, error: { message: 'Not found' } })
+
+    const request = createMockRequest('/api/invoices/inv-1/send', { method: 'POST' })
+    const response = await POST(request, createMockRouteParams({ id: 'inv-1' }))
+    const { status, body } = await parseJsonResponse<{ error: string }>(response)
+
+    expect(status).toBe(404)
+    expect(body.error).toBe('Fakturan hittades inte')
+  })
+
+  it('returns 400 when customer has no email', async () => {
+    const noEmailInvoice = makeInvoice({
+      id: 'inv-1',
+      customer: makeCustomer({ email: null }),
+      items: [],
+    })
+    enqueue({ data: noEmailInvoice, error: null })
+
+    const request = createMockRequest('/api/invoices/inv-1/send', { method: 'POST' })
+    const response = await POST(request, createMockRouteParams({ id: 'inv-1' }))
+    const { status, body } = await parseJsonResponse<{ error: string }>(response)
+
+    expect(status).toBe(400)
+    expect(body.error).toContain('e-postadress')
+  })
+
+  it('returns 404 when company settings not found', async () => {
+    enqueue({ data: invoice, error: null })
+    enqueue({ data: null, error: { message: 'Not found' } })
+
+    const request = createMockRequest('/api/invoices/inv-1/send', { method: 'POST' })
+    const response = await POST(request, createMockRouteParams({ id: 'inv-1' }))
+    const { status, body } = await parseJsonResponse<{ error: string }>(response)
+
+    expect(status).toBe(404)
+    expect(body.error).toBe('Företagsinställningar saknas')
+  })
+
+  it('sends invoice email, updates status, creates journal entry for accrual', async () => {
+    // Fetch invoice
+    enqueue({ data: invoice, error: null })
+    // Fetch company settings
+    enqueue({ data: company, error: null })
+
+    mockSendEmail.mockResolvedValue({ success: true, messageId: 'msg-1' })
+    mockCreateInvoiceJournalEntry.mockResolvedValue({ id: 'je-1' })
+
+    // Update invoice status to 'sent'
+    enqueue({ data: null, error: null })
+    // Update invoice with journal_entry_id
+    enqueue({ data: null, error: null })
+
+    const emitSpy = vi.spyOn(eventBus, 'emit')
+
+    const request = createMockRequest('/api/invoices/inv-1/send', { method: 'POST' })
+    const response = await POST(request, createMockRouteParams({ id: 'inv-1' }))
+    const { status, body } = await parseJsonResponse<{
+      success: boolean
+      messageId: string
+    }>(response)
+
+    expect(status).toBe(200)
+    expect(body.success).toBe(true)
+    expect(body.messageId).toBe('msg-1')
+    expect(mockSendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'kund@test.se',
+        subject: 'Faktura F-2024001',
+      })
+    )
+    expect(mockCreateInvoiceJournalEntry).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({ id: 'inv-1' }),
+      'enskild_firma'
+    )
+    expect(emitSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'invoice.sent' })
+    )
+  })
+
+  it('skips journal entry for cash method', async () => {
+    const cashCompany = makeCompanySettings({ accounting_method: 'cash' })
+    enqueue({ data: invoice, error: null })
+    enqueue({ data: cashCompany, error: null })
+
+    mockSendEmail.mockResolvedValue({ success: true, messageId: 'msg-2' })
+
+    // Update invoice status
+    enqueue({ data: null, error: null })
+
+    const request = createMockRequest('/api/invoices/inv-1/send', { method: 'POST' })
+    const response = await POST(request, createMockRouteParams({ id: 'inv-1' }))
+    const { status, body } = await parseJsonResponse<{ success: boolean }>(response)
+
+    expect(status).toBe(200)
+    expect(body.success).toBe(true)
+    expect(mockCreateInvoiceJournalEntry).not.toHaveBeenCalled()
+  })
+
+  it('does not fail when journal entry creation fails (non-blocking)', async () => {
+    enqueue({ data: invoice, error: null })
+    enqueue({ data: company, error: null })
+
+    mockSendEmail.mockResolvedValue({ success: true, messageId: 'msg-3' })
+    mockCreateInvoiceJournalEntry.mockRejectedValue(new Error('Period locked'))
+
+    // Update invoice status
+    enqueue({ data: null, error: null })
+
+    const request = createMockRequest('/api/invoices/inv-1/send', { method: 'POST' })
+    const response = await POST(request, createMockRouteParams({ id: 'inv-1' }))
+    const { status, body } = await parseJsonResponse<{ success: boolean }>(response)
+
+    expect(status).toBe(200)
+    expect(body.success).toBe(true)
+  })
+
+  it('returns 500 when email sending fails', async () => {
+    enqueue({ data: invoice, error: null })
+    enqueue({ data: company, error: null })
+
+    mockSendEmail.mockResolvedValue({ success: false, error: 'SMTP error' })
+
+    const request = createMockRequest('/api/invoices/inv-1/send', { method: 'POST' })
+    const response = await POST(request, createMockRouteParams({ id: 'inv-1' }))
+    const { status, body } = await parseJsonResponse<{ error: string }>(response)
+
+    expect(status).toBe(500)
+    expect(body.error).toContain('SMTP error')
+  })
+})

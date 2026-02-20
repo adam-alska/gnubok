@@ -10,6 +10,11 @@ import type {
   JournalEntryLine,
   DocumentAttachment,
   TaxCode,
+  Invoice,
+  Customer,
+  Supplier,
+  SupplierInvoice,
+  CompanySettings,
 } from '@/types'
 
 // ============================================================
@@ -266,4 +271,309 @@ export function makeTaxCode(overrides: Partial<TaxCode> = {}): TaxCode {
     updated_at: '2024-01-01T00:00:00Z',
     ...overrides,
   }
+}
+
+export function makeInvoice(overrides: Partial<Invoice> = {}): Invoice {
+  return {
+    id: nextId(),
+    user_id: 'user-1',
+    customer_id: 'customer-1',
+    invoice_number: 'F-2024001',
+    invoice_date: '2024-06-15',
+    due_date: '2024-07-15',
+    status: 'draft',
+    currency: 'SEK',
+    exchange_rate: null,
+    exchange_rate_date: null,
+    subtotal: 10000,
+    subtotal_sek: null,
+    vat_amount: 2500,
+    vat_amount_sek: null,
+    total: 12500,
+    total_sek: null,
+    vat_treatment: 'standard_25',
+    vat_rate: 25,
+    moms_ruta: '10',
+    your_reference: null,
+    our_reference: null,
+    notes: null,
+    reverse_charge_text: null,
+    credited_invoice_id: null,
+    paid_at: null,
+    paid_amount: null,
+    created_at: '2024-06-15T14:30:00Z',
+    updated_at: '2024-06-15T14:30:00Z',
+    ...overrides,
+  }
+}
+
+export function makeCustomer(overrides: Partial<Customer> = {}): Customer {
+  return {
+    id: nextId(),
+    user_id: 'user-1',
+    name: 'Test AB',
+    customer_type: 'swedish_business',
+    email: 'kontakt@test.se',
+    phone: null,
+    address_line1: 'Storgatan 1',
+    address_line2: null,
+    postal_code: '111 22',
+    city: 'Stockholm',
+    country: 'SE',
+    org_number: '5566778899',
+    vat_number: 'SE556677889901',
+    vat_number_validated: true,
+    vat_number_validated_at: '2024-01-01T00:00:00Z',
+    default_payment_terms: 30,
+    notes: null,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
+export function makeSupplier(overrides: Partial<Supplier> = {}): Supplier {
+  return {
+    id: nextId(),
+    user_id: 'user-1',
+    name: 'Leverantör AB',
+    supplier_type: 'swedish_business',
+    email: 'info@leverantor.se',
+    phone: null,
+    address_line1: 'Industrivägen 5',
+    address_line2: null,
+    postal_code: '123 45',
+    city: 'Göteborg',
+    country: 'SE',
+    org_number: '5599887766',
+    vat_number: null,
+    bankgiro: '123-4567',
+    plusgiro: null,
+    bank_account: null,
+    iban: null,
+    bic: null,
+    default_expense_account: '6200',
+    default_payment_terms: 30,
+    default_currency: 'SEK',
+    notes: null,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
+export function makeSupplierInvoice(
+  overrides: Partial<SupplierInvoice> = {}
+): SupplierInvoice {
+  return {
+    id: nextId(),
+    user_id: 'user-1',
+    supplier_id: 'supplier-1',
+    arrival_number: 1,
+    supplier_invoice_number: 'LF-001',
+    invoice_date: '2024-06-01',
+    due_date: '2024-07-01',
+    received_date: '2024-06-02',
+    delivery_date: null,
+    status: 'registered',
+    currency: 'SEK',
+    exchange_rate: null,
+    exchange_rate_date: null,
+    subtotal: 8000,
+    subtotal_sek: null,
+    vat_amount: 2000,
+    vat_amount_sek: null,
+    total: 10000,
+    total_sek: null,
+    vat_treatment: 'standard_25',
+    reverse_charge: false,
+    payment_reference: null,
+    paid_at: null,
+    paid_amount: 0,
+    remaining_amount: 10000,
+    is_credit_note: false,
+    credited_invoice_id: null,
+    registration_journal_entry_id: null,
+    payment_journal_entry_id: null,
+    transaction_id: null,
+    document_id: null,
+    notes: null,
+    created_at: '2024-06-02T00:00:00Z',
+    updated_at: '2024-06-02T00:00:00Z',
+    ...overrides,
+  }
+}
+
+export function makeCompanySettings(
+  overrides: Partial<CompanySettings> = {}
+): CompanySettings {
+  return {
+    id: nextId(),
+    user_id: 'user-1',
+    entity_type: 'enskild_firma',
+    company_name: 'Test Firma',
+    org_number: '199001011234',
+    address_line1: 'Testgatan 1',
+    address_line2: null,
+    postal_code: '111 22',
+    city: 'Stockholm',
+    country: 'SE',
+    f_skatt: true,
+    vat_registered: true,
+    vat_number: null,
+    moms_period: 'quarterly',
+    fiscal_year_start_month: 1,
+    preliminary_tax_monthly: null,
+    bank_name: null,
+    clearing_number: null,
+    account_number: null,
+    iban: null,
+    bic: null,
+    accounting_method: 'accrual',
+    invoice_prefix: 'F',
+    next_invoice_number: 1,
+    invoice_default_days: 30,
+    onboarding_step: 6,
+    onboarding_complete: true,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
+// ============================================================
+// API Route Test Helpers
+// ============================================================
+
+/**
+ * Build a Request object for testing Next.js API route handlers.
+ */
+export function createMockRequest(
+  url: string,
+  options?: {
+    method?: string
+    body?: unknown
+    searchParams?: Record<string, string>
+  }
+): Request {
+  const fullUrl = new URL(url, 'http://localhost:3000')
+  if (options?.searchParams) {
+    for (const [key, value] of Object.entries(options.searchParams)) {
+      fullUrl.searchParams.set(key, value)
+    }
+  }
+  return new Request(fullUrl.toString(), {
+    method: options?.method || 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    ...(options?.body ? { body: JSON.stringify(options.body) } : {}),
+  })
+}
+
+/**
+ * Parse NextResponse to {status, body}.
+ */
+export async function parseJsonResponse<T = unknown>(
+  response: Response
+): Promise<{ status: number; body: T }> {
+  const body = (await response.json()) as T
+  return { status: response.status, body }
+}
+
+/**
+ * Build Promise-based params for Next.js 16 dynamic routes.
+ */
+export function createMockRouteParams<T extends Record<string, string>>(
+  params: T
+): { params: Promise<T> } {
+  return { params: Promise.resolve(params) }
+}
+
+/**
+ * Queue-based Supabase mock for routes with multiple sequential DB calls.
+ *
+ * Each call to `.from()` or `.rpc()` consumes the next result in the queue.
+ */
+export function createQueuedMockSupabase() {
+  const queue: { data: unknown; error: unknown; count?: number | null }[] = []
+
+  const enqueue = (result: {
+    data?: unknown
+    error?: unknown
+    count?: number | null
+  }) => {
+    queue.push({
+      data: result.data ?? null,
+      error: result.error ?? null,
+      count: result.count ?? null,
+    })
+  }
+
+  const enqueueMany = (
+    results: { data?: unknown; error?: unknown; count?: number | null }[]
+  ) => {
+    for (const r of results) {
+      enqueue(r)
+    }
+  }
+
+  const reset = () => {
+    queue.length = 0
+  }
+
+  const buildChain = (): unknown => {
+    // Capture the result at chain creation (when from/rpc is called)
+    const result = queue.shift() || { data: null, error: null, count: null }
+
+    const handler: ProxyHandler<object> = {
+      get(_target, prop) {
+        if (prop === 'then') {
+          return (resolve: (v: unknown) => void) => resolve(result)
+        }
+        return (..._args: unknown[]) => buildChain2(result)
+      },
+    }
+    return new Proxy({}, handler)
+  }
+
+  // Inner chain methods reuse the same result
+  const buildChain2 = (result: {
+    data: unknown
+    error: unknown
+    count?: number | null
+  }): unknown => {
+    const handler: ProxyHandler<object> = {
+      get(_target, prop) {
+        if (prop === 'then') {
+          return (resolve: (v: unknown) => void) => resolve(result)
+        }
+        return (..._args: unknown[]) => buildChain2(result)
+      },
+    }
+    return new Proxy({}, handler)
+  }
+
+  const storageMock = {
+    from: vi.fn().mockReturnValue({
+      upload: vi.fn().mockResolvedValue({ data: {}, error: null }),
+      download: vi.fn().mockResolvedValue({
+        data: new Blob(['test']),
+        error: null,
+      }),
+      remove: vi.fn().mockResolvedValue({ data: [], error: null }),
+      getPublicUrl: vi.fn().mockReturnValue({
+        data: { publicUrl: 'https://example.com/file.jpg' },
+      }),
+    }),
+  }
+
+  const supabase = {
+    from: vi.fn().mockImplementation(() => buildChain()),
+    rpc: vi.fn().mockImplementation(() => buildChain()),
+    storage: storageMock,
+    auth: {
+      getUser: vi.fn(),
+    },
+  }
+
+  return { supabase, enqueue, enqueueMany, reset }
 }

@@ -1,0 +1,394 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import {
+  createMockRequest,
+  parseJsonResponse,
+  createQueuedMockSupabase,
+  makeInvoice,
+  makeCustomer,
+} from '@/tests/helpers'
+import { eventBus } from '@/lib/events'
+
+const { supabase: mockSupabase, enqueue, reset } = createQueuedMockSupabase()
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: () => Promise.resolve(mockSupabase),
+}))
+
+vi.mock('@/lib/init', () => ({
+  ensureInitialized: vi.fn(),
+}))
+
+const mockGetVatRules = vi.fn()
+const mockCalculateVat = vi.fn()
+vi.mock('@/lib/invoice/vat-rules', () => ({
+  getVatRules: (...args: unknown[]) => mockGetVatRules(...args),
+  calculateVat: (...args: unknown[]) => mockCalculateVat(...args),
+  calculateTotal: vi.fn(),
+}))
+
+vi.mock('@/lib/currency/riksbanken', () => ({
+  fetchExchangeRate: vi.fn().mockResolvedValue(null),
+  convertToSEK: vi.fn(),
+}))
+
+const mockCreateCreditNoteJournalEntry = vi.fn()
+vi.mock('@/lib/bookkeeping/invoice-entries', () => ({
+  createCreditNoteJournalEntry: (...args: unknown[]) =>
+    mockCreateCreditNoteJournalEntry(...args),
+}))
+
+import { GET, POST } from '../route'
+
+describe('GET /api/invoices', () => {
+  const mockUser = { id: 'user-1', email: 'test@test.se' }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    reset()
+    eventBus.clear()
+    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+  })
+
+  it('returns 401 when not authenticated', async () => {
+    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+
+    const request = createMockRequest('/api/invoices')
+    const response = await GET(request)
+    const { status, body } = await parseJsonResponse(response)
+
+    expect(status).toBe(401)
+    expect(body).toEqual({ error: 'Unauthorized' })
+  })
+
+  it('returns invoices list', async () => {
+    const invoices = [makeInvoice(), makeInvoice()]
+    enqueue({ data: invoices, error: null, count: 2 })
+
+    const request = createMockRequest('/api/invoices')
+    const response = await GET(request)
+    const { status, body } = await parseJsonResponse<{ data: unknown[]; count: number }>(response)
+
+    expect(status).toBe(200)
+    expect(body.data).toEqual(invoices)
+    expect(body.count).toBe(2)
+  })
+
+  it('applies status filter', async () => {
+    enqueue({ data: [], error: null, count: 0 })
+
+    const request = createMockRequest('/api/invoices', {
+      searchParams: { status: 'sent' },
+    })
+    const response = await GET(request)
+    const { status } = await parseJsonResponse(response)
+
+    expect(status).toBe(200)
+    expect(mockSupabase.from).toHaveBeenCalledWith('invoices')
+  })
+
+  it('applies pagination', async () => {
+    enqueue({ data: [], error: null, count: 0 })
+
+    const request = createMockRequest('/api/invoices', {
+      searchParams: { limit: '10', offset: '20' },
+    })
+    const response = await GET(request)
+    const { status } = await parseJsonResponse(response)
+
+    expect(status).toBe(200)
+  })
+
+  it('returns 500 on database error', async () => {
+    enqueue({ data: null, error: { message: 'DB error' } })
+
+    const request = createMockRequest('/api/invoices')
+    const response = await GET(request)
+    const { status, body } = await parseJsonResponse<{ error: string }>(response)
+
+    expect(status).toBe(500)
+    expect(body.error).toBe('DB error')
+  })
+})
+
+describe('POST /api/invoices (create invoice)', () => {
+  const mockUser = { id: 'user-1', email: 'test@test.se' }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    reset()
+    eventBus.clear()
+    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+  })
+
+  it('returns 401 when not authenticated', async () => {
+    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+
+    const request = createMockRequest('/api/invoices', {
+      method: 'POST',
+      body: { customer_id: 'cust-1', items: [] },
+    })
+    const response = await POST(request)
+    const { status, body } = await parseJsonResponse(response)
+
+    expect(status).toBe(401)
+    expect(body).toEqual({ error: 'Unauthorized' })
+  })
+
+  it('returns 404 when customer not found', async () => {
+    enqueue({ data: null, error: { message: 'Not found' } })
+
+    const request = createMockRequest('/api/invoices', {
+      method: 'POST',
+      body: {
+        customer_id: 'cust-999',
+        invoice_date: '2024-06-15',
+        due_date: '2024-07-15',
+        currency: 'SEK',
+        items: [{ description: 'Test', quantity: 1, unit: 'st', unit_price: 1000 }],
+      },
+    })
+    const response = await POST(request)
+    const { status, body } = await parseJsonResponse<{ error: string }>(response)
+
+    expect(status).toBe(404)
+    expect(body.error).toBe('Customer not found')
+  })
+
+  it('creates invoice with items and emits event', async () => {
+    const customer = makeCustomer({ id: 'cust-1' })
+    const createdInvoice = makeInvoice({ id: 'inv-1' })
+
+    mockGetVatRules.mockReturnValue({
+      treatment: 'standard_25',
+      rate: 25,
+      momsRuta: '10',
+      reverseChargeText: null,
+    })
+    mockCalculateVat.mockReturnValue(2500)
+
+    // Fetch customer
+    enqueue({ data: customer, error: null })
+    // RPC generate_invoice_number
+    enqueue({ data: 'F-2024001' })
+    // Insert invoice
+    enqueue({ data: createdInvoice, error: null })
+    // Insert items
+    enqueue({ data: null, error: null })
+    // Fetch complete invoice
+    enqueue({ data: { ...createdInvoice, customer, items: [] }, error: null })
+
+    const emitSpy = vi.spyOn(eventBus, 'emit')
+
+    const request = createMockRequest('/api/invoices', {
+      method: 'POST',
+      body: {
+        customer_id: 'cust-1',
+        invoice_date: '2024-06-15',
+        due_date: '2024-07-15',
+        currency: 'SEK',
+        items: [{ description: 'Consulting', quantity: 10, unit: 'tim', unit_price: 1000 }],
+      },
+    })
+    const response = await POST(request)
+    const { status, body } = await parseJsonResponse<{ data: unknown }>(response)
+
+    expect(status).toBe(200)
+    expect(body.data).toBeTruthy()
+    expect(emitSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'invoice.created' })
+    )
+  })
+
+  it('rolls back invoice when items insertion fails', async () => {
+    const customer = makeCustomer({ id: 'cust-1' })
+    const createdInvoice = makeInvoice({ id: 'inv-1' })
+
+    mockGetVatRules.mockReturnValue({
+      treatment: 'standard_25',
+      rate: 25,
+      momsRuta: '10',
+      reverseChargeText: null,
+    })
+    mockCalculateVat.mockReturnValue(2500)
+
+    enqueue({ data: customer, error: null })
+    enqueue({ data: 'F-2024001' })
+    enqueue({ data: createdInvoice, error: null })
+    // Items insertion fails
+    enqueue({ data: null, error: { message: 'Items insert failed' } })
+    // Rollback delete
+    enqueue({ data: null, error: null })
+
+    const request = createMockRequest('/api/invoices', {
+      method: 'POST',
+      body: {
+        customer_id: 'cust-1',
+        invoice_date: '2024-06-15',
+        due_date: '2024-07-15',
+        currency: 'SEK',
+        items: [{ description: 'Test', quantity: 1, unit: 'st', unit_price: 1000 }],
+      },
+    })
+    const response = await POST(request)
+    const { status, body } = await parseJsonResponse<{ error: string }>(response)
+
+    expect(status).toBe(500)
+    expect(body.error).toBe('Items insert failed')
+  })
+})
+
+describe('POST /api/invoices (create credit note)', () => {
+  const mockUser = { id: 'user-1', email: 'test@test.se' }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    reset()
+    eventBus.clear()
+    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+  })
+
+  it('returns 404 when original invoice not found', async () => {
+    enqueue({ data: null, error: { message: 'Not found' } })
+
+    const request = createMockRequest('/api/invoices', {
+      method: 'POST',
+      body: { credited_invoice_id: 'inv-999' },
+    })
+    const response = await POST(request)
+    const { status, body } = await parseJsonResponse<{ error: string }>(response)
+
+    expect(status).toBe(404)
+    expect(body.error).toBe('Original invoice not found')
+  })
+
+  it('returns 400 when invoice is already credited', async () => {
+    const original = makeInvoice({ id: 'inv-1', status: 'credited' })
+    enqueue({ data: original, error: null })
+
+    const request = createMockRequest('/api/invoices', {
+      method: 'POST',
+      body: { credited_invoice_id: 'inv-1' },
+    })
+    const response = await POST(request)
+    const { status, body } = await parseJsonResponse<{ error: string }>(response)
+
+    expect(status).toBe(400)
+    expect(body.error).toBe('Invoice has already been credited')
+  })
+
+  it('returns 400 when invoice is in draft status', async () => {
+    const original = makeInvoice({ id: 'inv-1', status: 'draft' })
+    enqueue({ data: original, error: null })
+
+    const request = createMockRequest('/api/invoices', {
+      method: 'POST',
+      body: { credited_invoice_id: 'inv-1' },
+    })
+    const response = await POST(request)
+    const { status, body } = await parseJsonResponse<{ error: string }>(response)
+
+    expect(status).toBe(400)
+    expect(body.error).toBe('Only sent, paid, or overdue invoices can be credited')
+  })
+
+  it('creates credit note with negated amounts and emits event', async () => {
+    const items = [
+      {
+        id: 'item-1',
+        invoice_id: 'inv-1',
+        sort_order: 0,
+        description: 'Consulting',
+        quantity: 10,
+        unit: 'tim',
+        unit_price: 1000,
+        line_total: 10000,
+        created_at: '2024-06-15T14:30:00Z',
+      },
+    ]
+    const original = makeInvoice({
+      id: 'inv-1',
+      status: 'sent',
+      subtotal: 10000,
+      vat_amount: 2500,
+      total: 12500,
+      items,
+    })
+    const creditNote = makeInvoice({
+      id: 'cn-1',
+      credited_invoice_id: 'inv-1',
+      subtotal: -10000,
+      vat_amount: -2500,
+      total: -12500,
+      status: 'sent',
+    })
+
+    // Fetch original invoice
+    enqueue({ data: original, error: null })
+    // Insert credit note
+    enqueue({ data: creditNote, error: null })
+    // Insert credit note items
+    enqueue({ data: null, error: null })
+    // Update original status to 'credited'
+    enqueue({ data: null, error: null })
+    // Fetch complete credit note
+    enqueue({ data: { ...creditNote, items: [] }, error: null })
+    // Fetch company settings for entity type
+    enqueue({ data: { entity_type: 'enskild_firma' }, error: null })
+
+    mockCreateCreditNoteJournalEntry.mockResolvedValue({ id: 'je-1' })
+    // Update credit note with journal_entry_id
+    enqueue({ data: null, error: null })
+
+    const emitSpy = vi.spyOn(eventBus, 'emit')
+
+    const request = createMockRequest('/api/invoices', {
+      method: 'POST',
+      body: { credited_invoice_id: 'inv-1' },
+    })
+    const response = await POST(request)
+    const { status, body } = await parseJsonResponse<{ data: unknown }>(response)
+
+    expect(status).toBe(200)
+    expect(body.data).toBeTruthy()
+    expect(emitSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'credit_note.created' })
+    )
+  })
+
+  it('rolls back credit note when items insertion fails', async () => {
+    const original = makeInvoice({
+      id: 'inv-1',
+      status: 'sent',
+      items: [
+        {
+          id: 'item-1',
+          invoice_id: 'inv-1',
+          sort_order: 0,
+          description: 'Test',
+          quantity: 1,
+          unit: 'st',
+          unit_price: 1000,
+          line_total: 1000,
+          created_at: '2024-06-15T14:30:00Z',
+        },
+      ],
+    })
+    const creditNote = makeInvoice({ id: 'cn-1' })
+
+    enqueue({ data: original, error: null })
+    enqueue({ data: creditNote, error: null })
+    // Items fail
+    enqueue({ data: null, error: { message: 'Items insert failed' } })
+    // Rollback delete
+    enqueue({ data: null, error: null })
+
+    const request = createMockRequest('/api/invoices', {
+      method: 'POST',
+      body: { credited_invoice_id: 'inv-1' },
+    })
+    const response = await POST(request)
+    const { status, body } = await parseJsonResponse<{ error: string }>(response)
+
+    expect(status).toBe(500)
+    expect(body.error).toBe('Items insert failed')
+  })
+})
