@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Download, AlertCircle } from 'lucide-react'
+import { AccountNumber } from '@/components/ui/account-number'
 import type { NEDeclaration } from '@/types'
 
 function formatAmount(amount: number): string {
@@ -279,7 +280,7 @@ function NEDeclarationRow({
               <tbody>
                 {accounts.map((acc) => (
                   <tr key={acc.accountNumber}>
-                    <td className="py-1 font-mono">{acc.accountNumber}</td>
+                    <td className="py-1"><AccountNumber number={acc.accountNumber} name={acc.accountName} size="sm" /></td>
                     <td className="py-1">{acc.accountName}</td>
                     <td className="py-1 text-right">
                       {isExpense && acc.amount > 0 ? '-' : ''}{formatAmount(Math.abs(acc.amount))} kr

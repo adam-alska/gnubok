@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useToast } from '@/components/ui/use-toast'
 import { ArrowLeft, CheckCircle, CreditCard, FileText, Trash2 } from 'lucide-react'
 import Link from 'next/link'
+import { AccountNumber } from '@/components/ui/account-number'
 import type { SupplierInvoice, SupplierInvoiceItem, SupplierInvoicePayment } from '@/types'
 
 function formatAmount(amount: number): string {
@@ -316,7 +317,7 @@ export default function SupplierInvoiceDetailPage() {
                   <td className="py-2 text-right">{item.quantity}</td>
                   <td className="py-2">{item.unit}</td>
                   <td className="py-2 text-right font-mono">{formatAmount(item.unit_price)}</td>
-                  <td className="py-2 font-mono">{item.account_number}</td>
+                  <td className="py-2"><AccountNumber number={item.account_number} /></td>
                   <td className="py-2 text-right">{Math.round(item.vat_rate * 100)}%</td>
                   <td className="py-2 text-right font-mono">{formatAmount(item.line_total)}</td>
                   <td className="py-2 text-right font-mono">{formatAmount(item.vat_amount)}</td>

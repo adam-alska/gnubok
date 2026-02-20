@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Download, AlertCircle } from 'lucide-react'
+import { AccountNumber } from '@/components/ui/account-number'
 import type { SRUExportResult, SRUCoverageStats } from '@/types'
 
 function formatAmount(amount: number): string {
@@ -228,7 +229,7 @@ function SRUBalanceRow({
               <tbody>
                 {balance.accounts.map((acc) => (
                   <tr key={acc.accountNumber}>
-                    <td className="py-1 font-mono w-16">{acc.accountNumber}</td>
+                    <td className="py-1 w-16"><AccountNumber number={acc.accountNumber} name={acc.accountName} size="sm" /></td>
                     <td className="py-1">{acc.accountName}</td>
                     <td className="py-1 text-right">{formatAmount(acc.amount)} kr</td>
                   </tr>

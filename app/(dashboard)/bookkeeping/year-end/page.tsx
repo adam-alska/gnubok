@@ -36,6 +36,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react'
+import { AccountNumber } from '@/components/ui/account-number'
 import type {
   FiscalPeriod,
   YearEndValidation,
@@ -439,7 +440,7 @@ export default function YearEndPage() {
                 <TableBody>
                   {preview.resultAccountSummary.map((account) => (
                     <TableRow key={account.account_number}>
-                      <TableCell className="font-mono">{account.account_number}</TableCell>
+                      <TableCell><AccountNumber number={account.account_number} name={account.account_name} /></TableCell>
                       <TableCell>{account.account_name}</TableCell>
                       <TableCell className="text-right font-mono">
                         {formatAmount(account.amount)} kr
@@ -480,7 +481,7 @@ export default function YearEndPage() {
                   <TableBody>
                     {preview.closingLines.map((line, i) => (
                       <TableRow key={i}>
-                        <TableCell className="font-mono">{line.account_number}</TableCell>
+                        <TableCell><AccountNumber number={line.account_number} /></TableCell>
                         <TableCell>{line.line_description}</TableCell>
                         <TableCell className="text-right font-mono">
                           {line.debit_amount > 0 ? formatAmount(line.debit_amount) : ''}

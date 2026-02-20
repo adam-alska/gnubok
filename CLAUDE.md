@@ -43,12 +43,13 @@ components/
   [feature]/              Feature-organized components (banking, invoices, suppliers, etc.)
 
 extensions/               First-party extension implementations
-  receipt-ocr/            Receipt image OCR processing
   ai-categorization/      AI-powered transaction categorization
   ai-chat/                Claude-based chat assistant
+  enable-banking/         PSD2 bank integration via Enable Banking (JWT auth, sync)
   ne-bilaga/              NE tax form attachment generation
-  sru-export/             SRU file export
   push-notifications/     Web push notification system
+  receipt-ocr/            Receipt image OCR processing
+  sru-export/             SRU file export
   example-logger/         Minimal reference extension (not loaded by default)
 
 lib/
@@ -65,20 +66,29 @@ lib/
     documents/            Document archive (upload, versioning, SHA-256 integrity)
     audit/                Audit trail service
     tax/                  Tax code service
-  banking/                PSD2 integration via Enable Banking
-  reports/                Financial reports (trial-balance, income-statement,
-                          balance-sheet, vat-declaration, sie-export,
-                          supplier-ledger, supplier-reconciliation)
+  calendar/               Calendar and scheduling utilities
+  currency/               Riksbanken exchange rates
+  customers/              Customer management helpers
+  deadlines/              Tax deadline tracking
+  email/                  Email service (Resend integration)
   events/                 Event bus (bus.ts, types.ts)
   extensions/             Extension registry, loader, types
-  tax/                    Tax calculations, deadlines, Swedish holidays
-  import/                 SIE file parser
+  import/                 SIE and bank file parser
   invoice/                VAT rules for invoicing
-  currency/               Riksbanken exchange rates
+  invoices/               Invoice business logic helpers
+  reports/                Financial reports (trial-balance, income-statement,
+                          balance-sheet, vat-declaration, sie-export,
+                          supplier-ledger, supplier-reconciliation,
+                          general-ledger, journal-register,
+                          ar-ledger, ar-reconciliation)
   supabase/               Client setup (client.ts = browser, server.ts = server/admin)
+  tax/                    Tax calculations, deadlines, Swedish holidays
+  transactions/           Transaction processing helpers
   init.ts                 Extension loader (idempotent, called by API routes)
+  utils.ts                Shared utility functions
 
-types/index.ts            Canonical type definitions (70+ types, single source of truth)
+types/index.ts            Canonical type definitions (110+ types, single source of truth)
+types/chat.ts             Chat-specific type definitions
 tests/helpers.ts          Mock factories and fixture builders
 supabase/migrations/      SQL migration files
 dev_docs/                 Extensive project documentation (PRD, architecture, BAS guide, etc.)
@@ -306,11 +316,11 @@ mockResult({ data: makeTransaction(), error: null })
 
 ### Location
 
-`supabase/migrations/` — currently 27 files numbered `20240101000001` through `20240101000027`.
+`supabase/migrations/` — currently 28 files numbered `20240101000001` through `20240101000028`.
 
 ### Naming Convention
 
-`YYYYMMDD00NNNN_descriptive_name.sql` — next migration: `20240101000028_*.sql`
+`YYYYMMDD00NNNN_descriptive_name.sql` — next migration: `20240101000029_*.sql`
 
 ### Migration Rules
 
@@ -422,11 +432,11 @@ Hosted on **Vercel** with cron jobs defined in `vercel.json`:
 
 | Cron Job | Schedule |
 |----------|----------|
-| `/api/banking/sync/cron` | Daily 05:00 |
+| `/api/extensions/enable-banking/sync/cron` | Daily 05:00 |
 | `/api/deadlines/status/cron` | Daily 06:00 |
 | `/api/invoices/reminders/cron` | Daily 08:00 |
 | `/api/extensions/push-notifications/cron` | Daily 09:00 |
-| `/api/tax-deadlines/cron` | Monthly, 1st at 00:00 |
+| `/api/tax-deadlines/cron` | Yearly, January 2nd at 00:00 |
 | `/api/documents/verify/cron` | Weekly, Sunday 03:00 |
 
 ### Required Environment Variables
@@ -436,8 +446,7 @@ NEXT_PUBLIC_SUPABASE_URL          # Supabase project URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY     # Supabase anonymous key
 SUPABASE_SERVICE_ROLE_KEY         # Supabase service role key
 ENABLE_BANKING_APP_ID             # Enable Banking app ID
-ENABLE_BANKING_APP_SECRET         # Enable Banking app secret
-ENABLE_BANKING_SANDBOX            # true for sandbox mode
+ENABLE_BANKING_PRIVATE_KEY        # Enable Banking private key (base64-encoded)
 ANTHROPIC_API_KEY                 # Claude API key (ai-chat)
 OPENAI_API_KEY                    # OpenAI API key (embeddings)
 NEXT_PUBLIC_APP_URL               # App base URL

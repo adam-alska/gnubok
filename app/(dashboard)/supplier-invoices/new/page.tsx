@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/components/ui/use-toast'
 import { ArrowLeft, Plus, Trash2, Loader2 } from 'lucide-react'
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
+import { SupplierInvoiceReviewContent } from '@/components/suppliers/SupplierInvoiceReviewContent'
 import type { Supplier, VatTreatment } from '@/types'
 
 interface LineItem {
@@ -47,6 +49,8 @@ export default function NewSupplierInvoicePage() {
   const { toast } = useToast()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showReview, setShowReview] = useState(false)
+  const [pendingData, setPendingData] = useState<FormData | null>(null)
 
   const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
     defaultValues: {
@@ -125,7 +129,7 @@ export default function NewSupplierInvoicePage() {
   const totalVat = itemTotals.reduce((sum, t) => sum + t.vatAmount, 0)
   const total = Math.round((subtotal + totalVat) * 100) / 100
 
-  async function onSubmit(data: FormData) {
+  function onSubmit(data: FormData) {
     if (!data.supplier_id) {
       toast({ title: 'Fel', description: 'Välj en leverantör', variant: 'destructive' })
       return
@@ -135,21 +139,27 @@ export default function NewSupplierInvoicePage() {
       return
     }
 
+    setPendingData(data)
+    setShowReview(true)
+  }
+
+  async function handleConfirm() {
+    if (!pendingData) return
     setIsSubmitting(true)
 
     const payload = {
-      supplier_id: data.supplier_id,
-      supplier_invoice_number: data.supplier_invoice_number,
-      invoice_date: data.invoice_date,
-      due_date: data.due_date,
-      delivery_date: data.delivery_date || undefined,
-      currency: data.currency,
-      exchange_rate: data.exchange_rate ? parseFloat(data.exchange_rate) : undefined,
-      vat_treatment: data.vat_treatment,
-      reverse_charge: data.reverse_charge,
-      payment_reference: data.payment_reference || undefined,
-      notes: data.notes || undefined,
-      items: data.items.map((item) => ({
+      supplier_id: pendingData.supplier_id,
+      supplier_invoice_number: pendingData.supplier_invoice_number,
+      invoice_date: pendingData.invoice_date,
+      due_date: pendingData.due_date,
+      delivery_date: pendingData.delivery_date || undefined,
+      currency: pendingData.currency,
+      exchange_rate: pendingData.exchange_rate ? parseFloat(pendingData.exchange_rate) : undefined,
+      vat_treatment: pendingData.vat_treatment,
+      reverse_charge: pendingData.reverse_charge,
+      payment_reference: pendingData.payment_reference || undefined,
+      notes: pendingData.notes || undefined,
+      items: pendingData.items.map((item) => ({
         description: item.description,
         quantity: item.quantity,
         unit: item.unit,
@@ -171,6 +181,7 @@ export default function NewSupplierInvoicePage() {
       toast({ title: 'Fel', description: result.error || 'Kunde inte registrera faktura', variant: 'destructive' })
     } else {
       toast({ title: 'Faktura registrerad', description: `Ankomstnummer: ${result.data.arrival_number}` })
+      setShowReview(false)
       router.push(`/supplier-invoices/${result.data.id}`)
     }
 
@@ -489,17 +500,43 @@ export default function NewSupplierInvoicePage() {
             Avbryt
           </Button>
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Registrerar...
-              </>
-            ) : (
-              'Registrera faktura'
-            )}
+            Granska & registrera
           </Button>
         </div>
       </form>
+
+      {pendingData && (() => {
+        const selectedSupplier = suppliers.find((s) => s.id === pendingData.supplier_id)
+        if (!selectedSupplier) return null
+        return (
+          <ConfirmationDialog
+            open={showReview}
+            onOpenChange={setShowReview}
+            onConfirm={handleConfirm}
+            isSubmitting={isSubmitting}
+            title="Granska leverantörsfaktura"
+            warningText="Leverantörsfakturan registreras och en verifikation bokförs. Verifikationen kan inte ändras efteråt."
+            confirmLabel="Bekräfta & registrera"
+          >
+            <SupplierInvoiceReviewContent
+              supplier={selectedSupplier}
+              invoiceNumber={pendingData.supplier_invoice_number}
+              invoiceDate={pendingData.invoice_date}
+              dueDate={pendingData.due_date}
+              deliveryDate={pendingData.delivery_date || undefined}
+              currency={pendingData.currency}
+              exchangeRate={pendingData.exchange_rate || undefined}
+              vatTreatment={pendingData.vat_treatment}
+              reverseCharge={pendingData.reverse_charge}
+              paymentReference={pendingData.payment_reference || undefined}
+              items={pendingData.items}
+              subtotal={subtotal}
+              totalVat={totalVat}
+              total={total}
+            />
+          </ConfirmationDialog>
+        )
+      })()}
     </div>
   )
 }

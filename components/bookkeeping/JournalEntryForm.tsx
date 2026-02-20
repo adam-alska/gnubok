@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { Plus, Trash2 } from 'lucide-react'
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
+import { JournalEntryReviewContent } from '@/components/bookkeeping/JournalEntryReviewContent'
 import type { CreateJournalEntryLineInput, FiscalPeriod } from '@/types'
 
 interface Props {
@@ -31,6 +33,7 @@ export default function JournalEntryForm({ onCreated }: Props) {
     { account_number: '', debit_amount: '', credit_amount: '', line_description: '' },
   ])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showReview, setShowReview] = useState(false)
 
   useEffect(() => {
     fetchPeriods()
@@ -75,9 +78,12 @@ export default function JournalEntryForm({ onCreated }: Props) {
   const totalCredit = lines.reduce((sum, l) => sum + (parseFloat(l.credit_amount) || 0), 0)
   const isBalanced = Math.abs(totalDebit - totalCredit) < 0.01 && totalDebit > 0
 
-  const handleSubmit = async () => {
+  const handleReview = () => {
     if (!selectedPeriod || !description || !isBalanced) return
+    setShowReview(true)
+  }
 
+  const handleConfirm = async () => {
     setIsSubmitting(true)
 
     const entryLines: CreateJournalEntryLineInput[] = lines
@@ -114,6 +120,7 @@ export default function JournalEntryForm({ onCreated }: Props) {
         title: 'Verifikation skapad',
         description: `Verifikation ${result.data?.voucher_series}${result.data?.voucher_number} har skapats.`,
       })
+      setShowReview(false)
       // Reset form
       setDescription('')
       setLines([
@@ -276,12 +283,30 @@ export default function JournalEntryForm({ onCreated }: Props) {
 
         <div className="flex justify-end">
           <Button
-            onClick={handleSubmit}
+            onClick={handleReview}
             disabled={!isBalanced || !description || !selectedPeriod || isSubmitting}
           >
-            {isSubmitting ? 'Sparar...' : 'Skapa verifikation'}
+            Granska & skapa
           </Button>
         </div>
+
+        <ConfirmationDialog
+          open={showReview}
+          onOpenChange={setShowReview}
+          onConfirm={handleConfirm}
+          isSubmitting={isSubmitting}
+          title="Granska verifikation"
+          warningText="En verifikation skapas och kan inte ändras efteråt. Korrigeringar görs genom storno."
+        >
+          <JournalEntryReviewContent
+            periodName={periods.find((p) => p.id === selectedPeriod)?.name || ''}
+            entryDate={entryDate}
+            description={description}
+            lines={lines}
+            totalDebit={totalDebit}
+            totalCredit={totalCredit}
+          />
+        </ConfirmationDialog>
       </CardContent>
     </Card>
   )

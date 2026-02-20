@@ -1,0 +1,171 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+// ============================================================
+// Mock — sequential result queue
+// ============================================================
+
+let resultIdx: number
+let results: Array<{ data?: unknown; error?: unknown }>
+
+function makeBuilder() {
+  const b: Record<string, unknown> = {}
+  for (const m of ['select', 'eq', 'in']) {
+    b[m] = vi.fn().mockReturnValue(b)
+  }
+  b.single = vi.fn().mockImplementation(async () => results[resultIdx++] ?? { data: null, error: null })
+  b.then = (resolve: (v: unknown) => void) => resolve(results[resultIdx++] ?? { data: null, error: null })
+  return b
+}
+
+function makeClient() {
+  return {
+    from: vi.fn().mockImplementation(() => makeBuilder()),
+  }
+}
+
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: vi.fn(async () => makeClient()),
+}))
+
+import { generateARReconciliation } from '../ar-reconciliation'
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  resultIdx = 0
+  results = []
+})
+
+describe('generateARReconciliation', () => {
+  it('returns reconciled when AR ledger matches account 1510', async () => {
+    results = [
+      // 0: invoices
+      {
+        data: [
+          { total: 5000, paid_amount: 2000 },
+          { total: 3000, paid_amount: 0 },
+        ],
+        error: null,
+      },
+      // 1: journal_entry_lines for account 1510
+      {
+        data: [
+          { debit_amount: 8000, credit_amount: 0, journal_entry_id: 'e1' },
+          { debit_amount: 0, credit_amount: 2000, journal_entry_id: 'e2' },
+        ],
+        error: null,
+      },
+    ]
+
+    const result = await generateARReconciliation('user-1', 'period-1')
+
+    // AR: (5000-2000) + (3000-0) = 6000
+    expect(result.ar_ledger_total).toBe(6000)
+    // 1510: 8000 - 2000 = 6000
+    expect(result.account_1510_balance).toBe(6000)
+    expect(result.difference).toBe(0)
+    expect(result.is_reconciled).toBe(true)
+  })
+
+  it('detects difference when AR ledger does not match account 1510', async () => {
+    results = [
+      // 0: invoices
+      {
+        data: [
+          { total: 5000, paid_amount: 0 },
+        ],
+        error: null,
+      },
+      // 1: journal_entry_lines — manual debit on 1510 creates mismatch
+      {
+        data: [
+          { debit_amount: 5000, credit_amount: 0, journal_entry_id: 'e1' },
+          { debit_amount: 1000, credit_amount: 0, journal_entry_id: 'e2' }, // manual entry
+        ],
+        error: null,
+      },
+    ]
+
+    const result = await generateARReconciliation('user-1', 'period-1')
+
+    expect(result.ar_ledger_total).toBe(5000)
+    expect(result.account_1510_balance).toBe(6000)
+    expect(result.difference).toBe(-1000)
+    expect(result.is_reconciled).toBe(false)
+  })
+
+  it('returns zero balances when no data exists', async () => {
+    results = [
+      { data: [], error: null },
+      { data: [], error: null },
+    ]
+
+    const result = await generateARReconciliation('user-1', 'period-1')
+
+    expect(result.ar_ledger_total).toBe(0)
+    expect(result.account_1510_balance).toBe(0)
+    expect(result.difference).toBe(0)
+    expect(result.is_reconciled).toBe(true)
+  })
+
+  it('handles null invoice data gracefully', async () => {
+    results = [
+      { data: null, error: null },
+      {
+        data: [
+          { debit_amount: 3000, credit_amount: 0, journal_entry_id: 'e1' },
+        ],
+        error: null,
+      },
+    ]
+
+    const result = await generateARReconciliation('user-1', 'period-1')
+
+    expect(result.ar_ledger_total).toBe(0)
+    expect(result.account_1510_balance).toBe(3000)
+    expect(result.difference).toBe(-3000)
+    expect(result.is_reconciled).toBe(false)
+  })
+
+  it('uses correct debit-normal balance for account 1510 (asset)', async () => {
+    results = [
+      { data: [], error: null },
+      {
+        data: [
+          { debit_amount: 10000, credit_amount: 0, journal_entry_id: 'e1' },
+          { debit_amount: 0, credit_amount: 4000, journal_entry_id: 'e2' },
+          { debit_amount: 0, credit_amount: 3000, journal_entry_id: 'e3' },
+        ],
+        error: null,
+      },
+    ]
+
+    const result = await generateARReconciliation('user-1', 'period-1')
+
+    // Balance = debits - credits = 10000 - 4000 - 3000 = 3000
+    expect(result.account_1510_balance).toBe(3000)
+  })
+
+  it('uses Math.round for monetary precision', async () => {
+    results = [
+      {
+        data: [
+          { total: 100.1, paid_amount: 33.33 },
+        ],
+        error: null,
+      },
+      {
+        data: [
+          { debit_amount: 66.77, credit_amount: 0, journal_entry_id: 'e1' },
+        ],
+        error: null,
+      },
+    ]
+
+    const result = await generateARReconciliation('user-1', 'period-1')
+
+    expect(result.ar_ledger_total).toBe(66.77)
+    expect(result.account_1510_balance).toBe(66.77)
+    expect(result.difference).toBe(0)
+    expect(result.is_reconciled).toBe(true)
+  })
+})

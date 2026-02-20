@@ -18,6 +18,8 @@ import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency } from '@/lib/utils'
 import { getVatRules, getVatTreatmentLabel } from '@/lib/invoice/vat-rules'
 import { Loader2, Plus, Trash2, ArrowLeft } from 'lucide-react'
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
+import { InvoiceReviewContent } from '@/components/invoices/InvoiceReviewContent'
 import type { Customer, Currency, CreateInvoiceInput } from '@/types'
 
 const itemSchema = z.object({
@@ -54,6 +56,8 @@ export default function NewInvoicePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
+  const [showReview, setShowReview] = useState(false)
+  const [pendingData, setPendingData] = useState<FormData | null>(null)
 
   const {
     register,
@@ -136,14 +140,20 @@ export default function NewInvoicePage() {
   const vatAmount = vatRules ? subtotal * (vatRules.rate / 100) : 0
   const total = subtotal + vatAmount
 
-  async function onSubmit(data: FormData) {
+  function onSubmit(data: FormData) {
+    setPendingData(data)
+    setShowReview(true)
+  }
+
+  async function handleConfirm() {
+    if (!pendingData) return
     setIsSubmitting(true)
 
     try {
       const response = await fetch('/api/invoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data as CreateInvoiceInput),
+        body: JSON.stringify(pendingData as CreateInvoiceInput),
       })
 
       const result = await response.json()
@@ -157,6 +167,7 @@ export default function NewInvoicePage() {
         description: `Faktura ${result.data.invoice_number} har skapats`,
       })
 
+      setShowReview(false)
       router.push(`/invoices/${result.data.id}`)
     } catch (error) {
       toast({
@@ -422,18 +433,38 @@ export default function NewInvoicePage() {
 
             {/* Actions */}
             <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Skapar...
-                </>
-              ) : (
-                'Skapa faktura'
-              )}
+              Granska & skapa
             </Button>
           </div>
         </div>
       </form>
+
+      {selectedCustomer && vatRules && (
+        <ConfirmationDialog
+          open={showReview}
+          onOpenChange={setShowReview}
+          onConfirm={handleConfirm}
+          isSubmitting={isSubmitting}
+          title="Granska faktura"
+          warningText="En faktura skapas och en verifikation bokförs. Verifikationen kan inte ändras efteråt."
+        >
+          <InvoiceReviewContent
+            customer={selectedCustomer}
+            invoiceDate={pendingData?.invoice_date || ''}
+            dueDate={pendingData?.due_date || ''}
+            currency={(pendingData?.currency || 'SEK') as Currency}
+            items={pendingData?.items || []}
+            subtotal={subtotal}
+            vatRate={vatRules.rate}
+            vatAmount={vatAmount}
+            total={total}
+            vatTreatment={vatRules.treatment}
+            yourReference={pendingData?.your_reference}
+            ourReference={pendingData?.our_reference}
+            notes={pendingData?.notes}
+          />
+        </ConfirmationDialog>
+      )}
     </div>
   )
 }

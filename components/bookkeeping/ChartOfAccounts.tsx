@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ChevronDown, ChevronRight, Search } from 'lucide-react'
+import { AccountNumber } from '@/components/ui/account-number'
 import type { BASAccount } from '@/types'
 
 const CLASS_LABELS: Record<number, string> = {
@@ -150,7 +151,7 @@ export default function ChartOfAccounts() {
                               !account.is_active ? 'opacity-50' : ''
                             }`}
                           >
-                            <td className="py-2 font-mono">{account.account_number}</td>
+                            <td className="py-2"><AccountNumber number={account.account_number} name={account.account_name} /></td>
                             <td className="py-2">{account.account_name}</td>
                             <td className="py-2 text-center">
                               {editingSRU === account.id ? (

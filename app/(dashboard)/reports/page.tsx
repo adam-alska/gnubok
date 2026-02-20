@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Download, FileText, FileDown, TrendingUp, Scale, AlertCircle, Receipt, Briefcase, Building2 } from 'lucide-react'
+import { Download, FileText, FileDown, TrendingUp, Scale, AlertCircle, Receipt, Briefcase, Building2, BookOpen, List, Users, ChevronDown, ChevronRight } from 'lucide-react'
+import { AccountNumber } from '@/components/ui/account-number'
 import { NEDeclarationView } from '@/extensions/ne-bilaga/NEDeclarationView'
 import { SRUExportView } from '@/extensions/sru-export/SRUExportView'
 import type {
@@ -62,7 +63,7 @@ export default function ReportsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Rapporter</h1>
           <p className="text-muted-foreground">
-            Saldobalans, resultaträkning, balansräkning, momsdeklaration, NE-bilaga, SRU-export och SIE-export
+            Huvudbok, grundbok, kundreskontra, saldobalans, resultaträkning, balansräkning, momsdeklaration och mer
           </p>
         </div>
       </div>
@@ -124,6 +125,18 @@ export default function ReportsPage() {
               <FileDown className="h-4 w-4 mr-1" />
               SRU-export
             </TabsTrigger>
+            <TabsTrigger value="huvudbok">
+              <BookOpen className="h-4 w-4 mr-1" />
+              Huvudbok
+            </TabsTrigger>
+            <TabsTrigger value="grundbok">
+              <List className="h-4 w-4 mr-1" />
+              Grundbok
+            </TabsTrigger>
+            <TabsTrigger value="kundreskontra">
+              <Users className="h-4 w-4 mr-1" />
+              Kundreskontra
+            </TabsTrigger>
             <TabsTrigger value="supplier-ledger">
               <Building2 className="h-4 w-4 mr-1" />
               Lev.reskontra
@@ -149,6 +162,15 @@ export default function ReportsPage() {
           )}
           <TabsContent value="sru-export">
             <SRUExportView periodId={selectedPeriod} />
+          </TabsContent>
+          <TabsContent value="huvudbok">
+            <GeneralLedgerView periodId={selectedPeriod} />
+          </TabsContent>
+          <TabsContent value="grundbok">
+            <JournalRegisterView periodId={selectedPeriod} />
+          </TabsContent>
+          <TabsContent value="kundreskontra">
+            <ARLedgerView periodId={selectedPeriod} />
           </TabsContent>
           <TabsContent value="supplier-ledger">
             <SupplierLedgerView periodId={selectedPeriod} />
@@ -252,7 +274,7 @@ function TrialBalanceView({ periodId }: { periodId: string }) {
           <tbody>
             {data.rows.map((row) => (
               <tr key={row.account_number} className="border-b last:border-0">
-                <td className="py-2 font-mono">{row.account_number}</td>
+                <td className="py-2"><AccountNumber number={row.account_number} name={row.account_name} /></td>
                 <td className="py-2">{row.account_name}</td>
                 <td className="py-2 text-right">
                   {row.period_debit > 0 ? formatAmount(row.period_debit) : ''}
@@ -553,7 +575,7 @@ function ReportSectionTable({
             <tbody>
               {section.rows.map((row) => (
                 <tr key={row.account_number} className="border-b last:border-0">
-                  <td className="py-1 font-mono w-16">{row.account_number}</td>
+                  <td className="py-1 w-16"><AccountNumber number={row.account_number} name={row.account_name} /></td>
                   <td className="py-1">{row.account_name}</td>
                   <td className="py-1 text-right w-28">
                     {negate ? `-${formatAmount(row.amount)}` : formatAmount(row.amount)} kr
@@ -1074,7 +1096,7 @@ function SupplierLedgerView({ periodId }: { periodId: string }) {
       {reconciliation && (
         <Card className="border-2">
           <CardHeader>
-            <CardTitle>Avstämning mot konto 2440</CardTitle>
+            <CardTitle>Avstämning mot <AccountNumber number="2440" /></CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2 text-sm">
@@ -1083,8 +1105,643 @@ function SupplierLedgerView({ periodId }: { periodId: string }) {
                 <span className="font-mono">{formatAmount(reconciliation.supplier_ledger_total)} kr</span>
               </div>
               <div className="flex justify-between">
-                <span>Konto 2440 saldo (huvudbok)</span>
+                <span><AccountNumber number="2440" /> saldo (huvudbok)</span>
                 <span className="font-mono">{formatAmount(reconciliation.account_2440_balance)} kr</span>
+              </div>
+              <div className="flex justify-between pt-2 border-t font-semibold">
+                <span>Differens</span>
+                <span className={reconciliation.is_reconciled ? 'text-green-600' : 'text-red-600'}>
+                  {formatAmount(reconciliation.difference)} kr
+                </span>
+              </div>
+              <div className="pt-2">
+                {reconciliation.is_reconciled ? (
+                  <Badge className="bg-green-100 text-green-800">Avstämd</Badge>
+                ) : (
+                  <Badge variant="destructive">Ej avstämd - kontrollera bokföring</Badge>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+// --- General Ledger (Huvudbok) ---
+
+interface GeneralLedgerData {
+  accounts: {
+    account_number: string
+    account_name: string
+    opening_balance: number
+    lines: {
+      date: string
+      voucher_series: string
+      voucher_number: number
+      description: string
+      source_type: string
+      debit: number
+      credit: number
+      balance: number
+    }[]
+    closing_balance: number
+    total_debit: number
+    total_credit: number
+  }[]
+  period: { start: string; end: string }
+}
+
+function GeneralLedgerView({ periodId }: { periodId: string }) {
+  const [data, setData] = useState<GeneralLedgerData | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [accountFrom, setAccountFrom] = useState('')
+  const [accountTo, setAccountTo] = useState('')
+
+  const fetchData = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const params = new URLSearchParams({ period_id: periodId })
+      if (accountFrom) params.set('account_from', accountFrom)
+      if (accountTo) params.set('account_to', accountTo)
+      const res = await fetch(`/api/reports/general-ledger?${params}`)
+      const result = await res.json()
+      if (result.error) {
+        setError(result.error)
+      } else {
+        setData(result.data)
+      }
+    } catch {
+      setError('Kunde inte hämta huvudbok')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (periodId) fetchData()
+  }, [periodId])
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-muted-foreground">
+          Laddar huvudbok...
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-destructive">
+          <AlertCircle className="h-6 w-6 mx-auto mb-2" />
+          {error}
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!data || data.accounts.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-muted-foreground">
+          Inga bokförda verifikationer i denna period.
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Account range filter */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-wrap items-end gap-4">
+            <div>
+              <Label>Konto från</Label>
+              <input
+                type="text"
+                value={accountFrom}
+                onChange={(e) => setAccountFrom(e.target.value)}
+                placeholder="t.ex. 1510"
+                className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <Label>Konto till</Label>
+              <input
+                type="text"
+                value={accountTo}
+                onChange={(e) => setAccountTo(e.target.value)}
+                placeholder="t.ex. 1519"
+                className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+            </div>
+            <Button onClick={fetchData} variant="outline">
+              Filtrera
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {data.period.start && (
+        <p className="text-sm text-muted-foreground">
+          Period: {data.period.start} — {data.period.end} | {data.accounts.length} konton
+        </p>
+      )}
+
+      {data.accounts.map((account) => (
+        <Card key={account.account_number}>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">
+                <AccountNumber number={account.account_number} name={account.account_name} showName />
+              </CardTitle>
+              <span className="text-sm text-muted-foreground">
+                IB: {formatAmount(account.opening_balance)} kr
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-muted-foreground">
+                  <th className="py-2 w-16">Ver.nr</th>
+                  <th className="py-2 w-24">Datum</th>
+                  <th className="py-2">Beskrivning</th>
+                  <th className="py-2 w-24 text-right">Debet</th>
+                  <th className="py-2 w-24 text-right">Kredit</th>
+                  <th className="py-2 w-28 text-right">Saldo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {account.lines.map((line, i) => (
+                  <tr key={i} className="border-b last:border-0">
+                    <td className="py-1.5 font-mono text-xs">
+                      {line.voucher_series}{line.voucher_number}
+                    </td>
+                    <td className="py-1.5">{line.date}</td>
+                    <td className="py-1.5 truncate max-w-[200px]">{line.description}</td>
+                    <td className="py-1.5 text-right">
+                      {line.debit > 0 ? formatAmount(line.debit) : ''}
+                    </td>
+                    <td className="py-1.5 text-right">
+                      {line.credit > 0 ? formatAmount(line.credit) : ''}
+                    </td>
+                    <td className="py-1.5 text-right font-mono">{formatAmount(line.balance)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="font-semibold border-t-2">
+                  <td colSpan={3} className="py-2">Summa / Utgående balans</td>
+                  <td className="py-2 text-right">{formatAmount(account.total_debit)}</td>
+                  <td className="py-2 text-right">{formatAmount(account.total_credit)}</td>
+                  <td className="py-2 text-right font-mono">{formatAmount(account.closing_balance)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+// --- Journal Register (Grundbok) ---
+
+interface JournalRegisterData {
+  entries: {
+    voucher_series: string
+    voucher_number: number
+    date: string
+    description: string
+    source_type: string
+    status: string
+    lines: {
+      account_number: string
+      account_name: string
+      debit: number
+      credit: number
+    }[]
+    total_debit: number
+    total_credit: number
+  }[]
+  total_entries: number
+  total_debit: number
+  total_credit: number
+  period: { start: string; end: string }
+}
+
+function JournalRegisterView({ periodId }: { periodId: string }) {
+  const [data, setData] = useState<JournalRegisterData | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [expandedEntries, setExpandedEntries] = useState<Set<number>>(new Set())
+
+  const fetchData = async () => {
+    setLoading(true)
+    setError(null)
+    setExpandedEntries(new Set())
+    try {
+      const res = await fetch(`/api/reports/journal-register?period_id=${periodId}`)
+      const result = await res.json()
+      if (result.error) {
+        setError(result.error)
+      } else {
+        setData(result.data)
+      }
+    } catch {
+      setError('Kunde inte hämta grundbok')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (periodId) fetchData()
+  }, [periodId])
+
+  const toggleEntry = (index: number) => {
+    setExpandedEntries((prev) => {
+      const next = new Set(prev)
+      if (next.has(index)) {
+        next.delete(index)
+      } else {
+        next.add(index)
+      }
+      return next
+    })
+  }
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-muted-foreground">
+          Laddar grundbok...
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-destructive">
+          <AlertCircle className="h-6 w-6 mx-auto mb-2" />
+          {error}
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!data || data.entries.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-muted-foreground">
+          Inga bokförda verifikationer i denna period.
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {data.period.start && (
+        <p className="text-sm text-muted-foreground">
+          Period: {data.period.start} — {data.period.end} | {data.total_entries} verifikationer
+        </p>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Grundbok (registreringsordning)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-muted-foreground">
+                <th className="py-2 w-8"></th>
+                <th className="py-2 w-16">Ver.nr</th>
+                <th className="py-2 w-24">Datum</th>
+                <th className="py-2">Beskrivning</th>
+                <th className="py-2 w-24">Typ</th>
+                <th className="py-2 w-24 text-right">Debet</th>
+                <th className="py-2 w-24 text-right">Kredit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.entries.map((entry, index) => {
+                const isExpanded = expandedEntries.has(index)
+                const isReversed = entry.status === 'reversed'
+
+                return (
+                  <React.Fragment key={index}>
+                    <tr
+                      className={`border-b cursor-pointer hover:bg-muted/50 ${isReversed ? 'line-through opacity-60' : ''}`}
+                      onClick={() => toggleEntry(index)}
+                    >
+                      <td className="py-2">
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </td>
+                      <td className="py-2 font-mono text-xs">
+                        {entry.voucher_series}{entry.voucher_number}
+                      </td>
+                      <td className="py-2">{entry.date}</td>
+                      <td className="py-2">
+                        {entry.description}
+                        {isReversed && (
+                          <Badge variant="outline" className="ml-2 text-xs">Makulerad</Badge>
+                        )}
+                      </td>
+                      <td className="py-2 text-xs text-muted-foreground">{entry.source_type}</td>
+                      <td className="py-2 text-right">{formatAmount(entry.total_debit)}</td>
+                      <td className="py-2 text-right">{formatAmount(entry.total_credit)}</td>
+                    </tr>
+                    {isExpanded && entry.lines.map((line, lineIndex) => (
+                      <tr key={`${index}-${lineIndex}`} className="bg-muted/30 border-b last:border-0">
+                        <td></td>
+                        <td></td>
+                        <td className="py-1"><AccountNumber number={line.account_number} name={line.account_name} size="sm" /></td>
+                        <td className="py-1 text-muted-foreground">{line.account_name}</td>
+                        <td></td>
+                        <td className="py-1 text-right">
+                          {line.debit > 0 ? formatAmount(line.debit) : ''}
+                        </td>
+                        <td className="py-1 text-right">
+                          {line.credit > 0 ? formatAmount(line.credit) : ''}
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                )
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="font-semibold border-t-2">
+                <td colSpan={5} className="py-2">Summa</td>
+                <td className="py-2 text-right">{formatAmount(data.total_debit)}</td>
+                <td className="py-2 text-right">{formatAmount(data.total_credit)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// --- AR Ledger (Kundreskontra) ---
+
+interface ARLedgerData {
+  ledger: {
+    entries: {
+      customer_id: string
+      customer_name: string
+      invoices: {
+        invoice_id: string
+        invoice_number: string
+        invoice_date: string
+        due_date: string
+        total: number
+        paid_amount: number
+        outstanding: number
+        days_overdue: number
+        currency: string
+      }[]
+      current: number
+      days_1_30: number
+      days_31_60: number
+      days_61_90: number
+      days_90_plus: number
+      total_outstanding: number
+    }[]
+    total_outstanding: number
+    total_current: number
+    total_overdue: number
+    unpaid_count: number
+  }
+  reconciliation: {
+    ar_ledger_total: number
+    account_1510_balance: number
+    difference: number
+    is_reconciled: boolean
+  } | null
+}
+
+function ARLedgerView({ periodId }: { periodId: string }) {
+  const [data, setData] = useState<ARLedgerData | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set())
+
+  const fetchData = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/reports/ar-ledger?period_id=${periodId}`)
+      const result = await res.json()
+      if (result.error) {
+        setError(result.error)
+      } else {
+        setData(result.data)
+      }
+    } catch {
+      setError('Kunde inte hämta kundreskontra')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (periodId) fetchData()
+  }, [periodId])
+
+  const toggleCustomer = (customerId: string) => {
+    setExpandedCustomers((prev) => {
+      const next = new Set(prev)
+      if (next.has(customerId)) {
+        next.delete(customerId)
+      } else {
+        next.add(customerId)
+      }
+      return next
+    })
+  }
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-muted-foreground">
+          Laddar kundreskontra...
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-destructive">
+          <AlertCircle className="h-6 w-6 mx-auto mb-2" />
+          {error}
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!data || !data.ledger) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-muted-foreground">
+          Ingen data tillgänglig.
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const { ledger, reconciliation } = data
+
+  return (
+    <div className="space-y-4">
+      {/* Summary cards */}
+      <div className="grid md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">Totalt utestående</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{formatAmount(ledger.total_outstanding)} kr</p>
+            <p className="text-xs text-muted-foreground">{ledger.unpaid_count} fakturor</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">Ej förfallet</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-green-600">{formatAmount(ledger.total_current)} kr</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">Förfallet</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-red-600">{formatAmount(ledger.total_overdue)} kr</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Aging table with expandable invoice details */}
+      {ledger.entries.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Ålderfördelning per kund</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-muted-foreground">
+                  <th className="py-2 w-8"></th>
+                  <th className="py-2">Kund</th>
+                  <th className="py-2 text-right">Ej förfallet</th>
+                  <th className="py-2 text-right">1-30 dagar</th>
+                  <th className="py-2 text-right">31-60 dagar</th>
+                  <th className="py-2 text-right">61-90 dagar</th>
+                  <th className="py-2 text-right">90+ dagar</th>
+                  <th className="py-2 text-right font-semibold">Totalt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ledger.entries.map((entry) => {
+                  const isExpanded = expandedCustomers.has(entry.customer_id)
+                  return (
+                    <React.Fragment key={entry.customer_id}>
+                      <tr
+                        className="border-b cursor-pointer hover:bg-muted/50"
+                        onClick={() => toggleCustomer(entry.customer_id)}
+                      >
+                        <td className="py-2">
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </td>
+                        <td className="py-2">{entry.customer_name}</td>
+                        <td className="py-2 text-right">{entry.current > 0 ? formatAmount(entry.current) : ''}</td>
+                        <td className="py-2 text-right">{entry.days_1_30 > 0 ? formatAmount(entry.days_1_30) : ''}</td>
+                        <td className="py-2 text-right">{entry.days_31_60 > 0 ? formatAmount(entry.days_31_60) : ''}</td>
+                        <td className="py-2 text-right">{entry.days_61_90 > 0 ? formatAmount(entry.days_61_90) : ''}</td>
+                        <td className="py-2 text-right text-red-600">{entry.days_90_plus > 0 ? formatAmount(entry.days_90_plus) : ''}</td>
+                        <td className="py-2 text-right font-semibold">{formatAmount(entry.total_outstanding)}</td>
+                      </tr>
+                      {isExpanded && entry.invoices.map((inv) => (
+                        <tr key={inv.invoice_id} className="bg-muted/30 border-b last:border-0">
+                          <td></td>
+                          <td className="py-1 text-xs" colSpan={2}>
+                            <span className="font-mono">{inv.invoice_number}</span>
+                            <span className="text-muted-foreground ml-2">{inv.invoice_date}</span>
+                            <span className="text-muted-foreground ml-2">förfaller {inv.due_date}</span>
+                          </td>
+                          <td className="py-1 text-right text-xs text-muted-foreground" colSpan={2}>
+                            {inv.days_overdue > 0 ? `${inv.days_overdue} dagar förfallen` : 'Ej förfallen'}
+                          </td>
+                          <td className="py-1 text-right text-xs text-muted-foreground">
+                            {inv.paid_amount > 0 ? `Betalt: ${formatAmount(inv.paid_amount)}` : ''}
+                          </td>
+                          <td></td>
+                          <td className="py-1 text-right text-xs font-medium">
+                            {formatAmount(inv.outstanding)} {inv.currency}
+                          </td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                  )
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="font-semibold border-t-2">
+                  <td className="py-2"></td>
+                  <td className="py-2">Summa</td>
+                  <td className="py-2 text-right">{formatAmount(ledger.entries.reduce((s, e) => s + e.current, 0))}</td>
+                  <td className="py-2 text-right">{formatAmount(ledger.entries.reduce((s, e) => s + e.days_1_30, 0))}</td>
+                  <td className="py-2 text-right">{formatAmount(ledger.entries.reduce((s, e) => s + e.days_31_60, 0))}</td>
+                  <td className="py-2 text-right">{formatAmount(ledger.entries.reduce((s, e) => s + e.days_61_90, 0))}</td>
+                  <td className="py-2 text-right text-red-600">{formatAmount(ledger.entries.reduce((s, e) => s + e.days_90_plus, 0))}</td>
+                  <td className="py-2 text-right">{formatAmount(ledger.total_outstanding)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Reconciliation */}
+      {reconciliation && (
+        <Card className="border-2">
+          <CardHeader>
+            <CardTitle>Avstämning mot <AccountNumber number="1510" /></CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span>Kundreskontra (summa utestående)</span>
+                <span className="font-mono">{formatAmount(reconciliation.ar_ledger_total)} kr</span>
+              </div>
+              <div className="flex justify-between">
+                <span><AccountNumber number="1510" /> saldo (huvudbok)</span>
+                <span className="font-mono">{formatAmount(reconciliation.account_1510_balance)} kr</span>
               </div>
               <div className="flex justify-between pt-2 border-t font-semibold">
                 <span>Differens</span>

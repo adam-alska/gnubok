@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ChevronDown, ChevronRight } from 'lucide-react'
+import { AccountNumber } from '@/components/ui/account-number'
 import type { JournalEntry, JournalEntryLine } from '@/types'
 
 interface Props {
@@ -138,7 +139,7 @@ export default function JournalEntryList({ periodId }: Props) {
                         .sort((a, b) => a.sort_order - b.sort_order)
                         .map((line) => (
                           <tr key={line.id} className="border-b last:border-0">
-                            <td className="py-2 font-mono">{line.account_number}</td>
+                            <td className="py-2"><AccountNumber number={line.account_number} /></td>
                             <td className="py-2 text-muted-foreground">
                               {line.line_description || ''}
                             </td>
