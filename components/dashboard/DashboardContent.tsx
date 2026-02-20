@@ -20,9 +20,13 @@ import {
   Receipt,
   ArrowLeftRight,
   ChevronDown,
+  ChevronUp,
   ArrowRight,
   Camera,
   Users,
+  Landmark,
+  CheckCircle2,
+  ClipboardList,
 } from 'lucide-react'
 import type { CompanySettings, EntityType, Deadline, ReceiptQueueSummary, OnboardingProgress } from '@/types'
 
@@ -48,6 +52,7 @@ interface DashboardContentProps {
 
 export default function DashboardContent({ firstName, settings, summary, onboardingProgress }: DashboardContentProps) {
   const [showAllAlerts, setShowAllAlerts] = useState(false)
+  const [showMore, setShowMore] = useState(false)
 
   const entityType = (settings?.entity_type as EntityType) || 'enskild_firma'
   const preliminaryTaxMonthly = settings?.preliminary_tax_monthly || 0
@@ -253,12 +258,116 @@ export default function DashboardContent({ firstName, settings, summary, onboard
         </section>
       )}
 
-      {/* Upcoming deadlines */}
-      {summary.deadlines && summary.deadlines.length > 0 && (
-        <section className="mb-10">
-          <UpcomingDeadlinesWidget deadlines={summary.deadlines} maxItems={8} />
-        </section>
-      )}
+      {/* 4 Key Summary Cards */}
+      {(() => {
+        const passedDeadlinesCount = summary.deadlines.filter(d => !d.is_completed && new Date(d.due_date) <= new Date()).length
+        const pendingReceiptsCount = summary.receiptQueue
+          ? summary.receiptQueue.pending_review_count + summary.receiptQueue.unmatched_receipts_count
+          : 0
+        const todoCount = summary.uncategorizedCount + summary.overdueInvoicesCount + pendingReceiptsCount + passedDeadlinesCount
+
+        return (
+          <section className="mb-10">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {/* Card 1: Resultat */}
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Resultat</span>
+                  </div>
+                  <p className={cn(
+                    'font-display text-xl font-medium tabular-nums leading-tight',
+                    summary.mtd.net >= 0 ? 'text-success' : 'text-destructive'
+                  )}>
+                    {formatLargeNumber(summary.mtd.net)}
+                    <span className="text-sm ml-0.5 text-muted-foreground font-normal">kr</span>
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    {formatCurrency(summary.ytd.net)} i år
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Card 2: Att få betalt */}
+              <Link href="/invoices?status=unpaid">
+                <Card className="h-full hover:border-primary/50 transition-colors">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Receipt className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Att få betalt</span>
+                    </div>
+                    <p className="font-display text-xl font-medium tabular-nums leading-tight">
+                      {summary.unpaidInvoicesCount}
+                      <span className="text-sm ml-0.5 text-muted-foreground font-normal">st</span>
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      {formatCurrency(summary.unpaidInvoicesTotal)}
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+
+              {/* Card 3: Banksaldo */}
+              {summary.bankBalance !== null ? (
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Landmark className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Banksaldo</span>
+                    </div>
+                    <p className="font-display text-xl font-medium tabular-nums leading-tight">
+                      {formatLargeNumber(summary.bankBalance)}
+                      <span className="text-sm ml-0.5 text-muted-foreground font-normal">kr</span>
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Link href="/import">
+                  <Card className="h-full hover:border-primary/50 transition-colors">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Landmark className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">Banksaldo</span>
+                      </div>
+                      <p className="text-sm font-medium text-primary">Koppla bank</p>
+                      <p className="text-[11px] text-muted-foreground mt-1">Importera transaktioner</p>
+                    </CardContent>
+                  </Card>
+                </Link>
+              )}
+
+              {/* Card 4: Att göra */}
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <ClipboardList className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Att göra</span>
+                  </div>
+                  {todoCount > 0 ? (
+                    <>
+                      <p className="font-display text-xl font-medium tabular-nums leading-tight text-warning-foreground">
+                        {todoCount}
+                        <span className="text-sm ml-0.5 text-muted-foreground font-normal">st</span>
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        Åtgärder att hantera
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-1.5">
+                        <CheckCircle2 className="h-4 w-4 text-success" />
+                        <p className="text-sm font-medium text-success">Allt klart!</p>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+        )
+      })()}
 
       {/* Quick actions */}
       <section id="quick-actions" className="mb-10">
@@ -294,15 +403,14 @@ export default function DashboardContent({ firstName, settings, summary, onboard
         </div>
       </section>
 
-      {/* F-skatt warning */}
-      <section id="fskatt-section" className="mb-10">
-        <FSkattWarningCard
-          warningStatus={taxWarning}
-          onAdjustClick={() => { window.location.href = '/settings' }}
-        />
-      </section>
+      {/* Upcoming deadlines — always visible */}
+      {summary.deadlines && summary.deadlines.length > 0 && (
+        <section className="mb-10">
+          <UpcomingDeadlinesWidget deadlines={summary.deadlines} maxItems={8} />
+        </section>
+      )}
 
-      {/* Alerts section */}
+      {/* Alerts section — always visible */}
       {alertItems.length > 0 && (
         <section id="alerts-section" className="mb-10">
           <h2 className="font-display text-lg font-medium mb-4">Att hantera</h2>
@@ -321,82 +429,112 @@ export default function DashboardContent({ firstName, settings, summary, onboard
         </section>
       )}
 
-      {/* Uncategorized transactions warning */}
-      {summary.uncategorizedCount > 0 && (summary.uncategorizedIncome > 0 || summary.uncategorizedExpenses > 0) && (
-        <section className="mb-10">
-          <Link href="/transactions?tab=uncategorized" className="group">
-            <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl border border-warning/30 bg-warning/[0.03] hover:bg-warning/[0.06] transition-colors">
-              <ArrowLeftRight className="h-4 w-4 text-warning-foreground flex-shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm">
-                  {summary.uncategorizedCount} okategoriserade transaktioner
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {summary.uncategorizedIncome > 0 && (
-                    <span>{formatCurrency(summary.uncategorizedIncome)} intäkter</span>
-                  )}
-                  {summary.uncategorizedIncome > 0 && summary.uncategorizedExpenses > 0 && ', '}
-                  {summary.uncategorizedExpenses > 0 && (
-                    <span>{formatCurrency(summary.uncategorizedExpenses)} kostnader</span>
-                  )}
-                  {' '}saknas i resultatet
-                </p>
-              </div>
-              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground flex-shrink-0 mt-0.5 transition-colors" />
+      {/* Collapsible details section */}
+      <button
+        onClick={() => setShowMore(!showMore)}
+        className="mb-6 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
+      >
+        {showMore ? (
+          <>
+            Dölj detaljer
+            <ChevronUp className="h-3.5 w-3.5" />
+          </>
+        ) : (
+          <>
+            Visa detaljer
+            <ChevronDown className="h-3.5 w-3.5" />
+          </>
+        )}
+      </button>
+
+      {showMore && (
+        <div>
+          {/* F-skatt warning */}
+          <section id="fskatt-section" className="mb-10">
+            <FSkattWarningCard
+              warningStatus={taxWarning}
+              onAdjustClick={() => { window.location.href = '/settings' }}
+            />
+          </section>
+
+          {/* Uncategorized transactions warning */}
+          {summary.uncategorizedCount > 0 && (summary.uncategorizedIncome > 0 || summary.uncategorizedExpenses > 0) && (
+            <section className="mb-10">
+              <Link href="/transactions?tab=uncategorized" className="group">
+                <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl border border-warning/30 bg-warning/[0.03] hover:bg-warning/[0.06] transition-colors">
+                  <ArrowLeftRight className="h-4 w-4 text-warning-foreground flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm">
+                      {summary.uncategorizedCount} okategoriserade transaktioner
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {summary.uncategorizedIncome > 0 && (
+                        <span>{formatCurrency(summary.uncategorizedIncome)} intäkter</span>
+                      )}
+                      {summary.uncategorizedIncome > 0 && summary.uncategorizedExpenses > 0 && ', '}
+                      {summary.uncategorizedExpenses > 0 && (
+                        <span>{formatCurrency(summary.uncategorizedExpenses)} kostnader</span>
+                      )}
+                      {' '}saknas i resultatet
+                    </p>
+                  </div>
+                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground flex-shrink-0 mt-0.5 transition-colors" />
+                </div>
+              </Link>
+            </section>
+          )}
+
+          {/* Income/Expenses */}
+          <section className="mb-10">
+            <h2 className="font-display text-lg font-medium mb-4">Resultat</h2>
+            <div className="grid md:grid-cols-2 gap-3">
+              <Card>
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <TrendingUp className="h-3.5 w-3.5 text-success" />
+                    <span className="text-sm text-muted-foreground">Intäkter</span>
+                  </div>
+                  <div>
+                    <p className="font-display text-2xl font-medium tabular-nums leading-tight">
+                      {formatLargeNumber(summary.mtd.income)}
+                      <span className="text-base ml-1 text-muted-foreground font-normal">kr</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">denna månad</p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-border/30">
+                    <div className="flex items-baseline justify-between">
+                      <p className="text-xs text-muted-foreground">I år</p>
+                      <p className="text-sm font-medium tabular-nums">{formatCurrency(summary.ytd.income)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <TrendingDown className="h-3.5 w-3.5 text-destructive" />
+                    <span className="text-sm text-muted-foreground">Kostnader</span>
+                  </div>
+                  <div>
+                    <p className="font-display text-2xl font-medium tabular-nums leading-tight">
+                      {formatLargeNumber(summary.mtd.expenses)}
+                      <span className="text-base ml-1 text-muted-foreground font-normal">kr</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">denna månad</p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-border/30">
+                    <div className="flex items-baseline justify-between">
+                      <p className="text-xs text-muted-foreground">I år</p>
+                      <p className="text-sm font-medium tabular-nums">{formatCurrency(summary.ytd.expenses)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          </Link>
-        </section>
-      )}
-
-      {/* Income/Expenses */}
-      <section className="mb-10">
-        <h2 className="font-display text-lg font-medium mb-4">Resultat</h2>
-        <div className="grid md:grid-cols-2 gap-3">
-          <Card>
-            <CardContent className="p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <TrendingUp className="h-3.5 w-3.5 text-success" />
-                <span className="text-sm text-muted-foreground">Intäkter</span>
-              </div>
-              <div>
-                <p className="font-display text-2xl font-medium tabular-nums leading-tight">
-                  {formatLargeNumber(summary.mtd.income)}
-                  <span className="text-base ml-1 text-muted-foreground font-normal">kr</span>
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">denna månad</p>
-              </div>
-              <div className="mt-4 pt-3 border-t border-border/30">
-                <div className="flex items-baseline justify-between">
-                  <p className="text-xs text-muted-foreground">I år</p>
-                  <p className="text-sm font-medium tabular-nums">{formatCurrency(summary.ytd.income)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <TrendingDown className="h-3.5 w-3.5 text-destructive" />
-                <span className="text-sm text-muted-foreground">Kostnader</span>
-              </div>
-              <div>
-                <p className="font-display text-2xl font-medium tabular-nums leading-tight">
-                  {formatLargeNumber(summary.mtd.expenses)}
-                  <span className="text-base ml-1 text-muted-foreground font-normal">kr</span>
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">denna månad</p>
-              </div>
-              <div className="mt-4 pt-3 border-t border-border/30">
-                <div className="flex items-baseline justify-between">
-                  <p className="text-xs text-muted-foreground">I år</p>
-                  <p className="text-sm font-medium tabular-nums">{formatCurrency(summary.ytd.expenses)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          </section>
         </div>
-      </section>
+      )}
     </div>
   )
 }

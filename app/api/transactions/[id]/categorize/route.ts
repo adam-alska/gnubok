@@ -209,6 +209,27 @@ export async function POST(
     }
   }
 
+  // Link receipt document to journal entry if both exist
+  if (journalEntryId && transaction.receipt_id) {
+    try {
+      const { data: receipt } = await supabase
+        .from('receipts')
+        .select('document_id')
+        .eq('id', transaction.receipt_id)
+        .single()
+
+      if (receipt?.document_id) {
+        await supabase
+          .from('document_attachments')
+          .update({ journal_entry_id: journalEntryId })
+          .eq('id', receipt.document_id)
+          .eq('user_id', user.id)
+      }
+    } catch (linkErr) {
+      console.error('[categorize] Failed to link receipt document:', linkErr)
+    }
+  }
+
   // Update the transaction
   const { error: updateError } = await supabase
     .from('transactions')

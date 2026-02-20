@@ -49,8 +49,8 @@ const navItems: NavItem[] = [
   { href: '/supplier-invoices', label: 'Lev.fakturor', icon: FileInput, group: 'finans' },
   { href: '/transactions', label: 'Transaktioner', icon: ArrowLeftRight, group: 'finans' },
   { href: '/bookkeeping', label: 'Bokföring', icon: BookOpen, group: 'finans' },
+  { href: '/reports', label: 'Rapporter', icon: BarChart3, group: 'finans' },
   { href: '/import', label: 'Importera', icon: Upload, group: 'övrigt' },
-  { href: '/reports', label: 'Rapporter', icon: BarChart3, group: 'övrigt' },
   { href: '/help', label: 'Hjälp', icon: HelpCircle, group: 'övrigt' },
   { href: '/settings', label: 'Inställningar', icon: Settings, group: 'övrigt' },
 ]
@@ -66,7 +66,10 @@ export default function DashboardNav({ companyName, entityType }: DashboardNavPr
   const router = useRouter()
   const supabase = createClient()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isOvrigtExpanded, setIsOvrigtExpanded] = useState(false)
+  // Auto-expand Övrigt when the user is on one of its pages, or when manually toggled
+  const isOnOvrigtPage = ['/import', '/help', '/settings'].some(p => pathname.startsWith(p))
+  const [manualOvrigtExpanded, setManualOvrigtExpanded] = useState(false)
+  const isOvrigtExpanded = isOnOvrigtPage || manualOvrigtExpanded
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -177,7 +180,7 @@ export default function DashboardNav({ companyName, entityType }: DashboardNavPr
               {/* Övrigt group - collapsible */}
               <div className="mb-4">
                 <button
-                  onClick={() => setIsOvrigtExpanded(!isOvrigtExpanded)}
+                  onClick={() => setManualOvrigtExpanded(!isOvrigtExpanded)}
                   className="w-full flex items-center justify-between px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-[0.08em] hover:text-muted-foreground transition-colors"
                 >
                   <span>{groupLabels.övrigt}</span>

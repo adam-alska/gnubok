@@ -2,7 +2,7 @@
 
 import { Badge } from '@/components/ui/badge'
 import { AccountNumber } from '@/components/ui/account-number'
-import { CheckCircle2 } from 'lucide-react'
+import { CheckCircle2, Paperclip } from 'lucide-react'
 
 interface ReviewLine {
   account_number: string
@@ -18,6 +18,7 @@ interface JournalEntryReviewContentProps {
   lines: ReviewLine[]
   totalDebit: number
   totalCredit: number
+  attachmentCount?: number
 }
 
 function formatAmount(amount: number): string {
@@ -31,6 +32,7 @@ export function JournalEntryReviewContent({
   lines,
   totalDebit,
   totalCredit,
+  attachmentCount,
 }: JournalEntryReviewContentProps) {
   const activeLines = lines.filter(
     (l) => l.account_number && (l.debit_amount || l.credit_amount)
@@ -62,6 +64,12 @@ export function JournalEntryReviewContent({
           <CheckCircle2 className="h-3 w-3 mr-1" />
           Debet = Kredit
         </Badge>
+        {attachmentCount != null && attachmentCount > 0 && (
+          <Badge variant="outline">
+            <Paperclip className="h-3 w-3 mr-1" />
+            {attachmentCount} {attachmentCount === 1 ? 'underlag' : 'underlag'}
+          </Badge>
+        )}
       </div>
 
       {/* Debit/Credit table */}

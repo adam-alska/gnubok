@@ -17,7 +17,8 @@ import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency } from '@/lib/utils'
 import { getVatRules, getVatTreatmentLabel } from '@/lib/invoice/vat-rules'
-import { Loader2, Plus, Trash2, ArrowLeft } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { Loader2, Plus, Trash2, ArrowLeft, Send } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { InvoiceReviewContent } from '@/components/invoices/InvoiceReviewContent'
 import type { Customer, Currency, CreateInvoiceInput } from '@/types'
@@ -58,6 +59,9 @@ export default function NewInvoicePage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [showReview, setShowReview] = useState(false)
   const [pendingData, setPendingData] = useState<FormData | null>(null)
+  const [createdInvoiceId, setCreatedInvoiceId] = useState<string | null>(null)
+  const [showSendPrompt, setShowSendPrompt] = useState(false)
+  const [isSending, setIsSending] = useState(false)
 
   const {
     register,
@@ -168,7 +172,14 @@ export default function NewInvoicePage() {
       })
 
       setShowReview(false)
-      router.push(`/invoices/${result.data.id}`)
+
+      // If customer has email, offer to send immediately
+      if (selectedCustomer?.email) {
+        setCreatedInvoiceId(result.data.id)
+        setShowSendPrompt(true)
+      } else {
+        router.push(`/invoices/${result.data.id}`)
+      }
     } catch (error) {
       toast({
         title: 'Fel',
@@ -177,6 +188,37 @@ export default function NewInvoicePage() {
       })
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  async function handleSendNow() {
+    if (!createdInvoiceId) return
+    setIsSending(true)
+
+    try {
+      const response = await fetch(`/api/invoices/${createdInvoiceId}/send`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        const result = await response.json()
+        throw new Error(result.error || 'Kunde inte skicka faktura')
+      }
+
+      toast({
+        title: 'Faktura skickad',
+        description: `Fakturan har skickats till ${selectedCustomer?.email}`,
+      })
+    } catch (error) {
+      toast({
+        title: 'Fel vid skickning',
+        description: error instanceof Error ? error.message : 'Något gick fel',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSending(false)
+      setShowSendPrompt(false)
+      router.push(`/invoices/${createdInvoiceId}`)
     }
   }
 
@@ -465,6 +507,43 @@ export default function NewInvoicePage() {
           />
         </ConfirmationDialog>
       )}
+
+      {/* Send now prompt dialog */}
+      <Dialog open={showSendPrompt} onOpenChange={(open) => {
+        if (!open && createdInvoiceId) {
+          setShowSendPrompt(false)
+          router.push(`/invoices/${createdInvoiceId}`)
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Skicka fakturan nu?</DialogTitle>
+            <DialogDescription>
+              Fakturan skapades. Vill du skicka den till {selectedCustomer?.email} direkt?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowSendPrompt(false)
+                if (createdInvoiceId) router.push(`/invoices/${createdInvoiceId}`)
+              }}
+              disabled={isSending}
+            >
+              Skicka senare
+            </Button>
+            <Button onClick={handleSendNow} disabled={isSending}>
+              {isSending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="mr-2 h-4 w-4" />
+              )}
+              {isSending ? 'Skickar...' : 'Skicka nu'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
