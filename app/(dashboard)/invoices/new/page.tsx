@@ -391,7 +391,7 @@ export default function NewInvoicePage() {
                 <div className="space-y-4">
                   {fields.map((field, index) => (
                     <div key={field.id} className="grid gap-4 md:grid-cols-12 items-start">
-                      <div className="md:col-span-4 space-y-2">
+                      <div className="md:col-span-3 space-y-2">
                         <Label>Beskrivning</Label>
                         <Input
                           placeholder="T.ex. Instagram-kampanj"
@@ -403,7 +403,7 @@ export default function NewInvoicePage() {
                           </p>
                         )}
                       </div>
-                      <div className="md:col-span-1 space-y-2">
+                      <div className="md:col-span-2 space-y-2">
                         <Label>Antal</Label>
                         <Input
                           type="number"

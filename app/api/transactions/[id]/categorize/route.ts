@@ -32,9 +32,9 @@ async function ensureFiscalPeriod(
     .lte('period_start', date)
     .gte('period_end', date)
     .eq('is_closed', false)
-    .single()
+    .limit(1)
 
-  if (existing) {
+  if (existing && existing.length > 0) {
     return true
   }
 
