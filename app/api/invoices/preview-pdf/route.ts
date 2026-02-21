@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { renderToBuffer } from '@react-pdf/renderer'
-import { InvoicePDF } from '@/lib/invoice/pdf-template'
-import { getVatRules } from '@/lib/invoice/vat-rules'
+import { InvoicePDF } from '@/lib/invoices/pdf-template'
+import { getVatRules } from '@/lib/invoices/vat-rules'
 import type { Invoice, InvoiceItem, Customer, CompanySettings, InvoiceDocumentType } from '@/types'
 
 /**

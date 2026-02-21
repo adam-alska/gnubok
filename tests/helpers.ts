@@ -15,6 +15,7 @@ import type {
   Supplier,
   SupplierInvoice,
   CompanySettings,
+  InvoiceInboxItem,
 } from '@/types'
 import type { ExtensionToggle } from '@/lib/extensions/types'
 
@@ -440,6 +441,29 @@ export function makeCompanySettings(
     sector_slug: null,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
+export function makeInvoiceInboxItem(
+  overrides: Partial<InvoiceInboxItem> = {}
+): InvoiceInboxItem {
+  return {
+    id: nextId(),
+    user_id: 'user-1',
+    status: 'pending',
+    source: 'upload',
+    email_from: null,
+    email_subject: null,
+    email_received_at: null,
+    document_id: null,
+    extracted_data: null,
+    confidence: null,
+    matched_supplier_id: null,
+    created_supplier_invoice_id: null,
+    error_message: null,
+    created_at: '2024-06-15T14:30:00Z',
+    updated_at: '2024-06-15T14:30:00Z',
     ...overrides,
   }
 }

@@ -1271,6 +1271,36 @@ export interface SIEAccountMapping {
 }
 
 // ============================================================
+// Invoice Inbox Types
+// ============================================================
+
+export type InboxItemStatus = 'pending' | 'processing' | 'ready' | 'confirmed' | 'rejected' | 'error'
+export type InboxItemSource = 'email' | 'upload'
+
+export interface InvoiceInboxItem {
+  id: string
+  user_id: string
+  status: InboxItemStatus
+  source: InboxItemSource
+  email_from: string | null
+  email_subject: string | null
+  email_received_at: string | null
+  document_id: string | null
+  extracted_data: Record<string, unknown> | null
+  confidence: number | null
+  matched_supplier_id: string | null
+  created_supplier_invoice_id: string | null
+  error_message: string | null
+  created_at: string
+  updated_at: string
+
+  // Relations (populated when fetched)
+  document?: DocumentAttachment
+  supplier?: Supplier
+  supplier_invoice?: SupplierInvoice
+}
+
+// ============================================================
 // Receipt Types (canonical source: extensions/receipt-ocr/types.ts)
 // ============================================================
 export type { ReceiptStatus, Receipt, ReceiptLineItem, ReceiptExtractionResult, ExtractedLineItem, ReceiptMatchCandidate, CreateReceiptInput, ConfirmReceiptInput, ConfirmLineItemInput, ReceiptQueueSummary, CameraQualityFeedback } from '@/extensions/general/receipt-ocr/types'

@@ -257,3 +257,69 @@ export function getExpenseAccountForCategory(category: TransactionCategory): str
   }
   return mapping[category] || null
 }
+
+/**
+ * Get the default account number for a category.
+ * For expense categories: returns the expense account (debit side).
+ * For income categories: returns the revenue account (credit side).
+ * For private/uncategorized: returns the entity-specific private or fallback account.
+ */
+export function getDefaultAccountForCategory(
+  category: TransactionCategory,
+  entityType: EntityType = 'enskild_firma'
+): string {
+  if (category === 'private') {
+    return PRIVATE_ACCOUNTS[entityType] || PRIVATE_ACCOUNTS.enskild_firma
+  }
+
+  const expenseMapping: Record<string, string> = {
+    expense_equipment: '5410',
+    expense_software: '5420',
+    expense_travel: '5800',
+    expense_office: '5010',
+    expense_marketing: '5910',
+    expense_professional_services: '6530',
+    expense_education: entityType === 'aktiebolag' ? '7610' : '6991',
+    expense_bank_fees: '6570',
+    expense_card_fees: '6570',
+    expense_currency_exchange: '7960',
+    expense_other: '6991',
+  }
+
+  if (category.startsWith('expense_')) {
+    return expenseMapping[category] || '6991'
+  }
+
+  const incomeMapping: Record<string, string> = {
+    income_services: '3001',
+    income_products: '3001',
+    income_other: '3900',
+  }
+
+  if (category.startsWith('income_')) {
+    return incomeMapping[category] || '3900'
+  }
+
+  // uncategorized
+  return '6991'
+}
+
+/**
+ * Get the default VAT treatment for a category.
+ * Bank fees, card fees, and currency exchange are VAT-exempt.
+ * All other business categories default to standard 25%.
+ */
+export function getDefaultVatTreatmentForCategory(
+  category: TransactionCategory
+): VatTreatment | null {
+  if (category === 'private' || category === 'uncategorized') {
+    return null
+  }
+
+  const vatExemptCategories = ['expense_bank_fees', 'expense_card_fees', 'expense_currency_exchange']
+  if (vatExemptCategories.includes(category)) {
+    return null
+  }
+
+  return 'standard_25'
+}
