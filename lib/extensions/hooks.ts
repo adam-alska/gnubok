@@ -62,6 +62,11 @@ export function useExtensionToggle(sectorSlug: string, extensionSlug: string) {
       })
       if (!res.ok) {
         setEnabled(!newValue) // Revert on error
+      } else {
+        // Notify other components about the toggle change
+        window.dispatchEvent(new CustomEvent('extension-toggle-changed', {
+          detail: { sectorSlug, extensionSlug, enabled: newValue },
+        }))
       }
     } catch {
       setEnabled(!newValue) // Revert on error

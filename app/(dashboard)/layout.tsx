@@ -35,16 +35,6 @@ export default async function DashboardLayout({
     .eq('user_id', user.id)
     .eq('enabled', true)
 
-  // Check if ai-chat is explicitly disabled (legacy default: enabled when no row exists)
-  const { data: aiChatToggle } = await supabase
-    .from('extension_toggles')
-    .select('enabled')
-    .eq('user_id', user.id)
-    .eq('sector_slug', 'general')
-    .eq('extension_slug', 'ai-chat')
-    .single()
-  const showAiChat = aiChatToggle ? aiChatToggle.enabled : true
-
   return (
     <div className="min-h-screen bg-background">
       {/* Skip to content link for keyboard/screen reader users */}
@@ -64,7 +54,7 @@ export default async function DashboardLayout({
           {children}
         </div>
       </main>
-      {showAiChat && <ChatWidget />}
+      <ChatWidget />
     </div>
   )
 }
