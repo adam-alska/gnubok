@@ -30,7 +30,7 @@ import {
   AlertTriangle,
   MessageSquare,
 } from 'lucide-react'
-import type { Invoice, InvoiceItem, Customer, InvoiceStatus, InvoiceReminder } from '@/types'
+import type { Invoice, InvoiceItem, Customer, InvoiceStatus, InvoiceReminder, InvoiceDocumentType } from '@/types'
 
 const statusConfig: Record<InvoiceStatus, { label: string; variant: 'default' | 'secondary' | 'success' | 'warning' | 'destructive'; icon: React.ElementType }> = {
   draft: { label: 'Utkast', variant: 'secondary', icon: FileText },
@@ -63,6 +63,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [reminders, setReminders] = useState<InvoiceReminder[]>([])
   const [creditNote, setCreditNote] = useState<Invoice | null>(null)
   const [originalInvoice, setOriginalInvoice] = useState<Invoice | null>(null)
+  const [convertedFromInvoice, setConvertedFromInvoice] = useState<Invoice | null>(null)
+  const [isConverting, setIsConverting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
@@ -136,6 +138,19 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
       if (originalData) {
         setOriginalInvoice(originalData as Invoice)
+      }
+    }
+
+    // If this invoice was converted from a proforma, fetch it
+    if (data.converted_from_id) {
+      const { data: convertedData } = await supabase
+        .from('invoices')
+        .select('id, invoice_number')
+        .eq('id', data.converted_from_id)
+        .single()
+
+      if (convertedData) {
+        setConvertedFromInvoice(convertedData as Invoice)
       }
     }
 
@@ -235,6 +250,38 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     setIsSendingEmail(false)
   }
 
+  async function convertToInvoice() {
+    if (!invoice) return
+    setIsConverting(true)
+
+    try {
+      const response = await fetch(`/api/invoices/${invoice.id}/convert`, {
+        method: 'POST',
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Kunde inte konvertera proformafakturan')
+      }
+
+      toast({
+        title: 'Konverterad till faktura',
+        description: `Faktura ${data.data.invoice_number} har skapats`,
+      })
+
+      router.push(`/invoices/${data.data.id}`)
+    } catch (error) {
+      toast({
+        title: 'Fel',
+        description: error instanceof Error ? error.message : 'Kunde inte konvertera',
+        variant: 'destructive',
+      })
+    }
+
+    setIsConverting(false)
+  }
+
   async function downloadPDF() {
     if (!invoice) return
 
@@ -288,6 +335,11 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const StatusIcon = status.icon
   const customer = invoice.customer
   const customerHasEmail = !!customer.email
+  const docType = ((invoice as Invoice & { document_type?: InvoiceDocumentType }).document_type || 'invoice') as InvoiceDocumentType
+  const isProforma = docType === 'proforma'
+  const isDeliveryNote = docType === 'delivery_note'
+  const isRealInvoice = docType === 'invoice'
+  const docLabel = isProforma ? 'Proformafaktura' : isDeliveryNote ? 'Följesedel' : 'Faktura'
 
   return (
     <div className="space-y-6">
@@ -300,6 +352,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight">{invoice.invoice_number}</h1>
+              {isProforma && (
+                <Badge variant="secondary" className="bg-blue-100 text-blue-700">Proforma</Badge>
+              )}
+              {isDeliveryNote && (
+                <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">Följesedel</Badge>
+              )}
               <Badge variant={status.variant as 'default' | 'secondary' | 'destructive'}>
                 <StatusIcon className="mr-1 h-3 w-3" />
                 {status.label}
@@ -314,7 +372,17 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          {invoice.status === 'draft' && (
+          {isProforma && invoice.status !== 'cancelled' && (
+            <Button onClick={convertToInvoice} disabled={isConverting}>
+              {isConverting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <FileText className="mr-2 h-4 w-4" />
+              )}
+              Konvertera till faktura
+            </Button>
+          )}
+          {invoice.status === 'draft' && !isDeliveryNote && (
             customerHasEmail ? (
               <Button onClick={sendInvoiceEmail} disabled={isSendingEmail}>
                 {isSendingEmail ? (
@@ -331,7 +399,13 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               </Button>
             )
           )}
-          {(invoice.status === 'sent' || invoice.status === 'overdue') && (
+          {isDeliveryNote && invoice.status === 'draft' && (
+            <Button onClick={() => updateStatus('sent')} disabled={isUpdating}>
+              <Send className="mr-2 h-4 w-4" />
+              Markera som skickad
+            </Button>
+          )}
+          {(invoice.status === 'sent' || invoice.status === 'overdue') && isRealInvoice && (
             <Button onClick={() => updateStatus('paid')} disabled={isUpdating}>
               <CheckCircle className="mr-2 h-4 w-4" />
               Markera som betald
@@ -656,6 +730,29 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             </Card>
           )}
 
+          {/* Converted from proforma */}
+          {convertedFromInvoice && (
+            <Card className="border-blue-300">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-blue-600">
+                  <FileText className="h-5 w-5" />
+                  Konverterad
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Konverterad från proformafaktura
+                </p>
+                <Link href={`/invoices/${convertedFromInvoice.id}`}>
+                  <Button variant="outline" size="sm" className="w-full">
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Se proforma {convertedFromInvoice.invoice_number}
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Status actions */}
           {invoice.status !== 'cancelled' && invoice.status !== 'credited' && !invoice.credited_invoice_id && (
             <Card>
@@ -663,9 +760,34 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 <CardTitle>Åtgärder</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {invoice.status === 'draft' && (
+                {isProforma && (
                   <>
-                    {customerHasEmail ? (
+                    <Button
+                      className="w-full"
+                      onClick={convertToInvoice}
+                      disabled={isConverting}
+                    >
+                      {isConverting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileText className="mr-2 h-4 w-4" />
+                      )}
+                      Konvertera till faktura
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => updateStatus('cancelled')}
+                      disabled={isUpdating}
+                    >
+                      <XCircle className="mr-2 h-4 w-4" />
+                      Makulera
+                    </Button>
+                  </>
+                )}
+                {!isProforma && invoice.status === 'draft' && (
+                  <>
+                    {!isDeliveryNote && customerHasEmail ? (
                       <Button
                         className="w-full"
                         onClick={sendInvoiceEmail}
@@ -680,12 +802,14 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                       </Button>
                     ) : (
                       <>
-                        <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-2">
-                          <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
-                          <p className="text-xs text-yellow-700">
-                            Kunden saknar e-postadress. Lägg till e-post för att kunna skicka fakturan digitalt.
-                          </p>
-                        </div>
+                        {!isDeliveryNote && (
+                          <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-2">
+                            <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-yellow-700">
+                              Kunden saknar e-postadress. Lägg till e-post för att kunna skicka fakturan digitalt.
+                            </p>
+                          </div>
+                        )}
                         <Button
                           className="w-full"
                           onClick={() => updateStatus('sent')}
@@ -707,7 +831,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     </Button>
                   </>
                 )}
-                {(invoice.status === 'sent' || invoice.status === 'overdue') && (
+                {(invoice.status === 'sent' || invoice.status === 'overdue') && isRealInvoice && (
                   <>
                     <Button
                       className="w-full"
@@ -734,7 +858,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     </Button>
                   </>
                 )}
-                {invoice.status === 'paid' && (
+                {invoice.status === 'paid' && isRealInvoice && (
                   <Link href={`/invoices/${invoice.id}/credit`} className="block">
                     <Button variant="outline" className="w-full">
                       <ReceiptText className="mr-2 h-4 w-4" />

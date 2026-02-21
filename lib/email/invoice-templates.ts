@@ -1,5 +1,13 @@
-import type { Invoice, Customer, CompanySettings } from '@/types'
+import type { Invoice, Customer, CompanySettings, InvoiceDocumentType } from '@/types'
 import { formatCurrency, formatDate } from '@/lib/utils'
+
+function getDocumentLabel(invoice: Invoice): string {
+  if (invoice.credited_invoice_id) return 'Kreditfaktura'
+  const docType = (invoice as Invoice & { document_type?: InvoiceDocumentType }).document_type || 'invoice'
+  if (docType === 'proforma') return 'Proformafaktura'
+  if (docType === 'delivery_note') return 'Följesedel'
+  return 'Faktura'
+}
 
 export interface InvoiceEmailData {
   invoice: Invoice
@@ -13,8 +21,12 @@ export interface InvoiceEmailData {
 export function generateInvoiceEmailHtml(data: InvoiceEmailData): string {
   const { invoice, customer, company } = data
 
+  const documentType = getDocumentLabel(invoice)
   const isCreditNote = !!invoice.credited_invoice_id
-  const documentType = isCreditNote ? 'Kreditfaktura' : 'Faktura'
+  const docType = (invoice as Invoice & { document_type?: InvoiceDocumentType }).document_type || 'invoice'
+  const isDeliveryNote = docType === 'delivery_note'
+  const isProforma = docType === 'proforma'
+  const hidePayment = isCreditNote || isDeliveryNote || isProforma
 
   return `
 <!DOCTYPE html>
@@ -79,7 +91,7 @@ export function generateInvoiceEmailHtml(data: InvoiceEmailData): string {
     </div>
 
     <!-- Payment Details -->
-    ${!isCreditNote ? `
+    ${!hidePayment ? `
     <div style="margin-bottom: 30px;">
       <h2 style="margin: 0 0 15px 0; font-size: 16px; font-weight: 600; color: #111;">
         Betalningsinformation
@@ -146,8 +158,12 @@ export function generateInvoiceEmailHtml(data: InvoiceEmailData): string {
 export function generateInvoiceEmailText(data: InvoiceEmailData): string {
   const { invoice, customer, company } = data
 
+  const documentType = getDocumentLabel(invoice)
   const isCreditNote = !!invoice.credited_invoice_id
-  const documentType = isCreditNote ? 'Kreditfaktura' : 'Faktura'
+  const docType = (invoice as Invoice & { document_type?: InvoiceDocumentType }).document_type || 'invoice'
+  const isDeliveryNote = docType === 'delivery_note'
+  const isProforma = docType === 'proforma'
+  const hidePayment = isCreditNote || isDeliveryNote || isProforma
 
   let text = `${documentType} från ${company.company_name}\n`
   text += `${documentType}nummer: ${invoice.invoice_number}\n\n`
@@ -168,7 +184,7 @@ export function generateInvoiceEmailText(data: InvoiceEmailData): string {
   text += `Att betala: ${formatCurrency(invoice.total, invoice.currency)}\n`
   text += `---\n\n`
 
-  if (!isCreditNote) {
+  if (!hidePayment) {
     text += `Betalningsinformation:\n`
     if (company.bank_name) text += `Bank: ${company.bank_name}\n`
     if (company.clearing_number && company.account_number) {
@@ -198,8 +214,7 @@ export function generateInvoiceEmailText(data: InvoiceEmailData): string {
  */
 export function generateInvoiceEmailSubject(data: InvoiceEmailData): string {
   const { invoice, company } = data
-  const isCreditNote = !!invoice.credited_invoice_id
-  const documentType = isCreditNote ? 'Kreditfaktura' : 'Faktura'
+  const documentType = getDocumentLabel(invoice)
 
   return `${documentType} ${invoice.invoice_number} från ${company.company_name}`
 }

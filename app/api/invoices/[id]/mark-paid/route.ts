@@ -77,29 +77,33 @@ export async function POST(
   const accountingMethod = settings?.accounting_method || 'accrual'
   const entityType = (settings?.entity_type as EntityType) || 'enskild_firma'
 
+  // Only create journal entries for real invoices (not proformas or delivery notes)
+  const isRealInvoice = !invoice.document_type || invoice.document_type === 'invoice'
   let journalEntryId: string | null = null
 
-  try {
-    if (accountingMethod === 'accrual') {
-      // Faktureringsmetoden: clear receivable (Debit 1930, Credit 1510)
-      const journalEntry = await createInvoicePaymentJournalEntry(
-        user.id,
-        invoice as Invoice,
-        paymentDate
-      )
-      journalEntryId = journalEntry?.id ?? null
-    } else {
-      // Kontantmetoden: combined revenue entry (Debit 1930, Credit 30xx, Credit 26xx)
-      const journalEntry = await createInvoiceCashEntry(
-        user.id,
-        invoice as Invoice,
-        paymentDate,
-        entityType
-      )
-      journalEntryId = journalEntry?.id ?? null
+  if (isRealInvoice) {
+    try {
+      if (accountingMethod === 'accrual') {
+        // Faktureringsmetoden: clear receivable (Debit 1930, Credit 1510)
+        const journalEntry = await createInvoicePaymentJournalEntry(
+          user.id,
+          invoice as Invoice,
+          paymentDate
+        )
+        journalEntryId = journalEntry?.id ?? null
+      } else {
+        // Kontantmetoden: combined revenue entry (Debit 1930, Credit 30xx, Credit 26xx)
+        const journalEntry = await createInvoiceCashEntry(
+          user.id,
+          invoice as Invoice,
+          paymentDate,
+          entityType
+        )
+        journalEntryId = journalEntry?.id ?? null
+      }
+    } catch (err) {
+      console.error('Failed to create payment journal entry on mark-paid:', err)
     }
-  } catch (err) {
-    console.error('Failed to create payment journal entry on mark-paid:', err)
   }
 
   return NextResponse.json({

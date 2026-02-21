@@ -30,6 +30,9 @@ export type CustomerType =
 // Invoice status
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled' | 'credited'
 
+// Invoice document type
+export type InvoiceDocumentType = 'invoice' | 'proforma' | 'delivery_note'
+
 // Supplier types
 export type SupplierType = 'swedish_business' | 'eu_business' | 'non_eu_business'
 
@@ -50,6 +53,9 @@ export type AccountingMethod = 'accrual' | 'cash'
 
 // Moms reporting period
 export type MomsPeriod = 'monthly' | 'quarterly' | 'yearly'
+
+// Reconciliation method
+export type ReconciliationMethod = 'auto_exact' | 'auto_date_range' | 'auto_reference' | 'auto_fuzzy' | 'manual'
 
 // Bank connection status
 export type BankConnectionStatus = 'pending' | 'active' | 'expired' | 'revoked' | 'error'
@@ -95,6 +101,10 @@ export interface CompanySettings {
 
   // Fiscal year
   fiscal_year_start_month: number  // 1-12
+  // Transient first-year fields (used during onboarding, not persisted in DB)
+  is_first_fiscal_year?: boolean
+  first_year_start?: string
+  first_year_end?: string
 
   // Preliminary tax
   preliminary_tax_monthly: number | null
@@ -113,6 +123,7 @@ export interface CompanySettings {
   invoice_prefix: string | null
   next_invoice_number: number
   invoice_default_days: number
+  invoice_default_notes: string | null
 
   // Onboarding
   onboarding_step: number
@@ -208,6 +219,9 @@ export interface Transaction {
 
   // Receipt link
   receipt_id: string | null
+
+  // Reconciliation
+  reconciliation_method: ReconciliationMethod | null
 
   // Import tracking
   import_source: string | null
@@ -457,6 +471,12 @@ export interface Invoice {
   // Credit note reference
   credited_invoice_id: string | null
 
+  // Document type (invoice, proforma, delivery_note)
+  document_type: InvoiceDocumentType
+
+  // Conversion tracking (proforma -> invoice)
+  converted_from_id: string | null
+
   // Payment tracking
   paid_at: string | null
   paid_amount: number | null
@@ -489,6 +509,10 @@ export interface InvoiceItem {
 
   // Calculated
   line_total: number
+
+  // Per-line VAT
+  vat_rate: number
+  vat_amount: number
 
   created_at: string
 }
@@ -597,12 +621,14 @@ export interface CreateSupplierInvoiceInput {
 
 export interface CreateSupplierInvoiceItemInput {
   description: string
-  quantity: number
-  unit?: string
-  unit_price: number
+  amount: number
   account_number: string
-  vat_code?: string
   vat_rate?: number
+  vat_code?: string
+  // Legacy fields (backward compat, ignored when amount is set)
+  quantity?: number
+  unit?: string
+  unit_price?: number
 }
 
 export interface CreateInvoiceInput {
@@ -610,6 +636,7 @@ export interface CreateInvoiceInput {
   invoice_date: string
   due_date: string
   currency: Currency
+  document_type?: InvoiceDocumentType
   your_reference?: string
   our_reference?: string
   notes?: string
@@ -621,6 +648,7 @@ export interface CreateInvoiceItemInput {
   quantity: number
   unit: string
   unit_price: number
+  vat_rate?: number
 }
 
 export interface CreateTransactionInput {
@@ -1028,6 +1056,9 @@ export interface OnboardingStepData {
   step3?: {
     f_skatt: boolean
     fiscal_year_start_month: number
+    is_first_fiscal_year?: boolean
+    first_year_start?: string
+    first_year_end?: string
     vat_registered: boolean
     vat_number?: string
     moms_period?: MomsPeriod

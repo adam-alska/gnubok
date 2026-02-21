@@ -1,24 +1,45 @@
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import type {
   VatDeclaration,
   VatDeclarationRutor,
   VatPeriodType,
-  Invoice,
-  Transaction,
-  Receipt,
-  TaxCode,
+  AccountingMethod,
 } from '@/types'
 
 /**
- * Calculate VAT declaration (Momsdeklaration) for a given period
+ * Calculate VAT declaration (Momsdeklaration) for a given period.
  *
- * Aggregates data from:
- * - Invoices: Utgående moms (output VAT) based on moms_ruta
- * - Transactions: Ingående moms (input VAT) from categorized expenses
- * - Receipts: Ingående moms from confirmed receipts
+ * Reads directly from the general ledger — sums posted journal entry lines
+ * on 26xx (VAT) and 3xxx (revenue) accounts for the period. This makes the
+ * momsdeklaration a pure projection from the double-entry bookkeeping ledger.
  *
- * Returns VAT rutor according to Swedish tax authority format.
+ * The accounting method (accrual vs cash) is already reflected in when
+ * journal entries were created by the entry generators, so no separate
+ * filtering logic is needed here.
  */
+
+/**
+ * Account-to-ruta mapping for the Swedish momsdeklaration.
+ *
+ * Output VAT (26xx): net credit balance feeds output VAT boxes.
+ * Input VAT (2641/2645): net debit balance feeds ruta 48.
+ * Revenue (3xxx): net credit balance feeds underlag (basis) boxes.
+ */
+const ACCOUNT_RUTA: Record<string, { box: keyof VatDeclarationRutor; side: 'credit' | 'debit' }> = {
+  '2611': { box: 'ruta05', side: 'credit' },
+  '2621': { box: 'ruta06', side: 'credit' },
+  '2631': { box: 'ruta07', side: 'credit' },
+  '2641': { box: 'ruta48', side: 'debit' },
+  '2645': { box: 'ruta48', side: 'debit' },
+  '3001': { box: 'ruta10', side: 'credit' },
+  '3002': { box: 'ruta11', side: 'credit' },
+  '3003': { box: 'ruta12', side: 'credit' },
+  '3305': { box: 'ruta40', side: 'credit' },
+  '3308': { box: 'ruta39', side: 'credit' },
+}
+
+const VAT_ACCOUNTS = Object.keys(ACCOUNT_RUTA)
 
 /**
  * Calculate period start and end dates
@@ -79,296 +100,117 @@ function round(value: number): number {
 }
 
 /**
- * Main function to calculate VAT declaration
+ * Calculate VAT declaration from the general ledger.
+ *
+ * Sums posted journal entry lines on 26xx and 3xxx accounts:
+ *   - 2611/2621/2631 credit balance -> ruta 05/06/07 (output VAT)
+ *   - 2641/2645 debit balance -> ruta 48 (input VAT)
+ *   - 3001/3002/3003 credit balance -> ruta 10/11/12 (revenue basis)
+ *   - 3308/3305 credit balance -> ruta 39/40 (EU/export)
+ *   - ruta 49 = (05 + 06 + 07) - 48
+ *
+ * The accounting method parameter is accepted for backward compatibility
+ * but not used — the method is already baked into journal entry timing.
  */
 export async function calculateVatDeclaration(
   userId: string,
   periodType: VatPeriodType,
   year: number,
-  period: number
+  period: number,
+  _accountingMethod: AccountingMethod = 'accrual'
 ): Promise<VatDeclaration> {
   const supabase = await createClient()
   const { start, end } = calculatePeriodDates(periodType, year, period)
 
-  // Fetch invoices for the period
-  const { data: invoices, error: invoicesError } = await supabase
-    .from('invoices')
-    .select('*')
-    .eq('user_id', userId)
-    .gte('invoice_date', start)
-    .lte('invoice_date', end)
-    .in('status', ['sent', 'paid', 'overdue'])
+  // Fetch all posted journal entry lines on VAT-relevant accounts for the period
+  const lines = await fetchAllRows<{
+    account_number: string
+    debit_amount: number
+    credit_amount: number
+  }>(({ from, to }) =>
+    supabase
+      .from('journal_entry_lines')
+      .select(`
+        account_number,
+        debit_amount,
+        credit_amount,
+        journal_entries!inner (user_id, entry_date, status)
+      `)
+      .in('account_number', VAT_ACCOUNTS)
+      .eq('journal_entries.user_id', userId)
+      .eq('journal_entries.status', 'posted')
+      .gte('journal_entries.entry_date', start)
+      .lte('journal_entries.entry_date', end)
+      .range(from, to)
+  )
 
-  if (invoicesError) {
-    console.error('Error fetching invoices:', invoicesError)
+  // Aggregate debit/credit totals per account
+  const totals = new Map<string, { debit: number; credit: number }>()
+  for (const line of lines) {
+    const t = totals.get(line.account_number) || { debit: 0, credit: 0 }
+    t.debit += Number(line.debit_amount) || 0
+    t.credit += Number(line.credit_amount) || 0
+    totals.set(line.account_number, t)
   }
 
-  // Fetch transactions with business expenses for the period
-  const { data: transactions, error: transactionsError } = await supabase
-    .from('transactions')
-    .select('*')
-    .eq('user_id', userId)
-    .gte('date', start)
-    .lte('date', end)
-    .eq('is_business', true)
-    .lt('amount', 0) // Expenses are negative
-
-  if (transactionsError) {
-    console.error('Error fetching transactions:', transactionsError)
-  }
-
-  // Fetch confirmed receipts for the period
-  const { data: receipts, error: receiptsError } = await supabase
-    .from('receipts')
-    .select('*')
-    .eq('user_id', userId)
-    .gte('receipt_date', start)
-    .lte('receipt_date', end)
-    .eq('status', 'confirmed')
-
-  if (receiptsError) {
-    console.error('Error fetching receipts:', receiptsError)
-  }
-
-  // Calculate invoice-based VAT (utgående moms)
-  const invoiceVat = calculateInvoiceVat(invoices as Invoice[] || [])
-
-  // Calculate input VAT from transactions
-  const transactionVat = calculateTransactionInputVat(transactions as Transaction[] || [])
-
-  // Calculate input VAT from receipts
-  const receiptVat = calculateReceiptInputVat(receipts as Receipt[] || [])
-
-  // Total ingående moms (input VAT to deduct)
-  const totalInputVat = round(transactionVat + receiptVat)
-
-  // Total utgående moms (output VAT to pay)
-  const totalOutputVat = round(invoiceVat.ruta05 + invoiceVat.ruta06 + invoiceVat.ruta07)
-
-  // Moms att betala/återfå (VAT to pay or receive back)
-  const vatToPay = round(totalOutputVat - totalInputVat)
-
+  // Map account balances to momsdeklaration boxes
   const rutor: VatDeclarationRutor = {
-    ruta05: invoiceVat.ruta05,
-    ruta06: invoiceVat.ruta06,
-    ruta07: invoiceVat.ruta07,
-    ruta10: invoiceVat.ruta10,
-    ruta11: invoiceVat.ruta11,
-    ruta12: invoiceVat.ruta12,
-    ruta39: invoiceVat.ruta39,
-    ruta40: invoiceVat.ruta40,
-    ruta48: totalInputVat,
-    ruta49: vatToPay,
+    ruta05: 0, ruta06: 0, ruta07: 0,
+    ruta10: 0, ruta11: 0, ruta12: 0,
+    ruta39: 0, ruta40: 0,
+    ruta48: 0, ruta49: 0,
+  }
+
+  for (const [account, mapping] of Object.entries(ACCOUNT_RUTA)) {
+    const t = totals.get(account)
+    if (!t) continue
+    const balance = mapping.side === 'credit'
+      ? t.credit - t.debit
+      : t.debit - t.credit
+    rutor[mapping.box] = round(rutor[mapping.box] + balance)
+  }
+
+  rutor.ruta49 = round(rutor.ruta05 + rutor.ruta06 + rutor.ruta07 - rutor.ruta48)
+
+  // Count journal entries by source type for metadata
+  const { data: entryCounts } = await supabase
+    .from('journal_entries')
+    .select('source_type')
+    .eq('user_id', userId)
+    .eq('status', 'posted')
+    .gte('entry_date', start)
+    .lte('entry_date', end)
+
+  const invoiceSources = new Set([
+    'invoice_created', 'invoice_paid', 'invoice_cash_payment', 'credit_note',
+  ])
+  let invoiceCount = 0
+  let transactionCount = 0
+  for (const e of entryCounts || []) {
+    if (invoiceSources.has(e.source_type)) invoiceCount++
+    else if (e.source_type === 'bank_transaction') transactionCount++
   }
 
   return {
-    period: {
-      type: periodType,
-      year,
-      period,
-      start,
-      end,
-    },
+    period: { type: periodType, year, period, start, end },
     rutor,
-    invoiceCount: (invoices || []).length,
-    transactionCount: (transactions || []).length,
+    invoiceCount,
+    transactionCount,
     breakdown: {
       invoices: {
-        ruta05: invoiceVat.ruta05,
-        ruta06: invoiceVat.ruta06,
-        ruta07: invoiceVat.ruta07,
-        ruta10: invoiceVat.ruta10,
-        ruta11: invoiceVat.ruta11,
-        ruta12: invoiceVat.ruta12,
-        ruta39: invoiceVat.ruta39,
-        ruta40: invoiceVat.ruta40,
+        ruta05: rutor.ruta05,
+        ruta06: rutor.ruta06,
+        ruta07: rutor.ruta07,
+        ruta10: rutor.ruta10,
+        ruta11: rutor.ruta11,
+        ruta12: rutor.ruta12,
+        ruta39: rutor.ruta39,
+        ruta40: rutor.ruta40,
       },
-      transactions: {
-        ruta48: round(transactionVat),
-      },
-      receipts: {
-        ruta48: round(receiptVat),
-      },
+      transactions: { ruta48: rutor.ruta48 },
+      receipts: { ruta48: 0 },
     },
   }
-}
-
-/**
- * Calculate VAT from invoices
- */
-function calculateInvoiceVat(invoices: Invoice[]): {
-  ruta05: number
-  ruta06: number
-  ruta07: number
-  ruta10: number
-  ruta11: number
-  ruta12: number
-  ruta39: number
-  ruta40: number
-} {
-  let ruta05 = 0 // Utgående moms 25%
-  let ruta06 = 0 // Utgående moms 12%
-  let ruta07 = 0 // Utgående moms 6%
-  let ruta10 = 0 // Underlag 25%
-  let ruta11 = 0 // Underlag 12%
-  let ruta12 = 0 // Underlag 6%
-  let ruta39 = 0 // EU tjänster
-  let ruta40 = 0 // Export
-
-  for (const invoice of invoices) {
-    // Use subtotal_sek if available (for foreign currency invoices), otherwise subtotal
-    const subtotal = invoice.subtotal_sek ?? invoice.subtotal
-    const vatAmount = invoice.vat_amount_sek ?? invoice.vat_amount
-
-    switch (invoice.moms_ruta) {
-      case '05':
-        // Standard 25% VAT
-        ruta05 += vatAmount
-        ruta10 += subtotal
-        break
-      case '06':
-        // Reduced 12% VAT
-        ruta06 += vatAmount
-        ruta11 += subtotal
-        break
-      case '07':
-        // Reduced 6% VAT
-        ruta07 += vatAmount
-        ruta12 += subtotal
-        break
-      case '39':
-        // EU reverse charge - no VAT charged, but report the value
-        ruta39 += subtotal
-        break
-      case '40':
-        // Export outside EU - no VAT charged, but report the value
-        ruta40 += subtotal
-        break
-      default:
-        // Default to 25% if moms_ruta is not set but there's VAT
-        if (vatAmount > 0) {
-          ruta05 += vatAmount
-          ruta10 += subtotal
-        }
-    }
-  }
-
-  return {
-    ruta05: round(ruta05),
-    ruta06: round(ruta06),
-    ruta07: round(ruta07),
-    ruta10: round(ruta10),
-    ruta11: round(ruta11),
-    ruta12: round(ruta12),
-    ruta39: round(ruta39),
-    ruta40: round(ruta40),
-  }
-}
-
-/**
- * Calculate input VAT from business expense transactions
- *
- * For Swedish business expenses with 25% VAT, we can deduct the VAT.
- * This is a simplified calculation - in reality, the journal entry
- * would have the exact VAT amounts.
- */
-function calculateTransactionInputVat(transactions: Transaction[]): number {
-  let inputVat = 0
-
-  for (const transaction of transactions) {
-    // Only process business expenses (amount is negative)
-    if (!transaction.is_business || transaction.amount >= 0) continue
-
-    // Use amount_sek if available, otherwise amount
-    const expenseAmount = Math.abs(transaction.amount_sek ?? transaction.amount)
-
-    // Estimate VAT based on category
-    // Most Swedish business expenses have 25% VAT
-    // Some categories might have reduced rates or no VAT
-    const vatRate = getVatRateForCategory(transaction.category)
-
-    if (vatRate > 0) {
-      // Extract VAT from total (VAT-inclusive) amount
-      // VAT = total * rate / (1 + rate)
-      const vat = (expenseAmount * vatRate) / (1 + vatRate)
-      inputVat += vat
-    }
-  }
-
-  return inputVat
-}
-
-/**
- * Get VAT rate for expense category
- */
-function getVatRateForCategory(category: string | null): number {
-  // Categories that typically have 25% VAT
-  const standard25Categories = [
-    'expense_equipment',
-    'expense_software',
-    'expense_office',
-    'expense_marketing',
-    'expense_professional_services',
-    'expense_education',
-    'expense_other',
-  ]
-
-  // Categories with 12% VAT (e.g., food/restaurants, but only 50% deductible for representation)
-  const reduced12Categories = [
-    'expense_travel', // Hotels, some transport
-  ]
-
-  // Categories with 6% VAT
-  const reduced6Categories: string[] = [
-    // Books, newspapers, etc.
-  ]
-
-  // No VAT deduction
-  const noVatCategories = [
-    'private',
-    'uncategorized',
-    'income_services',
-    'income_products',
-    'income_other',
-  ]
-
-  if (!category || noVatCategories.includes(category)) {
-    return 0
-  }
-
-  if (standard25Categories.includes(category)) {
-    return 0.25
-  }
-
-  if (reduced12Categories.includes(category)) {
-    return 0.12
-  }
-
-  if (reduced6Categories.includes(category)) {
-    return 0.06
-  }
-
-  // Default to 25% for unrecognized expense categories
-  return 0.25
-}
-
-/**
- * Calculate input VAT from confirmed receipts
- */
-function calculateReceiptInputVat(receipts: Receipt[]): number {
-  let inputVat = 0
-
-  for (const receipt of receipts) {
-    // Only confirmed receipts
-    if (receipt.status !== 'confirmed') continue
-
-    // Use the extracted VAT amount if available
-    if (receipt.vat_amount && receipt.vat_amount > 0) {
-      inputVat += receipt.vat_amount
-    }
-  }
-
-  return inputVat
 }
 
 /**
@@ -418,127 +260,5 @@ export function formatPeriodLabel(
       return `Helår ${year}`
     default:
       return `${year}`
-  }
-}
-
-// ============================================================
-// Tax-code-driven VAT declaration (new approach)
-// ============================================================
-
-/**
- * Calculate VAT declaration using tax codes from journal entry lines.
- *
- * This is the new, tax-code-driven approach that sums journal_entry_lines
- * grouped by tax_code, then maps via the tax_codes table to moms boxes.
- * Falls back to the legacy invoice/transaction/receipt approach for
- * lines without tax codes.
- */
-export async function calculateVatDeclarationFromTaxCodes(
-  userId: string,
-  periodType: VatPeriodType,
-  year: number,
-  period: number
-): Promise<VatDeclaration> {
-  const supabase = await createClient()
-  const { start, end } = calculatePeriodDates(periodType, year, period)
-
-  // Fetch tax codes for this user (including system codes)
-  const { data: taxCodesData } = await supabase
-    .from('tax_codes')
-    .select('*')
-    .or(`user_id.eq.${userId},user_id.is.null`)
-
-  const taxCodes = (taxCodesData as TaxCode[]) || []
-  const taxCodeMap = new Map<string, TaxCode>()
-  for (const tc of taxCodes) {
-    if (!taxCodeMap.has(tc.code) || tc.user_id) {
-      taxCodeMap.set(tc.code, tc)
-    }
-  }
-
-  // Fetch posted journal entry lines with tax_code in the period
-  const { data: lines } = await supabase
-    .from('journal_entry_lines')
-    .select(`
-      tax_code,
-      debit_amount,
-      credit_amount,
-      journal_entry_id,
-      journal_entries!inner (
-        user_id,
-        entry_date,
-        status
-      )
-    `)
-    .not('tax_code', 'is', null)
-    .eq('journal_entries.user_id', userId)
-    .eq('journal_entries.status', 'posted')
-    .gte('journal_entries.entry_date', start)
-    .lte('journal_entries.entry_date', end)
-
-  // Aggregate amounts by moms box
-  const boxTotals = new Map<string, number>()
-
-  for (const line of lines || []) {
-    if (!line.tax_code) continue
-
-    const taxCode = taxCodeMap.get(line.tax_code)
-    if (!taxCode) continue
-
-    const amount = Math.abs(Number(line.debit_amount || 0) - Number(line.credit_amount || 0))
-
-    // Map to all relevant boxes
-    for (const box of [...taxCode.moms_basis_boxes, ...taxCode.moms_tax_boxes, ...taxCode.moms_input_boxes]) {
-      const current = boxTotals.get(box) || 0
-      boxTotals.set(box, current + amount)
-    }
-  }
-
-  // Build rutor from box totals
-  const rutor: VatDeclarationRutor = {
-    ruta05: round(boxTotals.get('05') || 0),
-    ruta06: round(boxTotals.get('06') || 0),
-    ruta07: round(boxTotals.get('07') || 0),
-    ruta10: round(boxTotals.get('10') || 0),
-    ruta11: round(boxTotals.get('11') || 0),
-    ruta12: round(boxTotals.get('12') || 0),
-    ruta39: round(boxTotals.get('39') || 0),
-    ruta40: round(boxTotals.get('40') || 0),
-    ruta48: round(boxTotals.get('48') || 0),
-    ruta49: 0,
-  }
-
-  const totalOutputVat = round(rutor.ruta05 + rutor.ruta06 + rutor.ruta07)
-  rutor.ruta49 = round(totalOutputVat - rutor.ruta48)
-
-  return {
-    period: {
-      type: periodType,
-      year,
-      period,
-      start,
-      end,
-    },
-    rutor,
-    invoiceCount: 0,
-    transactionCount: (lines || []).length,
-    breakdown: {
-      invoices: {
-        ruta05: 0,
-        ruta06: 0,
-        ruta07: 0,
-        ruta10: 0,
-        ruta11: 0,
-        ruta12: 0,
-        ruta39: 0,
-        ruta40: 0,
-      },
-      transactions: {
-        ruta48: 0,
-      },
-      receipts: {
-        ruta48: 0,
-      },
-    },
   }
 }

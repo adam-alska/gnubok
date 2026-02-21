@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Download, FileText, FileDown, TrendingUp, Scale, AlertCircle, Receipt, Briefcase, Building2, BookOpen, List, Users, ChevronDown, ChevronRight } from 'lucide-react'
+import { Download, FileText, FileDown, TrendingUp, Scale, AlertCircle, Receipt, Briefcase, Building2, BookOpen, List, Users, ChevronDown, ChevronRight, ArrowLeftRight } from 'lucide-react'
 import { AccountNumber } from '@/components/ui/account-number'
 import { NEDeclarationView } from '@/extensions/ne-bilaga/NEDeclarationView'
 import { SRUExportView } from '@/extensions/sru-export/SRUExportView'
+import { BankReconciliationView } from '@/components/reports/BankReconciliationView'
 import { TrialBalanceChart } from '@/components/reports/TrialBalanceChart'
 import { VatCompositionChart } from '@/components/reports/VatCompositionChart'
 import { IncomeExpenseChart } from '@/components/reports/IncomeExpenseChart'
@@ -82,7 +83,7 @@ export default function ReportsPage() {
           >
             {periods.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name}
+                {p.name} ({p.period_start} — {p.period_end})
               </option>
             ))}
           </select>
@@ -146,6 +147,10 @@ export default function ReportsPage() {
               <Building2 className="h-4 w-4 mr-1" />
               Lev.reskontra
             </TabsTrigger>
+            <TabsTrigger value="bank-reconciliation">
+              <ArrowLeftRight className="h-4 w-4 mr-1" />
+              Bankavstämning
+            </TabsTrigger>
             </TabsList>
             <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent pointer-events-none md:hidden" />
           </div>
@@ -181,6 +186,9 @@ export default function ReportsPage() {
           </TabsContent>
           <TabsContent value="supplier-ledger">
             <SupplierLedgerView periodId={selectedPeriod} />
+          </TabsContent>
+          <TabsContent value="bank-reconciliation">
+            <BankReconciliationView />
           </TabsContent>
         </Tabs>
       ) : (

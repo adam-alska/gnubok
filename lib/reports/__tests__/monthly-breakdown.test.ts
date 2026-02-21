@@ -24,7 +24,7 @@ describe('generateMonthlyBreakdown', () => {
   it('returns empty months when no journal entries exist', async () => {
     // First call: fiscal period
     mockResult({
-      data: { start_date: '2024-01-01', end_date: '2024-12-31' },
+      data: { period_start: '2024-01-01', period_end: '2024-12-31' },
       error: null,
     })
 
@@ -45,7 +45,7 @@ describe('generateMonthlyBreakdown', () => {
               eq: () => ({
                 single: () =>
                   Promise.resolve({
-                    data: { start_date: '2024-01-01', end_date: '2024-12-31' },
+                    data: { period_start: '2024-01-01', period_end: '2024-12-31' },
                     error: null,
                   }),
               }),
@@ -88,7 +88,7 @@ describe('generateMonthlyBreakdown', () => {
               eq: () => ({
                 single: () =>
                   Promise.resolve({
-                    data: { start_date: '2024-01-01', end_date: '2024-03-31' },
+                    data: { period_start: '2024-01-01', period_end: '2024-03-31' },
                     error: null,
                   }),
               }),
@@ -167,7 +167,7 @@ describe('generateMonthlyBreakdown', () => {
               eq: () => ({
                 single: () =>
                   Promise.resolve({
-                    data: { start_date: '2024-01-01', end_date: '2024-01-31' },
+                    data: { period_start: '2024-01-01', period_end: '2024-01-31' },
                     error: null,
                   }),
               }),

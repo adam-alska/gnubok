@@ -131,7 +131,7 @@ export function EmptyReceipts() {
     <EmptyState
       icon={Camera}
       title="Inga kvitton"
-      description="Ta en bild på ett kvitto för automatisk avläsning och kategorisering. Vi sköter resten!"
+      description="Ta en bild på ett kvitto för automatisk avläsning och bokföring. Vi sköter resten!"
       actionLabel="Skanna kvitto"
       actionHref="/receipts/scan"
     />

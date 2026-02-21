@@ -10,6 +10,7 @@ import type {
   CAMT053Statement,
   CAMT054Notification,
   AuditSecurityEvent,
+  ReconciliationMethod,
 } from '@/types'
 
 // ============================================================
@@ -32,6 +33,7 @@ export type CoreEvent =
   // Banking
   | { type: 'transaction.synced'; payload: { transactions: Transaction[]; userId: string } }
   | { type: 'transaction.categorized'; payload: { transaction: Transaction; account: string; taxCode: string; userId: string } }
+  | { type: 'transaction.reconciled'; payload: { transaction: Transaction; journalEntryId: string; method: ReconciliationMethod; userId: string } }
   | { type: 'bank.statement_received'; payload: { statement: CAMT053Statement; userId: string } }
   | { type: 'bank.payment_notification'; payload: { notification: CAMT054Notification; userId: string } }
   // Periods

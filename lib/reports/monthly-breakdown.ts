@@ -32,7 +32,7 @@ export async function generateMonthlyBreakdown(
   // Get the fiscal period date range
   const { data: period, error: periodError } = await supabase
     .from('fiscal_periods')
-    .select('start_date, end_date')
+    .select('period_start, period_end')
     .eq('id', fiscalPeriodId)
     .eq('user_id', userId)
     .single()
@@ -67,8 +67,8 @@ export async function generateMonthlyBreakdown(
   const monthMap = new Map<number, { income: number; expenses: number }>()
 
   // Initialize all months in the period range
-  const startDate = new Date(period.start_date)
-  const endDate = new Date(period.end_date)
+  const startDate = new Date(period.period_start)
+  const endDate = new Date(period.period_end)
   const startMonth = startDate.getMonth()
   const endMonth = endDate.getMonth() + (endDate.getFullYear() - startDate.getFullYear()) * 12
 

@@ -1,0 +1,218 @@
+'use client'
+
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
+import { Input } from '@/components/ui/input'
+import { getAccountClassName } from '@/lib/bookkeeping/account-descriptions'
+import type { BASAccount } from '@/types'
+
+interface AccountComboboxProps {
+  value: string
+  accounts: BASAccount[]
+  onChange: (accountNumber: string) => void
+}
+
+const MAX_RESULTS = 50
+
+export default function AccountCombobox({ value, accounts, onChange }: AccountComboboxProps) {
+  const [search, setSearch] = useState(value)
+  const [isOpen, setIsOpen] = useState(false)
+  const [highlightedIndex, setHighlightedIndex] = useState(0)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  // Sync external value changes into the search field
+  useEffect(() => {
+    setSearch(value)
+  }, [value])
+
+  // Filter accounts based on search input
+  const filteredAccounts = useMemo(() => {
+    if (!search) return accounts.slice(0, MAX_RESULTS)
+
+    const trimmed = search.trim()
+    if (!trimmed) return accounts.slice(0, MAX_RESULTS)
+
+    const startsWithDigit = /^\d/.test(trimmed)
+
+    if (startsWithDigit) {
+      return accounts
+        .filter((a) => a.account_number.startsWith(trimmed))
+        .slice(0, MAX_RESULTS)
+    }
+
+    const lowerSearch = trimmed.toLowerCase()
+    return accounts
+      .filter((a) => a.account_name.toLowerCase().includes(lowerSearch))
+      .slice(0, MAX_RESULTS)
+  }, [accounts, search])
+
+  // Group filtered accounts by class
+  const groupedAccounts = useMemo(() => {
+    const groups: { className: string; accounts: BASAccount[] }[] = []
+    const groupMap = new Map<string, BASAccount[]>()
+
+    for (const account of filteredAccounts) {
+      const className = getAccountClassName(account.account_class)
+      if (!groupMap.has(className)) {
+        groupMap.set(className, [])
+      }
+      groupMap.get(className)!.push(account)
+    }
+
+    for (const [className, accts] of groupMap) {
+      groups.push({ className, accounts: accts })
+    }
+
+    return groups
+  }, [filteredAccounts])
+
+  // Flat list for keyboard navigation
+  const flatList = useMemo(() => filteredAccounts, [filteredAccounts])
+
+  // Reset highlight when filtered results change
+  useEffect(() => {
+    setHighlightedIndex(0)
+  }, [filteredAccounts])
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (!isOpen || !listRef.current) return
+    const highlighted = listRef.current.querySelector('[data-highlighted="true"]')
+    if (highlighted) {
+      highlighted.scrollIntoView({ block: 'nearest' })
+    }
+  }, [highlightedIndex, isOpen])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const selectAccount = useCallback(
+    (accountNumber: string) => {
+      onChange(accountNumber)
+      setSearch(accountNumber)
+      setIsOpen(false)
+      inputRef.current?.blur()
+    },
+    [onChange]
+  )
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        setIsOpen(true)
+        e.preventDefault()
+      }
+      return
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setHighlightedIndex((prev) => Math.min(prev + 1, flatList.length - 1))
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setHighlightedIndex((prev) => Math.max(prev - 1, 0))
+        break
+      case 'Enter':
+        e.preventDefault()
+        if (flatList[highlightedIndex]) {
+          selectAccount(flatList[highlightedIndex].account_number)
+        }
+        break
+      case 'Escape':
+        e.preventDefault()
+        setIsOpen(false)
+        break
+    }
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value
+    setSearch(newValue)
+    onChange(newValue)
+    if (!isOpen) {
+      setIsOpen(true)
+    }
+  }
+
+  const handleFocus = () => {
+    setIsOpen(true)
+  }
+
+  // Find matching account for helper text
+  const matchedAccount = useMemo(() => {
+    if (!value || value.length !== 4) return null
+    return accounts.find((a) => a.account_number === value) || null
+  }, [value, accounts])
+
+  return (
+    <div ref={containerRef} className="relative">
+      <Input
+        ref={inputRef}
+        value={search}
+        onChange={handleInputChange}
+        onFocus={handleFocus}
+        onKeyDown={handleKeyDown}
+        placeholder="1930"
+        className="font-mono h-8"
+        maxLength={4}
+        autoComplete="off"
+      />
+
+      {/* Account name helper text (md+ screens only) */}
+      {matchedAccount && (
+        <p className="hidden md:block text-[11px] text-muted-foreground truncate mt-0.5 leading-tight">
+          {matchedAccount.account_name}
+        </p>
+      )}
+
+      {/* Dropdown */}
+      {isOpen && flatList.length > 0 && (
+        <div
+          ref={listRef}
+          className="absolute z-50 top-full left-0 mt-1 w-64 max-h-[300px] overflow-y-auto rounded-md border border-input bg-card shadow-md"
+        >
+          {groupedAccounts.map((group) => (
+            <div key={group.className}>
+              <div className="sticky top-0 px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted border-b border-input">
+                {group.className}
+              </div>
+              {group.accounts.map((account) => {
+                const flatIndex = flatList.indexOf(account)
+                const isHighlighted = flatIndex === highlightedIndex
+                return (
+                  <button
+                    key={account.account_number}
+                    type="button"
+                    data-highlighted={isHighlighted}
+                    className={`w-full text-left px-2 py-1.5 text-sm cursor-pointer flex items-baseline gap-2 ${
+                      isHighlighted ? 'bg-primary/10 text-primary' : 'hover:bg-muted/50'
+                    }`}
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      selectAccount(account.account_number)
+                    }}
+                    onMouseEnter={() => setHighlightedIndex(flatIndex)}
+                  >
+                    <span className="font-mono shrink-0">{account.account_number}</span>
+                    <span className="truncate">{account.account_name}</span>
+                  </button>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -134,6 +135,7 @@ export default function SettingsPage() {
       next_invoice_number: parseInt(formData.get('next_invoice_number') as string) || 1,
       invoice_default_days: parseInt(formData.get('invoice_default_days') as string) || 30,
       accounting_method: formData.get('accounting_method') as string || 'accrual',
+      invoice_default_notes: (formData.get('invoice_default_notes') as string) || null,
     }
 
     try {
@@ -457,35 +459,33 @@ export default function SettingsPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="accounting_method">Bokföringsmetod</Label>
-                  {settings?.entity_type === 'aktiebolag' ? (
-                    <>
-                      <input type="hidden" name="accounting_method" value="accrual" />
-                      <div className="flex items-center gap-2">
-                        <Input
-                          value="Faktureringsmetoden"
-                          disabled
-                          className="max-w-xs"
-                        />
-                        <span className="text-sm text-muted-foreground">
-                          Obligatorisk för aktiebolag
-                        </span>
-                      </div>
-                    </>
-                  ) : (
-                    <select
-                      id="accounting_method"
-                      name="accounting_method"
-                      defaultValue={settings?.accounting_method || 'accrual'}
-                      className="flex h-10 w-full max-w-xs rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    >
-                      <option value="accrual">Faktureringsmetoden</option>
-                      <option value="cash">Kontantmetoden</option>
-                    </select>
-                  )}
+                  <select
+                    id="accounting_method"
+                    name="accounting_method"
+                    defaultValue={settings?.accounting_method || 'accrual'}
+                    className="flex h-10 w-full max-w-xs rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    <option value="accrual">Faktureringsmetoden</option>
+                    <option value="cash">Kontantmetoden</option>
+                  </select>
                   <p className="text-xs text-muted-foreground">
                     {settings?.entity_type === 'aktiebolag'
-                      ? 'Aktiebolag måste använda faktureringsmetoden enligt BFL.'
+                      ? 'Aktiebolag med omsättning över 3 MSEK måste använda faktureringsmetoden enligt BFL. Mindre aktiebolag kan välja kontantmetoden.'
                       : 'Kontantmetoden är tillgänglig för enskild firma med omsättning under 3 MSEK.'}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="invoice_default_notes">Standardtext på fakturor</Label>
+                  <Textarea
+                    id="invoice_default_notes"
+                    name="invoice_default_notes"
+                    rows={3}
+                    placeholder="T.ex. betalningsvillkor, leveransinfo..."
+                    defaultValue={settings?.invoice_default_notes || ''}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Texten föreslås automatiskt i anteckningsfältet vid ny faktura.
                   </p>
                 </div>
               </CardContent>

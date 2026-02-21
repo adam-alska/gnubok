@@ -112,7 +112,7 @@ export default function SwipeCategorizationView({
               if (success) {
                 moveToNext()
               } else {
-                setError('Kunde inte kategorisera. Tryck "Hoppa över" för att gå vidare.')
+                setError('Kunde inte bokföra. Tryck "Hoppa över" för att gå vidare.')
               }
             } catch {
               setError('Ett fel uppstod. Tryck "Hoppa över" för att gå vidare.')
@@ -140,7 +140,7 @@ export default function SwipeCategorizationView({
         setShowCategorySelect(false)
         moveToNext()
       } else {
-        setError('Kunde inte kategorisera. Tryck "Hoppa över" för att gå vidare.')
+        setError('Kunde inte bokföra. Tryck "Hoppa över" för att gå vidare.')
       }
     } catch {
       setError('Ett fel uppstod. Tryck "Hoppa över" för att gå vidare.')
@@ -186,7 +186,7 @@ export default function SwipeCategorizationView({
           </div>
           <h2 className="text-2xl font-bold">Klart!</h2>
           <p className="text-muted-foreground mt-2">
-            Alla transaktioner är nu kategoriserade
+            Alla transaktioner är nu bokförda
           </p>
           <Button onClick={onClose} className="mt-6">
             Tillbaka till transaktioner
@@ -276,7 +276,7 @@ export default function SwipeCategorizationView({
           <span>Hoppa över</span>
         </div>
         <div className="flex items-center gap-2 text-muted-foreground">
-          <span>Kategorisera</span>
+          <span>Bokför</span>
           <Building className="h-4 w-4" />
           <ArrowRight className="h-4 w-4" />
         </div>
@@ -457,7 +457,7 @@ export default function SwipeCategorizationView({
             disabled={isProcessing}
           >
             <Building className="mr-2 h-4 w-4" />
-            Kategorisera
+            Bokför
           </Button>
 
           {/* Skip button - always visible */}

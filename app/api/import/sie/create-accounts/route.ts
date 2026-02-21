@@ -71,27 +71,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No accounts provided' }, { status: 400 })
     }
 
-    // Fetch existing accounts to avoid duplicates
-    const { data: existingAccounts } = await supabase
-      .from('chart_of_accounts')
-      .select('account_number')
-      .eq('user_id', user.id)
-
-    const existingNumbers = new Set(existingAccounts?.map(a => a.account_number) || [])
-
-    // Filter to only accounts that don't exist
-    const newAccounts = accounts.filter(a => !existingNumbers.has(a.number))
-
-    if (newAccounts.length === 0) {
-      return NextResponse.json({
-        success: true,
-        created: 0,
-        message: 'All accounts already exist'
-      })
-    }
-
-    // Prepare accounts for insertion
-    const accountsToInsert = newAccounts.map(account => {
+    // Prepare accounts for upsert (idempotent — safe to retry)
+    const accountsToUpsert = accounts.map(account => {
       const accountClass = parseInt(account.number.charAt(0), 10) || 1
       const accountGroup = account.number.substring(0, 2)
       const accountType = getAccountType(account.number)
@@ -112,26 +93,32 @@ export async function POST(request: Request) {
       }
     })
 
-    // Insert in batches of 100 to avoid timeout
+    // Upsert in batches of 100 to avoid timeout
+    // ignoreDuplicates skips rows that already exist (no update)
     const batchSize = 100
     let totalCreated = 0
 
-    for (let i = 0; i < accountsToInsert.length; i += batchSize) {
-      const batch = accountsToInsert.slice(i, i + batchSize)
+    for (let i = 0; i < accountsToUpsert.length; i += batchSize) {
+      const batch = accountsToUpsert.slice(i, i + batchSize)
 
-      const { error } = await supabase
+      const { data: upserted, error } = await supabase
         .from('chart_of_accounts')
-        .insert(batch)
+        .upsert(batch, {
+          onConflict: 'user_id,account_number',
+          ignoreDuplicates: true,
+          count: 'exact',
+        })
+        .select('account_number')
 
       if (error) {
-        console.error('Error inserting accounts batch:', error)
+        console.error('Error upserting accounts batch:', error)
         return NextResponse.json({
           error: `Failed to create accounts: ${error.message}`,
           created: totalCreated,
         }, { status: 500 })
       }
 
-      totalCreated += batch.length
+      totalCreated += upserted?.length ?? batch.length
     }
 
     return NextResponse.json({

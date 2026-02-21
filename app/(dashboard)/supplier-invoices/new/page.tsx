@@ -11,16 +11,16 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/components/ui/use-toast'
-import { ArrowLeft, Plus, Trash2, Loader2 } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { SupplierInvoiceReviewContent } from '@/components/suppliers/SupplierInvoiceReviewContent'
-import type { Supplier, VatTreatment } from '@/types'
+import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
+import { getAccountDescription } from '@/lib/bookkeeping/account-descriptions'
+import type { Supplier, BASAccount, VatTreatment } from '@/types'
 
 interface LineItem {
   description: string
-  quantity: number
-  unit: string
-  unit_price: number
+  amount: number
   account_number: string
   vat_rate: number
 }
@@ -33,7 +33,6 @@ interface FormData {
   delivery_date: string
   currency: string
   exchange_rate: string
-  vat_treatment: VatTreatment
   reverse_charge: boolean
   payment_reference: string
   notes: string
@@ -44,15 +43,31 @@ function formatAmount(amount: number): string {
   return amount.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+function inferVatTreatment(items: LineItem[], reverseCharge: boolean): VatTreatment {
+  if (reverseCharge) return 'reverse_charge'
+
+  const rates = new Set(items.map((i) => i.vat_rate))
+  if (rates.size === 1) {
+    const rate = rates.values().next().value!
+    if (rate === 0.25) return 'standard_25'
+    if (rate === 0.12) return 'reduced_12'
+    if (rate === 0.06) return 'reduced_6'
+    if (rate === 0) return 'exempt'
+  }
+
+  return 'standard_25'
+}
+
 export default function NewSupplierInvoicePage() {
   const router = useRouter()
   const { toast } = useToast()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [accounts, setAccounts] = useState<BASAccount[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showReview, setShowReview] = useState(false)
   const [pendingData, setPendingData] = useState<FormData | null>(null)
 
-  const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
+  const { register, control, handleSubmit, watch, setValue } = useForm<FormData>({
     defaultValues: {
       supplier_id: '',
       supplier_invoice_number: '',
@@ -61,16 +76,13 @@ export default function NewSupplierInvoicePage() {
       delivery_date: '',
       currency: 'SEK',
       exchange_rate: '',
-      vat_treatment: 'standard_25',
       reverse_charge: false,
       payment_reference: '',
       notes: '',
       items: [
         {
           description: '',
-          quantity: 1,
-          unit: 'st',
-          unit_price: 0,
+          amount: 0,
           account_number: '5010',
           vat_rate: 0.25,
         },
@@ -85,6 +97,7 @@ export default function NewSupplierInvoicePage() {
 
   useEffect(() => {
     fetchSuppliers()
+    fetchAccounts()
   }, [])
 
   // Auto-fill due date when supplier is selected
@@ -106,7 +119,6 @@ export default function NewSupplierInvoicePage() {
         }
         if (supplier.supplier_type === 'eu_business') {
           setValue('reverse_charge', true)
-          setValue('vat_treatment', 'reverse_charge')
         }
       }
     }
@@ -118,9 +130,27 @@ export default function NewSupplierInvoicePage() {
     setSuppliers(data || [])
   }
 
+  async function fetchAccounts() {
+    const res = await fetch('/api/bookkeeping/accounts')
+    const { data } = await res.json()
+    setAccounts(data || [])
+  }
+
+  function handleAccountChange(index: number, accountNumber: string) {
+    setValue(`items.${index}.account_number`, accountNumber)
+    // Auto-fill description from account name if description is empty
+    const currentDesc = watch(`items.${index}.description`)
+    if (!currentDesc && accountNumber.length === 4) {
+      const desc = getAccountDescription(accountNumber)
+      if (desc) {
+        setValue(`items.${index}.description`, desc.name)
+      }
+    }
+  }
+
   // Calculate totals
   const itemTotals = (watchedItems || []).map((item) => {
-    const lineTotal = Math.round((item.quantity || 0) * (item.unit_price || 0) * 100) / 100
+    const lineTotal = Math.round((item.amount || 0) * 100) / 100
     const vatAmount = Math.round(lineTotal * (item.vat_rate || 0) * 100) / 100
     return { lineTotal, vatAmount }
   })
@@ -147,6 +177,8 @@ export default function NewSupplierInvoicePage() {
     if (!pendingData) return
     setIsSubmitting(true)
 
+    const vatTreatment = inferVatTreatment(pendingData.items, pendingData.reverse_charge)
+
     const payload = {
       supplier_id: pendingData.supplier_id,
       supplier_invoice_number: pendingData.supplier_invoice_number,
@@ -155,15 +187,13 @@ export default function NewSupplierInvoicePage() {
       delivery_date: pendingData.delivery_date || undefined,
       currency: pendingData.currency,
       exchange_rate: pendingData.exchange_rate ? parseFloat(pendingData.exchange_rate) : undefined,
-      vat_treatment: pendingData.vat_treatment,
+      vat_treatment: vatTreatment,
       reverse_charge: pendingData.reverse_charge,
       payment_reference: pendingData.payment_reference || undefined,
       notes: pendingData.notes || undefined,
       items: pendingData.items.map((item) => ({
         description: item.description,
-        quantity: item.quantity,
-        unit: item.unit,
-        unit_price: item.unit_price,
+        amount: item.amount,
         account_number: item.account_number,
         vat_rate: item.vat_rate,
       })),
@@ -270,13 +300,13 @@ export default function NewSupplierInvoicePage() {
           </CardContent>
         </Card>
 
-        {/* Currency & VAT */}
+        {/* Currency & Reverse Charge */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Valuta & moms</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Valuta</Label>
                 <Controller
@@ -310,27 +340,6 @@ export default function NewSupplierInvoicePage() {
                   />
                 </div>
               )}
-              <div className="space-y-2">
-                <Label>Momsbehandling</Label>
-                <Controller
-                  name="vat_treatment"
-                  control={control}
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="standard_25">Standard 25%</SelectItem>
-                        <SelectItem value="reduced_12">Reducerad 12%</SelectItem>
-                        <SelectItem value="reduced_6">Reducerad 6%</SelectItem>
-                        <SelectItem value="reverse_charge">Omvänd skattskyldighet</SelectItem>
-                        <SelectItem value="exempt">Momsfritt</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </div>
             </div>
             <div className="flex items-center gap-2">
               <Controller
@@ -351,7 +360,7 @@ export default function NewSupplierInvoicePage() {
         {/* Line Items */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">Rader</CardTitle>
+            <CardTitle className="text-lg">Kontering</CardTitle>
             <Button
               type="button"
               variant="outline"
@@ -359,10 +368,8 @@ export default function NewSupplierInvoicePage() {
               onClick={() =>
                 append({
                   description: '',
-                  quantity: 1,
-                  unit: 'st',
-                  unit_price: 0,
-                  account_number: '5010',
+                  amount: 0,
+                  account_number: '',
                   vat_rate: 0.25,
                 })
               }
@@ -375,20 +382,30 @@ export default function NewSupplierInvoicePage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
+                  <th className="pb-2 w-28">Konto</th>
                   <th className="pb-2">Beskrivning</th>
-                  <th className="pb-2 w-16">Antal</th>
-                  <th className="pb-2 w-16">Enhet</th>
-                  <th className="pb-2 w-28">À-pris (exkl.)</th>
-                  <th className="pb-2 w-24">Konto</th>
+                  <th className="pb-2 w-32">Belopp (exkl.)</th>
                   <th className="pb-2 w-24">Momssats</th>
-                  <th className="pb-2 w-28 text-right">Belopp</th>
                   <th className="pb-2 w-24 text-right">Moms</th>
                   <th className="pb-2 w-8"></th>
                 </tr>
               </thead>
               <tbody>
                 {fields.map((field, index) => (
-                  <tr key={field.id} className="border-b last:border-0">
+                  <tr key={field.id} className="border-b last:border-0 align-top">
+                    <td className="py-2 pr-2">
+                      <Controller
+                        name={`items.${index}.account_number`}
+                        control={control}
+                        render={({ field: f }) => (
+                          <AccountCombobox
+                            value={f.value}
+                            accounts={accounts}
+                            onChange={(val) => handleAccountChange(index, val)}
+                          />
+                        )}
+                      />
+                    </td>
                     <td className="py-2 pr-2">
                       <Input
                         placeholder="Beskrivning"
@@ -399,23 +416,8 @@ export default function NewSupplierInvoicePage() {
                       <Input
                         type="number"
                         step="0.01"
-                        {...register(`items.${index}.quantity`, { valueAsNumber: true })}
-                      />
-                    </td>
-                    <td className="py-2 pr-2">
-                      <Input {...register(`items.${index}.unit`)} />
-                    </td>
-                    <td className="py-2 pr-2">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        {...register(`items.${index}.unit_price`, { valueAsNumber: true })}
-                      />
-                    </td>
-                    <td className="py-2 pr-2">
-                      <Input
-                        placeholder="5010"
-                        {...register(`items.${index}.account_number`)}
+                        placeholder="0,00"
+                        {...register(`items.${index}.amount`, { valueAsNumber: true })}
                       />
                     </td>
                     <td className="py-2 pr-2">
@@ -440,13 +442,10 @@ export default function NewSupplierInvoicePage() {
                         )}
                       />
                     </td>
-                    <td className="py-2 pr-2 text-right font-mono">
-                      {formatAmount(itemTotals[index]?.lineTotal || 0)}
-                    </td>
-                    <td className="py-2 pr-2 text-right font-mono">
+                    <td className="py-2 pr-2 text-right font-mono pt-4">
                       {formatAmount(itemTotals[index]?.vatAmount || 0)}
                     </td>
-                    <td className="py-2">
+                    <td className="py-2 pt-3">
                       {fields.length > 1 && (
                         <Button
                           type="button"
@@ -515,7 +514,7 @@ export default function NewSupplierInvoicePage() {
             onConfirm={handleConfirm}
             isSubmitting={isSubmitting}
             title="Granska leverantörsfaktura"
-            warningText="Leverantörsfakturan registreras och en verifikation bokförs. Verifikationen kan inte ändras efteråt."
+            warningText="Leverantörsfakturan registreras och en verifikation bokförs. Verifikationen kan inte redigeras direkt, men kan korrigeras via en ändringsverifikation."
             confirmLabel="Bekräfta & registrera"
           >
             <SupplierInvoiceReviewContent
@@ -526,7 +525,6 @@ export default function NewSupplierInvoicePage() {
               deliveryDate={pendingData.delivery_date || undefined}
               currency={pendingData.currency}
               exchangeRate={pendingData.exchange_rate || undefined}
-              vatTreatment={pendingData.vat_treatment}
               reverseCharge={pendingData.reverse_charge}
               paymentReference={pendingData.payment_reference || undefined}
               items={pendingData.items}

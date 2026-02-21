@@ -11,6 +11,7 @@ interface ReviewItem {
   quantity: number
   unit: string
   unit_price: number
+  vat_rate?: number
 }
 
 interface InvoiceReviewContentProps {
@@ -51,6 +52,24 @@ export function InvoiceReviewContent({
     non_eu_business: 'Utanför EU',
   }
 
+  // Check if items have mixed VAT rates
+  const hasPerLineVat = items.some((item) => item.vat_rate !== undefined)
+  const uniqueRates = hasPerLineVat
+    ? new Set(items.map((item) => item.vat_rate ?? vatRate))
+    : new Set([vatRate])
+  const showVatColumn = hasPerLineVat && uniqueRates.size > 1
+
+  // Calculate per-rate VAT breakdown
+  const vatByRate = new Map<number, number>()
+  if (hasPerLineVat) {
+    for (const item of items) {
+      const rate = item.vat_rate ?? vatRate
+      const lineTotal = item.quantity * item.unit_price
+      const lineVat = Math.round(lineTotal * rate / 100 * 100) / 100
+      vatByRate.set(rate, (vatByRate.get(rate) || 0) + lineVat)
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Customer info */}
@@ -89,6 +108,7 @@ export function InvoiceReviewContent({
             <th className="py-2 w-16 text-right">Antal</th>
             <th className="py-2 w-16 text-center">Enhet</th>
             <th className="py-2 w-24 text-right">À-pris</th>
+            {showVatColumn && <th className="py-2 w-16 text-right">Moms</th>}
             <th className="py-2 w-28 text-right">Belopp</th>
           </tr>
         </thead>
@@ -99,6 +119,9 @@ export function InvoiceReviewContent({
               <td className="py-2 text-right">{item.quantity}</td>
               <td className="py-2 text-center">{item.unit}</td>
               <td className="py-2 text-right">{formatCurrency(item.unit_price, currency)}</td>
+              {showVatColumn && (
+                <td className="py-2 text-right">{item.vat_rate ?? vatRate}%</td>
+              )}
               <td className="py-2 text-right">
                 {formatCurrency(item.quantity * item.unit_price, currency)}
               </td>
@@ -113,10 +136,23 @@ export function InvoiceReviewContent({
           <span className="text-muted-foreground">Delsumma</span>
           <span>{formatCurrency(subtotal, currency)}</span>
         </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Moms ({vatRate}%)</span>
-          <span>{formatCurrency(vatAmount, currency)}</span>
-        </div>
+        {vatByRate.size > 1 ? (
+          // Per-rate breakdown
+          Array.from(vatByRate.entries())
+            .filter(([, vat]) => vat > 0)
+            .sort(([a], [b]) => b - a)
+            .map(([rate, vat]) => (
+              <div key={rate} className="flex justify-between">
+                <span className="text-muted-foreground">Moms {rate}%</span>
+                <span>{formatCurrency(vat, currency)}</span>
+              </div>
+            ))
+        ) : (
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Moms ({vatRate}%)</span>
+            <span>{formatCurrency(vatAmount, currency)}</span>
+          </div>
+        )}
         <Separator />
         <div className="flex justify-between font-bold text-2xl">
           <span>Totalt</span>

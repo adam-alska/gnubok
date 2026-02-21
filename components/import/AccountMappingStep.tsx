@@ -30,6 +30,7 @@ import {
 } from 'lucide-react'
 import type { AccountMapping } from '@/lib/import/types'
 import type { BASAccount } from '@/types'
+import { getAccountClassName } from '@/lib/bookkeeping/account-descriptions'
 
 interface AccountMappingStepProps {
   mappings: AccountMapping[]
@@ -352,25 +353,3 @@ function ConfidenceBadge({
   return <Badge variant="outline">Osäker</Badge>
 }
 
-function getAccountClassName(accountClass: number): string {
-  switch (accountClass) {
-    case 1:
-      return '1xxx - Tillgångar'
-    case 2:
-      return '2xxx - Eget kapital & Skulder'
-    case 3:
-      return '3xxx - Intäkter'
-    case 4:
-      return '4xxx - Varuinköp'
-    case 5:
-      return '5xxx - Externa kostnader'
-    case 6:
-      return '6xxx - Övriga externa kostnader'
-    case 7:
-      return '7xxx - Personal'
-    case 8:
-      return '8xxx - Finansiella poster'
-    default:
-      return `${accountClass}xxx - Övrigt`
-  }
-}

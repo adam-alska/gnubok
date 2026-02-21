@@ -2,6 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { evaluateMappingRules } from '@/lib/bookkeeping/mapping-engine'
 import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-entries'
 import { getBestInvoiceMatch } from '@/lib/invoice/invoice-matching'
+import { tryReconcileTransaction, fetchUnlinkedGLLines } from '@/lib/reconciliation/bank-reconciliation'
+import type { UnlinkedGLLine } from '@/lib/reconciliation/bank-reconciliation'
 import type { Transaction } from '@/types'
 
 /**
@@ -24,6 +26,7 @@ export interface RawTransaction {
 export interface IngestResult {
   imported: number
   duplicates: number
+  reconciled: number
   auto_categorized: number
   auto_matched_invoices: number
   errors: number
@@ -51,10 +54,19 @@ export async function ingestTransactions(
   const result: IngestResult = {
     imported: 0,
     duplicates: 0,
+    reconciled: 0,
     auto_categorized: 0,
     auto_matched_invoices: 0,
     errors: 0,
     transaction_ids: [],
+  }
+
+  // Pre-fetch unlinked GL lines for reconciliation (non-critical)
+  let glLinePool: UnlinkedGLLine[] = []
+  try {
+    glLinePool = await fetchUnlinkedGLLines(supabase, userId)
+  } catch {
+    // Non-critical — reconciliation will be skipped
   }
 
   for (const raw of rawTransactions) {
@@ -99,6 +111,30 @@ export async function ingestTransactions(
 
     result.imported++
     result.transaction_ids.push(newTransaction.id)
+
+    // 2.5. Try reconciliation against pre-fetched unlinked GL lines
+    if (glLinePool.length > 0) {
+      try {
+        const match = tryReconcileTransaction(newTransaction as Transaction, glLinePool)
+        if (match) {
+          await supabase
+            .from('transactions')
+            .update({
+              journal_entry_id: match.glLine.journal_entry_id,
+              reconciliation_method: match.method,
+              is_business: true,
+            })
+            .eq('id', newTransaction.id)
+
+          // Remove matched GL line from pool to prevent double-matching
+          glLinePool = glLinePool.filter((l) => l.line_id !== match.glLine.line_id)
+          result.reconciled++
+          continue // Skip invoice matching and auto-categorization
+        }
+      } catch {
+        // Non-critical — fall through to normal flow
+      }
+    }
 
     // 3. For income transactions, try invoice matching
     if (newTransaction.amount > 0) {

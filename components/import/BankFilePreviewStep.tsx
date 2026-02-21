@@ -200,6 +200,23 @@ export default function BankFilePreviewStep({
         </CardContent>
       </Card>
 
+      {/* Error blocking continuation */}
+      {hasIssues && (
+        <Card className="border-destructive">
+          <CardContent className="pt-6">
+            <div className="flex gap-3">
+              <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-destructive">Filen innehåller fel som förhindrar import</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Kontrollera felet ovan och försök ladda upp en korrigerad fil.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Navigation */}
       <div className="flex justify-between">
         <Button variant="outline" onClick={onBack}>

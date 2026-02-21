@@ -2,8 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { eventBus } from '@/lib/events'
 import { ensureInitialized } from '@/lib/init'
-import type { CreateInvoiceInput, EntityType, Invoice, CreditNote } from '@/types'
-import { getVatRules, calculateVat, calculateTotal } from '@/lib/invoice/vat-rules'
+import type { CreateInvoiceInput, EntityType, AccountingMethod, Invoice, CreditNote, InvoiceDocumentType } from '@/types'
+import { getVatRules, calculateVat, calculateTotal, getAvailableVatRates, getVatTreatmentForRate } from '@/lib/invoice/vat-rules'
 import { fetchExchangeRate, convertToSEK } from '@/lib/currency/riksbanken'
 import {
   createCreditNoteJournalEntry,
@@ -67,6 +67,7 @@ export async function POST(request: Request) {
   }
 
   const invoiceInput = body as CreateInvoiceInput
+  const documentType: InvoiceDocumentType = body.document_type || 'invoice'
 
   // Get customer for VAT calculation
   const { data: customer, error: customerError } = await supabase
@@ -80,16 +81,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
   }
 
-  // Calculate VAT rules
+  // Calculate VAT rules (default for customer)
   const vatRules = getVatRules(customer.customer_type, customer.vat_number_validated)
+  const availableRates = getAvailableVatRates(customer.customer_type, customer.vat_number_validated)
+  const allowedRates = new Set(availableRates.map((r) => r.rate))
 
-  // Calculate subtotal from items
+  // Calculate per-item VAT and subtotals
   const subtotal = invoiceInput.items.reduce((sum, item) => {
     return sum + item.quantity * item.unit_price
   }, 0)
 
-  const vatAmount = calculateVat(subtotal, vatRules.rate)
-  const total = subtotal + vatAmount
+  // Calculate VAT per item, respecting per-line vat_rate
+  let vatAmount = 0
+  if (documentType !== 'delivery_note') {
+    for (const item of invoiceInput.items) {
+      const itemRate = item.vat_rate !== undefined ? item.vat_rate : vatRules.rate
+      // Validate rate is allowed for this customer
+      if (!allowedRates.has(itemRate)) {
+        return NextResponse.json(
+          { error: `Momssats ${itemRate}% är inte tillåten för denna kundtyp` },
+          { status: 400 }
+        )
+      }
+      const lineTotal = item.quantity * item.unit_price
+      vatAmount += Math.round(lineTotal * itemRate / 100 * 100) / 100
+    }
+  }
+  const total = documentType === 'delivery_note' ? 0 : subtotal + vatAmount
+
+  // Determine if this is a mixed-rate invoice
+  const uniqueRates = new Set(invoiceInput.items.map((item) => item.vat_rate ?? vatRules.rate))
+  const isMixedRate = uniqueRates.size > 1
 
   // Handle currency conversion
   let exchangeRate: number | null = null
@@ -109,10 +131,15 @@ export async function POST(request: Request) {
     }
   }
 
-  // Generate invoice number
-  const { data: invoiceNumber } = await supabase.rpc('generate_invoice_number', {
+  // Generate invoice number with appropriate prefix
+  const { data: baseNumber } = await supabase.rpc('generate_invoice_number', {
     p_user_id: user.id,
   })
+  const invoiceNumber = documentType === 'proforma'
+    ? `PF-${baseNumber}`
+    : documentType === 'delivery_note'
+      ? `FS-${baseNumber}`
+      : baseNumber
 
   // Create invoice
   const { data: invoice, error: invoiceError } = await supabase
@@ -126,19 +153,20 @@ export async function POST(request: Request) {
       currency: invoiceInput.currency,
       exchange_rate: exchangeRate,
       exchange_rate_date: exchangeRateDate,
-      subtotal,
-      subtotal_sek: subtotalSek,
+      subtotal: documentType === 'delivery_note' ? 0 : subtotal,
+      subtotal_sek: documentType === 'delivery_note' ? null : subtotalSek,
       vat_amount: vatAmount,
-      vat_amount_sek: vatAmountSek,
+      vat_amount_sek: documentType === 'delivery_note' ? null : vatAmountSek,
       total,
-      total_sek: totalSek,
+      total_sek: documentType === 'delivery_note' ? null : totalSek,
       vat_treatment: vatRules.treatment,
-      vat_rate: vatRules.rate,
+      vat_rate: documentType === 'delivery_note' ? 0 : (isMixedRate ? null : (uniqueRates.values().next().value ?? vatRules.rate)),
       moms_ruta: vatRules.momsRuta,
       reverse_charge_text: vatRules.reverseChargeText || null,
       your_reference: invoiceInput.your_reference,
       our_reference: invoiceInput.our_reference,
       notes: invoiceInput.notes,
+      document_type: documentType,
     })
     .select()
     .single()
@@ -147,16 +175,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: invoiceError.message }, { status: 500 })
   }
 
-  // Create invoice items
-  const items = invoiceInput.items.map((item, index) => ({
-    invoice_id: invoice.id,
-    sort_order: index,
-    description: item.description,
-    quantity: item.quantity,
-    unit: item.unit,
-    unit_price: item.unit_price,
-    line_total: item.quantity * item.unit_price,
-  }))
+  // Create invoice items with per-line VAT
+  const items = invoiceInput.items.map((item, index) => {
+    const itemRate = item.vat_rate !== undefined ? item.vat_rate : vatRules.rate
+    const lineTotal = item.quantity * item.unit_price
+    const itemVat = documentType === 'delivery_note' ? 0 : Math.round(lineTotal * itemRate / 100 * 100) / 100
+    return {
+      invoice_id: invoice.id,
+      sort_order: index,
+      description: item.description,
+      quantity: item.quantity,
+      unit: item.unit,
+      unit_price: item.unit_price,
+      line_total: lineTotal,
+      vat_rate: itemRate,
+      vat_amount: itemVat,
+    }
+  })
 
   const { error: itemsError } = await supabase
     .from('invoice_items')
@@ -175,8 +210,8 @@ export async function POST(request: Request) {
     .eq('id', invoice.id)
     .single()
 
-  // Emit event (no journal entry at draft — booking happens at send/payment based on accounting method)
-  if (completeInvoice) {
+  // Emit event only for real invoices (proformas and delivery notes are informational)
+  if (completeInvoice && documentType === 'invoice') {
     await eventBus.emit({
       type: 'invoice.created',
       payload: { invoice: completeInvoice as Invoice, userId: user.id },
@@ -202,6 +237,14 @@ async function createCreditNote(
 
   if (originalError || !originalInvoice) {
     return NextResponse.json({ error: 'Original invoice not found' }, { status: 404 })
+  }
+
+  // Credit notes can only be created from real invoices
+  if (originalInvoice.document_type && originalInvoice.document_type !== 'invoice') {
+    return NextResponse.json(
+      { error: 'Credit notes can only be created from standard invoices' },
+      { status: 400 }
+    )
   }
 
   // Check if invoice is already credited
@@ -258,8 +301,8 @@ async function createCreditNote(
     return NextResponse.json({ error: creditNoteError.message }, { status: 500 })
   }
 
-  // Create credit note items (negated from original)
-  const creditNoteItems = (originalInvoice.items || []).map((item: { sort_order: number; description: string; quantity: number; unit: string; unit_price: number; line_total: number }, index: number) => ({
+  // Create credit note items (negated from original, preserving per-line VAT)
+  const creditNoteItems = (originalInvoice.items || []).map((item: { sort_order: number; description: string; quantity: number; unit: string; unit_price: number; line_total: number; vat_rate?: number; vat_amount?: number }) => ({
     invoice_id: creditNote.id,
     sort_order: item.sort_order,
     description: item.description,
@@ -267,6 +310,8 @@ async function createCreditNote(
     unit: item.unit,
     unit_price: item.unit_price,
     line_total: -Math.abs(item.line_total),
+    vat_rate: item.vat_rate ?? 25,
+    vat_amount: -(item.vat_amount ? Math.abs(item.vat_amount) : 0),
   }))
 
   const { error: itemsError } = await supabase
@@ -292,17 +337,19 @@ async function createCreditNote(
     .eq('id', creditNote.id)
     .single()
 
-  // Fetch entity type for correct account mapping
+  // Fetch entity type and accounting method for correct account mapping
   const { data: creditNoteSettings } = await supabase
     .from('company_settings')
-    .select('entity_type')
+    .select('entity_type, accounting_method')
     .eq('user_id', userId)
     .single()
 
   const entityType = (creditNoteSettings?.entity_type as EntityType) || 'enskild_firma'
+  const accountingMethod = (creditNoteSettings?.accounting_method as AccountingMethod) || 'accrual'
 
   // Create journal entry for the credit note (non-blocking)
-  if (completeCreditNote) {
+  // Cash method: skip — no original invoice entry exists to reverse; deferred until refund
+  if (completeCreditNote && accountingMethod === 'accrual') {
     try {
       const journalEntry = await createCreditNoteJournalEntry(
         userId,

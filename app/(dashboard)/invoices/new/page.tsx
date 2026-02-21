@@ -16,18 +16,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency } from '@/lib/utils'
-import { getVatRules, getVatTreatmentLabel } from '@/lib/invoice/vat-rules'
+import { getVatRules, getVatTreatmentLabel, getAvailableVatRates } from '@/lib/invoice/vat-rules'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { Loader2, Plus, Trash2, ArrowLeft, Send } from 'lucide-react'
+import { Loader2, Plus, Trash2, ArrowLeft, Send, Eye } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { InvoiceReviewContent } from '@/components/invoices/InvoiceReviewContent'
-import type { Customer, Currency, CreateInvoiceInput } from '@/types'
+import type { Customer, Currency, CreateInvoiceInput, InvoiceDocumentType } from '@/types'
 
 const itemSchema = z.object({
   description: z.string().min(1, 'Beskrivning krävs'),
   quantity: z.number().min(0.01, 'Minst 0.01'),
   unit: z.string().min(1, 'Enhet krävs'),
   unit_price: z.number().min(0, 'Pris måste vara positivt'),
+  vat_rate: z.number().min(0).max(25),
 })
 
 const schema = z.object({
@@ -35,6 +36,7 @@ const schema = z.object({
   invoice_date: z.string().min(1, 'Fakturadatum krävs'),
   due_date: z.string().min(1, 'Förfallodatum krävs'),
   currency: z.enum(['SEK', 'EUR', 'USD', 'GBP', 'NOK', 'DKK']),
+  document_type: z.enum(['invoice', 'proforma', 'delivery_note']),
   your_reference: z.string().optional(),
   our_reference: z.string().optional(),
   notes: z.string().optional(),
@@ -62,6 +64,8 @@ export default function NewInvoicePage() {
   const [createdInvoiceId, setCreatedInvoiceId] = useState<string | null>(null)
   const [showSendPrompt, setShowSendPrompt] = useState(false)
   const [isSending, setIsSending] = useState(false)
+  const [isPreviewing, setIsPreviewing] = useState(false)
+  const [defaultNotes, setDefaultNotes] = useState<string | null>(null)
 
   const {
     register,
@@ -77,7 +81,8 @@ export default function NewInvoicePage() {
       invoice_date: '',
       due_date: '',
       currency: 'SEK',
-      items: [{ description: '', quantity: 1, unit: 'st', unit_price: 0 }],
+      document_type: 'invoice' as InvoiceDocumentType,
+      items: [{ description: '', quantity: 1, unit: 'st', unit_price: 0, vat_rate: 25 }],
     },
   })
 
@@ -95,10 +100,23 @@ export default function NewInvoicePage() {
   const watchItems = watch('items')
   const watchCurrency = watch('currency')
   const watchCustomerId = watch('customer_id')
+  const watchDocumentType = watch('document_type') as InvoiceDocumentType
 
   useEffect(() => {
     fetchCustomers()
+    fetchDefaultNotes()
   }, [])
+
+  async function fetchDefaultNotes() {
+    const { data } = await supabase
+      .from('company_settings')
+      .select('invoice_default_notes')
+      .single()
+    if (data?.invoice_default_notes) {
+      setDefaultNotes(data.invoice_default_notes)
+      setValue('notes', data.invoice_default_notes)
+    }
+  }
 
   useEffect(() => {
     if (watchCustomerId) {
@@ -111,6 +129,17 @@ export default function NewInvoicePage() {
           'due_date',
           format(addDays(new Date(), customer.default_payment_terms), 'yyyy-MM-dd')
         )
+      }
+
+      // When customer forces a single rate (reverse charge/export), update all lines
+      if (customer) {
+        const rates = getAvailableVatRates(customer.customer_type, customer.vat_number_validated)
+        if (rates.length === 1) {
+          const forcedRate = rates[0].rate
+          watchItems.forEach((_, i) => {
+            setValue(`items.${i}.vat_rate`, forcedRate)
+          })
+        }
       }
     }
   }, [watchCustomerId, customers, setValue])
@@ -141,7 +170,24 @@ export default function NewInvoicePage() {
     ? getVatRules(selectedCustomer.customer_type, selectedCustomer.vat_number_validated)
     : null
 
-  const vatAmount = vatRules ? subtotal * (vatRules.rate / 100) : 0
+  const availableRates = selectedCustomer
+    ? getAvailableVatRates(selectedCustomer.customer_type, selectedCustomer.vat_number_validated)
+    : []
+  const isRateLocked = availableRates.length === 1
+
+  // Calculate per-item VAT
+  const vatByRate = new Map<number, { base: number; vat: number }>()
+  let vatAmount = 0
+  for (const item of watchItems) {
+    const rate = item.vat_rate ?? (vatRules?.rate || 25)
+    const lineTotal = (item.quantity || 0) * (item.unit_price || 0)
+    const lineVat = Math.round(lineTotal * rate / 100 * 100) / 100
+    vatAmount += lineVat
+    const existing = vatByRate.get(rate) || { base: 0, vat: 0 }
+    existing.base += lineTotal
+    existing.vat += lineVat
+    vatByRate.set(rate, existing)
+  }
   const total = subtotal + vatAmount
 
   function onSubmit(data: FormData) {
@@ -166,9 +212,10 @@ export default function NewInvoicePage() {
         throw new Error(result.error || 'Kunde inte skapa faktura')
       }
 
+      const docLabel = watchDocumentType === 'proforma' ? 'Proformafaktura' : watchDocumentType === 'delivery_note' ? 'Följesedel' : 'Faktura'
       toast({
-        title: 'Faktura skapad',
-        description: `Faktura ${result.data.invoice_number} har skapats`,
+        title: `${docLabel} skapad`,
+        description: `${docLabel} ${result.data.invoice_number} har skapats`,
       })
 
       setShowReview(false)
@@ -222,6 +269,46 @@ export default function NewInvoicePage() {
     }
   }
 
+  async function handlePreviewPDF() {
+    if (!pendingData) return
+    setIsPreviewing(true)
+
+    try {
+      const response = await fetch('/api/invoices/preview-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: pendingData.customer_id,
+          invoice_date: pendingData.invoice_date,
+          due_date: pendingData.due_date,
+          currency: pendingData.currency,
+          document_type: pendingData.document_type,
+          items: pendingData.items,
+          your_reference: pendingData.your_reference,
+          our_reference: pendingData.our_reference,
+          notes: pendingData.notes,
+        }),
+      })
+
+      if (!response.ok) {
+        const result = await response.json()
+        throw new Error(result.error || 'Kunde inte generera förhandsgranskning')
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      window.open(url, '_blank')
+    } catch (error) {
+      toast({
+        title: 'Fel',
+        description: error instanceof Error ? error.message : 'Kunde inte generera PDF',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsPreviewing(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -237,8 +324,12 @@ export default function NewInvoicePage() {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Ny faktura</h1>
-          <p className="text-muted-foreground">Skapa en ny faktura</p>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {watchDocumentType === 'proforma' ? 'Ny proformafaktura' : watchDocumentType === 'delivery_note' ? 'Ny följesedel' : 'Ny faktura'}
+          </h1>
+          <p className="text-muted-foreground">
+            {watchDocumentType === 'proforma' ? 'Skapa en proformafaktura (ingen bokföring)' : watchDocumentType === 'delivery_note' ? 'Skapa en följesedel (utan priser)' : 'Skapa en ny faktura'}
+          </p>
         </div>
       </div>
 
@@ -300,7 +391,7 @@ export default function NewInvoicePage() {
                 <div className="space-y-4">
                   {fields.map((field, index) => (
                     <div key={field.id} className="grid gap-4 md:grid-cols-12 items-start">
-                      <div className="md:col-span-5 space-y-2">
+                      <div className="md:col-span-4 space-y-2">
                         <Label>Beskrivning</Label>
                         <Input
                           placeholder="T.ex. Instagram-kampanj"
@@ -312,7 +403,7 @@ export default function NewInvoicePage() {
                           </p>
                         )}
                       </div>
-                      <div className="md:col-span-2 space-y-2">
+                      <div className="md:col-span-1 space-y-2">
                         <Label>Antal</Label>
                         <Input
                           type="number"
@@ -349,6 +440,31 @@ export default function NewInvoicePage() {
                           {...register(`items.${index}.unit_price`, { valueAsNumber: true })}
                         />
                       </div>
+                      <div className="md:col-span-2 space-y-2">
+                        <Label>Moms</Label>
+                        <Controller
+                          name={`items.${index}.vat_rate`}
+                          control={control}
+                          render={({ field }) => (
+                            <Select
+                              value={String(field.value ?? 25)}
+                              onValueChange={(v) => field.onChange(Number(v))}
+                              disabled={isRateLocked}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableRates.map((opt) => (
+                                  <SelectItem key={opt.rate} value={String(opt.rate)}>
+                                    {opt.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                      </div>
                       <div className="md:col-span-1 flex items-end">
                         <Button
                           type="button"
@@ -367,7 +483,7 @@ export default function NewInvoicePage() {
                     type="button"
                     variant="outline"
                     onClick={() =>
-                      append({ description: '', quantity: 1, unit: 'st', unit_price: 0 })
+                      append({ description: '', quantity: 1, unit: 'st', unit_price: 0, vat_rate: availableRates[0]?.rate ?? 25 })
                     }
                   >
                     <Plus className="mr-2 h-4 w-4" />
@@ -400,6 +516,26 @@ export default function NewInvoicePage() {
                 <CardTitle>Fakturadetaljer</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Dokumenttyp</Label>
+                  <Controller
+                    name="document_type"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="invoice">Faktura</SelectItem>
+                          <SelectItem value="proforma">Proformafaktura</SelectItem>
+                          <SelectItem value="delivery_note">Följesedel</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+
                 <div className="space-y-2">
                   <Label>Valuta</Label>
                   <Controller
@@ -459,12 +595,21 @@ export default function NewInvoicePage() {
                   <span className="text-muted-foreground">Delsumma</span>
                   <span>{formatCurrency(subtotal, watchCurrency)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    Moms ({vatRules?.rate || 25}%)
-                  </span>
-                  <span>{formatCurrency(vatAmount, watchCurrency)}</span>
-                </div>
+                {Array.from(vatByRate.entries())
+                  .filter(([, group]) => group.vat > 0)
+                  .sort(([a], [b]) => b - a)
+                  .map(([rate, group]) => (
+                    <div key={rate} className="flex justify-between">
+                      <span className="text-muted-foreground">Moms {rate}%</span>
+                      <span>{formatCurrency(group.vat, watchCurrency)}</span>
+                    </div>
+                  ))}
+                {vatByRate.size === 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Moms</span>
+                    <span>{formatCurrency(0, watchCurrency)}</span>
+                  </div>
+                )}
                 <Separator />
                 <div className="flex justify-between font-bold text-lg">
                   <span>Totalt</span>
@@ -487,15 +632,37 @@ export default function NewInvoicePage() {
           onOpenChange={setShowReview}
           onConfirm={handleConfirm}
           isSubmitting={isSubmitting}
-          title="Granska faktura"
-          warningText="En faktura skapas och en verifikation bokförs. Verifikationen kan inte ändras efteråt."
+          title={watchDocumentType === 'proforma' ? 'Granska proformafaktura' : watchDocumentType === 'delivery_note' ? 'Granska följesedel' : 'Granska faktura'}
+          warningText={watchDocumentType === 'invoice'
+            ? 'En faktura skapas och en verifikation bokförs. Verifikationen kan inte redigeras direkt, men kan korrigeras via en kreditnota.'
+            : watchDocumentType === 'proforma'
+              ? 'En proformafaktura skapas. Ingen verifikation bokförs. Proforman kan senare konverteras till en riktig faktura.'
+              : 'En följesedel skapas utan priser. Ingen verifikation bokförs.'}
+          confirmLabel={watchDocumentType === 'proforma' ? 'Skapa proformafaktura' : watchDocumentType === 'delivery_note' ? 'Skapa följesedel' : 'Bekräfta & skapa'}
+          extraActions={
+            <Button
+              variant="outline"
+              onClick={handlePreviewPDF}
+              disabled={isPreviewing || isSubmitting}
+            >
+              {isPreviewing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Eye className="mr-2 h-4 w-4" />
+              )}
+              {isPreviewing ? 'Genererar...' : 'Förhandsgranska PDF'}
+            </Button>
+          }
         >
           <InvoiceReviewContent
             customer={selectedCustomer}
             invoiceDate={pendingData?.invoice_date || ''}
             dueDate={pendingData?.due_date || ''}
             currency={(pendingData?.currency || 'SEK') as Currency}
-            items={pendingData?.items || []}
+            items={(pendingData?.items || []).map((item) => ({
+              ...item,
+              vat_rate: item.vat_rate ?? (vatRules?.rate || 25),
+            }))}
             subtotal={subtotal}
             vatRate={vatRules.rate}
             vatAmount={vatAmount}

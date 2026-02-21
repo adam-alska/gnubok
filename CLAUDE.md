@@ -40,7 +40,13 @@ app/
 
 components/
   ui/                     shadcn/ui primitives (button, card, dialog, table, etc.)
-  [feature]/              Feature-organized components (banking, invoices, suppliers, etc.)
+  bookkeeping/            Chart of accounts manager, account combobox, add/edit dialogs
+  calendar/               Calendar views, deadline cards, payment summary, todo widgets
+  chat/                   ChatWidget, ChatPanel, ChatInput, ChatMessage
+  dashboard/              DashboardContent, DashboardNav, FSkattWarningCard
+  reports/                Report views (including BankReconciliationView)
+  settings/               CalendarFeedSettings
+  [feature]/              Feature-organized components (invoices, suppliers, import, etc.)
 
 extensions/               First-party extension implementations
   ai-categorization/      AI-powered transaction categorization
@@ -55,12 +61,15 @@ extensions/               First-party extension implementations
 lib/
   bookkeeping/            Core journal entry engine and all entry generators
     engine.ts             Draft/commit workflow, balance validation, voucher numbering
-    invoice-entries.ts    Sales invoice journal entries
+    invoice-entries.ts    Sales invoice journal entries (supports per-line VAT rates)
     transaction-entries.ts Bank transaction journal entries
     supplier-invoice-entries.ts Purchase invoice journal entries
     category-mapping.ts   Category-to-BAS-account mapping
     mapping-engine.ts     Rule-based auto-categorization (MCC codes, merchant patterns)
     vat-entries.ts        VAT line generation
+    bas-reference.ts      BAS account catalog (~180 accounts with metadata, SRU codes)
+    account-descriptions.ts Human-readable account name lookup
+    validate-period-duration.ts Fiscal period duration validation (BFL 3 kap.)
   core/
     bookkeeping/          Period service, storno reversal, year-end closing
     documents/            Document archive (upload, versioning, SHA-256 integrity)
@@ -74,23 +83,28 @@ lib/
   events/                 Event bus (bus.ts, types.ts)
   extensions/             Extension registry, loader, types
   import/                 SIE and bank file parser
-  invoice/                VAT rules for invoicing
-  invoices/               Invoice business logic helpers
+    bank-file/            Bank file parser with format modules
+      formats/            camt053, generic-csv, handelsbanken, nordea, seb, swedbank
+  invoice/                VAT rules, invoice matching (vat-rules.ts, invoice-matching.ts)
+  invoices/               Invoice business logic (reminder-processor)
+  reconciliation/         Bank reconciliation engine (4-pass matching algorithm)
   reports/                Financial reports (trial-balance, income-statement,
                           balance-sheet, vat-declaration, sie-export,
                           supplier-ledger, supplier-reconciliation,
                           general-ledger, journal-register,
-                          ar-ledger, ar-reconciliation)
-  supabase/               Client setup (client.ts = browser, server.ts = server/admin)
+                          ar-ledger, ar-reconciliation, monthly-breakdown)
+  supabase/               Client setup (client.ts = browser, server.ts = server/admin,
+                          fetch-all.ts = pagination helper for large queries)
   tax/                    Tax calculations, deadlines, Swedish holidays
   transactions/           Transaction processing helpers
   init.ts                 Extension loader (idempotent, called by API routes)
   utils.ts                Shared utility functions
 
-types/index.ts            Canonical type definitions (110+ types, single source of truth)
+types/index.ts            Canonical type definitions (120+ types, single source of truth)
 types/chat.ts             Chat-specific type definitions
 tests/helpers.ts          Mock factories and fixture builders
 supabase/migrations/      SQL migration files
+scripts/                  Utility scripts (clear-user-data.sql)
 dev_docs/                 Extensive project documentation (PRD, architecture, BAS guide, etc.)
 ```
 
@@ -118,10 +132,10 @@ The bookkeeping engine (`lib/bookkeeping/engine.ts`) is the most critical system
 
 | Function | File | Purpose |
 |----------|------|---------|
-| `createInvoiceJournalEntry()` | `invoice-entries.ts` | Debit 1510, Credit 30xx + 26xx VAT |
+| `createInvoiceJournalEntry()` | `invoice-entries.ts` | Debit 1510, Credit 30xx + 26xx VAT (per-line VAT rates) |
 | `createInvoicePaymentJournalEntry()` | `invoice-entries.ts` | Debit 1930, Credit 1510 |
-| `createCreditNoteJournalEntry()` | `invoice-entries.ts` | Reverses original invoice entry |
-| `createInvoiceCashEntry()` | `invoice-entries.ts` | Cash method: revenue + VAT at payment |
+| `createCreditNoteJournalEntry()` | `invoice-entries.ts` | Reverses original invoice entry (per-rate lines) |
+| `createInvoiceCashEntry()` | `invoice-entries.ts` | Cash method: revenue + VAT at payment (per-rate) |
 | `createTransactionJournalEntry()` | `transaction-entries.ts` | Maps bank transactions via MappingResult |
 | `createSupplierInvoiceRegistrationEntry()` | `supplier-invoice-entries.ts` | Debit expense + 2641, Credit 2440 |
 | `createSupplierInvoicePaymentEntry()` | `supplier-invoice-entries.ts` | Debit 2440, Credit 1930 |
@@ -146,6 +160,23 @@ The bookkeeping engine (`lib/bookkeeping/engine.ts`) is the most critical system
 ### VAT Treatments
 
 `standard_25`, `reduced_12`, `reduced_6`, `reverse_charge`, `export`, `exempt`
+
+### Per-Line VAT
+
+Invoice items support individual `vat_rate` values, enabling mixed-rate invoices. The helper `generatePerRateLines()` in `invoice-entries.ts` groups items by VAT rate and creates separate revenue + VAT account lines per rate group. Available rates depend on customer type — use `getAvailableVatRates(customerType, vatNumberValidated)` from `lib/invoice/vat-rules.ts`.
+
+### Bank Reconciliation
+
+The reconciliation engine (`lib/reconciliation/bank-reconciliation.ts`) matches bank transactions to journal entry lines on account 1930 using a 4-pass algorithm:
+
+| Pass | Method | Confidence | Match Criteria |
+|------|--------|------------|----------------|
+| 1 | `auto_exact` | 0.95 | Exact amount + exact date |
+| 2 | `auto_reference` | 0.90 | Exact amount + reference/description match |
+| 3 | `auto_date_range` | 0.85 | Exact amount + date within ±3 days |
+| 4 | `auto_fuzzy` | 0.75 | Fuzzy amount (±0.01) + exact date |
+
+Manual linking (`manual` method) is also supported. Only SEK transactions are reconciled. Greedy assignment prevents double-matching.
 
 ---
 
@@ -251,6 +282,7 @@ All defined in `lib/events/types.ts`:
 | `receipt.extracted` | `{ receipt, documentId, confidence, userId }` |
 | `receipt.matched` | `{ receipt, transaction, confidence, autoMatched, userId }` |
 | `receipt.confirmed` | `{ receipt, businessTotal, privateTotal, userId }` |
+| `transaction.reconciled` | `{ transaction, journalEntryId, method, userId }` |
 | `audit.security_event` | `{ event, userId }` |
 
 ### Event Bus Behavior
@@ -305,10 +337,17 @@ mockResult({ data: makeTransaction(), error: null })
 ### Reference Tests
 
 - `lib/bookkeeping/__tests__/engine.test.ts` — Balance validation
+- `lib/bookkeeping/__tests__/invoice-entries.test.ts` — Per-line VAT, mixed-rate invoices, credit notes
 - `lib/core/bookkeeping/__tests__/storno-service.test.ts` — Complex mock queues
 - `lib/core/documents/__tests__/document-service.test.ts` — Storage mocking
 - `lib/events/__tests__/bus.test.ts` — Event bus behavior
 - `lib/extensions/__tests__/registry.test.ts` — Extension registration
+- `lib/import/__tests__/sie-parser.test.ts` — SIE file parsing
+- `lib/import/bank-file/__tests__/parser.test.ts` — Bank file format parsing
+- `lib/reconciliation/__tests__/bank-reconciliation.test.ts` — Reconciliation matching algorithm
+- `lib/reports/__tests__/vat-declaration.test.ts` — VAT declaration report
+- `lib/tax/__tests__/deadline-config.test.ts` — Tax deadline configuration
+- `lib/transactions/__tests__/ingest.test.ts` — Transaction ingestion and dedup
 
 ---
 
@@ -316,11 +355,11 @@ mockResult({ data: makeTransaction(), error: null })
 
 ### Location
 
-`supabase/migrations/` — currently 28 files numbered `20240101000001` through `20240101000028`.
+`supabase/migrations/` — currently 32 files numbered `20240101000001` through `20240101000032`.
 
 ### Naming Convention
 
-`YYYYMMDD00NNNN_descriptive_name.sql` — next migration: `20240101000029_*.sql`
+`YYYYMMDD00NNNN_descriptive_name.sql` — next migration: `20240101000033_*.sql`
 
 ### Migration Rules
 
@@ -353,6 +392,12 @@ mockResult({ data: makeTransaction(), error: null })
 - `enforce_retention_journal_entries` — 7-year retention enforcement
 - `set_committed_at` — Auto-sets timestamp on draft-to-posted transition
 - `calculate_retention_expiry` — Auto-sets `retention_expires_at = period_end + 7 years`
+
+### Recent Migrations
+
+- **Migration 030 (`bank_reconciliation`)** — Adds `reconciliation_method` column to `transactions` (CHECK constraint for method types), indexes for unmatched transaction lookup, and RPC `get_unlinked_1930_lines()` for finding unreconciled GL lines.
+- **Migration 031 (`invoice_document_type`)** — Adds `document_type` column to `invoices` (CHECK: invoice/proforma/delivery_note, default 'invoice') and `converted_from_id` FK for tracking proforma-to-invoice conversions.
+- **Migration 032 (`add_accounting_method`)** — Adds `accounting_method` column to `company_settings` (CHECK: accrual/cash, default 'accrual') to support kontantmetoden vs faktureringsmetoden.
 
 ---
 

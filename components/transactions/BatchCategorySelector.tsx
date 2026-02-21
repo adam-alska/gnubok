@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
@@ -49,12 +48,12 @@ export default function BatchCategorySelector({
         <DialogHeader>
           <DialogTitle>
             {isProcessing
-              ? `Kategoriserar ${progress.done}/${progress.total}...`
-              : `Kategorisera ${selectedCount} transaktioner`}
+              ? `Bokför ${progress.done}/${progress.total}...`
+              : `Bokför ${selectedCount} transaktioner`}
           </DialogTitle>
           <DialogDescription>
             {isProcessing
-              ? 'Vänta medan transaktionerna kategoriseras'
+              ? 'Vänta medan transaktionerna bokförs'
               : 'Välj en kategori som ska tillämpas på alla valda transaktioner'}
           </DialogDescription>
         </DialogHeader>

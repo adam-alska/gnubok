@@ -188,18 +188,18 @@ export default function TransactionsPage() {
       if (result.journal_entry_created) {
         toast({
           title: 'Bokförd',
-          description: 'Transaktion kategoriserad och verifikation skapad',
+          description: 'Transaktion bokförd och verifikation skapad',
         })
       } else if (result.journal_entry_error) {
         toast({
-          title: 'Kategoriserad',
-          description: `Bokföring misslyckades: ${result.journal_entry_error}`,
+          title: 'Delvis bokförd',
+          description: `Verifikation kunde inte skapas: ${result.journal_entry_error}`,
           variant: 'destructive',
         })
       } else {
         toast({
-          title: 'Kategoriserad',
-          description: 'Transaktion uppdaterad men kunde inte bokföras',
+          title: 'Delvis bokförd',
+          description: 'Transaktion uppdaterad men verifikation kunde inte skapas',
         })
       }
 
@@ -207,7 +207,7 @@ export default function TransactionsPage() {
     } catch (err) {
       toast({
         title: 'Fel',
-        description: 'Något gick fel vid kategorisering',
+        description: 'Något gick fel vid bokföring',
         variant: 'destructive',
       })
       return false
@@ -415,7 +415,7 @@ export default function TransactionsPage() {
     setShowBatchSelector(false)
     toast({
       title: 'Klart',
-      description: `${ids.length} transaktioner kategoriserade`,
+      description: `${ids.length} transaktioner bokförda`,
     })
     exitBatchMode()
   }
@@ -468,7 +468,7 @@ export default function TransactionsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Transaktioner</h1>
           <p className="text-muted-foreground">
-            Hantera och kategorisera dina transaktioner
+            Hantera och bokför dina transaktioner
           </p>
         </div>
         <div className="flex gap-2">
@@ -482,7 +482,7 @@ export default function TransactionsPage() {
             <>
               <Button variant="outline" onClick={openSwipeView} disabled={isLoadingSuggestions}>
                 <Sparkles className="mr-2 h-4 w-4" />
-                {isLoadingSuggestions ? 'Laddar...' : `Kategorisera (${uncategorizedTransactions.length})`}
+                {isLoadingSuggestions ? 'Laddar...' : `Bokför (${uncategorizedTransactions.length})`}
               </Button>
               <Button
                 variant={isBatchMode ? 'default' : 'outline'}
@@ -525,7 +525,7 @@ export default function TransactionsPage() {
           <TabsList>
             <TabsTrigger value="all">Alla</TabsTrigger>
             <TabsTrigger value="uncategorized">
-              Ej kategoriserade
+              Ej bokförda
               {uncategorizedTransactions.length > 0 && (
                 <Badge variant="secondary" className="ml-2">
                   {uncategorizedTransactions.length}
@@ -551,7 +551,7 @@ export default function TransactionsPage() {
         <div className="flex items-start gap-3 px-4 py-3 rounded-lg border border-primary/20 bg-primary/[0.03]">
           <Sparkles className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
           <p className="text-sm text-muted-foreground flex-1">
-            <span className="font-medium text-foreground">Tips:</span> Klicka &quot;Kategorisera&quot; ovan för att snabbt svepkategorisera transaktioner en i taget. Använd &quot;Välj flera&quot; för att hantera flera samtidigt.
+            <span className="font-medium text-foreground">Tips:</span> Klicka &quot;Bokför&quot; ovan för att snabbt bokföra transaktioner en i taget. Använd &quot;Välj flera&quot; för att hantera flera samtidigt.
           </p>
           <button
             onClick={() => {
@@ -612,7 +612,7 @@ export default function TransactionsPage() {
       ) : (
         <div className="space-y-2">
           {filteredTransactions.map((transaction) => {
-            const isUncategorized = transaction.is_business === null
+            const isUncategorized = transaction.is_business === null && !transaction.journal_entry_id
             const isSelected = selectedIds.has(transaction.id)
             const showCheckbox = isBatchMode && isUncategorized
 
@@ -653,7 +653,7 @@ export default function TransactionsPage() {
                       <p className="font-medium">{transaction.description}</p>
                       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                         <span>{formatDate(transaction.date)}</span>
-                        {transaction.is_business !== null && (
+                        {transaction.is_business !== null && !(transaction.is_business && transaction.category === 'uncategorized' && transaction.journal_entry_id) && (
                           <>
                             <span>·</span>
                             <Badge
@@ -674,7 +674,7 @@ export default function TransactionsPage() {
                             </Badge>
                           </>
                         )}
-                        {transaction.journal_entry_id && (
+                        {transaction.journal_entry_id ? (
                           <>
                             <span>·</span>
                             <Badge variant="outline" className="text-success border-success">
@@ -682,15 +682,14 @@ export default function TransactionsPage() {
                               Bokförd
                             </Badge>
                           </>
-                        )}
-                        {transaction.is_business === null && !transaction.potential_invoice && (
+                        ) : transaction.is_business === null && !transaction.potential_invoice ? (
                           <>
                             <span>·</span>
                             <Badge variant="outline" className="text-warning border-warning">
-                              Ej kategoriserad
+                              Ej bokförd
                             </Badge>
                           </>
-                        )}
+                        ) : null}
                         {transaction.potential_invoice && !transaction.invoice_id && (
                           <>
                             <span>·</span>
@@ -753,7 +752,7 @@ export default function TransactionsPage() {
             size="sm"
             onClick={() => setShowBatchSelector(true)}
           >
-            Kategorisera {selectedIds.size} st
+            Bokför {selectedIds.size} st
           </Button>
         </div>
       )}

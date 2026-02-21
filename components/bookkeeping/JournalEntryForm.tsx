@@ -10,8 +10,9 @@ import { Plus, Trash2 } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { JournalEntryReviewContent } from '@/components/bookkeeping/JournalEntryReviewContent'
 import DocumentUploadZone from '@/components/bookkeeping/DocumentUploadZone'
+import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
 import type { UploadedFile } from '@/components/bookkeeping/DocumentUploadZone'
-import type { CreateJournalEntryLineInput, FiscalPeriod } from '@/types'
+import type { CreateJournalEntryLineInput, FiscalPeriod, BASAccount } from '@/types'
 
 interface Props {
   onCreated?: () => void
@@ -37,11 +38,13 @@ export default function JournalEntryForm({ onCreated }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showReview, setShowReview] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
+  const [accounts, setAccounts] = useState<BASAccount[]>([])
 
   const isUploading = uploadedFiles.some((f) => f.status === 'uploading')
 
   useEffect(() => {
     fetchPeriods()
+    fetchAccounts()
   }, [])
 
   async function fetchPeriods() {
@@ -51,6 +54,12 @@ export default function JournalEntryForm({ onCreated }: Props) {
     if (data && data.length > 0) {
       setSelectedPeriod(data[0].id)
     }
+  }
+
+  async function fetchAccounts() {
+    const res = await fetch('/api/bookkeeping/accounts')
+    const { data } = await res.json()
+    setAccounts(data || [])
   }
 
   const addLine = () => {
@@ -211,12 +220,10 @@ export default function JournalEntryForm({ onCreated }: Props) {
               {lines.map((line, index) => (
                 <tr key={index} className="border-b">
                   <td className="py-1">
-                    <Input
+                    <AccountCombobox
                       value={line.account_number}
-                      onChange={(e) => updateLine(index, 'account_number', e.target.value)}
-                      placeholder="1930"
-                      className="font-mono h-8"
-                      maxLength={4}
+                      accounts={accounts}
+                      onChange={(num) => updateLine(index, 'account_number', num)}
                     />
                   </td>
                   <td className="py-1 px-1">
@@ -313,13 +320,20 @@ export default function JournalEntryForm({ onCreated }: Props) {
           </p>
         )}
 
-        <div className="flex justify-end">
+        <div className="flex flex-col items-end gap-1">
           <Button
             onClick={handleReview}
             disabled={!isBalanced || !description || !selectedPeriod || isSubmitting || isUploading}
           >
             Granska & skapa
           </Button>
+          {(!description || !selectedPeriod || isUploading) && (
+            <div className="text-xs text-muted-foreground space-y-0.5 text-right">
+              {!description && <p>Ange en beskrivning</p>}
+              {!selectedPeriod && <p>Välj en räkenskapsperiod</p>}
+              {isUploading && <p>Vänta tills filerna laddats upp</p>}
+            </div>
+          )}
         </div>
 
         <ConfirmationDialog

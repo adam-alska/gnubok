@@ -1,0 +1,45 @@
+import { createClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+import { ensureInitialized } from '@/lib/init'
+import { runReconciliation } from '@/lib/reconciliation/bank-reconciliation'
+
+ensureInitialized()
+
+export async function POST(request: Request) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const body = await request.json()
+  const { date_from, date_to, dry_run } = body
+
+  const result = await runReconciliation(supabase, user.id, {
+    dateFrom: date_from,
+    dateTo: date_to,
+    dryRun: dry_run ?? false,
+  })
+
+  return NextResponse.json({
+    data: {
+      matches: result.matches.map((m) => ({
+        transaction_id: m.transaction.id,
+        transaction_date: m.transaction.date,
+        transaction_description: m.transaction.description,
+        transaction_amount: m.transaction.amount,
+        journal_entry_id: m.glLine.journal_entry_id,
+        voucher_number: m.glLine.voucher_number,
+        voucher_series: m.glLine.voucher_series,
+        entry_date: m.glLine.entry_date,
+        entry_description: m.glLine.entry_description,
+        method: m.method,
+        confidence: m.confidence,
+      })),
+      applied: result.applied,
+      errors: result.errors,
+      dry_run: dry_run ?? false,
+    },
+  })
+}

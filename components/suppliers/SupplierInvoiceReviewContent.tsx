@@ -3,13 +3,11 @@
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { AccountNumber } from '@/components/ui/account-number'
-import type { Supplier, VatTreatment } from '@/types'
+import type { Supplier } from '@/types'
 
 interface ReviewLineItem {
   description: string
-  quantity: number
-  unit: string
-  unit_price: number
+  amount: number
   account_number: string
   vat_rate: number
 }
@@ -22,7 +20,6 @@ interface SupplierInvoiceReviewContentProps {
   deliveryDate?: string
   currency: string
   exchangeRate?: string
-  vatTreatment: VatTreatment
   reverseCharge: boolean
   paymentReference?: string
   items: ReviewLineItem[]
@@ -35,13 +32,88 @@ function formatAmount(amount: number): string {
   return amount.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-const VAT_TREATMENT_LABELS: Record<VatTreatment, string> = {
-  standard_25: '25% moms',
-  reduced_12: '12% moms',
-  reduced_6: '6% moms',
-  reverse_charge: 'Omvänd skattskyldighet',
-  export: 'Export (0%)',
-  exempt: 'Momsfritt',
+interface JournalPreviewLine {
+  account_number: string
+  description: string
+  debit: number
+  credit: number
+}
+
+function buildJournalPreview(
+  items: ReviewLineItem[],
+  subtotal: number,
+  totalVat: number,
+  total: number,
+  reverseCharge: boolean,
+): JournalPreviewLine[] {
+  const lines: JournalPreviewLine[] = []
+
+  // Aggregate expense amounts by account number
+  const expenseByAccount = new Map<string, number>()
+  for (const item of items) {
+    const current = expenseByAccount.get(item.account_number) || 0
+    expenseByAccount.set(item.account_number, current + Math.round(item.amount * 100) / 100)
+  }
+
+  // Debit: Expense accounts
+  for (const [accountNumber, amount] of expenseByAccount) {
+    lines.push({
+      account_number: accountNumber,
+      description: accountNumber,
+      debit: Math.round(amount * 100) / 100,
+      credit: 0,
+    })
+  }
+
+  if (reverseCharge) {
+    // EU reverse charge: fiktiv moms
+    const vatRate = 0.25
+    const fiktivVat = Math.round(subtotal * vatRate * 100) / 100
+    lines.push({
+      account_number: '2645',
+      description: 'Beraknad ingaende moms',
+      debit: fiktivVat,
+      credit: 0,
+    })
+    lines.push({
+      account_number: '2614',
+      description: 'Utgaende moms omvand',
+      debit: 0,
+      credit: fiktivVat,
+    })
+    // Credit: 2440 at subtotal (no real VAT for reverse charge)
+    lines.push({
+      account_number: '2440',
+      description: 'Leverantorsskulder',
+      debit: 0,
+      credit: Math.round(subtotal * 100) / 100,
+    })
+  } else {
+    if (totalVat > 0) {
+      lines.push({
+        account_number: '2641',
+        description: 'Ingaende moms',
+        debit: Math.round(totalVat * 100) / 100,
+        credit: 0,
+      })
+    }
+    // Credit: 2440 at total incl. VAT
+    lines.push({
+      account_number: '2440',
+      description: 'Leverantorsskulder',
+      debit: 0,
+      credit: Math.round(total * 100) / 100,
+    })
+  }
+
+  return lines
+}
+
+const ACCOUNT_LABELS: Record<string, string> = {
+  '2440': 'Leverantörsskulder',
+  '2641': 'Ingående moms',
+  '2645': 'Beräknad ingående moms',
+  '2614': 'Utg. moms omvänd skattskyldighet',
 }
 
 export function SupplierInvoiceReviewContent({
@@ -52,7 +124,6 @@ export function SupplierInvoiceReviewContent({
   deliveryDate,
   currency,
   exchangeRate,
-  vatTreatment,
   reverseCharge,
   paymentReference,
   items,
@@ -60,6 +131,10 @@ export function SupplierInvoiceReviewContent({
   totalVat,
   total,
 }: SupplierInvoiceReviewContentProps) {
+  const journalLines = buildJournalPreview(items, subtotal, totalVat, total, reverseCharge)
+  const totalDebit = journalLines.reduce((sum, l) => sum + l.debit, 0)
+  const totalCredit = journalLines.reduce((sum, l) => sum + l.credit, 0)
+
   return (
     <div className="space-y-4">
       {/* Supplier info */}
@@ -68,24 +143,19 @@ export function SupplierInvoiceReviewContent({
           <p className="font-medium text-base">{supplier.name}</p>
           <p className="text-sm text-muted-foreground">Fakturanr: {invoiceNumber}</p>
         </div>
-        {reverseCharge && (
-          <Badge variant="outline" className="border-orange-300 text-orange-700 dark:text-orange-400">
-            Omvänd skattskyldighet
-          </Badge>
-        )}
-      </div>
-
-      {/* VAT + currency badges */}
-      <div className="flex flex-wrap gap-2">
-        <Badge className="text-sm px-3 py-1">
-          {VAT_TREATMENT_LABELS[vatTreatment]}
-        </Badge>
-        {currency !== 'SEK' && (
-          <Badge variant="outline" className="text-sm px-3 py-1">
-            {currency}
-            {exchangeRate && ` (kurs ${exchangeRate})`}
-          </Badge>
-        )}
+        <div className="flex gap-2">
+          {reverseCharge && (
+            <Badge variant="outline" className="border-orange-300 text-orange-700 dark:text-orange-400">
+              Omvänd skattskyldighet
+            </Badge>
+          )}
+          {currency !== 'SEK' && (
+            <Badge variant="outline" className="text-sm">
+              {currency}
+              {exchangeRate && ` (kurs ${exchangeRate})`}
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* Dates */}
@@ -110,27 +180,25 @@ export function SupplierInvoiceReviewContent({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b text-left text-muted-foreground">
-            <th className="py-2">Beskrivning</th>
-            <th className="py-2 w-16 text-right">Antal</th>
-            <th className="py-2 w-24 text-right">À-pris</th>
             <th className="py-2 w-20">Konto</th>
-            <th className="py-2 w-16 text-right">Moms</th>
+            <th className="py-2">Beskrivning</th>
             <th className="py-2 w-28 text-right">Belopp</th>
+            <th className="py-2 w-16 text-right">Moms%</th>
+            <th className="py-2 w-24 text-right">Moms</th>
           </tr>
         </thead>
         <tbody>
           {items.map((item, index) => {
-            const lineTotal = Math.round((item.quantity || 0) * (item.unit_price || 0) * 100) / 100
+            const vatAmount = Math.round(item.amount * item.vat_rate * 100) / 100
             return (
               <tr key={index} className="border-b last:border-0">
-                <td className="py-2">{item.description}</td>
-                <td className="py-2 text-right">{item.quantity} {item.unit}</td>
-                <td className="py-2 text-right">{formatAmount(item.unit_price)}</td>
                 <td className="py-2">
                   <AccountNumber number={item.account_number} size="sm" />
                 </td>
+                <td className="py-2">{item.description}</td>
+                <td className="py-2 text-right font-mono">{formatAmount(item.amount)}</td>
                 <td className="py-2 text-right">{Math.round(item.vat_rate * 100)}%</td>
-                <td className="py-2 text-right">{formatAmount(lineTotal)}</td>
+                <td className="py-2 text-right font-mono">{formatAmount(vatAmount)}</td>
               </tr>
             )
           })}
@@ -158,6 +226,46 @@ export function SupplierInvoiceReviewContent({
             <span>{formatAmount(total * parseFloat(exchangeRate))} kr</span>
           </div>
         )}
+      </div>
+
+      {/* Verifikation preview */}
+      <div className="bg-muted/50 border rounded-lg p-4 space-y-2">
+        <p className="text-sm font-semibold text-muted-foreground">Verifikation som bokförs</p>
+        <table className="w-full text-sm font-mono">
+          <thead>
+            <tr className="text-left text-muted-foreground text-xs">
+              <th className="pb-1 w-16">Konto</th>
+              <th className="pb-1">Beskrivning</th>
+              <th className="pb-1 w-24 text-right">Debet</th>
+              <th className="pb-1 w-24 text-right">Kredit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {journalLines.map((line, index) => (
+              <tr key={index} className="border-b border-dashed border-muted-foreground/20 last:border-0">
+                <td className="py-1">
+                  <AccountNumber number={line.account_number} size="sm" />
+                </td>
+                <td className="py-1 text-xs">
+                  {ACCOUNT_LABELS[line.account_number] || line.description}
+                </td>
+                <td className="py-1 text-right">
+                  {line.debit > 0 ? formatAmount(line.debit) : ''}
+                </td>
+                <td className="py-1 text-right">
+                  {line.credit > 0 ? formatAmount(line.credit) : ''}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t font-semibold">
+              <td className="pt-1" colSpan={2}>SUMMA</td>
+              <td className="pt-1 text-right">{formatAmount(totalDebit)}</td>
+              <td className="pt-1 text-right">{formatAmount(totalCredit)}</td>
+            </tr>
+          </tfoot>
+        </table>
       </div>
 
       {/* Payment reference */}

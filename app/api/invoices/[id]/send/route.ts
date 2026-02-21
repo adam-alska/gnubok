@@ -113,11 +113,19 @@ export async function POST(
       company: company as CompanySettings
     }
 
-    // Determine filename
+    // Determine filename based on document type
     const isCreditNote = !!invoice.credited_invoice_id
-    const filename = isCreditNote
-      ? `kreditfaktura-${invoice.invoice_number}.pdf`
-      : `faktura-${invoice.invoice_number}.pdf`
+    const docType = invoice.document_type || 'invoice'
+    let filename: string
+    if (isCreditNote) {
+      filename = `kreditfaktura-${invoice.invoice_number}.pdf`
+    } else if (docType === 'proforma') {
+      filename = `proformafaktura-${invoice.invoice_number}.pdf`
+    } else if (docType === 'delivery_note') {
+      filename = `foljesedel-${invoice.invoice_number}.pdf`
+    } else {
+      filename = `faktura-${invoice.invoice_number}.pdf`
+    }
 
     // Send email
     const result = await sendEmail({
@@ -144,13 +152,10 @@ export async function POST(
       )
     }
 
-    // Update invoice status to "sent" and set sent_at timestamp
+    // Update invoice status to "sent"
     const { error: updateError } = await supabase
       .from('invoices')
-      .update({
-        status: 'sent',
-        sent_at: new Date().toISOString()
-      })
+      .update({ status: 'sent' })
       .eq('id', id)
       .eq('user_id', user.id)
 
@@ -159,8 +164,9 @@ export async function POST(
       // Don't fail the request - the email was sent successfully
     }
 
-    // Faktureringsmetoden: create journal entry when invoice is issued
-    if ((company as Record<string, unknown>).accounting_method === 'accrual' || !(company as Record<string, unknown>).accounting_method) {
+    // Only create journal entries for real invoices (not proformas or delivery notes)
+    const isRealInvoice = !invoice.document_type || invoice.document_type === 'invoice'
+    if (isRealInvoice && ((company as Record<string, unknown>).accounting_method === 'accrual' || !(company as Record<string, unknown>).accounting_method)) {
       try {
         const journalEntry = await createInvoiceJournalEntry(
           user.id,

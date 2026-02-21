@@ -222,9 +222,14 @@ export default function DocumentUploadZone({
                 </Badge>
               )}
               {file.status === 'error' && (
-                <Badge variant="destructive" className="text-xs px-1.5 py-0" title={file.error}>
-                  Fel
-                </Badge>
+                <>
+                  <Badge variant="destructive" className="text-xs px-1.5 py-0">
+                    Fel
+                  </Badge>
+                  {file.error && (
+                    <span className="text-xs text-destructive">{file.error}</span>
+                  )}
+                </>
               )}
 
               <Button

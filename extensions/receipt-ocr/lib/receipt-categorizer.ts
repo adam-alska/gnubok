@@ -281,7 +281,7 @@ export const CATEGORY_LABELS: Record<TransactionCategory, string> = {
   income_products: 'Varuintäkt',
   income_other: 'Övrig intäkt',
   private: 'Privat',
-  uncategorized: 'Ej kategoriserad',
+  uncategorized: 'Ej bokförd',
 }
 
 /**

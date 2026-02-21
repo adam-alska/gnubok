@@ -138,7 +138,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
                 <div>
                   <p className="font-medium text-sm">Transaktioner</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {summary.uncategorizedCount} okategoriserade
+                    {summary.uncategorizedCount} obokförda
                   </p>
                 </div>
               </div>
@@ -184,7 +184,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
     { href: '/invoices/new', icon: Receipt, label: 'Ny faktura', desc: 'Skapa och skicka', accent: true },
     { href: '/receipts/scan', icon: Camera, label: 'Skanna kvitto', desc: 'Fotografera & spara' },
     { href: '/customers', icon: Users, label: 'Ny kund', desc: 'Lägg till kunduppgifter' },
-    { href: '/transactions', icon: ArrowLeftRight, label: 'Transaktioner', desc: 'Kategorisera' },
+    { href: '/transactions', icon: ArrowLeftRight, label: 'Transaktioner', desc: 'Bokför' },
   ]
 
   return (
@@ -220,7 +220,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
           todoItems.push({ label: 'förfallna fakturor', href: '/invoices?status=unpaid', count: summary.overdueInvoicesCount, variant: 'destructive' })
         }
         if (summary.uncategorizedCount > 0) {
-          todoItems.push({ label: 'okategoriserade', href: '/transactions', count: summary.uncategorizedCount, variant: 'warning' })
+          todoItems.push({ label: 'obokförda', href: '/transactions', count: summary.uncategorizedCount, variant: 'warning' })
         }
         if (summary.receiptQueue && summary.receiptQueue.pending_review_count > 0) {
           todoItems.push({ label: 'kvitton att granska', href: '/receipts', count: summary.receiptQueue.pending_review_count, variant: 'default' })
@@ -465,7 +465,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
                   <ArrowLeftRight className="h-4 w-4 text-warning-foreground flex-shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm">
-                      {summary.uncategorizedCount} okategoriserade transaktioner
+                      {summary.uncategorizedCount} obokförda transaktioner
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {summary.uncategorizedIncome > 0 && (

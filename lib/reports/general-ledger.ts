@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 
 export interface GeneralLedgerLine {
   date: string
@@ -41,7 +42,7 @@ export async function generateGeneralLedger(
   // Get fiscal period dates
   const { data: period } = await supabase
     .from('fiscal_periods')
-    .select('start_date, end_date')
+    .select('period_start, period_end')
     .eq('id', periodId)
     .eq('user_id', userId)
     .single()
@@ -59,7 +60,7 @@ export async function generateGeneralLedger(
     .in('status', ['posted', 'reversed'])
 
   if (!entries || entries.length === 0) {
-    return { accounts: [], period: { start: period.start_date, end: period.end_date } }
+    return { accounts: [], period: { start: period.period_start, end: period.period_end } }
   }
 
   const entryIds = entries.map((e) => e.id)
@@ -72,17 +73,20 @@ export async function generateGeneralLedger(
     .in('journal_entry_id', entryIds)
 
   if (!lines) {
-    return { accounts: [], period: { start: period.start_date, end: period.end_date } }
+    return { accounts: [], period: { start: period.period_start, end: period.period_end } }
   }
 
   // Fetch account names
-  const { data: accounts } = await supabase
-    .from('chart_of_accounts')
-    .select('account_number, account_name')
-    .eq('user_id', userId)
+  const accounts = await fetchAllRows<{ account_number: string; account_name: string }>(({ from, to }) =>
+    supabase
+      .from('chart_of_accounts')
+      .select('account_number, account_name')
+      .eq('user_id', userId)
+      .range(from, to)
+  )
 
   const accountNameMap = new Map<string, string>()
-  for (const acc of accounts || []) {
+  for (const acc of accounts) {
     accountNameMap.set(acc.account_number, acc.account_name)
   }
 
@@ -92,7 +96,7 @@ export async function generateGeneralLedger(
     .select('id')
     .eq('user_id', userId)
     .in('status', ['posted', 'reversed'])
-    .lt('entry_date', period.start_date)
+    .lt('entry_date', period.period_start)
 
   const openingBalances = new Map<string, number>()
 
@@ -178,6 +182,6 @@ export async function generateGeneralLedger(
 
   return {
     accounts: result,
-    period: { start: period.start_date, end: period.end_date },
+    period: { start: period.period_start, end: period.period_end },
   }
 }
