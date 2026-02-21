@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -23,6 +23,7 @@ import {
   ChevronDown,
   Building2,
   FileInput,
+  Store,
 } from 'lucide-react'
 import { getExtensionDefinition } from '@/lib/extensions/sectors'
 import { resolveIcon } from '@/lib/extensions/icon-resolver'
@@ -85,10 +86,16 @@ export default function DashboardNav({ companyName, entityType, enabledExtension
     }
   }, [])
 
-  // Refresh extensions when dropdown is opened or mobile menu is opened
-  useEffect(() => {
-    if (isTillaggExpanded || isMobileMenuOpen) fetchExtensions()
-  }, [isTillaggExpanded, isMobileMenuOpen, fetchExtensions])
+  const toggleTillagg = () => {
+    const next = !isTillaggExpanded
+    setIsTillaggExpanded(next)
+    if (next) fetchExtensions()
+  }
+
+  const openMobileMenu = () => {
+    setIsMobileMenuOpen(true)
+    fetchExtensions()
+  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -196,10 +203,31 @@ export default function DashboardNav({ companyName, entityType, enabledExtension
                 </div>
               </div>
 
+              {/* Marketplace - standalone link */}
+              <div className="mb-4">
+                <div className="space-y-px">
+                  <Link
+                    href="/extensions"
+                    className={cn(
+                      'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
+                      isActive('/extensions')
+                        ? 'bg-primary/8 text-foreground font-medium'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                    )}
+                  >
+                    <Store className={cn(
+                      "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
+                      isActive('/extensions') ? "text-primary" : "text-muted-foreground/70 group-hover:text-muted-foreground"
+                    )} />
+                    Marketplace
+                  </Link>
+                </div>
+              </div>
+
               {/* Tillägg - collapsible */}
               <div className="mb-4">
                 <button
-                  onClick={() => setIsTillaggExpanded(!isTillaggExpanded)}
+                  onClick={toggleTillagg}
                   className="w-full flex items-center justify-between px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-[0.08em] hover:text-muted-foreground transition-colors"
                 >
                   <span>Tillägg</span>
@@ -330,7 +358,7 @@ export default function DashboardNav({ companyName, entityType, enabledExtension
           })}
           {/* Menu button */}
           <button
-            onClick={() => setIsMobileMenuOpen(true)}
+            onClick={openMobileMenu}
             aria-label="Öppna meny"
             className="flex flex-col items-center justify-center flex-1 h-full text-xs text-muted-foreground transition-colors duration-200"
           >
@@ -424,6 +452,23 @@ export default function DashboardNav({ companyName, entityType, enabledExtension
                     </Link>
                   )
                 })}
+              </div>
+
+              {/* Marketplace */}
+              <div className="mb-4">
+                <Link
+                  href="/extensions"
+                  onClick={closeMobileMenu}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
+                    isActive('/extensions')
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+                  )}
+                >
+                  <Store className="h-5 w-5" />
+                  Marketplace
+                </Link>
               </div>
 
               {/* Tillägg */}

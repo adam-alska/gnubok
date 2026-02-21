@@ -24,8 +24,12 @@ export async function GET(
     .eq('user_id', user.id)
     .eq('extension_id', extensionId)
 
+  const prefix = searchParams.get('prefix')
+
   if (key) {
     query = query.eq('key', key)
+  } else if (prefix) {
+    query = query.ilike('key', `${prefix}%`)
   }
 
   const { data, error } = await query
