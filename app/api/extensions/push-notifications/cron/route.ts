@@ -4,7 +4,7 @@ import { loadExtensions } from '@/lib/extensions/loader'
 import {
   sendTaxDeadlineNotifications,
   sendInvoiceNotifications,
-} from '@/extensions/push-notifications/notification-scheduler'
+} from '@/extensions/general/push-notifications/notification-scheduler'
 
 /**
  * GET /api/extensions/push-notifications/cron

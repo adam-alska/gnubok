@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { generateChatResponse } from '@/extensions/ai-chat/chatbot/chain'
-import { CHATBOT_CONFIG } from '@/extensions/ai-chat/chatbot/config'
+import { generateChatResponse } from '@/extensions/general/ai-chat/chatbot/chain'
+import { CHATBOT_CONFIG } from '@/extensions/general/ai-chat/chatbot/config'
 import type { ChatMessage, ChatRequest } from '@/types/chat'
 
 // Simple in-memory rate limiting (per user)

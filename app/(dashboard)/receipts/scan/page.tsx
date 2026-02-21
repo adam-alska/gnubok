@@ -1,1 +1,1 @@
-export { default } from '@/extensions/receipt-ocr/pages/scan/ScanReceiptPage'
+export { default } from '@/extensions/general/receipt-ocr/pages/scan/ScanReceiptPage'

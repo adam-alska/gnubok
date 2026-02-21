@@ -1,17 +1,17 @@
 import { extensionRegistry } from './registry'
-import { receiptOcrExtension } from '@/extensions/receipt-ocr'
-import { aiCategorizationExtension } from '@/extensions/ai-categorization'
-import { pushNotificationsExtension } from '@/extensions/push-notifications'
+import { receiptOcrExtension } from '@/extensions/general/receipt-ocr'
+import { aiCategorizationExtension } from '@/extensions/general/ai-categorization'
+import { pushNotificationsExtension } from '@/extensions/general/push-notifications'
 import { sruExportExtension } from '@/extensions/sru-export'
 import { neBilagaExtension } from '@/extensions/ne-bilaga'
-import { aiChatExtension } from '@/extensions/ai-chat'
+import { aiChatExtension } from '@/extensions/general/ai-chat'
 import type { Extension } from './types'
 
 // ── Enable Banking (PSD2) — opt-in extension ───────────────────────────
 // Uncomment the following line to enable automatic PSD2 bank transaction sync.
 // Requires ENABLE_BANKING_APP_ID and ENABLE_BANKING_PRIVATE_KEY env vars.
 //
-// import { enableBankingExtension } from '@/extensions/enable-banking'
+// import { enableBankingExtension } from '@/extensions/general/enable-banking'
 
 /**
  * Explicit list of first-party extensions.

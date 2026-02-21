@@ -1,7 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { createSession, getAccountBalance, type AccountInfo } from '@/extensions/enable-banking/lib/api-client'
-import type { StoredAccount } from '@/extensions/enable-banking/types'
+import { createSession, getAccountBalance, type AccountInfo } from '@/extensions/general/enable-banking/lib/api-client'
+import type { StoredAccount } from '@/extensions/general/enable-banking/types'
 
 /**
  * GET /api/extensions/enable-banking/callback

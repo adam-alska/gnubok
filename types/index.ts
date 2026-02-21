@@ -118,6 +118,9 @@ export interface CompanySettings {
   onboarding_step: number
   onboarding_complete: boolean
 
+  // Sector
+  sector_slug: string | null
+
   // Timestamps
   created_at: string
   updated_at: string
@@ -1143,7 +1146,7 @@ export interface CreateDeadlineInput {
 // ============================================================
 // Push Notification Types (canonical source: extensions/push-notifications/types.ts)
 // ============================================================
-export type { PushSubscription, NotificationSettings, NotificationType, NotificationLog } from '@/extensions/push-notifications/types'
+export type { PushSubscription, NotificationSettings, NotificationType, NotificationLog } from '@/extensions/general/push-notifications/types'
 
 // ============================================================
 // Calendar Feed Types (ICS)
@@ -1239,8 +1242,8 @@ export interface SIEAccountMapping {
 // ============================================================
 // Receipt Types (canonical source: extensions/receipt-ocr/types.ts)
 // ============================================================
-export type { ReceiptStatus, Receipt, ReceiptLineItem, ReceiptExtractionResult, ExtractedLineItem, ReceiptMatchCandidate, CreateReceiptInput, ConfirmReceiptInput, ConfirmLineItemInput, ReceiptQueueSummary, CameraQualityFeedback } from '@/extensions/receipt-ocr/types'
-export { RECEIPT_STATUS_LABELS } from '@/extensions/receipt-ocr/types'
+export type { ReceiptStatus, Receipt, ReceiptLineItem, ReceiptExtractionResult, ExtractedLineItem, ReceiptMatchCandidate, CreateReceiptInput, ConfirmReceiptInput, ConfirmLineItemInput, ReceiptQueueSummary, CameraQualityFeedback } from '@/extensions/general/receipt-ocr/types'
+export { RECEIPT_STATUS_LABELS } from '@/extensions/general/receipt-ocr/types'
 
 // ============================================================
 // VAT Declaration Types (Momsdeklaration)

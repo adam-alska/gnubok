@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { getSettings, saveSettings } from '@/extensions/push-notifications'
+import { getSettings, saveSettings } from '@/extensions/general/push-notifications'
 
 /**
  * GET /api/extensions/push-notifications/settings
