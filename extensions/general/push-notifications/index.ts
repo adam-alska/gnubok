@@ -45,16 +45,22 @@ export async function getSettings(userId: string): Promise<PushNotificationSetti
   const supabase = await createClient()
 
   const { data } = await supabase
-    .from('extension_data')
-    .select('value')
+    .from('notification_settings')
+    .select(
+      'period_locked_enabled, period_year_closed_enabled, invoice_sent_enabled, receipt_extracted_enabled, receipt_matched_enabled'
+    )
     .eq('user_id', userId)
-    .eq('extension_id', 'push-notifications')
-    .eq('key', 'settings')
     .single()
 
-  if (!data?.value) return { ...DEFAULT_SETTINGS }
+  if (!data) return { ...DEFAULT_SETTINGS }
 
-  return { ...DEFAULT_SETTINGS, ...(data.value as Partial<PushNotificationSettings>) }
+  return {
+    periodLockedEnabled: data.period_locked_enabled ?? DEFAULT_SETTINGS.periodLockedEnabled,
+    periodYearClosedEnabled: data.period_year_closed_enabled ?? DEFAULT_SETTINGS.periodYearClosedEnabled,
+    invoiceSentEnabled: data.invoice_sent_enabled ?? DEFAULT_SETTINGS.invoiceSentEnabled,
+    receiptExtractedEnabled: data.receipt_extracted_enabled ?? DEFAULT_SETTINGS.receiptExtractedEnabled,
+    receiptMatchedEnabled: data.receipt_matched_enabled ?? DEFAULT_SETTINGS.receiptMatchedEnabled,
+  }
 }
 
 export async function saveSettings(
@@ -67,15 +73,17 @@ export async function saveSettings(
   const supabase = await createClient()
 
   await supabase
-    .from('extension_data')
+    .from('notification_settings')
     .upsert(
       {
         user_id: userId,
-        extension_id: 'push-notifications',
-        key: 'settings',
-        value: merged,
+        period_locked_enabled: merged.periodLockedEnabled,
+        period_year_closed_enabled: merged.periodYearClosedEnabled,
+        invoice_sent_enabled: merged.invoiceSentEnabled,
+        receipt_extracted_enabled: merged.receiptExtractedEnabled,
+        receipt_matched_enabled: merged.receiptMatchedEnabled,
       },
-      { onConflict: 'user_id,extension_id,key' }
+      { onConflict: 'user_id' }
     )
 
   return merged
@@ -231,6 +239,21 @@ export const pushNotificationsExtension: Extension = {
     path: '/settings/extensions/push-notifications',
   },
   async onInstall(ctx) {
-    await saveSettings(ctx.userId, DEFAULT_SETTINGS)
+    const supabase = await createClient()
+
+    // Ensure a notification_settings row exists for this user
+    await supabase
+      .from('notification_settings')
+      .upsert(
+        {
+          user_id: ctx.userId,
+          period_locked_enabled: DEFAULT_SETTINGS.periodLockedEnabled,
+          period_year_closed_enabled: DEFAULT_SETTINGS.periodYearClosedEnabled,
+          invoice_sent_enabled: DEFAULT_SETTINGS.invoiceSentEnabled,
+          receipt_extracted_enabled: DEFAULT_SETTINGS.receiptExtractedEnabled,
+          receipt_matched_enabled: DEFAULT_SETTINGS.receiptMatchedEnabled,
+        },
+        { onConflict: 'user_id' }
+      )
   },
 }

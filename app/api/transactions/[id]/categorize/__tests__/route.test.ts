@@ -128,7 +128,7 @@ describe('POST /api/transactions/[id]/categorize', () => {
     // Fetch company settings
     enqueue({ data: { entity_type: 'enskild_firma', fiscal_year_start_month: 1 }, error: null })
     // ensureFiscalPeriod: check existing
-    enqueue({ data: { id: 'period-1' }, error: null })
+    enqueue({ data: [{ id: 'period-1' }], error: null })
 
     mockCreateTransactionJournalEntry.mockResolvedValue({ id: 'je-1' })
     mockSaveUserMappingRule.mockResolvedValue(undefined)
@@ -177,7 +177,7 @@ describe('POST /api/transactions/[id]/categorize', () => {
 
     enqueue({ data: tx, error: null })
     enqueue({ data: { entity_type: 'enskild_firma', fiscal_year_start_month: 1 }, error: null })
-    enqueue({ data: { id: 'period-1' }, error: null })
+    enqueue({ data: [{ id: 'period-1' }], error: null })
 
     mockCreateTransactionJournalEntry.mockRejectedValue(new Error('Period locked'))
 
@@ -210,7 +210,7 @@ describe('POST /api/transactions/[id]/categorize', () => {
 
     enqueue({ data: tx, error: null })
     enqueue({ data: { entity_type: 'enskild_firma', fiscal_year_start_month: 1 }, error: null })
-    enqueue({ data: { id: 'period-1' }, error: null })
+    enqueue({ data: [{ id: 'period-1' }], error: null })
 
     mockCreateTransactionJournalEntry.mockResolvedValue({ id: 'je-1' })
 
@@ -237,7 +237,7 @@ describe('POST /api/transactions/[id]/categorize', () => {
 
     enqueue({ data: tx, error: null })
     enqueue({ data: { entity_type: 'enskild_firma', fiscal_year_start_month: 1 }, error: null })
-    enqueue({ data: { id: 'period-1' }, error: null })
+    enqueue({ data: [{ id: 'period-1' }], error: null })
 
     mockCreateTransactionJournalEntry.mockResolvedValue({ id: 'je-1' })
 
