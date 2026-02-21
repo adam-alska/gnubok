@@ -1,0 +1,255 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import {
+  createMockRequest,
+  parseJsonResponse,
+  createMockRouteParams,
+  createQueuedMockSupabase,
+  makeSupplierInvoice,
+  makeSupplier,
+} from '@/tests/helpers'
+
+const { supabase: mockSupabase, enqueue, reset } = createQueuedMockSupabase()
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: () => Promise.resolve(mockSupabase),
+}))
+
+const mockCreateSupplierInvoicePaymentEntry = vi.fn()
+const mockCreateSupplierInvoiceCashEntry = vi.fn()
+vi.mock('@/lib/bookkeeping/supplier-invoice-entries', () => ({
+  createSupplierInvoicePaymentEntry: (...args: unknown[]) =>
+    mockCreateSupplierInvoicePaymentEntry(...args),
+  createSupplierInvoiceCashEntry: (...args: unknown[]) =>
+    mockCreateSupplierInvoiceCashEntry(...args),
+}))
+
+import { POST } from '../route'
+
+describe('POST /api/supplier-invoices/[id]/mark-paid', () => {
+  const mockUser = { id: 'user-1', email: 'test@test.se' }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    reset()
+    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+  })
+
+  it('returns 401 when not authenticated', async () => {
+    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+
+    const request = createMockRequest('/api/supplier-invoices/si-1/mark-paid', {
+      method: 'POST',
+      body: {},
+    })
+    const response = await POST(request, createMockRouteParams({ id: 'si-1' }))
+    const { status, body } = await parseJsonResponse(response)
+
+    expect(status).toBe(401)
+    expect(body).toEqual({ error: 'Unauthorized' })
+  })
+
+  it('returns 404 when invoice not found', async () => {
+    enqueue({ data: null, error: { message: 'Not found' } })
+
+    const request = createMockRequest('/api/supplier-invoices/si-999/mark-paid', {
+      method: 'POST',
+      body: {},
+    })
+    const response = await POST(request, createMockRouteParams({ id: 'si-999' }))
+    const { status, body } = await parseJsonResponse<{ error: string }>(response)
+
+    expect(status).toBe(404)
+    expect(body.error).toBe('Not found')
+  })
+
+  it('returns 400 when invoice is in wrong status', async () => {
+    const invoice = makeSupplierInvoice({
+      id: 'si-1',
+      status: 'paid',
+      supplier: makeSupplier(),
+      items: [],
+    })
+    enqueue({ data: invoice, error: null })
+
+    const request = createMockRequest('/api/supplier-invoices/si-1/mark-paid', {
+      method: 'POST',
+      body: {},
+    })
+    const response = await POST(request, createMockRouteParams({ id: 'si-1' }))
+    const { status, body } = await parseJsonResponse<{ error: string }>(response)
+
+    expect(status).toBe(400)
+    expect(body.error).toBe('Fakturan kan inte markeras som betald i nuvarande status')
+  })
+
+  it('marks as fully paid with accrual method', async () => {
+    const supplier = makeSupplier()
+    const invoice = makeSupplierInvoice({
+      id: 'si-1',
+      status: 'approved',
+      total: 10000,
+      remaining_amount: 10000,
+      paid_amount: 0,
+      supplier,
+      items: [],
+    })
+
+    // Fetch invoice
+    enqueue({ data: invoice, error: null })
+    // Fetch company settings
+    enqueue({ data: { accounting_method: 'accrual' }, error: null })
+
+    mockCreateSupplierInvoicePaymentEntry.mockResolvedValue({ id: 'je-1' })
+
+    // Update invoice
+    enqueue({ data: null, error: null })
+    // Record payment
+    enqueue({ data: null, error: null })
+
+    const request = createMockRequest('/api/supplier-invoices/si-1/mark-paid', {
+      method: 'POST',
+      body: {},
+    })
+    const response = await POST(request, createMockRouteParams({ id: 'si-1' }))
+    const { status, body } = await parseJsonResponse<{
+      success: boolean
+      status: string
+      paid_amount: number
+      remaining_amount: number
+      journal_entry_id: string
+    }>(response)
+
+    expect(status).toBe(200)
+    expect(body.success).toBe(true)
+    expect(body.status).toBe('paid')
+    expect(body.paid_amount).toBe(10000)
+    expect(body.remaining_amount).toBe(0)
+    expect(body.journal_entry_id).toBe('je-1')
+    expect(mockCreateSupplierInvoicePaymentEntry).toHaveBeenCalled()
+  })
+
+  it('marks as partially paid', async () => {
+    const supplier = makeSupplier()
+    const invoice = makeSupplierInvoice({
+      id: 'si-1',
+      status: 'approved',
+      total: 10000,
+      remaining_amount: 10000,
+      paid_amount: 0,
+      supplier,
+      items: [],
+    })
+
+    enqueue({ data: invoice, error: null })
+    enqueue({ data: { accounting_method: 'accrual' }, error: null })
+
+    mockCreateSupplierInvoicePaymentEntry.mockResolvedValue({ id: 'je-2' })
+
+    enqueue({ data: null, error: null })
+    enqueue({ data: null, error: null })
+
+    const request = createMockRequest('/api/supplier-invoices/si-1/mark-paid', {
+      method: 'POST',
+      body: { amount: 5000 },
+    })
+    const response = await POST(request, createMockRouteParams({ id: 'si-1' }))
+    const { status, body } = await parseJsonResponse<{
+      success: boolean
+      status: string
+      paid_amount: number
+      remaining_amount: number
+    }>(response)
+
+    expect(status).toBe(200)
+    expect(body.success).toBe(true)
+    expect(body.status).toBe('partially_paid')
+    expect(body.paid_amount).toBe(5000)
+    expect(body.remaining_amount).toBe(5000)
+  })
+
+  it('uses cash method journal entry when configured', async () => {
+    const supplier = makeSupplier()
+    const invoice = makeSupplierInvoice({
+      id: 'si-1',
+      status: 'approved',
+      total: 10000,
+      remaining_amount: 10000,
+      paid_amount: 0,
+      supplier,
+      items: [
+        {
+          id: 'item-1',
+          supplier_invoice_id: 'si-1',
+          sort_order: 0,
+          description: 'Material',
+          quantity: 10,
+          unit: 'st',
+          unit_price: 800,
+          line_total: 8000,
+          account_number: '4010',
+          vat_code: null,
+          vat_rate: 0.25,
+          vat_amount: 2000,
+          created_at: '2024-06-01T00:00:00Z',
+        },
+      ],
+    })
+
+    enqueue({ data: invoice, error: null })
+    enqueue({ data: { accounting_method: 'cash' }, error: null })
+
+    mockCreateSupplierInvoiceCashEntry.mockResolvedValue({ id: 'je-3' })
+
+    enqueue({ data: null, error: null })
+    enqueue({ data: null, error: null })
+
+    const request = createMockRequest('/api/supplier-invoices/si-1/mark-paid', {
+      method: 'POST',
+      body: {},
+    })
+    const response = await POST(request, createMockRouteParams({ id: 'si-1' }))
+    const { status, body } = await parseJsonResponse<{
+      success: boolean
+      journal_entry_id: string
+    }>(response)
+
+    expect(status).toBe(200)
+    expect(body.journal_entry_id).toBe('je-3')
+    expect(mockCreateSupplierInvoiceCashEntry).toHaveBeenCalled()
+    expect(mockCreateSupplierInvoicePaymentEntry).not.toHaveBeenCalled()
+  })
+
+  it('returns success when journal entry creation fails (non-blocking)', async () => {
+    const supplier = makeSupplier()
+    const invoice = makeSupplierInvoice({
+      id: 'si-1',
+      status: 'approved',
+      total: 10000,
+      remaining_amount: 10000,
+      paid_amount: 0,
+      supplier,
+      items: [],
+    })
+
+    enqueue({ data: invoice, error: null })
+    enqueue({ data: { accounting_method: 'accrual' }, error: null })
+
+    mockCreateSupplierInvoicePaymentEntry.mockRejectedValue(new Error('Period locked'))
+
+    enqueue({ data: null, error: null })
+    enqueue({ data: null, error: null })
+
+    const request = createMockRequest('/api/supplier-invoices/si-1/mark-paid', {
+      method: 'POST',
+      body: {},
+    })
+    const response = await POST(request, createMockRouteParams({ id: 'si-1' }))
+    const { status, body } = await parseJsonResponse<{
+      success: boolean
+      journal_entry_id: null
+    }>(response)
+
+    expect(status).toBe(200)
+    expect(body.success).toBe(true)
+    expect(body.journal_entry_id).toBeNull()
+  })
+})

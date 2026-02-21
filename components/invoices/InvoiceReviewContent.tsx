@@ -2,7 +2,7 @@
 
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { getVatTreatmentLabel } from '@/lib/invoice/vat-rules'
+import { getVatTreatmentLabel } from '@/lib/invoices/vat-rules'
 import { formatCurrency } from '@/lib/utils'
 import type { Customer, Currency, VatTreatment } from '@/types'
 

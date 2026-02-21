@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { eventBus } from '@/lib/events'
 import { ensureInitialized } from '@/lib/init'
 import { renderToBuffer } from '@react-pdf/renderer'
-import { InvoicePDF } from '@/lib/invoice/pdf-template'
+import { InvoicePDF } from '@/lib/invoices/pdf-template'
 import { sendEmail, isResendConfigured } from '@/lib/email/resend'
 import {
   generateInvoiceEmailHtml,

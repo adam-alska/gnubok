@@ -26,7 +26,7 @@ vi.mock('@/lib/bookkeeping/transaction-entries', () => ({
 }))
 
 const mockGetBestInvoiceMatch = vi.fn()
-vi.mock('@/lib/invoice/invoice-matching', () => ({
+vi.mock('@/lib/invoices/invoice-matching', () => ({
   getBestInvoiceMatch: (...args: unknown[]) => mockGetBestInvoiceMatch(...args),
 }))
 

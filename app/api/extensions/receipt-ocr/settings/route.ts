@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { getSettings, saveSettings } from '@/extensions/receipt-ocr'
+import { getSettings, saveSettings } from '@/extensions/general/receipt-ocr'
 
 /**
  * GET /api/extensions/receipt-ocr/settings
