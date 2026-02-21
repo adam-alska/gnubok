@@ -154,7 +154,7 @@ export function getCategoryDisplayName(category: string): string {
     expense_currency_exchange: 'Valutaväxling',
     expense_other: 'Övriga kostnader',
     private: 'Privat',
-    uncategorized: 'Ej kategoriserad',
+    uncategorized: 'Ej bokförd',
   }
 
   return names[category] || category

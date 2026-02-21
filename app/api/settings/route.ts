@@ -42,6 +42,16 @@ export async function PUT(request: Request) {
 
   const body = await request.json()
 
+  // Validate: enskild firma must use calendar year (BFL 3 kap.)
+  const effectiveEntityType = body.entity_type || oldSettings?.entity_type
+  const effectiveFYStartMonth = body.fiscal_year_start_month ?? oldSettings?.fiscal_year_start_month
+  if (effectiveEntityType === 'enskild_firma' && effectiveFYStartMonth && effectiveFYStartMonth !== 1) {
+    return NextResponse.json(
+      { error: 'Enskild firma måste använda kalenderår (BFL 3 kap.)' },
+      { status: 400 }
+    )
+  }
+
   const { data, error } = await supabase
     .from('company_settings')
     .update(body)

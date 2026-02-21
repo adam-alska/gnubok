@@ -357,6 +357,7 @@ async function importVouchers(
       description: v.description,
       source_type: 'import',
       status: 'posted',
+      committed_at: new Date().toISOString(),
     }))
 
     // Insert headers

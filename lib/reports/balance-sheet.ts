@@ -55,6 +55,34 @@ export async function generateBalanceSheet(
     'credit' // Equity/liabilities have credit normal balance
   )
 
+  // Calculate period result from income/expense accounts (class 3-8)
+  // Before year-end closing, this result lives on class 3-8 accounts and must
+  // be included in equity for the balance sheet to balance.
+  const incomeExpenseRows = rows.filter(
+    (r) => r.account_class >= 3 && r.account_class <= 8
+  )
+  const periodResult = Math.round(
+    incomeExpenseRows.reduce(
+      (sum, r) => sum + (r.closing_credit - r.closing_debit),
+      0
+    ) * 100
+  ) / 100
+
+  // Add period result as a synthetic section under equity if non-zero
+  if (Math.abs(periodResult) > 0.005) {
+    equityLiabilitySections.push({
+      title: 'Årets resultat',
+      rows: [
+        {
+          account_number: '',
+          account_name: 'Beräknat resultat',
+          amount: periodResult,
+        },
+      ],
+      subtotal: periodResult,
+    })
+  }
+
   const totalAssets = assetSections.reduce((sum, s) => sum + s.subtotal, 0)
   const totalEquityLiabilities = equityLiabilitySections.reduce((sum, s) => sum + s.subtotal, 0)
 

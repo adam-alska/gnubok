@@ -9,7 +9,7 @@ let results: Array<{ data?: unknown; error?: unknown }>
 
 function makeBuilder() {
   const b: Record<string, unknown> = {}
-  for (const m of ['select', 'eq', 'in', 'gte', 'lte', 'lt', 'or', 'not']) {
+  for (const m of ['select', 'eq', 'in', 'gte', 'lte', 'lt', 'or', 'not', 'range']) {
     b[m] = vi.fn().mockReturnValue(b)
   }
   b.single = vi.fn().mockImplementation(async () => results[resultIdx++] ?? { data: null, error: null })
@@ -32,7 +32,6 @@ import {
   formatPeriodLabel,
   getVatDeclarationSummary,
   calculateVatDeclaration,
-  calculateVatDeclarationFromTaxCodes,
 } from '../vat-declaration'
 import type { VatDeclaration } from '@/types'
 
@@ -112,8 +111,8 @@ describe('getVatDeclarationSummary', () => {
       transactionCount: 10,
       breakdown: {
         invoices: { ruta05: 2500, ruta06: 0, ruta07: 0, ruta10: 10000, ruta11: 0, ruta12: 0, ruta39: 0, ruta40: 0 },
-        transactions: { ruta48: 800 },
-        receipts: { ruta48: 200 },
+        transactions: { ruta48: 1000 },
+        receipts: { ruta48: 0 },
       },
     }
 
@@ -155,17 +154,17 @@ describe('getVatDeclarationSummary', () => {
 })
 
 // ============================================================
-// Async tests — require Supabase mocks
+// Ledger-based VAT declaration tests
+//
+// Mock queue order per call:
+//   [0] fetchAllRows: journal_entry_lines (VAT-relevant accounts)
+//   [1] entry counts: journal_entries source_type
 // ============================================================
 
 describe('calculateVatDeclaration', () => {
-  it('returns all zeros when no data exists', async () => {
+  it('returns all zeros when no ledger lines exist', async () => {
     results = [
-      // 0: invoices
       { data: [], error: null },
-      // 1: transactions
-      { data: [], error: null },
-      // 2: receipts
       { data: [], error: null },
     ]
 
@@ -180,23 +179,20 @@ describe('calculateVatDeclaration', () => {
     expect(result.transactionCount).toBe(0)
   })
 
-  it('maps invoice VAT to correct rutor by moms_ruta', async () => {
+  it('sums output VAT from 2611/2621/2631 credit balances', async () => {
     results = [
-      // 0: invoices — various moms_ruta values
       {
         data: [
-          { subtotal: 10000, vat_amount: 2500, moms_ruta: '05', subtotal_sek: null, vat_amount_sek: null },
-          { subtotal: 5000, vat_amount: 600, moms_ruta: '06', subtotal_sek: null, vat_amount_sek: null },
-          { subtotal: 3000, vat_amount: 180, moms_ruta: '07', subtotal_sek: null, vat_amount_sek: null },
-          { subtotal: 8000, vat_amount: 0, moms_ruta: '39', subtotal_sek: null, vat_amount_sek: null },
-          { subtotal: 12000, vat_amount: 0, moms_ruta: '40', subtotal_sek: null, vat_amount_sek: null },
+          { account_number: '2611', debit_amount: 0, credit_amount: 2500 },
+          { account_number: '2621', debit_amount: 0, credit_amount: 600 },
+          { account_number: '2631', debit_amount: 0, credit_amount: 180 },
+          { account_number: '3001', debit_amount: 0, credit_amount: 10000 },
+          { account_number: '3002', debit_amount: 0, credit_amount: 5000 },
+          { account_number: '3003', debit_amount: 0, credit_amount: 3000 },
         ],
         error: null,
       },
-      // 1: transactions (none)
-      { data: [], error: null },
-      // 2: receipts (none)
-      { data: [], error: null },
+      { data: [{ source_type: 'invoice_created' }, { source_type: 'invoice_created' }], error: null },
     ]
 
     const result = await calculateVatDeclaration('user-1', 'monthly', 2024, 1)
@@ -207,224 +203,166 @@ describe('calculateVatDeclaration', () => {
     expect(result.rutor.ruta10).toBe(10000)
     expect(result.rutor.ruta11).toBe(5000)
     expect(result.rutor.ruta12).toBe(3000)
+    expect(result.invoiceCount).toBe(2)
+  })
+
+  it('sums input VAT from 2641 debit balance', async () => {
+    results = [
+      {
+        data: [
+          { account_number: '2641', debit_amount: 250, credit_amount: 0 },
+          { account_number: '2641', debit_amount: 120, credit_amount: 0 },
+        ],
+        error: null,
+      },
+      { data: [{ source_type: 'bank_transaction' }, { source_type: 'bank_transaction' }], error: null },
+    ]
+
+    const result = await calculateVatDeclaration('user-1', 'monthly', 2024, 1)
+
+    expect(result.rutor.ruta48).toBe(370)
+    expect(result.transactionCount).toBe(2)
+  })
+
+  it('includes calculated input VAT (2645) from EU reverse charge in ruta48', async () => {
+    results = [
+      {
+        data: [
+          { account_number: '2645', debit_amount: 500, credit_amount: 0 },
+          { account_number: '2641', debit_amount: 200, credit_amount: 0 },
+        ],
+        error: null,
+      },
+      { data: [], error: null },
+    ]
+
+    const result = await calculateVatDeclaration('user-1', 'monthly', 2024, 1)
+
+    // Both 2641 and 2645 debit balances sum into ruta48
+    expect(result.rutor.ruta48).toBe(700)
+  })
+
+  it('maps EU/export revenue to ruta39/ruta40', async () => {
+    results = [
+      {
+        data: [
+          { account_number: '3308', debit_amount: 0, credit_amount: 8000 },
+          { account_number: '3305', debit_amount: 0, credit_amount: 12000 },
+        ],
+        error: null,
+      },
+      { data: [], error: null },
+    ]
+
+    const result = await calculateVatDeclaration('user-1', 'monthly', 2024, 1)
+
     expect(result.rutor.ruta39).toBe(8000)
     expect(result.rutor.ruta40).toBe(12000)
   })
 
-  it('prefers subtotal_sek/vat_amount_sek for foreign currency invoices', async () => {
+  it('handles credit notes as net reduction on revenue/VAT accounts', async () => {
     results = [
-      // 0: invoices — foreign currency with SEK conversion
       {
         data: [
-          { subtotal: 1000, vat_amount: 250, moms_ruta: '05', subtotal_sek: 11000, vat_amount_sek: 2750 },
+          // Invoice: C2611 2500, C3001 10000
+          { account_number: '2611', debit_amount: 0, credit_amount: 2500 },
+          { account_number: '3001', debit_amount: 0, credit_amount: 10000 },
+          // Credit note reversal: D2611 625, D3001 2500
+          { account_number: '2611', debit_amount: 625, credit_amount: 0 },
+          { account_number: '3001', debit_amount: 2500, credit_amount: 0 },
         ],
         error: null,
       },
-      // 1: transactions
-      { data: [], error: null },
-      // 2: receipts
-      { data: [], error: null },
+      { data: [{ source_type: 'invoice_created' }, { source_type: 'credit_note' }], error: null },
     ]
 
     const result = await calculateVatDeclaration('user-1', 'monthly', 2024, 1)
 
-    // Should use _sek values
-    expect(result.rutor.ruta05).toBe(2750)
-    expect(result.rutor.ruta10).toBe(11000)
-  })
-
-  it('defaults to ruta05 when moms_ruta is null but VAT > 0', async () => {
-    results = [
-      // 0: invoices — null moms_ruta with VAT
-      {
-        data: [
-          { subtotal: 4000, vat_amount: 1000, moms_ruta: null, subtotal_sek: null, vat_amount_sek: null },
-        ],
-        error: null,
-      },
-      // 1: transactions
-      { data: [], error: null },
-      // 2: receipts
-      { data: [], error: null },
-    ]
-
-    const result = await calculateVatDeclaration('user-1', 'monthly', 2024, 1)
-
-    expect(result.rutor.ruta05).toBe(1000)
-    expect(result.rutor.ruta10).toBe(4000)
-  })
-
-  it('calculates input VAT from transaction categories', async () => {
-    results = [
-      // 0: invoices
-      { data: [], error: null },
-      // 1: transactions — business expenses with categories
-      {
-        data: [
-          // 25% category: expense_software, amount -1250 → VAT = 1250 * 0.25/1.25 = 250
-          { amount: -1250, amount_sek: null, is_business: true, category: 'expense_software' },
-          // 12% category: expense_travel, amount -1120 → VAT = 1120 * 0.12/1.12 = 120
-          { amount: -1120, amount_sek: null, is_business: true, category: 'expense_travel' },
-        ],
-        error: null,
-      },
-      // 2: receipts
-      { data: [], error: null },
-    ]
-
-    const result = await calculateVatDeclaration('user-1', 'monthly', 2024, 1)
-
-    // 250 + 120 = 370
-    expect(result.rutor.ruta48).toBe(370)
-  })
-
-  it('sums VAT from confirmed receipts', async () => {
-    results = [
-      // 0: invoices
-      { data: [], error: null },
-      // 1: transactions
-      { data: [], error: null },
-      // 2: receipts — confirmed with vat_amount
-      {
-        data: [
-          { status: 'confirmed', vat_amount: 59.8 },
-          { status: 'confirmed', vat_amount: 125 },
-        ],
-        error: null,
-      },
-    ]
-
-    const result = await calculateVatDeclaration('user-1', 'monthly', 2024, 1)
-
-    expect(result.rutor.ruta48).toBe(184.8)
+    // Net: 2500 - 625 = 1875 output VAT, 10000 - 2500 = 7500 revenue
+    expect(result.rutor.ruta05).toBe(1875)
+    expect(result.rutor.ruta10).toBe(7500)
+    expect(result.invoiceCount).toBe(2)
   })
 
   it('calculates ruta49 as output minus input VAT', async () => {
     results = [
-      // 0: invoices — 25% VAT
       {
         data: [
-          { subtotal: 10000, vat_amount: 2500, moms_ruta: '05', subtotal_sek: null, vat_amount_sek: null },
+          { account_number: '2611', debit_amount: 0, credit_amount: 2500 },
+          { account_number: '3001', debit_amount: 0, credit_amount: 10000 },
+          { account_number: '2641', debit_amount: 350, credit_amount: 0 },
         ],
         error: null,
       },
-      // 1: transactions — 25% expense
-      {
-        data: [
-          { amount: -1250, amount_sek: null, is_business: true, category: 'expense_software' },
-        ],
-        error: null,
-      },
-      // 2: receipts
-      {
-        data: [
-          { status: 'confirmed', vat_amount: 100 },
-        ],
-        error: null,
-      },
+      { data: [], error: null },
     ]
 
     const result = await calculateVatDeclaration('user-1', 'monthly', 2024, 1)
 
-    // Output: 2500, Input: 250 + 100 = 350
-    expect(result.rutor.ruta49).toBe(2150)
+    expect(result.rutor.ruta05).toBe(2500)
+    expect(result.rutor.ruta48).toBe(350)
+    expect(result.rutor.ruta49).toBe(2150) // 2500 - 350
   })
-})
 
-describe('calculateVatDeclarationFromTaxCodes', () => {
-  it('maps journal lines to boxes via tax codes', async () => {
+  it('detects refund when input VAT exceeds output VAT', async () => {
     results = [
-      // 0: tax_codes
       {
         data: [
-          {
-            code: 'MP1',
-            user_id: null,
-            moms_basis_boxes: ['10'],
-            moms_tax_boxes: ['05'],
-            moms_input_boxes: [],
-          },
+          { account_number: '2611', debit_amount: 0, credit_amount: 500 },
+          { account_number: '2641', debit_amount: 3000, credit_amount: 0 },
         ],
         error: null,
       },
-      // 1: journal_entry_lines with tax_code
-      {
-        data: [
-          {
-            tax_code: 'MP1',
-            debit_amount: 0,
-            credit_amount: 2500,
-            journal_entry_id: 'e1',
-            journal_entries: { user_id: 'user-1', entry_date: '2024-01-15', status: 'posted' },
-          },
-        ],
-        error: null,
-      },
+      { data: [], error: null },
     ]
 
-    const result = await calculateVatDeclarationFromTaxCodes('user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration('user-1', 'monthly', 2024, 1)
+
+    expect(result.rutor.ruta49).toBe(-2500) // 500 - 3000
+  })
+
+  it('accepts accountingMethod parameter for backward compatibility', async () => {
+    results = [
+      { data: [], error: null },
+      { data: [], error: null },
+    ]
+
+    // Should not throw — parameter accepted but not used
+    const result = await calculateVatDeclaration('user-1', 'monthly', 2024, 1, 'cash')
+    expect(result.rutor.ruta49).toBe(0)
+  })
+
+  it('handles all three VAT rates in a single period', async () => {
+    results = [
+      {
+        data: [
+          // 25% rate: 10,000 revenue, 2,500 VAT
+          { account_number: '3001', debit_amount: 0, credit_amount: 10000 },
+          { account_number: '2611', debit_amount: 0, credit_amount: 2500 },
+          // 12% rate: 5,000 revenue, 600 VAT
+          { account_number: '3002', debit_amount: 0, credit_amount: 5000 },
+          { account_number: '2621', debit_amount: 0, credit_amount: 600 },
+          // 6% rate: 3,000 revenue, 180 VAT
+          { account_number: '3003', debit_amount: 0, credit_amount: 3000 },
+          { account_number: '2631', debit_amount: 0, credit_amount: 180 },
+          // Input VAT from purchases
+          { account_number: '2641', debit_amount: 1000, credit_amount: 0 },
+        ],
+        error: null,
+      },
+      { data: [], error: null },
+    ]
+
+    const result = await calculateVatDeclaration('user-1', 'quarterly', 2024, 1)
 
     expect(result.rutor.ruta05).toBe(2500)
-    expect(result.rutor.ruta10).toBe(2500)
-  })
-
-  it('user tax codes override system codes', async () => {
-    results = [
-      // 0: tax_codes — system and user with same code
-      {
-        data: [
-          {
-            code: 'MP1',
-            user_id: null,
-            moms_basis_boxes: ['10'],
-            moms_tax_boxes: ['05'],
-            moms_input_boxes: [],
-          },
-          {
-            code: 'MP1',
-            user_id: 'user-1',
-            moms_basis_boxes: ['11'],
-            moms_tax_boxes: ['06'],
-            moms_input_boxes: [],
-          },
-        ],
-        error: null,
-      },
-      // 1: journal_entry_lines
-      {
-        data: [
-          {
-            tax_code: 'MP1',
-            debit_amount: 0,
-            credit_amount: 600,
-            journal_entry_id: 'e1',
-            journal_entries: { user_id: 'user-1', entry_date: '2024-01-15', status: 'posted' },
-          },
-        ],
-        error: null,
-      },
-    ]
-
-    const result = await calculateVatDeclarationFromTaxCodes('user-1', 'monthly', 2024, 1)
-
-    // User override maps to ruta06/ruta11 instead of ruta05/ruta10
-    expect(result.rutor.ruta05).toBe(0)
     expect(result.rutor.ruta06).toBe(600)
-    expect(result.rutor.ruta11).toBe(600)
-  })
-
-  it('returns all zeros when no lines have tax codes', async () => {
-    results = [
-      // 0: tax_codes
-      { data: [], error: null },
-      // 1: journal_entry_lines — empty
-      { data: [], error: null },
-    ]
-
-    const result = await calculateVatDeclarationFromTaxCodes('user-1', 'monthly', 2024, 1)
-
-    expect(result.rutor.ruta05).toBe(0)
-    expect(result.rutor.ruta48).toBe(0)
-    expect(result.rutor.ruta49).toBe(0)
+    expect(result.rutor.ruta07).toBe(180)
+    expect(result.rutor.ruta10).toBe(10000)
+    expect(result.rutor.ruta11).toBe(5000)
+    expect(result.rutor.ruta12).toBe(3000)
+    expect(result.rutor.ruta48).toBe(1000)
+    // Output: 2500 + 600 + 180 = 3280, Input: 1000 → Pay: 2280
+    expect(result.rutor.ruta49).toBe(2280)
   })
 })

@@ -326,7 +326,55 @@ const ACCOUNT_DESCRIPTIONS: Record<string, AccountDescription> = {
 }
 
 export function getAccountDescription(accountNumber: string): AccountDescription | undefined {
-  return ACCOUNT_DESCRIPTIONS[accountNumber]
+  // Check hardcoded descriptions first (most detailed explanations)
+  const hardcoded = ACCOUNT_DESCRIPTIONS[accountNumber]
+  if (hardcoded) return hardcoded
+
+  // Fall back to BAS reference data for accounts not in the hardcoded list
+  try {
+    // Dynamic import avoided — use lazy require pattern
+    const { getBASReference, ACCOUNT_CLASS_LABELS } = require('./bas-reference')
+    const ref = getBASReference(accountNumber)
+    if (ref) {
+      const classLabel = ACCOUNT_CLASS_LABELS[ref.account_class] || ''
+      return {
+        name: ref.account_name,
+        classLabel,
+        type: ref.account_type,
+        explanation: ref.description,
+      }
+    }
+  } catch {
+    // BAS reference not available — that's fine
+  }
+
+  return undefined
+}
+
+/**
+ * Get a human-readable account class name for BAS account classes.
+ */
+export function getAccountClassName(accountClass: number): string {
+  switch (accountClass) {
+    case 1:
+      return '1xxx - Tillgångar'
+    case 2:
+      return '2xxx - Eget kapital & Skulder'
+    case 3:
+      return '3xxx - Intäkter'
+    case 4:
+      return '4xxx - Varuinköp'
+    case 5:
+      return '5xxx - Externa kostnader'
+    case 6:
+      return '6xxx - Övriga externa kostnader'
+    case 7:
+      return '7xxx - Personal'
+    case 8:
+      return '8xxx - Finansiella poster'
+    default:
+      return `${accountClass}xxx - Övrigt`
+  }
 }
 
 export { ACCOUNT_DESCRIPTIONS }

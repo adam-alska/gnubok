@@ -9,7 +9,10 @@ import { useToast } from '@/components/ui/use-toast'
 import { Plus, Trash2 } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { JournalEntryReviewContent } from '@/components/bookkeeping/JournalEntryReviewContent'
-import type { CreateJournalEntryLineInput, FiscalPeriod } from '@/types'
+import DocumentUploadZone from '@/components/bookkeeping/DocumentUploadZone'
+import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
+import type { UploadedFile } from '@/components/bookkeeping/DocumentUploadZone'
+import type { CreateJournalEntryLineInput, FiscalPeriod, BASAccount } from '@/types'
 
 interface Props {
   onCreated?: () => void
@@ -34,9 +37,14 @@ export default function JournalEntryForm({ onCreated }: Props) {
   ])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showReview, setShowReview] = useState(false)
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
+  const [accounts, setAccounts] = useState<BASAccount[]>([])
+
+  const isUploading = uploadedFiles.some((f) => f.status === 'uploading')
 
   useEffect(() => {
     fetchPeriods()
+    fetchAccounts()
   }, [])
 
   async function fetchPeriods() {
@@ -46,6 +54,12 @@ export default function JournalEntryForm({ onCreated }: Props) {
     if (data && data.length > 0) {
       setSelectedPeriod(data[0].id)
     }
+  }
+
+  async function fetchAccounts() {
+    const res = await fetch('/api/bookkeeping/accounts')
+    const { data } = await res.json()
+    setAccounts(data || [])
   }
 
   const addLine = () => {
@@ -116,6 +130,23 @@ export default function JournalEntryForm({ onCreated }: Props) {
         variant: 'destructive',
       })
     } else {
+      // Link uploaded documents to the new journal entry (non-blocking)
+      const journalEntryId = result.data?.id
+      if (journalEntryId) {
+        const filesToLink = uploadedFiles.filter((f) => f.status === 'uploaded' && f.id)
+        for (const file of filesToLink) {
+          try {
+            await fetch(`/api/documents/${file.id}/link`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ journal_entry_id: journalEntryId }),
+            })
+          } catch (linkErr) {
+            console.error('[JournalEntryForm] Failed to link document:', linkErr)
+          }
+        }
+      }
+
       toast({
         title: 'Verifikation skapad',
         description: `Verifikation ${result.data?.voucher_series}${result.data?.voucher_number} har skapats.`,
@@ -123,6 +154,7 @@ export default function JournalEntryForm({ onCreated }: Props) {
       setShowReview(false)
       // Reset form
       setDescription('')
+      setUploadedFiles([])
       setLines([
         { account_number: '', debit_amount: '', credit_amount: '', line_description: '' },
         { account_number: '', debit_amount: '', credit_amount: '', line_description: '' },
@@ -188,12 +220,10 @@ export default function JournalEntryForm({ onCreated }: Props) {
               {lines.map((line, index) => (
                 <tr key={index} className="border-b">
                   <td className="py-1">
-                    <Input
+                    <AccountCombobox
                       value={line.account_number}
-                      onChange={(e) => updateLine(index, 'account_number', e.target.value)}
-                      placeholder="1930"
-                      className="font-mono h-8"
-                      maxLength={4}
+                      accounts={accounts}
+                      onChange={(num) => updateLine(index, 'account_number', num)}
                     />
                   </td>
                   <td className="py-1 px-1">
@@ -275,19 +305,35 @@ export default function JournalEntryForm({ onCreated }: Props) {
           </Button>
         </div>
 
+        {/* Document attachments */}
+        <div>
+          <Label className="mb-2 block">Underlag</Label>
+          <DocumentUploadZone
+            files={uploadedFiles}
+            onFilesChange={setUploadedFiles}
+          />
+        </div>
+
         {!isBalanced && totalDebit > 0 && (
           <p className="text-sm text-red-600">
             Differens: {Math.abs(totalDebit - totalCredit).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} kr
           </p>
         )}
 
-        <div className="flex justify-end">
+        <div className="flex flex-col items-end gap-1">
           <Button
             onClick={handleReview}
-            disabled={!isBalanced || !description || !selectedPeriod || isSubmitting}
+            disabled={!isBalanced || !description || !selectedPeriod || isSubmitting || isUploading}
           >
             Granska & skapa
           </Button>
+          {(!description || !selectedPeriod || isUploading) && (
+            <div className="text-xs text-muted-foreground space-y-0.5 text-right">
+              {!description && <p>Ange en beskrivning</p>}
+              {!selectedPeriod && <p>Välj en räkenskapsperiod</p>}
+              {isUploading && <p>Vänta tills filerna laddats upp</p>}
+            </div>
+          )}
         </div>
 
         <ConfirmationDialog
@@ -305,6 +351,7 @@ export default function JournalEntryForm({ onCreated }: Props) {
             lines={lines}
             totalDebit={totalDebit}
             totalCredit={totalCredit}
+            attachmentCount={uploadedFiles.filter((f) => f.status === 'uploaded').length}
           />
         </ConfirmationDialog>
       </CardContent>

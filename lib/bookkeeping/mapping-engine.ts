@@ -190,7 +190,7 @@ function getDefaultResult(transaction: Transaction): MappingResult {
     requires_review: true,
     default_private: false,
     vat_lines: [],
-    description: 'Okategoriserad transaktion',
+    description: 'Obokförd transaktion',
   }
 }
 

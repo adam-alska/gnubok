@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import type { SIEExportOptions, JournalEntry, JournalEntryLine, BASAccount } from '@/types'
 
 /**
@@ -29,12 +30,15 @@ export async function generateSIEExport(
   }
 
   // Fetch all accounts
-  const { data: accounts } = await supabase
-    .from('chart_of_accounts')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('is_active', true)
-    .order('account_number')
+  const accounts = await fetchAllRows(({ from, to }) =>
+    supabase
+      .from('chart_of_accounts')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('account_number')
+      .range(from, to)
+  )
 
   // Fetch all posted journal entries with lines
   const { data: entries } = await supabase

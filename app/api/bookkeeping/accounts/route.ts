@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
@@ -13,27 +14,29 @@ export async function GET(request: Request) {
   const accountClass = searchParams.get('class')
   const activeOnly = searchParams.get('active') !== 'false'
 
-  let query = supabase
-    .from('chart_of_accounts')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('sort_order')
+  try {
+    const data = await fetchAllRows(({ from, to }) => {
+      let query = supabase
+        .from('chart_of_accounts')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('sort_order')
 
-  if (activeOnly) {
-    query = query.eq('is_active', true)
+      if (activeOnly) {
+        query = query.eq('is_active', true)
+      }
+
+      if (accountClass) {
+        query = query.eq('account_class', parseInt(accountClass))
+      }
+
+      return query.range(from, to)
+    })
+
+    return NextResponse.json({ data })
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to fetch accounts' }, { status: 500 })
   }
-
-  if (accountClass) {
-    query = query.eq('account_class', parseInt(accountClass))
-  }
-
-  const { data, error } = await query
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  return NextResponse.json({ data })
 }
 
 export async function POST(request: Request) {

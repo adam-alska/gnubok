@@ -9,7 +9,7 @@ let results: Array<{ data?: unknown; error?: unknown }>
 
 function makeBuilder() {
   const b: Record<string, unknown> = {}
-  for (const m of ['select', 'eq', 'in', 'lt', 'order']) {
+  for (const m of ['select', 'eq', 'in', 'lt', 'order', 'range']) {
     b[m] = vi.fn().mockReturnValue(b)
   }
   b.single = vi.fn().mockImplementation(async () => results[resultIdx++] ?? { data: null, error: null })
@@ -51,7 +51,7 @@ describe('generateGeneralLedger', () => {
   it('returns empty report when no entries in period', async () => {
     results = [
       // 0: fiscal_periods.single()
-      { data: { start_date: '2024-01-01', end_date: '2024-12-31' }, error: null },
+      { data: { period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
       // 1: journal_entries (empty)
       { data: [], error: null },
     ]
@@ -64,7 +64,7 @@ describe('generateGeneralLedger', () => {
   it('groups lines by account with correct totals and running balance', async () => {
     results = [
       // 0: fiscal_periods.single()
-      { data: { start_date: '2024-01-01', end_date: '2024-12-31' }, error: null },
+      { data: { period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
       // 1: journal_entries for this period
       {
         data: [
@@ -122,7 +122,7 @@ describe('generateGeneralLedger', () => {
   it('computes opening balance from prior period entries', async () => {
     results = [
       // 0: fiscal_periods.single()
-      { data: { start_date: '2025-01-01', end_date: '2025-12-31' }, error: null },
+      { data: { period_start: '2025-01-01', period_end: '2025-12-31' }, error: null },
       // 1: journal_entries for this period
       {
         data: [
@@ -168,7 +168,7 @@ describe('generateGeneralLedger', () => {
   it('filters accounts by account_from and account_to', async () => {
     results = [
       // 0: fiscal_periods.single()
-      { data: { start_date: '2024-01-01', end_date: '2024-12-31' }, error: null },
+      { data: { period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
       // 1: journal_entries
       {
         data: [
@@ -200,7 +200,7 @@ describe('generateGeneralLedger', () => {
   it('sorts lines within account by date then voucher number', async () => {
     results = [
       // 0: fiscal_periods.single()
-      { data: { start_date: '2024-01-01', end_date: '2024-12-31' }, error: null },
+      { data: { period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
       // 1: entries out of order
       {
         data: [
@@ -236,7 +236,7 @@ describe('generateGeneralLedger', () => {
 
   it('uses Math.round for monetary precision', async () => {
     results = [
-      { data: { start_date: '2024-01-01', end_date: '2024-12-31' }, error: null },
+      { data: { period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
       {
         data: [
           { id: 'e1', entry_date: '2024-01-15', voucher_number: 1, voucher_series: 'A', description: 'Precision', source_type: 'manual' },

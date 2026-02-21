@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import type {
   NEDeclaration,
   NEDeclarationRutor,
@@ -194,13 +195,16 @@ export async function generateNEDeclaration(
   }
 
   // Fetch chart of accounts for account names
-  const { data: accounts } = await supabase
-    .from('chart_of_accounts')
-    .select('account_number, account_name')
-    .eq('user_id', userId)
+  const accounts = await fetchAllRows<{ account_number: string; account_name: string }>(({ from, to }) =>
+    supabase
+      .from('chart_of_accounts')
+      .select('account_number, account_name')
+      .eq('user_id', userId)
+      .range(from, to)
+  )
 
   const accountNameMap = new Map<string, string>()
-  for (const acc of accounts || []) {
+  for (const acc of accounts) {
     accountNameMap.set(acc.account_number, acc.account_name)
   }
 

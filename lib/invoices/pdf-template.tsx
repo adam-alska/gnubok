@@ -5,7 +5,7 @@ import {
   View,
   StyleSheet,
 } from '@react-pdf/renderer'
-import type { Invoice, InvoiceItem, Customer, CompanySettings } from '@/types'
+import type { Invoice, InvoiceItem, Customer, CompanySettings, InvoiceDocumentType } from '@/types'
 
 // Create styles
 const styles = StyleSheet.create({
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#eee',
   },
   colDescription: {
-    flex: 4,
+    flex: 3.5,
   },
   colQty: {
     flex: 1,
@@ -94,6 +94,10 @@ const styles = StyleSheet.create({
   },
   colPrice: {
     flex: 1.5,
+    textAlign: 'right',
+  },
+  colVat: {
+    flex: 1,
     textAlign: 'right',
   },
   colTotal: {
@@ -255,6 +259,14 @@ function formatOrgNumber(orgNumber: string): string {
   return orgNumber
 }
 
+function getDocumentTitle(invoice: Invoice): string {
+  if (invoice.credited_invoice_id) return 'KREDITFAKTURA'
+  const docType = (invoice as Invoice & { document_type?: InvoiceDocumentType }).document_type || 'invoice'
+  if (docType === 'proforma') return 'PROFORMAFAKTURA'
+  if (docType === 'delivery_note') return 'FÖLJESEDEL'
+  return 'FAKTURA'
+}
+
 interface InvoicePDFProps {
   invoice: Invoice
   customer: Customer
@@ -266,6 +278,28 @@ interface InvoicePDFProps {
 export function InvoicePDF({ invoice, customer, items, company, originalInvoiceNumber }: InvoicePDFProps) {
   const isCreditNote = !!invoice.credited_invoice_id
 
+  // Check if items have mixed VAT rates
+  const hasPerLineVat = items.some((item) => item.vat_rate !== undefined && item.vat_rate !== null)
+  const uniqueRates = hasPerLineVat
+    ? new Set(items.map((item) => item.vat_rate))
+    : new Set<number>()
+  const showVatColumn = hasPerLineVat && uniqueRates.size > 1
+
+  // Calculate per-rate VAT breakdown for totals
+  const vatByRate = new Map<number, { base: number; vat: number }>()
+  if (hasPerLineVat) {
+    for (const item of items) {
+      const rate = item.vat_rate ?? 25
+      const group = vatByRate.get(rate) || { base: 0, vat: 0 }
+      group.base += Math.abs(item.line_total)
+      group.vat += Math.abs(item.vat_amount || 0)
+      vatByRate.set(rate, group)
+    }
+  }
+  const docType = (invoice as Invoice & { document_type?: InvoiceDocumentType }).document_type || 'invoice'
+  const isDeliveryNote = docType === 'delivery_note'
+  const isProforma = docType === 'proforma'
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -273,7 +307,7 @@ export function InvoicePDF({ invoice, customer, items, company, originalInvoiceN
         <View style={styles.header}>
           <View>
             <Text style={[styles.title, isCreditNote ? styles.creditNoteTitle : {}]}>
-              {isCreditNote ? 'KREDITFAKTURA' : 'FAKTURA'}
+              {getDocumentTitle(invoice)}
             </Text>
             <Text style={{ marginTop: 5, color: '#666' }}>{invoice.invoice_number}</Text>
           </View>
@@ -356,8 +390,15 @@ export function InvoicePDF({ invoice, customer, items, company, originalInvoiceN
               <Text style={[styles.colDescription, styles.tableHeaderText]}>Beskrivning</Text>
               <Text style={[styles.colQty, styles.tableHeaderText]}>Antal</Text>
               <Text style={[styles.colUnit, styles.tableHeaderText]}>Enhet</Text>
-              <Text style={[styles.colPrice, styles.tableHeaderText]}>à-pris</Text>
-              <Text style={[styles.colTotal, styles.tableHeaderText]}>Summa</Text>
+              {!isDeliveryNote && (
+                <Text style={[styles.colPrice, styles.tableHeaderText]}>à-pris</Text>
+              )}
+              {!isDeliveryNote && showVatColumn && (
+                <Text style={[styles.colVat, styles.tableHeaderText]}>Moms</Text>
+              )}
+              {!isDeliveryNote && (
+                <Text style={[styles.colTotal, styles.tableHeaderText]}>Summa</Text>
+              )}
             </View>
 
             {/* Table rows */}
@@ -366,37 +407,67 @@ export function InvoicePDF({ invoice, customer, items, company, originalInvoiceN
                 <Text style={styles.colDescription}>{item.description}</Text>
                 <Text style={styles.colQty}>{item.quantity}</Text>
                 <Text style={styles.colUnit}>{item.unit}</Text>
-                <Text style={styles.colPrice}>{formatCurrency(item.unit_price, invoice.currency)}</Text>
-                <Text style={styles.colTotal}>{formatCurrency(item.line_total, invoice.currency)}</Text>
+                {!isDeliveryNote && (
+                  <Text style={styles.colPrice}>{formatCurrency(item.unit_price, invoice.currency)}</Text>
+                )}
+                {!isDeliveryNote && showVatColumn && (
+                  <Text style={styles.colVat}>{item.vat_rate ?? 25}%</Text>
+                )}
+                {!isDeliveryNote && (
+                  <Text style={styles.colTotal}>{formatCurrency(item.line_total, invoice.currency)}</Text>
+                )}
               </View>
             ))}
           </View>
         </View>
 
-        {/* Totals */}
-        <View style={styles.totalsSection}>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Delsumma:</Text>
-            <Text style={styles.totalValue}>{formatCurrency(invoice.subtotal, invoice.currency)}</Text>
-          </View>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Moms ({invoice.vat_rate}%):</Text>
-            <Text style={styles.totalValue}>{formatCurrency(invoice.vat_amount, invoice.currency)}</Text>
-          </View>
-          <View style={styles.grandTotal}>
-            <Text style={styles.grandTotalLabel}>{isCreditNote ? 'Att kreditera:' : 'Att betala:'}</Text>
-            <Text style={styles.grandTotalValue}>{formatCurrency(invoice.total, invoice.currency)}</Text>
-          </View>
-          {invoice.currency !== 'SEK' && invoice.total_sek && (
-            <View style={[styles.totalRow, { marginTop: 8 }]}>
-              <Text style={[styles.totalLabel, { fontSize: 9 }]}>I SEK (kurs {invoice.exchange_rate}):</Text>
-              <Text style={[styles.totalValue, { fontSize: 9 }]}>{formatCurrency(invoice.total_sek, 'SEK')}</Text>
+        {/* Totals - hidden for delivery notes */}
+        {!isDeliveryNote && (
+          <View style={styles.totalsSection}>
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Delsumma:</Text>
+              <Text style={styles.totalValue}>{formatCurrency(invoice.subtotal, invoice.currency)}</Text>
             </View>
-          )}
-        </View>
+            {vatByRate.size > 1 ? (
+              Array.from(vatByRate.entries())
+                .filter(([, group]) => group.vat > 0)
+                .sort(([a], [b]) => b - a)
+                .map(([rate, group]) => (
+                  <View key={rate} style={styles.totalRow}>
+                    <Text style={styles.totalLabel}>Moms {rate}%:</Text>
+                    <Text style={styles.totalValue}>{formatCurrency(group.vat, invoice.currency)}</Text>
+                  </View>
+                ))
+            ) : (
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Moms ({invoice.vat_rate ?? 25}%):</Text>
+                <Text style={styles.totalValue}>{formatCurrency(invoice.vat_amount, invoice.currency)}</Text>
+              </View>
+            )}
+            <View style={styles.grandTotal}>
+              <Text style={styles.grandTotalLabel}>{isCreditNote ? 'Att kreditera:' : 'Att betala:'}</Text>
+              <Text style={styles.grandTotalValue}>{formatCurrency(invoice.total, invoice.currency)}</Text>
+            </View>
+            {invoice.currency !== 'SEK' && invoice.total_sek && (
+              <View style={[styles.totalRow, { marginTop: 8 }]}>
+                <Text style={[styles.totalLabel, { fontSize: 9 }]}>I SEK (kurs {invoice.exchange_rate}):</Text>
+                <Text style={[styles.totalValue, { fontSize: 9 }]}>{formatCurrency(invoice.total_sek, 'SEK')}</Text>
+              </View>
+            )}
+          </View>
+        )}
 
-        {/* Payment information - not shown for credit notes */}
-        {!isCreditNote && (
+        {/* Proforma notice */}
+        {isProforma && (
+          <View style={[styles.reverseChargeBox, { backgroundColor: '#e8f4fd', borderColor: '#90cdf4' }]}>
+            <Text style={[styles.reverseChargeText, { color: '#2b6cb0' }]}>
+              Detta är en proformafaktura och utgör ingen betalningsanmodan.
+            </Text>
+          </View>
+        )}
+
+        {/* Payment information - not shown for credit notes, proformas, or delivery notes */}
+        {!isCreditNote && !isProforma && !isDeliveryNote && (
           <View style={styles.paymentSection}>
             <Text style={styles.paymentTitle}>Betalningsinformation</Text>
             {company.bank_name && (

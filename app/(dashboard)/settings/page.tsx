@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -145,6 +146,7 @@ export default function SettingsPage() {
       next_invoice_number: parseInt(formData.get('next_invoice_number') as string) || 1,
       invoice_default_days: parseInt(formData.get('invoice_default_days') as string) || 30,
       accounting_method: formData.get('accounting_method') as string || 'accrual',
+      invoice_default_notes: (formData.get('invoice_default_notes') as string) || null,
     }
 
     try {
@@ -332,191 +334,214 @@ export default function SettingsPage() {
 
         {/* Company settings */}
         <TabsContent value="company">
-            <form onSubmit={handleSaveSettings}>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Företagsuppgifter</CardTitle>
-                  <CardDescription>
-                    Dessa uppgifter visas på dina fakturor
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="company_name">Företagsnamn</Label>
-                      <Input
-                        id="company_name"
-                        name="company_name"
-                        defaultValue={settings?.company_name || ''}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="org_number">Organisationsnummer</Label>
-                      <Input
-                        id="org_number"
-                        name="org_number"
-                        defaultValue={settings?.org_number || ''}
-                      />
-                    </div>
-                  </div>
-
+          <form onSubmit={handleSaveSettings} className="space-y-6">
+            {/* Företagsuppgifter */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Företagsuppgifter</CardTitle>
+                <CardDescription>
+                  Namn, organisationsnummer och adress
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="address_line1">Adress</Label>
+                    <Label htmlFor="company_name">Företagsnamn</Label>
                     <Input
-                      id="address_line1"
-                      name="address_line1"
-                      defaultValue={settings?.address_line1 || ''}
+                      id="company_name"
+                      name="company_name"
+                      defaultValue={settings?.company_name || ''}
                     />
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="postal_code">Postnummer</Label>
-                      <Input
-                        id="postal_code"
-                        name="postal_code"
-                        defaultValue={settings?.postal_code || ''}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="city">Ort</Label>
-                      <Input
-                        id="city"
-                        name="city"
-                        defaultValue={settings?.city || ''}
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="org_number">Organisationsnummer</Label>
+                    <Input
+                      id="org_number"
+                      name="org_number"
+                      defaultValue={settings?.org_number || ''}
+                    />
                   </div>
+                </div>
 
-                  <div className="pt-4 border-t">
-                    <h3 className="font-medium mb-4">Bankuppgifter för fakturor</h3>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="bank_name">Bank</Label>
-                        <Input
-                          id="bank_name"
-                          name="bank_name"
-                          defaultValue={settings?.bank_name || ''}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="clearing_number">Clearing</Label>
-                        <Input
-                          id="clearing_number"
-                          name="clearing_number"
-                          defaultValue={settings?.clearing_number || ''}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="account_number">Kontonummer</Label>
-                        <Input
-                          id="account_number"
-                          name="account_number"
-                          defaultValue={settings?.account_number || ''}
-                        />
-                      </div>
-                    </div>
+                <div className="space-y-2">
+                  <Label htmlFor="address_line1">Adress</Label>
+                  <Input
+                    id="address_line1"
+                    name="address_line1"
+                    defaultValue={settings?.address_line1 || ''}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="postal_code">Postnummer</Label>
+                    <Input
+                      id="postal_code"
+                      name="postal_code"
+                      defaultValue={settings?.postal_code || ''}
+                    />
                   </div>
-
-                  <div className="pt-4 border-t">
-                    <h3 className="font-medium mb-4">Fakturainställningar</h3>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="invoice_prefix">Fakturaprefix</Label>
-                        <Input
-                          id="invoice_prefix"
-                          name="invoice_prefix"
-                          placeholder="t.ex. F-"
-                          defaultValue={settings?.invoice_prefix || ''}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="next_invoice_number">Nästa fakturanummer</Label>
-                        <Input
-                          id="next_invoice_number"
-                          name="next_invoice_number"
-                          type="number"
-                          min="1"
-                          defaultValue={settings?.next_invoice_number || 1}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="invoice_default_days">Betalningsvillkor (dagar)</Label>
-                        <Input
-                          id="invoice_default_days"
-                          name="invoice_default_days"
-                          type="number"
-                          min="0"
-                          defaultValue={settings?.invoice_default_days || 30}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-4 space-y-2">
-                      <Label htmlFor="accounting_method">Bokföringsmetod</Label>
-                      {settings?.entity_type === 'aktiebolag' ? (
-                        <>
-                          <input type="hidden" name="accounting_method" value="accrual" />
-                          <div className="flex items-center gap-2">
-                            <Input
-                              value="Faktureringsmetoden"
-                              disabled
-                              className="max-w-xs"
-                            />
-                            <span className="text-sm text-muted-foreground">
-                              Obligatorisk för aktiebolag
-                            </span>
-                          </div>
-                        </>
-                      ) : (
-                        <select
-                          id="accounting_method"
-                          name="accounting_method"
-                          defaultValue={settings?.accounting_method || 'accrual'}
-                          className="flex h-10 w-full max-w-xs rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        >
-                          <option value="accrual">Faktureringsmetoden</option>
-                          <option value="cash">Kontantmetoden</option>
-                        </select>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        {settings?.entity_type === 'aktiebolag'
-                          ? 'Aktiebolag måste använda faktureringsmetoden enligt BFL.'
-                          : 'Kontantmetoden är tillgänglig för enskild firma med omsättning under 3 MSEK.'}
-                      </p>
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="city">Ort</Label>
+                    <Input
+                      id="city"
+                      name="city"
+                      defaultValue={settings?.city || ''}
+                    />
                   </div>
+                </div>
+              </CardContent>
+            </Card>
 
-                  <div className="pt-4 border-t">
-                    <h3 className="font-medium mb-4">Skatteinställningar</h3>
-                    <div className="space-y-2">
-                      <Label htmlFor="preliminary_tax_monthly">
-                        Månatlig preliminärskatt (F-skatt)
-                      </Label>
-                      <Input
-                        id="preliminary_tax_monthly"
-                        name="preliminary_tax_monthly"
-                        type="number"
-                        defaultValue={settings?.preliminary_tax_monthly || ''}
-                      />
-                    </div>
+            {/* Bankuppgifter */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Bankuppgifter</CardTitle>
+                <CardDescription>
+                  Betalningsuppgifter som visas på dina fakturor
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="bank_name">Bank</Label>
+                    <Input
+                      id="bank_name"
+                      name="bank_name"
+                      defaultValue={settings?.bank_name || ''}
+                    />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="clearing_number">Clearing</Label>
+                    <Input
+                      id="clearing_number"
+                      name="clearing_number"
+                      defaultValue={settings?.clearing_number || ''}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="account_number">Kontonummer</Label>
+                    <Input
+                      id="account_number"
+                      name="account_number"
+                      defaultValue={settings?.account_number || ''}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-                  <div className="flex justify-end">
-                    <Button type="submit" disabled={isSaving}>
-                      {isSaving ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Sparar...
-                        </>
-                      ) : (
-                        'Spara ändringar'
-                      )}
-                    </Button>
+            {/* Fakturainställningar */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Fakturainställningar</CardTitle>
+                <CardDescription>
+                  Numrering, betalningsvillkor och bokföringsmetod
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="invoice_prefix">Fakturaprefix</Label>
+                    <Input
+                      id="invoice_prefix"
+                      name="invoice_prefix"
+                      placeholder="t.ex. F-"
+                      defaultValue={settings?.invoice_prefix || ''}
+                    />
                   </div>
-                </CardContent>
-              </Card>
-            </form>
+                  <div className="space-y-2">
+                    <Label htmlFor="next_invoice_number">Nästa fakturanummer</Label>
+                    <Input
+                      id="next_invoice_number"
+                      name="next_invoice_number"
+                      type="number"
+                      min="1"
+                      defaultValue={settings?.next_invoice_number || 1}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="invoice_default_days">Betalningsvillkor (dagar)</Label>
+                    <Input
+                      id="invoice_default_days"
+                      name="invoice_default_days"
+                      type="number"
+                      min="0"
+                      defaultValue={settings?.invoice_default_days || 30}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="accounting_method">Bokföringsmetod</Label>
+                  <select
+                    id="accounting_method"
+                    name="accounting_method"
+                    defaultValue={settings?.accounting_method || 'accrual'}
+                    className="flex h-10 w-full max-w-xs rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    <option value="accrual">Faktureringsmetoden</option>
+                    <option value="cash">Kontantmetoden</option>
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    {settings?.entity_type === 'aktiebolag'
+                      ? 'Aktiebolag med omsättning över 3 MSEK måste använda faktureringsmetoden enligt BFL. Mindre aktiebolag kan välja kontantmetoden.'
+                      : 'Kontantmetoden är tillgänglig för enskild firma med omsättning under 3 MSEK.'}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="invoice_default_notes">Standardtext på fakturor</Label>
+                  <Textarea
+                    id="invoice_default_notes"
+                    name="invoice_default_notes"
+                    rows={3}
+                    placeholder="T.ex. betalningsvillkor, leveransinfo..."
+                    defaultValue={settings?.invoice_default_notes || ''}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Texten föreslås automatiskt i anteckningsfältet vid ny faktura.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Skatteinställningar */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Skatteinställningar</CardTitle>
+                <CardDescription>
+                  Preliminärskatt och F-skatt
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Label htmlFor="preliminary_tax_monthly">
+                    Månatlig preliminärskatt (F-skatt)
+                  </Label>
+                  <Input
+                    id="preliminary_tax_monthly"
+                    name="preliminary_tax_monthly"
+                    type="number"
+                    defaultValue={settings?.preliminary_tax_monthly || ''}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="flex justify-end">
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sparar...
+                  </>
+                ) : (
+                  'Spara ändringar'
+                )}
+              </Button>
+            </div>
+          </form>
         </TabsContent>
 
         {/* Banking settings (only shown when extension is active or connections exist) */}

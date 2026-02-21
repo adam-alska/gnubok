@@ -12,9 +12,11 @@ import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { getCategoryDisplayName } from '@/lib/tax/expense-warnings'
 import Link from 'next/link'
-import { Plus, Search, ArrowLeftRight, ArrowUpRight, ArrowDownRight, Sparkles, Check, FileText, Link2, Upload } from 'lucide-react'
+import { Plus, Search, ArrowLeftRight, ArrowUpRight, ArrowDownRight, Sparkles, Check, FileText, Link2, Upload, CheckSquare, X } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
 import TransactionForm from '@/components/transactions/TransactionForm'
 import SwipeCategorizationView from '@/components/transactions/SwipeCategorizationView'
+import BatchCategorySelector from '@/components/transactions/BatchCategorySelector'
 import type { Transaction, TransactionCategory, CreateTransactionInput, Invoice, Customer } from '@/types'
 import type { SuggestedCategory } from '@/lib/transactions/category-suggestions'
 
@@ -35,6 +37,15 @@ export default function TransactionsPage() {
   const [isConfirmingMatch, setIsConfirmingMatch] = useState(false)
   const [categorySuggestions, setCategorySuggestions] = useState<Record<string, SuggestedCategory[]>>({})
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
+  const [isBatchMode, setIsBatchMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showBatchSelector, setShowBatchSelector] = useState(false)
+  const [batchProgress, setBatchProgress] = useState<{ done: number; total: number } | null>(null)
+  const [hideCategorizationHint, setHideCategorizationHint] = useState(true)
+
+  useEffect(() => {
+    setHideCategorizationHint(localStorage.getItem('hideCategorizationHint') === 'true')
+  }, [])
   const { toast } = useToast()
   const supabase = createClient()
 
@@ -177,18 +188,18 @@ export default function TransactionsPage() {
       if (result.journal_entry_created) {
         toast({
           title: 'Bokförd',
-          description: 'Transaktion kategoriserad och verifikation skapad',
+          description: 'Transaktion bokförd och verifikation skapad',
         })
       } else if (result.journal_entry_error) {
         toast({
-          title: 'Kategoriserad',
-          description: `Bokföring misslyckades: ${result.journal_entry_error}`,
+          title: 'Delvis bokförd',
+          description: `Verifikation kunde inte skapas: ${result.journal_entry_error}`,
           variant: 'destructive',
         })
       } else {
         toast({
-          title: 'Kategoriserad',
-          description: 'Transaktion uppdaterad men kunde inte bokföras',
+          title: 'Delvis bokförd',
+          description: 'Transaktion uppdaterad men verifikation kunde inte skapas',
         })
       }
 
@@ -196,7 +207,7 @@ export default function TransactionsPage() {
     } catch (err) {
       toast({
         title: 'Fel',
-        description: 'Något gick fel vid kategorisering',
+        description: 'Något gick fel vid bokföring',
         variant: 'destructive',
       })
       return false
@@ -357,6 +368,58 @@ export default function TransactionsPage() {
     }
   }
 
+  function toggleBatchSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  function exitBatchMode() {
+    setIsBatchMode(false)
+    setSelectedIds(new Set())
+  }
+
+  async function handleBatchMarkPrivate() {
+    const ids = Array.from(selectedIds)
+    setBatchProgress({ done: 0, total: ids.length })
+
+    for (let i = 0; i < ids.length; i++) {
+      await handleCategorize(ids[i], false, 'private')
+      setBatchProgress({ done: i + 1, total: ids.length })
+    }
+
+    setBatchProgress(null)
+    toast({
+      title: 'Klart',
+      description: `${ids.length} transaktioner markerade som privat`,
+    })
+    exitBatchMode()
+  }
+
+  async function handleBatchCategorize(category: TransactionCategory) {
+    const ids = Array.from(selectedIds)
+    setBatchProgress({ done: 0, total: ids.length })
+
+    for (let i = 0; i < ids.length; i++) {
+      await handleCategorize(ids[i], true, category)
+      setBatchProgress({ done: i + 1, total: ids.length })
+    }
+
+    setBatchProgress(null)
+    setShowBatchSelector(false)
+    toast({
+      title: 'Klart',
+      description: `${ids.length} transaktioner bokförda`,
+    })
+    exitBatchMode()
+  }
+
   async function openSwipeView() {
     // Run batch invoice matching for income transactions first
     await runBatchInvoiceMatching()
@@ -405,7 +468,7 @@ export default function TransactionsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Transaktioner</h1>
           <p className="text-muted-foreground">
-            Hantera och kategorisera dina transaktioner
+            Hantera och bokför dina transaktioner
           </p>
         </div>
         <div className="flex gap-2">
@@ -416,10 +479,19 @@ export default function TransactionsPage() {
             </Link>
           </Button>
           {uncategorizedTransactions.length > 0 && (
-            <Button variant="outline" onClick={openSwipeView} disabled={isLoadingSuggestions}>
-              <Sparkles className="mr-2 h-4 w-4" />
-              {isLoadingSuggestions ? 'Laddar...' : `Kategorisera (${uncategorizedTransactions.length})`}
-            </Button>
+            <>
+              <Button variant="outline" onClick={openSwipeView} disabled={isLoadingSuggestions}>
+                <Sparkles className="mr-2 h-4 w-4" />
+                {isLoadingSuggestions ? 'Laddar...' : `Bokför (${uncategorizedTransactions.length})`}
+              </Button>
+              <Button
+                variant={isBatchMode ? 'default' : 'outline'}
+                onClick={() => isBatchMode ? exitBatchMode() : setIsBatchMode(true)}
+              >
+                <CheckSquare className="mr-2 h-4 w-4" />
+                {isBatchMode ? 'Avsluta' : 'Välj flera'}
+              </Button>
+            </>
           )}
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -453,7 +525,7 @@ export default function TransactionsPage() {
           <TabsList>
             <TabsTrigger value="all">Alla</TabsTrigger>
             <TabsTrigger value="uncategorized">
-              Ej kategoriserade
+              Ej bokförda
               {uncategorizedTransactions.length > 0 && (
                 <Badge variant="secondary" className="ml-2">
                   {uncategorizedTransactions.length}
@@ -473,6 +545,26 @@ export default function TransactionsPage() {
           </TabsList>
         </Tabs>
       </div>
+
+      {/* Feature discovery hint */}
+      {!hideCategorizationHint && uncategorizedTransactions.length > 0 && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-lg border border-primary/20 bg-primary/[0.03]">
+          <Sparkles className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-muted-foreground flex-1">
+            <span className="font-medium text-foreground">Tips:</span> Klicka &quot;Bokför&quot; ovan för att snabbt bokföra transaktioner en i taget. Använd &quot;Välj flera&quot; för att hantera flera samtidigt.
+          </p>
+          <button
+            onClick={() => {
+              localStorage.setItem('hideCategorizationHint', 'true')
+              setHideCategorizationHint(true)
+            }}
+            className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+            aria-label="Stäng tips"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Transaction list */}
       {isLoading ? (
@@ -519,16 +611,31 @@ export default function TransactionsPage() {
         </Card>
       ) : (
         <div className="space-y-2">
-          {filteredTransactions.map((transaction) => (
+          {filteredTransactions.map((transaction) => {
+            const isUncategorized = transaction.is_business === null && !transaction.journal_entry_id
+            const isSelected = selectedIds.has(transaction.id)
+            const showCheckbox = isBatchMode && isUncategorized
+
+            return (
             <Card
               key={transaction.id}
               className={`hover:border-primary/50 transition-colors ${
-                transaction.is_business === null ? 'border-warning/50' : ''
-              } ${transaction.potential_invoice && !transaction.invoice_id ? 'border-blue-500/50' : ''}`}
+                isUncategorized ? 'border-warning/50' : ''
+              } ${transaction.potential_invoice && !transaction.invoice_id ? 'border-blue-500/50' : ''} ${
+                isSelected ? 'border-primary bg-primary/[0.02]' : ''
+              }`}
+              onClick={showCheckbox ? () => toggleBatchSelect(transaction.id) : undefined}
             >
               <CardContent className="py-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
+                    {showCheckbox && (
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleBatchSelect(transaction.id)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    )}
                     <div
                       className={`h-10 w-10 rounded-full flex items-center justify-center ${
                         transaction.amount > 0
@@ -546,7 +653,7 @@ export default function TransactionsPage() {
                       <p className="font-medium">{transaction.description}</p>
                       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                         <span>{formatDate(transaction.date)}</span>
-                        {transaction.is_business !== null && (
+                        {transaction.is_business !== null && !(transaction.is_business && transaction.category === 'uncategorized' && transaction.journal_entry_id) && (
                           <>
                             <span>·</span>
                             <Badge
@@ -567,7 +674,7 @@ export default function TransactionsPage() {
                             </Badge>
                           </>
                         )}
-                        {transaction.journal_entry_id && (
+                        {transaction.journal_entry_id ? (
                           <>
                             <span>·</span>
                             <Badge variant="outline" className="text-success border-success">
@@ -575,15 +682,14 @@ export default function TransactionsPage() {
                               Bokförd
                             </Badge>
                           </>
-                        )}
-                        {transaction.is_business === null && !transaction.potential_invoice && (
+                        ) : transaction.is_business === null && !transaction.potential_invoice ? (
                           <>
                             <span>·</span>
                             <Badge variant="outline" className="text-warning border-warning">
-                              Ej kategoriserad
+                              Ej bokförd
                             </Badge>
                           </>
-                        )}
+                        ) : null}
                         {transaction.potential_invoice && !transaction.invoice_id && (
                           <>
                             <span>·</span>
@@ -618,9 +724,47 @@ export default function TransactionsPage() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+            )
+          })}
         </div>
       )}
+
+      {/* Batch mode floating action bar */}
+      {isBatchMode && selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-background border rounded-xl shadow-lg px-4 py-3">
+          <Badge variant="secondary">{selectedIds.size} valda</Badge>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedIds(new Set())}
+          >
+            <X className="mr-1 h-3 w-3" />
+            Avmarkera
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleBatchMarkPrivate}
+          >
+            Markera som privat
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setShowBatchSelector(true)}
+          >
+            Bokför {selectedIds.size} st
+          </Button>
+        </div>
+      )}
+
+      {/* Batch Category Selector */}
+      <BatchCategorySelector
+        open={showBatchSelector}
+        onOpenChange={setShowBatchSelector}
+        selectedCount={selectedIds.size}
+        onSelectCategory={handleBatchCategorize}
+        progress={batchProgress}
+      />
 
       {/* Invoice Match Confirmation Dialog */}
       <Dialog open={matchDialogOpen} onOpenChange={setMatchDialogOpen}>

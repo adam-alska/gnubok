@@ -32,9 +32,9 @@ async function ensureFiscalPeriod(
     .lte('period_start', date)
     .gte('period_end', date)
     .eq('is_closed', false)
-    .single()
+    .limit(1)
 
-  if (existing) {
+  if (existing && existing.length > 0) {
     return true
   }
 
@@ -206,6 +206,27 @@ export async function POST(
     } catch (err) {
       console.error('Failed to save mapping rule:', err)
       // Non-critical, continue
+    }
+  }
+
+  // Link receipt document to journal entry if both exist
+  if (journalEntryId && transaction.receipt_id) {
+    try {
+      const { data: receipt } = await supabase
+        .from('receipts')
+        .select('document_id')
+        .eq('id', transaction.receipt_id)
+        .single()
+
+      if (receipt?.document_id) {
+        await supabase
+          .from('document_attachments')
+          .update({ journal_entry_id: journalEntryId })
+          .eq('id', receipt.document_id)
+          .eq('user_id', user.id)
+      }
+    } catch (linkErr) {
+      console.error('[categorize] Failed to link receipt document:', linkErr)
     }
   }
 

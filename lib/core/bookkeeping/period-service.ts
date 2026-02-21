@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { eventBus } from '@/lib/events'
+import { validatePeriodDuration } from '@/lib/bookkeeping/validate-period-duration'
 import type { FiscalPeriod, PeriodStatus } from '@/types'
 
 /**
@@ -160,6 +161,12 @@ export async function createNextPeriod(
 
   const nextStartStr = nextStart.toISOString().split('T')[0]
   const nextEndStr = nextEnd.toISOString().split('T')[0]
+
+  // Validate period duration (max 18 months per BFL 3 kap.)
+  const durationError = validatePeriodDuration(nextStartStr, nextEndStr)
+  if (durationError) {
+    throw new Error(durationError)
+  }
 
   // Generate name: e.g. "FY 2025" or "FY 2025/2026"
   const startYear = nextStart.getFullYear()

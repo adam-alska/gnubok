@@ -110,8 +110,12 @@ function OnboardingPageContent() {
       onboarding_step: nextStep || currentStep,
     }
 
-    // Remove read-only fields before updating
-    const { id: _id, user_id: _uid, created_at: _ca, updated_at: _ua, ...settingsToSave } = updatedSettings as Record<string, unknown>
+    // Remove read-only and transient fields before updating
+    const {
+      id: _id, user_id: _uid, created_at: _ca, updated_at: _ua,
+      is_first_fiscal_year: _ify, first_year_start: _fys, first_year_end: _fye,
+      ...settingsToSave
+    } = updatedSettings as Record<string, unknown>
 
     const { error } = await supabase
       .from('company_settings')
@@ -159,30 +163,70 @@ function OnboardingPageContent() {
         try {
           const { data: { user } } = await supabase.auth.getUser()
           if (user) {
-            const startMonth = stepData.fiscal_year_start_month || settings.fiscal_year_start_month || 1
-            const currentYear = new Date().getFullYear()
+            const isFirstYear = stepData.is_first_fiscal_year as boolean | undefined
+            const firstYearStart = stepData.first_year_start as string | undefined
+            const firstYearEnd = stepData.first_year_end as string | undefined
 
-            const startStr = `${currentYear}-${String(startMonth).padStart(2, '0')}-01`
-            let endYear: number
-            let endMonth: number
-            if (startMonth === 1) {
-              endYear = currentYear
-              endMonth = 12
+            let startStr: string
+            let endStr: string
+            let periodName: string
+
+            if (isFirstYear && firstYearStart && firstYearEnd) {
+              // First fiscal year: use exact dates provided
+              startStr = firstYearStart
+              endStr = firstYearEnd
+
+              const startYear = new Date(firstYearStart).getFullYear()
+              const endYear = new Date(firstYearEnd).getFullYear()
+              periodName = startYear === endYear
+                ? `Första räkenskapsåret ${startYear}`
+                : `Första räkenskapsåret ${startYear}/${endYear}`
             } else {
-              endYear = currentYear + 1
-              endMonth = startMonth - 1
-            }
-            const lastDay = new Date(endYear, endMonth, 0).getDate()
-            const endStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+              // Ongoing: compute 12-month period from fiscal_year_start_month
+              let startMonth = stepData.fiscal_year_start_month || settings.fiscal_year_start_month || 1
 
-            await supabase.from('fiscal_periods').upsert({
-              user_id: user.id,
-              name: `Räkenskapsår ${currentYear}`,
-              period_start: startStr,
-              period_end: endStr,
-            }, {
-              onConflict: 'user_id,period_start,period_end',
-            })
+              // For enskild firma: force calendar year
+              if (settings.entity_type === 'enskild_firma') {
+                startMonth = 1
+              }
+
+              const currentYear = new Date().getFullYear()
+              startStr = `${currentYear}-${String(startMonth).padStart(2, '0')}-01`
+
+              let endYear: number
+              let endMonth: number
+              if (startMonth === 1) {
+                endYear = currentYear
+                endMonth = 12
+              } else {
+                endYear = currentYear + 1
+                endMonth = startMonth - 1
+              }
+              const lastDay = new Date(endYear, endMonth, 0).getDate()
+              endStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+
+              periodName = startMonth === 1
+                ? `Räkenskapsår ${currentYear}`
+                : `Räkenskapsår ${currentYear}/${currentYear + 1}`
+            }
+
+            // Validate period duration (max 18 months)
+            const startDate = new Date(startStr)
+            const endDate = new Date(endStr)
+            const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+              (endDate.getMonth() - startDate.getMonth()) + 1
+            if (months > 18) {
+              console.error(`Period duration ${months} months exceeds 18-month maximum`)
+            } else {
+              await supabase.from('fiscal_periods').upsert({
+                user_id: user.id,
+                name: periodName,
+                period_start: startStr,
+                period_end: endStr,
+              }, {
+                onConflict: 'user_id,period_start,period_end',
+              })
+            }
           }
         } catch (err) {
           console.error('Failed to create fiscal period:', err)
@@ -292,7 +336,9 @@ function OnboardingPageContent() {
             vat_registered: settings.vat_registered ?? undefined,
             vat_number: settings.vat_number ?? undefined,
             moms_period: settings.moms_period as MomsPeriod | undefined,
+            accounting_method: (settings.accounting_method as 'accrual' | 'cash') ?? undefined,
           }}
+          entityType={settings.entity_type as EntityType}
           onNext={(data) => handleNext(data)}
           onBack={handleBack}
           isSaving={isSaving}

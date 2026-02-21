@@ -6,10 +6,15 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Download, FileText, FileDown, TrendingUp, Scale, AlertCircle, Receipt, Briefcase, Building2, BookOpen, List, Users, ChevronDown, ChevronRight } from 'lucide-react'
+import { Download, FileText, FileDown, TrendingUp, Scale, AlertCircle, Receipt, Briefcase, Building2, BookOpen, List, Users, ChevronDown, ChevronRight, ArrowLeftRight } from 'lucide-react'
 import { AccountNumber } from '@/components/ui/account-number'
 import { NEDeclarationView } from '@/extensions/ne-bilaga/NEDeclarationView'
 import { SRUExportView } from '@/extensions/sru-export/SRUExportView'
+import { BankReconciliationView } from '@/components/reports/BankReconciliationView'
+import { TrialBalanceChart } from '@/components/reports/TrialBalanceChart'
+import { VatCompositionChart } from '@/components/reports/VatCompositionChart'
+import { IncomeExpenseChart } from '@/components/reports/IncomeExpenseChart'
+import type { MonthlyDataPoint } from '@/components/reports/IncomeExpenseChart'
 import type {
   FiscalPeriod,
   TrialBalanceRow,
@@ -78,7 +83,7 @@ export default function ReportsPage() {
           >
             {periods.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name}
+                {p.name} ({p.period_start} — {p.period_end})
               </option>
             ))}
           </select>
@@ -98,8 +103,9 @@ export default function ReportsPage() {
 
       {selectedPeriod ? (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="trial-balance">
+          <div className="relative">
+            <TabsList className="w-full justify-start overflow-x-auto flex-nowrap scrollbar-hide">
+              <TabsTrigger value="trial-balance">
               <Scale className="h-4 w-4 mr-1" />
               Saldobalans
             </TabsTrigger>
@@ -141,7 +147,13 @@ export default function ReportsPage() {
               <Building2 className="h-4 w-4 mr-1" />
               Lev.reskontra
             </TabsTrigger>
-          </TabsList>
+            <TabsTrigger value="bank-reconciliation">
+              <ArrowLeftRight className="h-4 w-4 mr-1" />
+              Bankavstämning
+            </TabsTrigger>
+            </TabsList>
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent pointer-events-none md:hidden" />
+          </div>
 
           <TabsContent value="trial-balance">
             <TrialBalanceView periodId={selectedPeriod} />
@@ -174,6 +186,9 @@ export default function ReportsPage() {
           </TabsContent>
           <TabsContent value="supplier-ledger">
             <SupplierLedgerView periodId={selectedPeriod} />
+          </TabsContent>
+          <TabsContent value="bank-reconciliation">
+            <BankReconciliationView />
           </TabsContent>
         </Tabs>
       ) : (
@@ -248,22 +263,24 @@ function TrialBalanceView({ periodId }: { periodId: string }) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>Saldobalans</CardTitle>
-          {data.isBalanced ? (
-            <Badge className="bg-green-100 text-green-800">Balanserad</Badge>
-          ) : (
-            <Badge variant="destructive">Ej balanserad</Badge>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b text-left text-muted-foreground">
-              <th className="py-2 w-20">Konto</th>
+    <div className="space-y-4">
+      <TrialBalanceChart rows={data.rows} />
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Saldobalans</CardTitle>
+            {data.isBalanced ? (
+              <Badge className="bg-green-100 text-green-800">Balanserad</Badge>
+            ) : (
+              <Badge variant="destructive">Ej balanserad</Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-muted-foreground">
+                <th className="py-2 w-20">Konto</th>
               <th className="py-2">Namn</th>
               <th className="py-2 w-28 text-right">Period debet</th>
               <th className="py-2 w-28 text-right">Period kredit</th>
@@ -311,17 +328,22 @@ function TrialBalanceView({ periodId }: { periodId: string }) {
         </table>
       </CardContent>
     </Card>
+    </div>
   )
 }
 
 function IncomeStatementView({ periodId }: { periodId: string }) {
   const [data, setData] = useState<IncomeStatementReport | null>(null)
+  const [monthlyData, setMonthlyData] = useState<MonthlyDataPoint[]>([])
+  const [monthlyLoading, setMonthlyLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     setLoading(true)
     setError(null)
+    setMonthlyLoading(true)
+
     fetch(`/api/reports/income-statement?period_id=${periodId}`)
       .then((res) => res.json())
       .then((result) => {
@@ -335,6 +357,18 @@ function IncomeStatementView({ periodId }: { periodId: string }) {
       .catch(() => {
         setError('Kunde inte hämta resultaträkning')
         setLoading(false)
+      })
+
+    fetch(`/api/reports/monthly-breakdown?period_id=${periodId}`)
+      .then((res) => res.json())
+      .then((result) => {
+        if (result.data?.months) {
+          setMonthlyData(result.data.months)
+        }
+        setMonthlyLoading(false)
+      })
+      .catch(() => {
+        setMonthlyLoading(false)
       })
   }, [periodId])
 
@@ -371,6 +405,10 @@ function IncomeStatementView({ periodId }: { periodId: string }) {
 
   return (
     <div className="space-y-4">
+      {!monthlyLoading && monthlyData.length > 0 && (
+        <IncomeExpenseChart months={monthlyData} />
+      )}
+
       {/* Revenue */}
       <Card>
         <CardHeader>
@@ -741,6 +779,8 @@ function VatDeclarationView() {
 
       {data && (
         <>
+          <VatCompositionChart rutor={data.rutor} />
+
           {/* Summary */}
           <Card className="border-2">
             <CardHeader>

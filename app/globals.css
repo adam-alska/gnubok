@@ -293,6 +293,15 @@ h1, h2, h3 {
   background: hsl(var(--muted-foreground) / 0.3);
 }
 
+/* Hide scrollbar utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Selection color */
 ::selection {
   background: hsl(var(--primary) / 0.15);

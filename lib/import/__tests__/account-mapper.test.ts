@@ -1,0 +1,351 @@
+import { describe, it, expect } from 'vitest'
+import type { BASAccount } from '@/types'
+import type { SIEAccount, SIEAccountMappingRecord } from '../types'
+import {
+  suggestMappings,
+  validateMappings,
+  getMappingStats,
+  applyMappingOverride,
+  mappingsToMap,
+} from '../account-mapper'
+
+// --- Helpers ---
+
+function makeBASAccount(number: string, name: string): BASAccount {
+  const classNum = parseInt(number.charAt(0), 10)
+  const accountType =
+    classNum <= 1
+      ? 'asset'
+      : classNum === 2
+        ? 'liability'
+        : classNum === 3
+          ? 'revenue'
+          : 'expense'
+  return {
+    id: `bas-${number}`,
+    user_id: 'user-1',
+    account_number: number,
+    account_name: name,
+    account_class: classNum,
+    account_group: number.substring(0, 2),
+    account_type: accountType,
+    normal_balance: classNum <= 1 || classNum >= 4 ? 'debit' : 'credit',
+    plan_type: 'k1',
+    is_active: true,
+    is_system_account: false,
+    default_vat_code: null,
+    description: null,
+    sru_code: null,
+    sort_order: parseInt(number, 10),
+    created_at: '2024-01-01',
+    updated_at: '2024-01-01',
+  }
+}
+
+function makeSIEAccount(number: string, name: string): SIEAccount {
+  return { number, name }
+}
+
+// --- Fixtures ---
+
+const basAccounts: BASAccount[] = [
+  makeBASAccount('1510', 'Kundfordringar'),
+  makeBASAccount('1930', 'Företagskonto'),
+  makeBASAccount('2440', 'Leverantörsskulder'),
+  makeBASAccount('3001', 'Försäljning varor 25%'),
+  makeBASAccount('3002', 'Försäljning varor 12%'),
+  makeBASAccount('5010', 'Lokalhyra'),
+  makeBASAccount('6211', 'Telekommunikation'),
+]
+
+// --- Tests ---
+
+describe('suggestMappings', () => {
+  it('returns exact match with confidence 1.0', () => {
+    const source = [makeSIEAccount('1510', 'Kundfordringar')]
+    const result = suggestMappings(source, basAccounts)
+
+    expect(result).toHaveLength(1)
+    expect(result[0].targetAccount).toBe('1510')
+    expect(result[0].targetName).toBe('Kundfordringar')
+    expect(result[0].confidence).toBe(1.0)
+    expect(result[0].matchType).toBe('exact')
+    expect(result[0].isOverride).toBe(false)
+  })
+
+  it('returns unmapped entry when no match exists', () => {
+    const source = [makeSIEAccount('9999', 'Okänt konto')]
+    const result = suggestMappings(source, basAccounts)
+
+    expect(result).toHaveLength(1)
+    expect(result[0].targetAccount).toBe('')
+    expect(result[0].targetName).toBe('')
+    expect(result[0].confidence).toBe(0)
+    expect(result[0].matchType).toBe('manual')
+  })
+
+  it('does not fuzzy match accounts with similar names', () => {
+    // 3400 should NOT match 3001 or 3002 despite being in same class
+    const source = [makeSIEAccount('3400', 'Försäljning tjänster')]
+    const result = suggestMappings(source, basAccounts)
+
+    expect(result).toHaveLength(1)
+    expect(result[0].targetAccount).toBe('')
+    expect(result[0].confidence).toBe(0)
+  })
+
+  it('does not fuzzy match accounts with similar numbers', () => {
+    // 2510 should NOT match 2440 despite being in same class
+    const source = [makeSIEAccount('2510', 'Skatteskulder')]
+    const result = suggestMappings(source, basAccounts)
+
+    expect(result).toHaveLength(1)
+    expect(result[0].targetAccount).toBe('')
+    expect(result[0].confidence).toBe(0)
+  })
+
+  it('preserves user overrides from existing mappings', () => {
+    const source = [makeSIEAccount('3400', 'Försäljning tjänster')]
+    const existingMappings: SIEAccountMappingRecord[] = [
+      {
+        id: 'map-1',
+        user_id: 'user-1',
+        source_account: '3400',
+        source_name: 'Försäljning tjänster',
+        target_account: '3001',
+        confidence: 1.0,
+        match_type: 'manual',
+        created_at: '2024-01-01',
+        updated_at: '2024-01-01',
+      },
+    ]
+
+    const result = suggestMappings(source, basAccounts, existingMappings)
+
+    expect(result).toHaveLength(1)
+    expect(result[0].targetAccount).toBe('3001')
+    expect(result[0].isOverride).toBe(true)
+    expect(result[0].matchType).toBe('manual')
+  })
+
+  it('sorts unmapped accounts first (lowest confidence)', () => {
+    const source = [
+      makeSIEAccount('1510', 'Kundfordringar'),
+      makeSIEAccount('9999', 'Okänt konto'),
+      makeSIEAccount('1930', 'Företagskonto'),
+    ]
+    const result = suggestMappings(source, basAccounts)
+
+    expect(result).toHaveLength(3)
+    // Unmapped (confidence 0) should come first
+    expect(result[0].sourceAccount).toBe('9999')
+    expect(result[0].confidence).toBe(0)
+    // Exact matches (confidence 1.0) come after
+    expect(result[1].confidence).toBe(1.0)
+    expect(result[2].confidence).toBe(1.0)
+  })
+
+  it('handles multiple accounts with mixed results', () => {
+    const source = [
+      makeSIEAccount('1510', 'Kundfordringar'),
+      makeSIEAccount('3400', 'Försäljning tjänster'),
+      makeSIEAccount('5010', 'Lokalhyra'),
+    ]
+    const result = suggestMappings(source, basAccounts)
+
+    expect(result).toHaveLength(3)
+
+    const mapped = result.filter((m) => m.targetAccount)
+    const unmapped = result.filter((m) => !m.targetAccount)
+    expect(mapped).toHaveLength(2)
+    expect(unmapped).toHaveLength(1)
+  })
+
+  it('handles empty source accounts', () => {
+    const result = suggestMappings([], basAccounts)
+    expect(result).toHaveLength(0)
+  })
+
+  it('handles empty BAS accounts — everything unmapped', () => {
+    const source = [makeSIEAccount('1510', 'Kundfordringar')]
+    const result = suggestMappings(source, [])
+
+    expect(result).toHaveLength(1)
+    expect(result[0].targetAccount).toBe('')
+    expect(result[0].confidence).toBe(0)
+  })
+})
+
+describe('validateMappings', () => {
+  it('returns valid when all accounts are mapped', () => {
+    const mappings = suggestMappings(
+      [makeSIEAccount('1510', 'Kundfordringar'), makeSIEAccount('1930', 'Företagskonto')],
+      basAccounts
+    )
+    const validation = validateMappings(mappings)
+
+    expect(validation.valid).toBe(true)
+    expect(validation.unmappedAccounts).toHaveLength(0)
+  })
+
+  it('returns invalid when accounts are unmapped', () => {
+    const mappings = suggestMappings(
+      [makeSIEAccount('1510', 'Kundfordringar'), makeSIEAccount('9999', 'Okänt konto')],
+      basAccounts
+    )
+    const validation = validateMappings(mappings)
+
+    expect(validation.valid).toBe(false)
+    expect(validation.unmappedAccounts).toContain('9999')
+    expect(validation.unmappedAccounts).toHaveLength(1)
+  })
+
+  it('detects low confidence accounts', () => {
+    // With exact-match-only mapper, low confidence only comes from existing overrides
+    const mappings = [
+      {
+        sourceAccount: '3400',
+        sourceName: 'Försäljning tjänster',
+        targetAccount: '3001',
+        targetName: 'Försäljning varor 25%',
+        confidence: 0.3,
+        matchType: 'class' as const,
+        isOverride: false,
+      },
+    ]
+
+    const validation = validateMappings(mappings)
+    expect(validation.lowConfidenceAccounts).toContain('3400')
+  })
+})
+
+describe('getMappingStats', () => {
+  it('counts total, mapped, unmapped correctly', () => {
+    const mappings = suggestMappings(
+      [
+        makeSIEAccount('1510', 'Kundfordringar'),
+        makeSIEAccount('9999', 'Okänt konto'),
+        makeSIEAccount('5010', 'Lokalhyra'),
+      ],
+      basAccounts
+    )
+    const stats = getMappingStats(mappings)
+
+    expect(stats.total).toBe(3)
+    expect(stats.mapped).toBe(2)
+    expect(stats.unmapped).toBe(1)
+  })
+
+  it('counts match types correctly', () => {
+    const mappings = suggestMappings(
+      [
+        makeSIEAccount('1510', 'Kundfordringar'),
+        makeSIEAccount('9999', 'Okänt konto'),
+      ],
+      basAccounts
+    )
+    const stats = getMappingStats(mappings)
+
+    expect(stats.exact).toBe(1)
+    expect(stats.manual).toBe(1) // unmapped gets matchType 'manual'
+    expect(stats.name).toBe(0)
+    expect(stats.class).toBe(0)
+  })
+
+  it('calculates average confidence for mapped accounts only', () => {
+    const mappings = suggestMappings(
+      [
+        makeSIEAccount('1510', 'Kundfordringar'), // exact, confidence 1.0
+        makeSIEAccount('1930', 'Företagskonto'),   // exact, confidence 1.0
+        makeSIEAccount('9999', 'Okänt konto'),     // unmapped, confidence 0
+      ],
+      basAccounts
+    )
+    const stats = getMappingStats(mappings)
+
+    // Average of mapped only: (1.0 + 1.0) / 2 = 1.0
+    expect(stats.averageConfidence).toBe(1.0)
+  })
+
+  it('returns 0 average confidence when nothing is mapped', () => {
+    const mappings = suggestMappings(
+      [makeSIEAccount('9999', 'Okänt konto')],
+      basAccounts
+    )
+    const stats = getMappingStats(mappings)
+    expect(stats.averageConfidence).toBe(0)
+  })
+})
+
+describe('applyMappingOverride', () => {
+  it('sets target, confidence 1.0, matchType manual, and isOverride', () => {
+    const mappings = suggestMappings(
+      [makeSIEAccount('3400', 'Försäljning tjänster')],
+      basAccounts
+    )
+
+    const updated = applyMappingOverride(mappings, '3400', '3001', 'Försäljning varor 25%')
+
+    expect(updated).toHaveLength(1)
+    expect(updated[0].targetAccount).toBe('3001')
+    expect(updated[0].targetName).toBe('Försäljning varor 25%')
+    expect(updated[0].confidence).toBe(1.0)
+    expect(updated[0].matchType).toBe('manual')
+    expect(updated[0].isOverride).toBe(true)
+  })
+
+  it('does not mutate the original array', () => {
+    const mappings = suggestMappings(
+      [makeSIEAccount('3400', 'Försäljning tjänster')],
+      basAccounts
+    )
+    const original = [...mappings]
+
+    applyMappingOverride(mappings, '3400', '3001', 'Försäljning varor 25%')
+
+    expect(mappings[0].targetAccount).toBe(original[0].targetAccount)
+    expect(mappings[0].confidence).toBe(original[0].confidence)
+  })
+
+  it('only affects the specified source account', () => {
+    const mappings = suggestMappings(
+      [
+        makeSIEAccount('3400', 'Försäljning tjänster'),
+        makeSIEAccount('9998', 'Annat okänt konto'),
+      ],
+      basAccounts
+    )
+
+    const updated = applyMappingOverride(mappings, '3400', '3001', 'Försäljning varor 25%')
+
+    const unchanged = updated.find((m) => m.sourceAccount === '9998')
+    expect(unchanged?.targetAccount).toBe('')
+    expect(unchanged?.confidence).toBe(0)
+  })
+})
+
+describe('mappingsToMap', () => {
+  it('creates a Map from source to target account', () => {
+    const mappings = suggestMappings(
+      [makeSIEAccount('1510', 'Kundfordringar'), makeSIEAccount('1930', 'Företagskonto')],
+      basAccounts
+    )
+    const map = mappingsToMap(mappings)
+
+    expect(map.get('1510')).toBe('1510')
+    expect(map.get('1930')).toBe('1930')
+    expect(map.size).toBe(2)
+  })
+
+  it('skips unmapped accounts', () => {
+    const mappings = suggestMappings(
+      [makeSIEAccount('1510', 'Kundfordringar'), makeSIEAccount('9999', 'Okänt konto')],
+      basAccounts
+    )
+    const map = mappingsToMap(mappings)
+
+    expect(map.get('1510')).toBe('1510')
+    expect(map.has('9999')).toBe(false)
+    expect(map.size).toBe(1)
+  })
+})

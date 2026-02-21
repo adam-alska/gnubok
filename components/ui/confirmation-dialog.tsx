@@ -20,6 +20,7 @@ interface ConfirmationDialogProps {
   title: string
   warningText?: string
   confirmLabel?: string
+  extraActions?: ReactNode
   children: ReactNode
 }
 
@@ -31,6 +32,7 @@ export function ConfirmationDialog({
   title,
   warningText = 'En verifikation skapas och kan inte ändras efteråt.',
   confirmLabel = 'Bekräfta & skapa',
+  extraActions,
   children,
 }: ConfirmationDialogProps) {
   return (
@@ -66,6 +68,7 @@ export function ConfirmationDialog({
             >
               Tillbaka
             </Button>
+            {extraActions}
             <Button onClick={onConfirm} disabled={isSubmitting}>
               {isSubmitting ? (
                 <>

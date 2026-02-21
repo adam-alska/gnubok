@@ -1,21 +1,104 @@
 import { createJournalEntry, findFiscalPeriod } from './engine'
 import { generateSalesVatLines, generateReverseChargeLines } from './vat-entries'
+import { getVatTreatmentForRate } from '@/lib/invoice/vat-rules'
 import type {
   CreateJournalEntryInput,
   CreateJournalEntryLineInput,
   EntityType,
   Invoice,
+  InvoiceItem,
   JournalEntry,
   VatTreatment,
 } from '@/types'
 
 /**
+ * Group invoice items by VAT rate and generate per-rate revenue + VAT lines.
+ * Returns credit lines only (revenue + VAT). The caller adds the debit side.
+ */
+function generatePerRateLines(
+  items: InvoiceItem[],
+  invoiceVatTreatment: VatTreatment,
+  entityType: EntityType,
+  invoiceNumber: string
+): CreateJournalEntryLineInput[] {
+  const lines: CreateJournalEntryLineInput[] = []
+
+  // Check if items have per-line vat_rate set (new invoices)
+  const hasPerLineVat = items.some((item) => item.vat_rate !== undefined && item.vat_rate !== null)
+
+  if (!hasPerLineVat) {
+    // Legacy fallback: single rate from invoice level
+    const revenueAccount = getRevenueAccount(invoiceVatTreatment, entityType)
+    const subtotal = items.reduce((sum, item) => sum + item.line_total, 0)
+    lines.push({
+      account_number: revenueAccount,
+      debit_amount: 0,
+      credit_amount: subtotal,
+      line_description: `Försäljning faktura ${invoiceNumber}`,
+    })
+
+    const totalVat = items.reduce((sum, item) => sum + (item.vat_amount || 0), 0)
+    if (totalVat > 0) {
+      const vatLines = generateSalesVatLines({
+        vatTreatment: invoiceVatTreatment,
+        baseAmount: subtotal,
+        direction: 'sales',
+      })
+      lines.push(...vatLines)
+    }
+    return lines
+  }
+
+  // Group items by vat_rate
+  const rateGroups = new Map<number, { subtotal: number; vatAmount: number }>()
+  for (const item of items) {
+    const rate = item.vat_rate ?? 25
+    const group = rateGroups.get(rate) || { subtotal: 0, vatAmount: 0 }
+    group.subtotal += item.line_total
+    group.vatAmount += item.vat_amount || 0
+    rateGroups.set(rate, group)
+  }
+
+  // Generate revenue + VAT lines per rate group
+  for (const [rate, group] of rateGroups) {
+    const treatment = rate === 0 && (invoiceVatTreatment === 'reverse_charge' || invoiceVatTreatment === 'export')
+      ? invoiceVatTreatment
+      : getVatTreatmentForRate(rate)
+    const revenueAccount = getRevenueAccount(treatment, entityType)
+    const roundedSubtotal = Math.round(group.subtotal * 100) / 100
+
+    lines.push({
+      account_number: revenueAccount,
+      debit_amount: 0,
+      credit_amount: roundedSubtotal,
+      line_description: `Försäljning faktura ${invoiceNumber}`,
+    })
+
+    const roundedVat = Math.round(group.vatAmount * 100) / 100
+    if (roundedVat !== 0) {
+      const vatAccount = getOutputVatAccount(treatment)
+      lines.push({
+        account_number: vatAccount,
+        debit_amount: 0,
+        credit_amount: roundedVat,
+        line_description: `Utgående moms ${rate}%`,
+      })
+    }
+  }
+
+  return lines
+}
+
+/**
  * Create journal entry when an invoice is created (status != draft)
+ *
+ * Supports mixed VAT rates per line item. Groups items by vat_rate
+ * and creates separate revenue + VAT lines per rate.
  *
  * Standard domestic invoice (25% VAT):
  *   Debit  1510 Kundfordringar     [total incl VAT]
- *   Credit 30xx Försäljning         [subtotal]
- *   Credit 2611 Utgående moms 25%   [vat_amount]
+ *   Credit 30xx Försäljning         [subtotal per rate]
+ *   Credit 26xx Utgående moms       [vat per rate]
  *
  * EU reverse charge:
  *   Debit  1510 Kundfordringar     [subtotal]
@@ -38,9 +121,6 @@ export async function createInvoiceJournalEntry(
 
   const lines: CreateJournalEntryLineInput[] = []
 
-  // Determine revenue account based on VAT treatment
-  const revenueAccount = getRevenueAccount(invoice.vat_treatment, entityType)
-
   // Debit: Kundfordringar (total including VAT)
   lines.push({
     account_number: '1510',
@@ -52,22 +132,27 @@ export async function createInvoiceJournalEntry(
     exchange_rate: invoice.exchange_rate || undefined,
   })
 
-  // Credit: Revenue account (subtotal, excl VAT)
-  lines.push({
-    account_number: revenueAccount,
-    debit_amount: 0,
-    credit_amount: invoice.subtotal,
-    line_description: `Försäljning faktura ${invoice.invoice_number}`,
-  })
-
-  // VAT lines (if applicable)
-  if (invoice.vat_amount > 0) {
-    const vatLines = generateSalesVatLines({
-      vatTreatment: invoice.vat_treatment,
-      baseAmount: invoice.subtotal,
-      direction: 'sales',
+  // Credit lines: revenue + VAT per rate group
+  if (invoice.items && invoice.items.length > 0) {
+    lines.push(...generatePerRateLines(invoice.items, invoice.vat_treatment, entityType, invoice.invoice_number))
+  } else {
+    // Fallback: no items available, use invoice-level amounts
+    const revenueAccount = getRevenueAccount(invoice.vat_treatment, entityType)
+    lines.push({
+      account_number: revenueAccount,
+      debit_amount: 0,
+      credit_amount: invoice.subtotal,
+      line_description: `Försäljning faktura ${invoice.invoice_number}`,
     })
-    lines.push(...vatLines)
+
+    if (invoice.vat_amount > 0) {
+      const vatLines = generateSalesVatLines({
+        vatTreatment: invoice.vat_treatment,
+        baseAmount: invoice.subtotal,
+        direction: 'sales',
+      })
+      lines.push(...vatLines)
+    }
   }
 
   const input: CreateJournalEntryInput = {
@@ -128,9 +213,10 @@ export async function createInvoicePaymentJournalEntry(
 
 /**
  * Create journal entry for a credit note (reversed version of original invoice entry)
+ * Supports per-item VAT rates with reversed debit/credit sides.
  *
- *   Debit  30xx Försäljning         [subtotal]
- *   Debit  26xx Utgående moms       [vat_amount]
+ *   Debit  30xx Försäljning         [subtotal per rate]
+ *   Debit  26xx Utgående moms       [vat per rate]
  *   Credit 1510 Kundfordringar      [total]
  */
 export async function createCreditNoteJournalEntry(
@@ -144,30 +230,43 @@ export async function createCreditNoteJournalEntry(
     return null
   }
 
-  const revenueAccount = getRevenueAccount(creditNote.vat_treatment, entityType)
-  const absSubtotal = Math.abs(creditNote.subtotal)
-  const absVat = Math.abs(creditNote.vat_amount)
   const absTotal = Math.abs(creditNote.total)
-
   const lines: CreateJournalEntryLineInput[] = []
 
-  // Debit: Revenue account (reverse the credit)
-  lines.push({
-    account_number: revenueAccount,
-    debit_amount: absSubtotal,
-    credit_amount: 0,
-    line_description: `Kreditfaktura ${creditNote.invoice_number}`,
-  })
+  // Generate reversed revenue + VAT lines per rate group
+  if (creditNote.items && creditNote.items.length > 0) {
+    const creditLines = generatePerRateLines(creditNote.items, creditNote.vat_treatment, entityType, creditNote.invoice_number)
+    // Swap debit/credit for credit note reversal (make amounts absolute first)
+    for (const line of creditLines) {
+      lines.push({
+        ...line,
+        debit_amount: Math.abs(line.credit_amount),
+        credit_amount: Math.abs(line.debit_amount),
+        line_description: `Kreditfaktura ${creditNote.invoice_number}`,
+      })
+    }
+  } else {
+    // Fallback: invoice-level amounts
+    const revenueAccount = getRevenueAccount(creditNote.vat_treatment, entityType)
+    const absSubtotal = Math.abs(creditNote.subtotal)
+    const absVat = Math.abs(creditNote.vat_amount)
 
-  // Debit: VAT account (reverse the credit, if applicable)
-  if (absVat > 0) {
-    const vatAccount = getOutputVatAccount(creditNote.vat_treatment)
     lines.push({
-      account_number: vatAccount,
-      debit_amount: absVat,
+      account_number: revenueAccount,
+      debit_amount: absSubtotal,
       credit_amount: 0,
-      line_description: `Moms kreditfaktura ${creditNote.invoice_number}`,
+      line_description: `Kreditfaktura ${creditNote.invoice_number}`,
     })
+
+    if (absVat > 0) {
+      const vatAccount = getOutputVatAccount(creditNote.vat_treatment)
+      lines.push({
+        account_number: vatAccount,
+        debit_amount: absVat,
+        credit_amount: 0,
+        line_description: `Moms kreditfaktura ${creditNote.invoice_number}`,
+      })
+    }
   }
 
   // Credit: Kundfordringar (reverse the debit)
@@ -192,11 +291,11 @@ export async function createCreditNoteJournalEntry(
 
 /**
  * Create journal entry for kontantmetoden (cash method) when payment is received.
- * Combined entry: revenue + VAT recognised at payment.
+ * Supports per-item VAT rates. Revenue + VAT recognised at payment.
  *
  *   Debit  1930 Företagskonto       [total]
- *   Credit 30xx Försäljning         [subtotal]
- *   Credit 26xx Utgående moms       [vat_amount]  (if applicable)
+ *   Credit 30xx Försäljning         [subtotal per rate]
+ *   Credit 26xx Utgående moms       [vat per rate]  (if applicable)
  */
 export async function createInvoiceCashEntry(
   userId: string,
@@ -210,7 +309,6 @@ export async function createInvoiceCashEntry(
     return null
   }
 
-  const revenueAccount = getRevenueAccount(invoice.vat_treatment, entityType)
   const lines: CreateJournalEntryLineInput[] = []
 
   // Debit: Företagskonto (total received)
@@ -221,23 +319,28 @@ export async function createInvoiceCashEntry(
     line_description: `Betalning faktura ${invoice.invoice_number}`,
   })
 
-  // Credit: Revenue account (subtotal excl VAT)
-  lines.push({
-    account_number: revenueAccount,
-    debit_amount: 0,
-    credit_amount: invoice.subtotal,
-    line_description: `Försäljning faktura ${invoice.invoice_number}`,
-  })
-
-  // Credit: Output VAT (if applicable)
-  if (invoice.vat_amount > 0) {
-    const vatAccount = getOutputVatAccount(invoice.vat_treatment)
+  // Credit lines: revenue + VAT per rate group
+  if (invoice.items && invoice.items.length > 0) {
+    lines.push(...generatePerRateLines(invoice.items, invoice.vat_treatment, entityType, invoice.invoice_number))
+  } else {
+    // Fallback: invoice-level amounts
+    const revenueAccount = getRevenueAccount(invoice.vat_treatment, entityType)
     lines.push({
-      account_number: vatAccount,
+      account_number: revenueAccount,
       debit_amount: 0,
-      credit_amount: invoice.vat_amount,
-      line_description: `Utgående moms faktura ${invoice.invoice_number}`,
+      credit_amount: invoice.subtotal,
+      line_description: `Försäljning faktura ${invoice.invoice_number}`,
     })
+
+    if (invoice.vat_amount > 0) {
+      const vatAccount = getOutputVatAccount(invoice.vat_treatment)
+      lines.push({
+        account_number: vatAccount,
+        debit_amount: 0,
+        credit_amount: invoice.vat_amount,
+        line_description: `Utgående moms faktura ${invoice.invoice_number}`,
+      })
+    }
   }
 
   const input: CreateJournalEntryInput = {

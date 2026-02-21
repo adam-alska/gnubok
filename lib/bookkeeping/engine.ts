@@ -90,6 +90,9 @@ export async function findFiscalPeriod(
 ): Promise<string | null> {
   const supabase = await createClient()
 
+  // Use limit(1) instead of single() to handle overlapping fiscal periods
+  // gracefully. When multiple periods cover the same date, we pick the one
+  // with the latest start date (most specific / narrowest period).
   const { data, error } = await supabase
     .from('fiscal_periods')
     .select('id')
@@ -97,13 +100,14 @@ export async function findFiscalPeriod(
     .lte('period_start', date)
     .gte('period_end', date)
     .eq('is_closed', false)
-    .single()
+    .order('period_start', { ascending: false })
+    .limit(1)
 
-  if (error || !data) {
+  if (error || !data || data.length === 0) {
     return null
   }
 
-  return data.id
+  return data[0].id
 }
 
 /**

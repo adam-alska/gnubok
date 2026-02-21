@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import { NextResponse } from 'next/server'
 import { parseSIEFile, detectEncoding, decodeBuffer } from '@/lib/import/sie-parser'
 import { suggestMappings } from '@/lib/import/account-mapper'
@@ -53,15 +54,18 @@ export async function POST(request: Request) {
     if (mappingsJson) {
       mappings = JSON.parse(mappingsJson)
     } else {
-      // Fetch user's chart of accounts and generate mappings
-      const { data: basAccounts } = await supabase
-        .from('chart_of_accounts')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .order('account_number')
+      // Fetch user's full chart of accounts (paginated to avoid 1000-row limit)
+      const basAccounts = await fetchAllRows(({ from, to }) =>
+        supabase
+          .from('chart_of_accounts')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .order('account_number')
+          .range(from, to)
+      )
 
-      if (!basAccounts || basAccounts.length === 0) {
+      if (basAccounts.length === 0) {
         return NextResponse.json({
           error: 'No chart of accounts found. Please complete onboarding first.',
         }, { status: 400 })

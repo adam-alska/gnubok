@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { findFiscalPeriod } from '@/lib/bookkeeping/engine'
 import { createSupplierInvoiceRegistrationEntry } from '@/lib/bookkeeping/supplier-invoice-entries'
 import type { CreateSupplierInvoiceInput, SupplierInvoice, SupplierInvoiceItem } from '@/types'
 
@@ -69,17 +68,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to get arrival number' }, { status: 500 })
   }
 
-  // Calculate totals from items
+  // Calculate totals from items (supports both amount-based and legacy quantity*price)
   const items = body.items.map((item, index) => {
     const vatRate = item.vat_rate ?? 0.25
-    const lineTotal = Math.round(item.quantity * item.unit_price * 100) / 100
+    const lineTotal = item.amount != null
+      ? Math.round(item.amount * 100) / 100
+      : Math.round((item.quantity ?? 1) * (item.unit_price ?? 0) * 100) / 100
     const vatAmount = Math.round(lineTotal * vatRate * 100) / 100
     return {
       sort_order: index,
       description: item.description,
-      quantity: item.quantity,
-      unit: item.unit || 'st',
-      unit_price: item.unit_price,
+      quantity: item.amount != null ? 1 : (item.quantity ?? 1),
+      unit: item.amount != null ? 'st' : (item.unit || 'st'),
+      unit_price: item.amount != null ? lineTotal : (item.unit_price ?? 0),
       line_total: lineTotal,
       account_number: item.account_number,
       vat_code: item.vat_code || null,

@@ -65,12 +65,14 @@ export async function POST(request: Request) {
     }
 
     // WORM archive copy (non-blocking — receipt flow continues even if this fails)
+    let wormDocumentId: string | null = null
     try {
-      await uploadDocument(user.id, {
+      const wormDoc = await uploadDocument(user.id, {
         name: imageFile.name,
         buffer: arrayBuffer,
         type: imageFile.type,
       }, { upload_source: 'camera' })
+      wormDocumentId = wormDoc.id
     } catch (archiveErr) {
       console.error('[receipt-upload] WORM archive copy failed:', archiveErr)
     }
@@ -86,6 +88,7 @@ export async function POST(request: Request) {
         user_id: user.id,
         image_url: imageUrl,
         status: 'processing',
+        document_id: wormDocumentId,
       })
       .select()
       .single()
@@ -178,7 +181,7 @@ export async function POST(request: Request) {
         type: 'receipt.extracted',
         payload: {
           receipt: completeReceipt,
-          documentId: null,
+          documentId: wormDocumentId,
           confidence: extraction.confidence,
           userId: user.id,
         },

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 
 export interface JournalRegisterLine {
   account_number: string
@@ -40,7 +41,7 @@ export async function generateJournalRegister(
   // Get fiscal period dates
   const { data: period } = await supabase
     .from('fiscal_periods')
-    .select('start_date, end_date')
+    .select('period_start, period_end')
     .eq('id', periodId)
     .eq('user_id', userId)
     .single()
@@ -60,7 +61,7 @@ export async function generateJournalRegister(
     .order('voucher_number', { ascending: true })
 
   if (!entries || entries.length === 0) {
-    return { entries: [], total_entries: 0, total_debit: 0, total_credit: 0, period: { start: period.start_date, end: period.end_date } }
+    return { entries: [], total_entries: 0, total_debit: 0, total_credit: 0, period: { start: period.period_start, end: period.period_end } }
   }
 
   const entryIds = entries.map((e) => e.id)
@@ -72,13 +73,16 @@ export async function generateJournalRegister(
     .in('journal_entry_id', entryIds)
 
   // Fetch account names
-  const { data: accounts } = await supabase
-    .from('chart_of_accounts')
-    .select('account_number, account_name')
-    .eq('user_id', userId)
+  const accounts = await fetchAllRows<{ account_number: string; account_name: string }>(({ from, to }) =>
+    supabase
+      .from('chart_of_accounts')
+      .select('account_number, account_name')
+      .eq('user_id', userId)
+      .range(from, to)
+  )
 
   const accountNameMap = new Map<string, string>()
-  for (const acc of accounts || []) {
+  for (const acc of accounts) {
     accountNameMap.set(acc.account_number, acc.account_name)
   }
 
@@ -126,6 +130,6 @@ export async function generateJournalRegister(
     total_entries: result.length,
     total_debit: Math.round(grandTotalDebit * 100) / 100,
     total_credit: Math.round(grandTotalCredit * 100) / 100,
-    period: { start: period.start_date, end: period.end_date },
+    period: { start: period.period_start, end: period.period_end },
   }
 }

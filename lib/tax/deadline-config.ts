@@ -178,7 +178,7 @@ export const TAX_DEADLINE_CONFIGS: TaxDeadlineConfig[] = [
     },
   },
 
-  // Inkomstdeklaration (AB) - 1 juli (for calendar year fiscal)
+  // Inkomstdeklaration (AB) — digital filing deadlines per Skatteverket lookup table
   {
     type: 'inkomstdeklaration_ab',
     titleTemplate: 'Inkomstdeklaration AB {periodLabel}',
@@ -187,23 +187,55 @@ export const TAX_DEADLINE_CONFIGS: TaxDeadlineConfig[] = [
     priority: 'critical',
     linkedReportType: null,
     generateDates: (year, settings) => {
-      // For calendar year fiscal (start month = 1), due July 1st
-      // For other fiscal years, this would need adjustment
-      if (settings.fiscal_year_start_month === 1) {
-        return [
-          { day: 1, month: 6, year, period: `${year - 1}`, periodLabel: `${year - 1}` },
-        ]
+      // FY end month (1-indexed): e.g. start=1 → end=12, start=5 → end=4
+      const fyEndMonth = settings.fiscal_year_start_month === 1 ? 12 : settings.fiscal_year_start_month - 1
+
+      // Skatteverket digital filing deadline lookup:
+      // FY end Jan–Apr  → Dec 1 same year as FY end
+      // FY end May–Jun  → Jan 15 year after FY end
+      // FY end Jul–Aug  → Apr 1 year after FY end
+      // FY end Sep–Dec  → Aug 1 year after FY end
+      const getDeadline = (fyEndYear: number) => {
+        if (fyEndMonth >= 1 && fyEndMonth <= 4) {
+          return { day: 1, month: 11, year: fyEndYear } // Dec 1
+        } else if (fyEndMonth >= 5 && fyEndMonth <= 6) {
+          return { day: 15, month: 0, year: fyEndYear + 1 } // Jan 15
+        } else if (fyEndMonth >= 7 && fyEndMonth <= 8) {
+          return { day: 1, month: 3, year: fyEndYear + 1 } // Apr 1
+        } else {
+          return { day: 1, month: 7, year: fyEndYear + 1 } // Aug 1
+        }
       }
-      // For non-calendar fiscal years, calculate based on fiscal year end + 6 months
-      const fiscalYearEnd = settings.fiscal_year_start_month === 1 ? 12 : settings.fiscal_year_start_month - 1
-      const deadlineMonth = (fiscalYearEnd + 5) % 12 // 6 months after year end
-      return [
-        { day: 1, month: deadlineMonth, year, period: `${year - 1}/${year}`, periodLabel: `${year - 1}/${year}` },
-      ]
+
+      // We need to find which FY ending produces a deadline in `year`.
+      // Try FY endings in year-1 and year (both could produce deadlines in `year`).
+      const results: DeadlineInstance[] = []
+      for (const fyEndYear of [year - 1, year]) {
+        const dl = getDeadline(fyEndYear)
+        if (dl.year === year) {
+          // Compute the FY start year
+          const fyStartYear = fyEndMonth === 12 ? fyEndYear : fyEndYear - (fyEndMonth < settings.fiscal_year_start_month ? 0 : 0)
+          const fyStart = fyEndMonth === 12 ? fyEndYear : fyEndYear
+          const periodLabel = fyEndMonth === 12
+            ? `${fyEndYear}`
+            : `${fyStart - 1}/${fyStart}`
+          const period = fyEndMonth === 12
+            ? `${fyEndYear}`
+            : `${fyStart - 1}/${fyStart}`
+          results.push({
+            day: dl.day,
+            month: dl.month,
+            year: dl.year,
+            period,
+            periodLabel,
+          })
+        }
+      }
+      return results
     },
   },
 
-  // Årsredovisning (AB) - 30 juni (6 months after fiscal year end)
+  // Årsredovisning (AB) — 7 months after fiscal year end per ÅRL 8:3
   {
     type: 'arsredovisning',
     titleTemplate: 'Årsredovisning till Bolagsverket {periodLabel}',
@@ -212,19 +244,45 @@ export const TAX_DEADLINE_CONFIGS: TaxDeadlineConfig[] = [
     priority: 'critical',
     linkedReportType: null,
     generateDates: (year, settings) => {
-      // For calendar year fiscal, due June 30th
-      if (settings.fiscal_year_start_month === 1) {
-        return [
-          { day: 30, month: 5, year, period: `${year - 1}`, periodLabel: `${year - 1}` },
-        ]
+      // FY end month (1-indexed)
+      const fyEndMonth = settings.fiscal_year_start_month === 1 ? 12 : settings.fiscal_year_start_month - 1
+
+      // 7 months after FY end per ÅRL 8:3
+      // Deadline month (0-indexed): ((fyEndMonth - 1) + 7) % 12
+      const deadlineMonth0 = ((fyEndMonth - 1) + 7) % 12
+      // Last day of the deadline month
+      // Determine which year the deadline falls in
+      const wrapsYear = fyEndMonth > 5 // Jun+ wraps into next year
+      // For calendar year (Dec end): deadline Jul 31 same year+1
+      // The FY ending in `year` produces a deadline:
+      const fyEndYear = year - 1 // By default we show deadline for the FY that ended in year-1
+      const deadlineYear = wrapsYear ? fyEndYear + 1 + 1 : fyEndYear + 1
+      // Simpler: compute from a concrete FY end date
+      // FY ends: fyEndMonth (1-indexed), last day, in some year.
+      // We want the deadline that falls in `year`.
+
+      // Try FY endings in year-1 and year
+      const results: DeadlineInstance[] = []
+      for (const endYr of [year - 1, year]) {
+        // Deadline: 7 months after last day of fyEndMonth in endYr
+        const dlMonth0 = ((fyEndMonth - 1) + 7) % 12
+        const dlYear = (fyEndMonth - 1) + 7 >= 12 ? endYr + 1 : endYr
+        if (dlYear === year) {
+          const lastDay = new Date(dlYear, dlMonth0 + 1, 0).getDate()
+          const periodLabel = fyEndMonth === 12
+            ? `${endYr}`
+            : `${endYr - 1}/${endYr}`
+          const period = periodLabel
+          results.push({
+            day: lastDay,
+            month: dlMonth0,
+            year: dlYear,
+            period,
+            periodLabel,
+          })
+        }
       }
-      // For non-calendar fiscal years, 6 months after year end
-      const fiscalYearEnd = settings.fiscal_year_start_month - 1 // 0-indexed month
-      const deadlineMonth = (fiscalYearEnd + 6) % 12
-      const deadlineYear = deadlineMonth < fiscalYearEnd ? year + 1 : year
-      return [
-        { day: 30, month: deadlineMonth, year: deadlineYear, period: `${year - 1}/${year}`, periodLabel: `${year - 1}/${year}` },
-      ]
+      return results
     },
   },
 

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import type { JournalEntry, JournalEntryLine } from '@/types'
 
 /**
@@ -52,20 +53,19 @@ export async function aggregateBalancesBySRU(
   }
 
   // Fetch chart of accounts with SRU codes
-  const { data: accounts, error: accountsError } = await supabase
-    .from('chart_of_accounts')
-    .select('account_number, account_name, sru_code, normal_balance')
-    .eq('user_id', userId)
-    .eq('is_active', true)
-
-  if (accountsError) {
-    throw new Error(`Failed to fetch accounts: ${accountsError.message}`)
-  }
+  const accounts = await fetchAllRows<{ account_number: string; account_name: string; sru_code: string | null; normal_balance: string }>(({ from, to }) =>
+    supabase
+      .from('chart_of_accounts')
+      .select('account_number, account_name, sru_code, normal_balance')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .range(from, to)
+  )
 
   // Build lookup maps
   const accountSRUMap = new Map<string, string>()
   const accountNameMap = new Map<string, string>()
-  for (const acc of accounts || []) {
+  for (const acc of accounts) {
     if (acc.sru_code) {
       accountSRUMap.set(acc.account_number, acc.sru_code)
     }
@@ -121,27 +121,25 @@ export async function aggregateBalancesBySRU(
 export async function getSRUCoverage(userId: string): Promise<SRUCoverageStats> {
   const supabase = await createClient()
 
-  const { data: accounts, error } = await supabase
-    .from('chart_of_accounts')
-    .select('account_number, account_name, sru_code')
-    .eq('user_id', userId)
-    .eq('is_active', true)
-    .order('account_number')
+  const accounts = await fetchAllRows<{ account_number: string; account_name: string; sru_code: string | null }>(({ from, to }) =>
+    supabase
+      .from('chart_of_accounts')
+      .select('account_number, account_name, sru_code')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('account_number')
+      .range(from, to)
+  )
 
-  if (error) {
-    throw new Error(`Failed to fetch accounts: ${error.message}`)
-  }
-
-  const allAccounts = accounts || []
-  const withSRU = allAccounts.filter((a) => a.sru_code)
-  const withoutSRU = allAccounts.filter((a) => !a.sru_code)
+  const withSRU = accounts.filter((a) => a.sru_code)
+  const withoutSRU = accounts.filter((a) => !a.sru_code)
 
   return {
-    totalAccounts: allAccounts.length,
+    totalAccounts: accounts.length,
     accountsWithSRU: withSRU.length,
     accountsWithoutSRU: withoutSRU.length,
-    coveragePercent: allAccounts.length > 0
-      ? Math.round((withSRU.length / allAccounts.length) * 100)
+    coveragePercent: accounts.length > 0
+      ? Math.round((withSRU.length / accounts.length) * 100)
       : 0,
     missingAccounts: withoutSRU.map((a) => ({
       accountNumber: a.account_number,
