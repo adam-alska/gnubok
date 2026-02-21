@@ -1,0 +1,64 @@
+'use client'
+
+import { useMemo } from 'react'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import type { VatDeclarationRutor } from '@/types'
+
+interface VatCompositionChartProps {
+  rutor: VatDeclarationRutor
+}
+
+const COLORS = [
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+]
+
+export function VatCompositionChart({ rutor }: VatCompositionChartProps) {
+  const chartData = useMemo(() => {
+    const segments = [
+      { name: 'Utgående 25%', value: rutor.ruta05 },
+      { name: 'Utgående 12%', value: rutor.ruta06 },
+      { name: 'Utgående 6%', value: rutor.ruta07 },
+      { name: 'Ingående moms', value: rutor.ruta48 },
+    ]
+    return segments.filter((s) => s.value > 0)
+  }, [rutor])
+
+  if (chartData.length === 0) return null
+
+  return (
+    <Card className="mb-4">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">Momsfördelning</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={250}>
+          <PieChart>
+            <Pie
+              data={chartData}
+              cx="50%"
+              cy="50%"
+              innerRadius={60}
+              outerRadius={90}
+              paddingAngle={2}
+              dataKey="value"
+            >
+              {chartData.map((_, index) => (
+                <Cell key={index} fill={COLORS[index % COLORS.length]} />
+              ))}
+            </Pie>
+            <Tooltip
+              formatter={(value) => [
+                new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value)) + ' kr',
+              ]}
+            />
+            <Legend />
+          </PieChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  )
+}

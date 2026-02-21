@@ -1,56 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { createJournalEntry, findFiscalPeriod } from '@/lib/bookkeeping/engine'
 import {
-  getRevenueAccount,
-  getOutputVatAccount,
+  createInvoicePaymentJournalEntry,
+  createInvoiceCashEntry,
 } from '@/lib/bookkeeping/invoice-entries'
-import type { Transaction, Invoice, CreateJournalEntryInput, EntityType, VatTreatment } from '@/types'
+import type { EntityType, Invoice } from '@/types'
 
 interface MatchInvoiceRequest {
   invoice_id: string
-}
-
-/**
- * Ensure a fiscal period exists for the given date, create one if needed
- */
-async function ensureFiscalPeriod(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
-  date: string
-): Promise<string | null> {
-  // Check if a fiscal period already covers this date
-  const existingPeriodId = await findFiscalPeriod(userId, date)
-  if (existingPeriodId) {
-    return existingPeriodId
-  }
-
-  // No fiscal period exists - create one for the year of the transaction
-  const transactionDate = new Date(date)
-  const year = transactionDate.getFullYear()
-
-  const periodStart = `${year}-01-01`
-  const periodEnd = `${year}-12-31`
-
-  const { data, error } = await supabase
-    .from('fiscal_periods')
-    .upsert({
-      user_id: userId,
-      name: `Räkenskapsår ${year}`,
-      period_start: periodStart,
-      period_end: periodEnd,
-    }, {
-      onConflict: 'user_id,period_start,period_end',
-    })
-    .select('id')
-    .single()
-
-  if (error) {
-    console.error('Failed to create fiscal period:', error)
-    return null
-  }
-
-  return data?.id || null
 }
 
 /**
@@ -113,10 +70,10 @@ export async function POST(
     )
   }
 
-  // Fetch the invoice (validates ownership)
+  // Fetch the invoice with items (validates ownership, items needed for per-line VAT)
   const { data: invoice, error: fetchInvError } = await supabase
     .from('invoices')
-    .select('*, customer:customers(*)')
+    .select('*, customer:customers(*), items:invoice_items(*)')
     .eq('id', invoice_id)
     .eq('user_id', user.id)
     .single()
@@ -151,76 +108,23 @@ export async function POST(
   let journalEntryError: string | null = null
 
   try {
-    const fiscalPeriodId = await ensureFiscalPeriod(supabase, user.id, transaction.date)
-
-    if (fiscalPeriodId) {
-      let journalInput: CreateJournalEntryInput
-
-      if (accountingMethod === 'cash') {
-        // Kontantmetoden: combined revenue entry at payment
-        // Debit 1930 Företagskonto, Credit 30xx Försäljning, Credit 26xx Utgående moms
-        const revenueAccount = getRevenueAccount(invoice.vat_treatment as VatTreatment, entityType)
-        const lines: CreateJournalEntryInput['lines'] = [
-          {
-            account_number: '1930',
-            debit_amount: invoice.total,
-            credit_amount: 0,
-            line_description: `Inbetalning faktura ${invoice.invoice_number}`,
-          },
-          {
-            account_number: revenueAccount,
-            debit_amount: 0,
-            credit_amount: invoice.subtotal,
-            line_description: `Försäljning faktura ${invoice.invoice_number}`,
-          },
-        ]
-
-        if (invoice.vat_amount > 0) {
-          const vatAccount = getOutputVatAccount(invoice.vat_treatment as VatTreatment)
-          lines.push({
-            account_number: vatAccount,
-            debit_amount: 0,
-            credit_amount: invoice.vat_amount,
-            line_description: `Utgående moms faktura ${invoice.invoice_number}`,
-          })
-        }
-
-        journalInput = {
-          fiscal_period_id: fiscalPeriodId,
-          entry_date: transaction.date,
-          description: `Betalning faktura ${invoice.invoice_number} (kontantmetoden)`,
-          source_type: 'invoice_cash_payment',
-          source_id: invoice.id,
-          lines,
-        }
-      } else {
-        // Faktureringsmetoden: clear receivable
-        // Debit 1930 Företagskonto, Credit 1510 Kundfordringar
-        journalInput = {
-          fiscal_period_id: fiscalPeriodId,
-          entry_date: transaction.date,
-          description: `Betalning mottagen: Faktura ${invoice.invoice_number}`,
-          source_type: 'invoice_paid',
-          source_id: invoice.id,
-          lines: [
-            {
-              account_number: '1930',
-              debit_amount: paidAmount,
-              credit_amount: 0,
-              line_description: `Inbetalning faktura ${invoice.invoice_number}`,
-            },
-            {
-              account_number: '1510',
-              debit_amount: 0,
-              credit_amount: paidAmount,
-              line_description: `Faktura ${invoice.invoice_number} betald`,
-            },
-          ],
-        }
-      }
-
-      const journalEntry = await createJournalEntry(user.id, journalInput)
-      journalEntryId = journalEntry.id
+    if (accountingMethod === 'cash') {
+      // Kontantmetoden: combined revenue entry with per-line VAT rates
+      const journalEntry = await createInvoiceCashEntry(
+        user.id,
+        invoice as Invoice,
+        transaction.date,
+        entityType
+      )
+      journalEntryId = journalEntry?.id ?? null
+    } else {
+      // Faktureringsmetoden: clear receivable (Debit 1930, Credit 1510)
+      const journalEntry = await createInvoicePaymentJournalEntry(
+        user.id,
+        invoice as Invoice,
+        transaction.date
+      )
+      journalEntryId = journalEntry?.id ?? null
     }
   } catch (err) {
     console.error('Failed to create payment journal entry:', err)

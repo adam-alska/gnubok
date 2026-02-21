@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { CreateFiscalPeriodInput } from '@/types'
+import { validatePeriodDuration } from '@/lib/bookkeeping/validate-period-duration'
 
 export async function GET() {
   const supabase = await createClient()
@@ -32,6 +33,12 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json() as CreateFiscalPeriodInput
+
+  // Validate period duration (max 18 months per BFL 3 kap.)
+  const durationError = validatePeriodDuration(body.period_start, body.period_end)
+  if (durationError) {
+    return NextResponse.json({ error: durationError }, { status: 400 })
+  }
 
   const { data, error } = await supabase
     .from('fiscal_periods')

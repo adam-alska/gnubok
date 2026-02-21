@@ -1,0 +1,564 @@
+'use client'
+
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useToast } from '@/components/ui/use-toast'
+import { AccountNumber } from '@/components/ui/account-number'
+import { AddAccountDialog } from './AddAccountDialog'
+import { EditAccountDialog } from './EditAccountDialog'
+import {
+  Search,
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  Pencil,
+  Trash2,
+  Loader2,
+  CheckCircle2,
+  BookOpen,
+} from 'lucide-react'
+import type { BASAccount } from '@/types'
+import type { BASReferenceAccount } from '@/lib/bookkeeping/bas-reference'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface ReferenceAccount extends BASReferenceAccount {
+  is_activated: boolean
+  is_active: boolean
+  is_system_account: boolean
+}
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const CLASS_LABELS: Record<number, string> = {
+  1: 'Tillgangar',
+  2: 'Eget kapital och skulder',
+  3: 'Rorelseintatker',
+  4: 'Varuinkop och material',
+  5: 'Ovriga externa kostnader',
+  6: 'Ovriga externa kostnader',
+  7: 'Personalkostnader och avskrivningar',
+  8: 'Finansiella poster och resultat',
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  asset: 'Tillgang',
+  liability: 'Skuld',
+  equity: 'EK',
+  revenue: 'Intakt',
+  expense: 'Kostnad',
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export default function ChartOfAccountsManager() {
+  const { toast } = useToast()
+
+  // View state
+  const [view, setView] = useState<'my-accounts' | 'bas-catalog'>('my-accounts')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [expandedClasses, setExpandedClasses] = useState<Set<number>>(new Set())
+
+  // Data state
+  const [accounts, setAccounts] = useState<BASAccount[]>([])
+  const [referenceAccounts, setReferenceAccounts] = useState<ReferenceAccount[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Dialog state
+  const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const [editAccount, setEditAccount] = useState<BASAccount | null>(null)
+
+  // Action states
+  const [togglingAccount, setTogglingAccount] = useState<string | null>(null)
+  const [deletingAccount, setDeletingAccount] = useState<string | null>(null)
+  const [activatingAccounts, setActivatingAccounts] = useState<Set<string>>(new Set())
+
+  // -------------------------------------------
+  // Data fetching
+  // -------------------------------------------
+
+  const fetchAccounts = useCallback(async () => {
+    const res = await fetch('/api/bookkeeping/accounts')
+    const { data } = await res.json()
+    setAccounts(data || [])
+  }, [])
+
+  const fetchReference = useCallback(async () => {
+    const res = await fetch('/api/bookkeeping/accounts/reference')
+    const { data } = await res.json()
+    setReferenceAccounts(data || [])
+  }, [])
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      await Promise.all([fetchAccounts(), fetchReference()])
+      setLoading(false)
+    }
+    load()
+  }, [fetchAccounts, fetchReference])
+
+  const refreshAll = useCallback(async () => {
+    await Promise.all([fetchAccounts(), fetchReference()])
+  }, [fetchAccounts, fetchReference])
+
+  // -------------------------------------------
+  // Actions
+  // -------------------------------------------
+
+  async function toggleActive(account: BASAccount) {
+    setTogglingAccount(account.account_number)
+    try {
+      const res = await fetch(`/api/bookkeeping/accounts/${account.account_number}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: !account.is_active }),
+      })
+      if (!res.ok) throw new Error('Kunde inte uppdatera kontot')
+      await refreshAll()
+    } catch {
+      toast({ title: 'Fel', description: 'Kunde inte uppdatera kontot', variant: 'destructive' })
+    } finally {
+      setTogglingAccount(null)
+    }
+  }
+
+  async function deleteAccount(account: BASAccount) {
+    setDeletingAccount(account.account_number)
+    try {
+      const res = await fetch(`/api/bookkeeping/accounts/${account.account_number}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Kunde inte ta bort kontot')
+      }
+      toast({ title: 'Konto borttaget', description: `${account.account_number} ${account.account_name}` })
+      await refreshAll()
+    } catch (err) {
+      toast({
+        title: 'Fel',
+        description: err instanceof Error ? err.message : 'Kunde inte ta bort kontot',
+        variant: 'destructive',
+      })
+    } finally {
+      setDeletingAccount(null)
+    }
+  }
+
+  async function activateBASAccount(accountNumber: string) {
+    setActivatingAccounts((prev) => new Set(prev).add(accountNumber))
+    try {
+      const res = await fetch('/api/bookkeeping/accounts/activate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account_numbers: [accountNumber] }),
+      })
+      if (!res.ok) throw new Error('Kunde inte aktivera kontot')
+      const { activated } = await res.json()
+      if (activated > 0) {
+        toast({ title: 'Konto aktiverat', description: `Konto ${accountNumber} har lagts till i din kontoplan` })
+      }
+      await refreshAll()
+    } catch {
+      toast({ title: 'Fel', description: 'Kunde inte aktivera kontot', variant: 'destructive' })
+    } finally {
+      setActivatingAccounts((prev) => {
+        const next = new Set(prev)
+        next.delete(accountNumber)
+        return next
+      })
+    }
+  }
+
+  // -------------------------------------------
+  // Toggle class expansion
+  // -------------------------------------------
+
+  function toggleClass(cls: number) {
+    setExpandedClasses((prev) => {
+      const next = new Set(prev)
+      if (next.has(cls)) {
+        next.delete(cls)
+      } else {
+        next.add(cls)
+      }
+      return next
+    })
+  }
+
+  // -------------------------------------------
+  // Filtered & grouped data
+  // -------------------------------------------
+
+  const filteredAccounts = useMemo(() => {
+    if (!searchQuery) return accounts
+    const q = searchQuery.toLowerCase()
+    return accounts.filter(
+      (a) => a.account_number.includes(q) || a.account_name.toLowerCase().includes(q)
+    )
+  }, [accounts, searchQuery])
+
+  const groupedAccounts = useMemo(() => {
+    const grouped: Record<number, BASAccount[]> = {}
+    for (const a of filteredAccounts) {
+      const cls = a.account_class
+      if (!grouped[cls]) grouped[cls] = []
+      grouped[cls].push(a)
+    }
+    return grouped
+  }, [filteredAccounts])
+
+  const filteredReference = useMemo(() => {
+    if (!searchQuery) return referenceAccounts
+    const q = searchQuery.toLowerCase()
+    return referenceAccounts.filter(
+      (a) => a.account_number.includes(q) || a.account_name.toLowerCase().includes(q)
+    )
+  }, [referenceAccounts, searchQuery])
+
+  const groupedReference = useMemo(() => {
+    const grouped: Record<number, ReferenceAccount[]> = {}
+    for (const a of filteredReference) {
+      const cls = a.account_class
+      if (!grouped[cls]) grouped[cls] = []
+      grouped[cls].push(a)
+    }
+    return grouped
+  }, [filteredReference])
+
+  // -------------------------------------------
+  // Render
+  // -------------------------------------------
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+          Laddar kontoplan...
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header controls */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Tabs
+          value={view}
+          onValueChange={(v) => {
+            setView(v as 'my-accounts' | 'bas-catalog')
+            setExpandedClasses(new Set())
+          }}
+        >
+          <TabsList>
+            <TabsTrigger value="my-accounts">
+              Mina konton
+              <Badge variant="secondary" className="ml-1.5 text-xs">
+                {accounts.length}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="bas-catalog">
+              <BookOpen className="mr-1.5 h-3.5 w-3.5" />
+              BAS-katalog
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {view === 'my-accounts' && (
+          <Button size="sm" onClick={() => setAddDialogOpen(true)}>
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            Eget konto
+          </Button>
+        )}
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Sok konto (nummer eller namn)..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
+      {/* My Accounts view */}
+      {view === 'my-accounts' && (
+        <div className="space-y-2">
+          {Object.entries(groupedAccounts)
+            .sort(([a], [b]) => Number(a) - Number(b))
+            .map(([cls, classAccounts]) => {
+              const classNum = Number(cls)
+              const isExpanded = expandedClasses.has(classNum) || !!searchQuery
+              const activeCount = classAccounts.filter((a) => a.is_active).length
+
+              return (
+                <Card key={cls}>
+                  <button
+                    onClick={() => toggleClass(classNum)}
+                    className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      {isExpanded ? (
+                        <ChevronDown className="h-4 w-4 shrink-0" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 shrink-0" />
+                      )}
+                      <span className="font-semibold text-left">
+                        Klass {cls}: {CLASS_LABELS[classNum] || ''}
+                      </span>
+                      <Badge variant="secondary" className="text-xs">
+                        {activeCount}/{classAccounts.length}
+                      </Badge>
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <CardContent className="pt-0 pb-4">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b text-left text-muted-foreground">
+                            <th className="py-2 w-24">Konto</th>
+                            <th className="py-2">Namn</th>
+                            <th className="py-2 w-20 text-center">SRU</th>
+                            <th className="py-2 w-24 text-center">Typ</th>
+                            <th className="py-2 w-16 text-center">Aktiv</th>
+                            <th className="py-2 w-20 text-right"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {classAccounts.map((account) => (
+                            <tr
+                              key={account.id}
+                              className={`border-b last:border-0 transition-opacity ${
+                                !account.is_active ? 'opacity-50' : ''
+                              }`}
+                            >
+                              <td className="py-2">
+                                <AccountNumber number={account.account_number} name={account.account_name} />
+                              </td>
+                              <td className="py-2">
+                                <span className="flex items-center gap-1.5">
+                                  {account.account_name}
+                                  {account.is_system_account && (
+                                    <Badge variant="outline" className="text-[10px] px-1 py-0">
+                                      System
+                                    </Badge>
+                                  )}
+                                </span>
+                              </td>
+                              <td className="py-2 text-center">
+                                <span className="text-xs font-mono text-muted-foreground">
+                                  {account.sru_code || '\u2014'}
+                                </span>
+                              </td>
+                              <td className="py-2 text-center">
+                                <Badge variant="outline" className="text-xs">
+                                  {TYPE_LABELS[account.account_type] || account.account_type}
+                                </Badge>
+                              </td>
+                              <td className="py-2 text-center">
+                                <Switch
+                                  checked={account.is_active}
+                                  onCheckedChange={() => toggleActive(account)}
+                                  disabled={togglingAccount === account.account_number}
+                                  className="scale-75"
+                                />
+                              </td>
+                              <td className="py-2 text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => setEditAccount(account)}
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                  {!account.is_system_account && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 text-destructive hover:text-destructive"
+                                      onClick={() => deleteAccount(account)}
+                                      disabled={deletingAccount === account.account_number}
+                                    >
+                                      {deletingAccount === account.account_number ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      )}
+                                    </Button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </CardContent>
+                  )}
+                </Card>
+              )
+            })}
+
+          {filteredAccounts.length === 0 && (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                {searchQuery ? 'Inga konton matchar sokningen' : 'Inga konton i kontoplanen'}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* BAS Catalog view */}
+      {view === 'bas-catalog' && (
+        <div className="space-y-2">
+          {Object.entries(groupedReference)
+            .sort(([a], [b]) => Number(a) - Number(b))
+            .map(([cls, classAccounts]) => {
+              const classNum = Number(cls)
+              const isExpanded = expandedClasses.has(classNum) || !!searchQuery
+              const activatedCount = classAccounts.filter((a) => a.is_activated).length
+
+              return (
+                <Card key={cls}>
+                  <button
+                    onClick={() => toggleClass(classNum)}
+                    className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      {isExpanded ? (
+                        <ChevronDown className="h-4 w-4 shrink-0" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 shrink-0" />
+                      )}
+                      <span className="font-semibold text-left">
+                        Klass {cls}: {CLASS_LABELS[classNum] || ''}
+                      </span>
+                      <Badge variant="secondary" className="text-xs">
+                        {activatedCount}/{classAccounts.length} aktiva
+                      </Badge>
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <CardContent className="pt-0 pb-4">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b text-left text-muted-foreground">
+                            <th className="py-2 w-24">Konto</th>
+                            <th className="py-2">Namn</th>
+                            <th className="py-2 w-20 text-center">SRU</th>
+                            <th className="py-2 w-24 text-center">Typ</th>
+                            <th className="py-2 w-28 text-right">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {classAccounts.map((account) => (
+                            <tr
+                              key={account.account_number}
+                              className={`border-b last:border-0 ${
+                                account.is_activated ? 'bg-muted/30' : ''
+                              }`}
+                            >
+                              <td className="py-2">
+                                <AccountNumber number={account.account_number} name={account.account_name} />
+                              </td>
+                              <td className="py-2">
+                                <div>
+                                  <span>{account.account_name}</span>
+                                  {account.description && (
+                                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                                      {account.description}
+                                    </p>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-2 text-center">
+                                <span className="text-xs font-mono text-muted-foreground">
+                                  {account.sru_code || '\u2014'}
+                                </span>
+                              </td>
+                              <td className="py-2 text-center">
+                                <Badge variant="outline" className="text-xs">
+                                  {TYPE_LABELS[account.account_type] || account.account_type}
+                                </Badge>
+                              </td>
+                              <td className="py-2 text-right">
+                                {account.is_activated ? (
+                                  <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                    Aktiverat
+                                  </span>
+                                ) : (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-xs"
+                                    onClick={() => activateBASAccount(account.account_number)}
+                                    disabled={activatingAccounts.has(account.account_number)}
+                                  >
+                                    {activatingAccounts.has(account.account_number) ? (
+                                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <Plus className="mr-1 h-3 w-3" />
+                                    )}
+                                    Lagg till
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </CardContent>
+                  )}
+                </Card>
+              )
+            })}
+
+          {filteredReference.length === 0 && (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                Inga konton matchar sokningen
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* Dialogs */}
+      <AddAccountDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+        onCreated={refreshAll}
+      />
+
+      {editAccount && (
+        <EditAccountDialog
+          open={!!editAccount}
+          onOpenChange={(open) => { if (!open) setEditAccount(null) }}
+          account={editAccount}
+          onSaved={refreshAll}
+        />
+      )}
+    </div>
+  )
+}

@@ -1,5 +1,58 @@
 import type { CustomerType, VatTreatment } from '@/types'
 
+export interface VatRateOption {
+  rate: number
+  label: string
+  treatment: VatTreatment
+}
+
+/**
+ * Get available VAT rates for invoice line items based on customer type.
+ *
+ * Swedish/EU-unvalidated customers can choose between 25%, 12%, 6%, and 0% (exempt).
+ * Reverse charge and export customers are locked to 0%.
+ */
+export function getAvailableVatRates(
+  customerType: CustomerType,
+  vatNumberValidated: boolean = false
+): VatRateOption[] {
+  // EU business with validated VAT → reverse charge, locked to 0%
+  if (customerType === 'eu_business' && vatNumberValidated) {
+    return [{ rate: 0, label: '0% (omvänd skattskyldighet)', treatment: 'reverse_charge' }]
+  }
+
+  // Non-EU → export, locked to 0%
+  if (customerType === 'non_eu_business') {
+    return [{ rate: 0, label: '0% (export)', treatment: 'export' }]
+  }
+
+  // Swedish customers (or EU without validated VAT) can choose any rate
+  return [
+    { rate: 25, label: '25%', treatment: 'standard_25' },
+    { rate: 12, label: '12%', treatment: 'reduced_12' },
+    { rate: 6, label: '6%', treatment: 'reduced_6' },
+    { rate: 0, label: '0% (momsfritt)', treatment: 'exempt' },
+  ]
+}
+
+/**
+ * Map a numeric VAT rate to a VatTreatment.
+ */
+export function getVatTreatmentForRate(rate: number): VatTreatment {
+  switch (rate) {
+    case 25:
+      return 'standard_25'
+    case 12:
+      return 'reduced_12'
+    case 6:
+      return 'reduced_6'
+    case 0:
+      return 'exempt'
+    default:
+      return 'standard_25'
+  }
+}
+
 export interface VatRule {
   treatment: VatTreatment
   rate: number

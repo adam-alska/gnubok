@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import JournalEntryList from '@/components/bookkeeping/JournalEntryList'
 import JournalEntryForm from '@/components/bookkeeping/JournalEntryForm'
-import ChartOfAccounts from '@/components/bookkeeping/ChartOfAccounts'
+import ChartOfAccountsManager from '@/components/bookkeeping/ChartOfAccountsManager'
 import { Lock } from 'lucide-react'
 
 export default function BookkeepingPage() {
@@ -45,7 +45,7 @@ export default function BookkeepingPage() {
         </TabsContent>
 
         <TabsContent value="accounts">
-          <ChartOfAccounts />
+          <ChartOfAccountsManager />
         </TabsContent>
       </Tabs>
     </div>

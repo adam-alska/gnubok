@@ -133,8 +133,10 @@ function BankFileImportWizard() {
           description: `${txCount} transaktioner hittades`,
         })
       } else if (data.data.parse_result.format === 'generic_csv' || !data.data.detected_format) {
-        // Unrecognized format — show upload step with error
         setBankError('Kunde inte identifiera bankformatet. Välj bank manuellt eller använd "Annan CSV".')
+      } else {
+        // Format detected but no transactions parsed — parser couldn't extract rows
+        setBankError('Filen kunde läsas men inga transaktioner hittades. Kontrollera att filen innehåller transaktionsdata och inte bara rubriker.')
       }
     } catch (err) {
       setBankError(err instanceof Error ? err.message : 'Kunde inte läsa filen')
@@ -293,8 +295,6 @@ function BankFileImportWizard() {
 // SIE Import Wizard (unchanged, extracted into component)
 // ============================================================
 
-const SIE_STEPS: ImportWizardStep[] = ['upload', 'preview', 'mapping', 'review', 'result']
-
 const SIE_STEP_LABELS: Record<ImportWizardStep, string> = {
   upload: 'Ladda upp',
   preview: 'Förhandsgranskning',
@@ -320,8 +320,14 @@ function SIEImportWizard() {
   const [_sieAccounts, setSieAccounts] = useState<{ number: string; name: string }[]>([])
   const [isCreatingAccounts, setIsCreatingAccounts] = useState(false)
 
-  const currentStepIndex = SIE_STEPS.indexOf(step)
-  const progress = ((currentStepIndex + 1) / SIE_STEPS.length) * 100
+  // Skip the mapping step when all accounts are already mapped
+  const hasUnmapped = mappings.some((m) => !m.targetAccount)
+  const sieSteps: ImportWizardStep[] = hasUnmapped
+    ? ['upload', 'preview', 'mapping', 'review', 'result']
+    : ['upload', 'preview', 'review', 'result']
+
+  const currentStepIndex = sieSteps.indexOf(step)
+  const progress = ((currentStepIndex + 1) / sieSteps.length) * 100
 
   const handleFileSelect = useCallback(async (selectedFile: File) => {
     setFile(selectedFile)
@@ -490,7 +496,7 @@ function SIEImportWizard() {
   }, [file, mappings, toast])
 
   const goToStep = (targetStep: ImportWizardStep) => { setStep(targetStep); setError(null) }
-  const goBack = () => { const i = SIE_STEPS.indexOf(step); if (i > 0) setStep(SIE_STEPS[i - 1]) }
+  const goBack = () => { const i = sieSteps.indexOf(step); if (i > 0) setStep(sieSteps[i - 1]) }
 
   const handleNewImport = () => {
     setStep('upload'); setFile(null); setParsed(null); setMappings([])
@@ -504,7 +510,7 @@ function SIEImportWizard() {
         <CardContent className="pt-6">
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              {SIE_STEPS.map((s, i) => (
+              {sieSteps.map((s, i) => (
                 <span key={s} className={i <= currentStepIndex ? 'text-primary font-medium' : 'text-muted-foreground'}>
                   {SIE_STEP_LABELS[s]}
                 </span>
@@ -519,7 +525,7 @@ function SIEImportWizard() {
       {step === 'preview' && preview && (
         <SIEPreviewStep preview={preview} issues={issues} missingAccounts={missingAccounts}
           onCreateAccounts={handleCreateAccounts} isCreatingAccounts={isCreatingAccounts}
-          onContinue={() => goToStep('mapping')} onBack={goBack} />
+          onContinue={() => goToStep(hasUnmapped ? 'mapping' : 'review')} onBack={goBack} />
       )}
       {step === 'mapping' && (
         <AccountMappingStep mappings={mappings} basAccounts={basAccounts}

@@ -45,10 +45,7 @@ export async function POST(
   // Update status to sent
   const { error: updateError } = await supabase
     .from('invoices')
-    .update({
-      status: 'sent',
-      sent_at: new Date().toISOString(),
-    })
+    .update({ status: 'sent' })
     .eq('id', id)
     .eq('user_id', user.id)
 
@@ -65,9 +62,10 @@ export async function POST(
 
   const accountingMethod = settings?.accounting_method || 'accrual'
 
-  // Faktureringsmetoden: book at send
+  // Only create journal entries for real invoices (not proformas or delivery notes)
+  const isRealInvoice = !invoice.document_type || invoice.document_type === 'invoice'
   let journalEntryId: string | null = null
-  if (accountingMethod === 'accrual') {
+  if (isRealInvoice && accountingMethod === 'accrual') {
     try {
       const journalEntry = await createInvoiceJournalEntry(
         user.id,

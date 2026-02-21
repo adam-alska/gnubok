@@ -147,6 +147,7 @@ export function makeTransaction(overrides: Partial<Transaction> = {}): Transacti
     journal_entry_id: null,
     mcc_code: null,
     merchant_name: 'ICA Maxi',
+    reconciliation_method: null,
     receipt_id: null,
     import_source: null,
     reference: null,

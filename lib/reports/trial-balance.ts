@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import type { TrialBalanceRow } from '@/types'
 
 /**
@@ -83,13 +84,16 @@ async function generateTrialBalanceManual(
   }
 
   // Get account names
-  const { data: accounts } = await supabase
-    .from('chart_of_accounts')
-    .select('account_number, account_name, account_class')
-    .eq('user_id', userId)
+  const accounts = await fetchAllRows<{ account_number: string; account_name: string; account_class: number }>(({ from, to }) =>
+    supabase
+      .from('chart_of_accounts')
+      .select('account_number, account_name, account_class')
+      .eq('user_id', userId)
+      .range(from, to)
+  )
 
   const accountMap = new Map<string, { name: string; class: number }>()
-  for (const acc of accounts || []) {
+  for (const acc of accounts) {
     accountMap.set(acc.account_number, {
       name: acc.account_name,
       class: acc.account_class,

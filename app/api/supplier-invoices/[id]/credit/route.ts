@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { createSupplierCreditNoteEntry } from '@/lib/bookkeeping/supplier-invoice-entries'
-import type { SupplierInvoice, SupplierInvoiceItem } from '@/types'
+import type { SupplierInvoice, SupplierInvoiceItem, AccountingMethod } from '@/types'
 
 export async function POST(
   _request: Request,
@@ -88,24 +88,36 @@ export async function POST(
 
   await supabase.from('supplier_invoice_items').insert(creditItems)
 
-  // Create credit note journal entry
+  // Fetch accounting method
+  const { data: settings } = await supabase
+    .from('company_settings')
+    .select('accounting_method')
+    .eq('user_id', user.id)
+    .single()
+
+  const accountingMethod = (settings?.accounting_method as AccountingMethod) || 'accrual'
+
+  // Create credit note journal entry (accrual only)
+  // Cash method: skip — no original registration entry exists to reverse; deferred until refund
   let journalEntryId: string | null = null
-  try {
-    const journalEntry = await createSupplierCreditNoteEntry(
-      user.id,
-      creditNote as SupplierInvoice,
-      creditItems as SupplierInvoiceItem[],
-      original.supplier?.supplier_type || 'swedish_business'
-    )
-    if (journalEntry) {
-      journalEntryId = journalEntry.id
-      await supabase
-        .from('supplier_invoices')
-        .update({ registration_journal_entry_id: journalEntry.id })
-        .eq('id', creditNote.id)
+  if (accountingMethod === 'accrual') {
+    try {
+      const journalEntry = await createSupplierCreditNoteEntry(
+        user.id,
+        creditNote as SupplierInvoice,
+        creditItems as SupplierInvoiceItem[],
+        original.supplier?.supplier_type || 'swedish_business'
+      )
+      if (journalEntry) {
+        journalEntryId = journalEntry.id
+        await supabase
+          .from('supplier_invoices')
+          .update({ registration_journal_entry_id: journalEntry.id })
+          .eq('id', creditNote.id)
+      }
+    } catch (err) {
+      console.error('Failed to create credit note journal entry:', err)
     }
-  } catch (err) {
-    console.error('Failed to create credit note journal entry:', err)
   }
 
   // Update original invoice: reduce remaining_amount

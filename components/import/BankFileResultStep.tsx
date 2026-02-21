@@ -79,7 +79,7 @@ export default function BankFileResultStep({
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <Sparkles className="h-4 w-4" />
-              <span className="text-sm">Auto-kategoriserade</span>
+              <span className="text-sm">Auto-bokförda</span>
             </div>
             <p className="text-2xl font-bold">{result.auto_categorized}</p>
           </CardContent>
@@ -108,11 +108,11 @@ export default function BankFileResultStep({
                 1
               </div>
               <div>
-                <p className="font-medium">Granska okategoriserade transaktioner</p>
+                <p className="font-medium">Granska obokförda transaktioner</p>
                 <p className="text-sm text-muted-foreground">
                   {result.imported - result.auto_categorized > 0
-                    ? `${result.imported - result.auto_categorized} transaktioner behöver kategoriseras manuellt.`
-                    : 'Alla transaktioner kategoriserades automatiskt.'}
+                    ? `${result.imported - result.auto_categorized} transaktioner behöver bokföras manuellt.`
+                    : 'Alla transaktioner bokfördes automatiskt.'}
                 </p>
               </div>
             </div>

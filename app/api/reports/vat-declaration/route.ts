@@ -4,7 +4,7 @@ import {
   calculateVatDeclaration,
   formatPeriodLabel,
 } from '@/lib/reports/vat-declaration'
-import type { VatPeriodType } from '@/types'
+import type { VatPeriodType, AccountingMethod } from '@/types'
 
 /**
  * GET /api/reports/vat-declaration
@@ -90,12 +90,22 @@ export async function GET(request: Request) {
     )
   }
 
+  // Fetch accounting method
+  const { data: settings } = await supabase
+    .from('company_settings')
+    .select('accounting_method')
+    .eq('user_id', user.id)
+    .single()
+
+  const accountingMethod = (settings?.accounting_method as AccountingMethod) || 'accrual'
+
   try {
     const declaration = await calculateVatDeclaration(
       user.id,
       periodType,
       year,
-      period
+      period,
+      accountingMethod
     )
 
     return NextResponse.json({

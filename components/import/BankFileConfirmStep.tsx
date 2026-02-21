@@ -126,7 +126,7 @@ export default function BankFileConfirmStep({
               />
               <div>
                 <Label htmlFor="auto-categorize" className="text-sm font-medium cursor-pointer">
-                  Auto-kategorisera kända transaktioner
+                  Auto-bokför kända transaktioner
                 </Label>
                 <p className="text-xs text-muted-foreground">
                   Skapar automatiskt bokföringsposter för transaktioner med hög konfidens
@@ -139,8 +139,8 @@ export default function BankFileConfirmStep({
           <div className="flex gap-3 p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
             <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-muted-foreground">
-              Importerade transaktioner som inte automatiskt kategoriseras visas som
-              &quot;okategoriserade&quot; på transaktionssidan. Du kan kategorisera dem manuellt
+              Importerade transaktioner som inte automatiskt bokförs visas som
+              &quot;obokförda&quot; på transaktionssidan. Du kan bokföra dem manuellt
               efteråt.
             </p>
           </div>

@@ -53,7 +53,7 @@ export default function ReceiptDashboard({
                 </div>
               </div>
               <p className="text-xs text-muted-foreground max-w-24 text-right">
-                Fortsätt kategorisera varje dag
+                Fortsätt bokföra varje dag
               </p>
             </div>
           </CardContent>

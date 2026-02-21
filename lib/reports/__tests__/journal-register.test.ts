@@ -9,7 +9,7 @@ let results: Array<{ data?: unknown; error?: unknown }>
 
 function makeBuilder() {
   const b: Record<string, unknown> = {}
-  for (const m of ['select', 'eq', 'in', 'order']) {
+  for (const m of ['select', 'eq', 'in', 'order', 'range']) {
     b[m] = vi.fn().mockReturnValue(b)
   }
   b.single = vi.fn().mockImplementation(async () => results[resultIdx++] ?? { data: null, error: null })
@@ -49,7 +49,7 @@ describe('generateJournalRegister', () => {
 
   it('returns empty report when no entries in period', async () => {
     results = [
-      { data: { start_date: '2024-01-01', end_date: '2024-12-31' }, error: null },
+      { data: { period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
       { data: [], error: null },
     ]
 
@@ -62,7 +62,7 @@ describe('generateJournalRegister', () => {
   it('produces entries in registration order with correct totals', async () => {
     results = [
       // 0: fiscal_periods.single()
-      { data: { start_date: '2024-01-01', end_date: '2024-12-31' }, error: null },
+      { data: { period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
       // 1: journal_entries (already ordered by series/number)
       {
         data: [
@@ -117,7 +117,7 @@ describe('generateJournalRegister', () => {
 
   it('includes reversed entries with correct status', async () => {
     results = [
-      { data: { start_date: '2024-01-01', end_date: '2024-12-31' }, error: null },
+      { data: { period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
       {
         data: [
           { id: 'e1', entry_date: '2024-01-15', voucher_number: 1, voucher_series: 'A', description: 'Original', source_type: 'manual', status: 'reversed' },
@@ -146,7 +146,7 @@ describe('generateJournalRegister', () => {
 
   it('resolves account names from chart_of_accounts', async () => {
     results = [
-      { data: { start_date: '2024-01-01', end_date: '2024-12-31' }, error: null },
+      { data: { period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
       {
         data: [
           { id: 'e1', entry_date: '2024-01-15', voucher_number: 1, voucher_series: 'A', description: 'Test', source_type: 'manual', status: 'posted' },
@@ -180,7 +180,7 @@ describe('generateJournalRegister', () => {
 
   it('defaults voucher_series to A when null', async () => {
     results = [
-      { data: { start_date: '2024-01-01', end_date: '2024-12-31' }, error: null },
+      { data: { period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
       {
         data: [
           { id: 'e1', entry_date: '2024-01-15', voucher_number: 1, voucher_series: null, description: 'No series', source_type: 'manual', status: 'posted' },

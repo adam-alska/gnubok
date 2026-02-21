@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PageHeader } from '@/components/ui/page-header'
 import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { Plus, Search, Receipt, FileText, Send, CheckCircle, Clock, XCircle, ReceiptText, AlertTriangle } from 'lucide-react'
+import { Plus, Search, Receipt, FileText, Send, CheckCircle, Clock, XCircle, ReceiptText, AlertTriangle, FileQuestion, Truck } from 'lucide-react'
 import { EmptyInvoices } from '@/components/ui/empty-state'
 import type { Invoice, InvoiceStatus } from '@/types'
 
@@ -82,11 +82,14 @@ export default function InvoicesPage() {
       (invoice.customer as { name: string })?.name?.toLowerCase().includes(searchTerm.toLowerCase())
 
     const isCreditNote = !!invoice.credited_invoice_id
+    const docType = (invoice as Invoice & { document_type?: string }).document_type || 'invoice'
     const matchesTab =
       activeTab === 'all' ||
-      (activeTab === 'unpaid' && ['sent', 'overdue'].includes(invoice.status) && !isCreditNote) ||
+      (activeTab === 'unpaid' && ['sent', 'overdue'].includes(invoice.status) && !isCreditNote && docType === 'invoice') ||
       (activeTab === 'credit' && isCreditNote) ||
-      invoice.status === activeTab
+      (activeTab === 'proforma' && docType === 'proforma') ||
+      (activeTab === 'delivery_note' && docType === 'delivery_note') ||
+      (activeTab !== 'proforma' && activeTab !== 'delivery_note' && invoice.status === activeTab)
 
     return matchesSearch && matchesTab
   })
@@ -181,6 +184,8 @@ export default function InvoicesPage() {
             <TabsTrigger value="unpaid">Obetalda</TabsTrigger>
             <TabsTrigger value="paid">Betalda</TabsTrigger>
             <TabsTrigger value="draft">Utkast</TabsTrigger>
+            <TabsTrigger value="proforma">Proforma</TabsTrigger>
+            <TabsTrigger value="delivery_note">Följesedel</TabsTrigger>
             <TabsTrigger value="credit">Kredit</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -232,9 +237,12 @@ export default function InvoicesPage() {
           {filteredInvoices.map((invoice) => {
             const status = statusConfig[invoice.status]
             const isCreditNote = !!invoice.credited_invoice_id
-            const StatusIcon = isCreditNote ? ReceiptText : status.icon
+            const docType = (invoice as Invoice & { document_type?: string }).document_type || 'invoice'
+            const isProforma = docType === 'proforma'
+            const isDeliveryNote = docType === 'delivery_note'
+            const StatusIcon = isCreditNote ? ReceiptText : isProforma ? FileQuestion : isDeliveryNote ? Truck : status.icon
             const relativeTime = invoice.due_date ? getRelativeTimeLabel(invoice.due_date, invoice.status) : null
-            const borderClass = isCreditNote ? 'border-l-4 border-l-destructive/50' : `border-l-4 ${status.borderColor}`
+            const borderClass = isCreditNote ? 'border-l-4 border-l-destructive/50' : isProforma ? 'border-l-4 border-l-blue-400' : isDeliveryNote ? 'border-l-4 border-l-emerald-400' : `border-l-4 ${status.borderColor}`
 
             return (
               <Link key={invoice.id} href={`/invoices/${invoice.id}`}>
@@ -251,6 +259,16 @@ export default function InvoicesPage() {
                             {isCreditNote && (
                               <Badge variant="destructive" className="text-xs">
                                 Kredit
+                              </Badge>
+                            )}
+                            {isProforma && (
+                              <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+                                Proforma
+                              </Badge>
+                            )}
+                            {isDeliveryNote && (
+                              <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-700">
+                                Följesedel
                               </Badge>
                             )}
                             <Badge variant={status.variant as 'default' | 'secondary' | 'destructive'}>
