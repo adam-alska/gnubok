@@ -1,6 +1,6 @@
 import { createJournalEntry, findFiscalPeriod } from './engine'
 import { generateSalesVatLines, generateReverseChargeLines } from './vat-entries'
-import { getVatTreatmentForRate } from '@/lib/invoice/vat-rules'
+import { getVatTreatmentForRate } from '@/lib/invoices/vat-rules'
 import type {
   CreateJournalEntryInput,
   CreateJournalEntryLineInput,

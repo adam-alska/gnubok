@@ -174,6 +174,8 @@ async function handleDocumentUploaded(
             : null,
         extraction_confidence: item.confidence,
         suggested_category: item.suggestedCategory,
+        category: item.category,
+        bas_account: item.basAccount,
         sort_order: index,
       }))
 

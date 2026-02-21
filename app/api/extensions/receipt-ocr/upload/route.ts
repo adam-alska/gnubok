@@ -143,6 +143,8 @@ export async function POST(request: Request) {
           vat_amount: item.vatRate && item.lineTotal ? (item.lineTotal * item.vatRate) / (100 + item.vatRate) : null,
           extraction_confidence: item.confidence,
           suggested_category: item.suggestedCategory,
+          category: item.category,
+          bas_account: item.basAccount,
           sort_order: index,
         }))
 
