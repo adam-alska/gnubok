@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { getBestInvoiceMatch } from '@/lib/invoice/invoice-matching'
+import { getBestInvoiceMatch } from '@/lib/invoices/invoice-matching'
 import type { Transaction } from '@/types'
 
 /**

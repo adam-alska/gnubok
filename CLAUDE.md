@@ -298,7 +298,7 @@ All defined in `lib/events/types.ts`:
 
 ### Scope
 
-Only test business logic in `lib/`. No component tests, no API route tests, no E2E tests.
+Test business logic in `lib/` and API routes in `app/api/`. No component tests, no E2E tests.
 
 ### Framework
 
@@ -333,6 +333,14 @@ mockResult({ data: makeTransaction(), error: null })
 - Test balance validation edge cases (floating point precision, zero amounts)
 - Test error paths (missing fiscal period, unbalanced entries)
 - Verify events are emitted correctly
+
+### API Route Tests
+
+- Colocated `__tests__/` directories alongside route files (e.g., `app/api/invoices/__tests__/route.test.ts`)
+- Mock `@/lib/supabase/server`, `@/lib/init`, and lib functions — do NOT re-test lib business logic
+- Use `createMockRequest()`, `parseJsonResponse()`, `createMockRouteParams()` from `tests/helpers.ts`
+- Use `createQueuedMockSupabase()` for routes with multiple sequential Supabase calls
+- Test: auth (401), validation (400), not found (404), errors (500), happy path, non-blocking journal entry failures
 
 ### Reference Tests
 
@@ -498,3 +506,6 @@ NEXT_PUBLIC_APP_URL               # App base URL
 NEXT_PUBLIC_VAPID_PUBLIC_KEY      # Web push public key
 VAPID_PRIVATE_KEY                 # Web push private key
 ```
+
+## Other
+We should never create a nul file

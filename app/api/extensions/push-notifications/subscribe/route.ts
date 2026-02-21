@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { getVapidPublicKey } from '@/extensions/push-notifications/notification-sender'
+import { getVapidPublicKey } from '@/extensions/general/push-notifications/notification-sender'
 
 /**
  * GET /api/extensions/push-notifications/subscribe

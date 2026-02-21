@@ -1,36 +1,9 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
-
-/* Force light mode */
-html, :root {
-  color-scheme: light only !important;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: 220 14% 96% !important;
-    --foreground: 224 12% 13% !important;
-    --card: 0 0% 100% !important;
-    --card-foreground: 224 12% 13% !important;
-    --popover: 0 0% 100% !important;
-    --popover-foreground: 224 12% 13% !important;
-    --primary: 222 47% 35% !important;
-    --primary-foreground: 0 0% 100% !important;
-    --secondary: 220 13% 93% !important;
-    --secondary-foreground: 224 12% 13% !important;
-    --muted: 218 12% 91% !important;
-    --muted-foreground: 218 8% 46% !important;
-    --accent: 213 72% 50% !important;
-    --accent-foreground: 0 0% 100% !important;
-    --destructive: 0 68% 50% !important;
-    --destructive-foreground: 0 0% 100% !important;
-    --border: 218 14% 89% !important;
-    --input: 218 14% 89% !important;
-    --ring: 222 47% 35% !important;
-  }
-}
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  color-scheme: light;
   /* Clean Slate — Modern ERP Palette */
 
   --background: 220 14% 96%;              /* Cool off-white #F2F4F7 */
@@ -93,6 +66,48 @@ html, :root {
   --duration-fast: 150ms;
   --duration-base: 300ms;
   --duration-slow: 500ms;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: 222 16% 10%;
+  --foreground: 216 12% 90%;
+
+  --card: 222 14% 13%;
+  --card-foreground: 216 12% 90%;
+
+  --popover: 222 14% 13%;
+  --popover-foreground: 216 12% 90%;
+
+  --primary: 222 50% 55%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 220 14% 18%;
+  --secondary-foreground: 216 12% 90%;
+
+  --muted: 220 12% 20%;
+  --muted-foreground: 218 8% 55%;
+
+  --accent: 213 72% 58%;
+  --accent-foreground: 0 0% 100%;
+
+  --destructive: 0 62% 55%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 220 12% 22%;
+  --input: 220 12% 22%;
+  --ring: 222 50% 55%;
+
+  --success: 152 44% 45%;
+  --success-foreground: 0 0% 100%;
+
+  --warning: 38 85% 55%;
+  --warning-foreground: 224 12% 13%;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.45);
 }
 
 @theme inline {
@@ -290,5 +305,10 @@ h1, h2, h3 {
 /* Selection color */
 ::selection {
   background: hsl(var(--primary) / 0.15);
+  color: hsl(var(--foreground));
+}
+
+.dark ::selection {
+  background: hsl(var(--primary) / 0.3);
   color: hsl(var(--foreground));
 }

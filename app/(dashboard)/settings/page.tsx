@@ -23,9 +23,14 @@ import {
   LogOut,
   Bell,
   Calendar,
+  Sun,
+  Moon,
+  Monitor,
+  Palette,
 } from 'lucide-react'
+import { useTheme } from 'next-themes'
 import type { CompanySettings, BankConnection } from '@/types'
-import { NotificationSettings } from '@/extensions/push-notifications/NotificationSettings'
+import { NotificationSettings } from '@/extensions/general/push-notifications/NotificationSettings'
 import { CalendarFeedSettings } from '@/components/settings/CalendarFeedSettings'
 
 export default function SettingsPage() {
@@ -41,6 +46,12 @@ export default function SettingsPage() {
   const [isSyncing, setIsSyncing] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
   const [hasBankingExtension, setHasBankingExtension] = useState(false)
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     fetchData()
@@ -310,6 +321,10 @@ export default function SettingsPage() {
           <TabsTrigger value="calendar">
             <Calendar className="mr-2 h-4 w-4" />
             Kalender
+          </TabsTrigger>
+          <TabsTrigger value="appearance">
+            <Palette className="mr-2 h-4 w-4" />
+            Utseende
           </TabsTrigger>
           <TabsTrigger value="account">
             <User className="mr-2 h-4 w-4" />
@@ -623,6 +638,103 @@ export default function SettingsPage() {
         {/* Calendar feed settings */}
         <TabsContent value="calendar">
           <CalendarFeedSettings />
+        </TabsContent>
+
+        {/* Appearance settings */}
+        <TabsContent value="appearance">
+          <Card>
+            <CardHeader>
+              <CardTitle>Utseende</CardTitle>
+              <CardDescription>
+                Välj hur applikationen ska se ut
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {mounted && (
+                <div className="grid grid-cols-3 gap-4">
+                  {/* Light */}
+                  <button
+                    type="button"
+                    onClick={() => setTheme('light')}
+                    className={`group relative rounded-lg border-2 p-4 text-left transition-colors ${
+                      theme === 'light'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/40'
+                    }`}
+                  >
+                    <div className="mb-3 flex h-20 items-end gap-1.5 rounded-md border bg-white p-2">
+                      <div className="h-full w-3 rounded-sm bg-[hsl(222,47%,35%)]" />
+                      <div className="flex flex-1 flex-col gap-1">
+                        <div className="h-2 w-3/4 rounded-sm bg-[hsl(220,14%,96%)]" />
+                        <div className="h-2 w-1/2 rounded-sm bg-[hsl(220,14%,96%)]" />
+                        <div className="h-2 w-2/3 rounded-sm bg-[hsl(220,14%,96%)]" />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Sun className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">Ljust</span>
+                    </div>
+                  </button>
+
+                  {/* Dark */}
+                  <button
+                    type="button"
+                    onClick={() => setTheme('dark')}
+                    className={`group relative rounded-lg border-2 p-4 text-left transition-colors ${
+                      theme === 'dark'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/40'
+                    }`}
+                  >
+                    <div className="mb-3 flex h-20 items-end gap-1.5 rounded-md border bg-[hsl(222,16%,10%)] p-2">
+                      <div className="h-full w-3 rounded-sm bg-[hsl(222,50%,55%)]" />
+                      <div className="flex flex-1 flex-col gap-1">
+                        <div className="h-2 w-3/4 rounded-sm bg-[hsl(220,12%,20%)]" />
+                        <div className="h-2 w-1/2 rounded-sm bg-[hsl(220,12%,20%)]" />
+                        <div className="h-2 w-2/3 rounded-sm bg-[hsl(220,12%,20%)]" />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Moon className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">Mörkt</span>
+                    </div>
+                  </button>
+
+                  {/* System */}
+                  <button
+                    type="button"
+                    onClick={() => setTheme('system')}
+                    className={`group relative rounded-lg border-2 p-4 text-left transition-colors ${
+                      theme === 'system'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/40'
+                    }`}
+                  >
+                    <div className="mb-3 flex h-20 overflow-hidden rounded-md border">
+                      <div className="flex flex-1 items-end gap-1 bg-white p-2">
+                        <div className="h-full w-2 rounded-sm bg-[hsl(222,47%,35%)]" />
+                        <div className="flex flex-1 flex-col gap-1">
+                          <div className="h-2 w-3/4 rounded-sm bg-[hsl(220,14%,96%)]" />
+                          <div className="h-2 w-1/2 rounded-sm bg-[hsl(220,14%,96%)]" />
+                        </div>
+                      </div>
+                      <div className="flex flex-1 items-end gap-1 bg-[hsl(222,16%,10%)] p-2">
+                        <div className="h-full w-2 rounded-sm bg-[hsl(222,50%,55%)]" />
+                        <div className="flex flex-1 flex-col gap-1">
+                          <div className="h-2 w-3/4 rounded-sm bg-[hsl(220,12%,20%)]" />
+                          <div className="h-2 w-1/2 rounded-sm bg-[hsl(220,12%,20%)]" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Monitor className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">System</span>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Account settings */}

@@ -1,1 +1,1 @@
-export { default } from '@/extensions/receipt-ocr/pages/ReceiptsPage'
+export { default } from '@/extensions/general/receipt-ocr/pages/ReceiptsPage'

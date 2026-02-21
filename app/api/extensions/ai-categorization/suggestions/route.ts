@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { categorizeTransactions } from '@/extensions/ai-categorization'
-import type { CategorizationSuggestion } from '@/extensions/ai-categorization/categorizer'
+import { categorizeTransactions } from '@/extensions/general/ai-categorization'
+import type { CategorizationSuggestion } from '@/extensions/general/ai-categorization/categorizer'
 
 /**
  * GET /api/extensions/ai-categorization/suggestions?transaction_ids=id1,id2,...

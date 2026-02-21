@@ -1,0 +1,156 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import {
+  createMockRequest,
+  parseJsonResponse,
+  createQueuedMockSupabase,
+  makeJournalEntry,
+} from '@/tests/helpers'
+
+// Mock dependencies
+const { supabase: mockSupabase, enqueue, reset } = createQueuedMockSupabase()
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: () => Promise.resolve(mockSupabase),
+}))
+
+const mockCreateJournalEntry = vi.fn()
+vi.mock('@/lib/bookkeeping/engine', () => ({
+  createJournalEntry: (...args: unknown[]) => mockCreateJournalEntry(...args),
+}))
+
+import { GET, POST } from '../route'
+
+describe('GET /api/bookkeeping/journal-entries', () => {
+  const mockUser = { id: 'user-1', email: 'test@test.se' }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    reset()
+    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+  })
+
+  it('returns 401 when not authenticated', async () => {
+    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+
+    const request = createMockRequest('/api/bookkeeping/journal-entries')
+    const response = await GET(request)
+    const { status, body } = await parseJsonResponse(response)
+
+    expect(status).toBe(401)
+    expect(body).toEqual({ error: 'Unauthorized' })
+  })
+
+  it('returns entries list', async () => {
+    const entries = [makeJournalEntry(), makeJournalEntry()]
+    enqueue({ data: entries, error: null, count: 2 })
+
+    const request = createMockRequest('/api/bookkeeping/journal-entries')
+    const response = await GET(request)
+    const { status, body } = await parseJsonResponse<{ data: unknown[]; count: number }>(response)
+
+    expect(status).toBe(200)
+    expect(body.data).toEqual(entries)
+    expect(body.count).toBe(2)
+  })
+
+  it('passes filters to query', async () => {
+    enqueue({ data: [], error: null, count: 0 })
+
+    const request = createMockRequest('/api/bookkeeping/journal-entries', {
+      searchParams: {
+        period_id: 'period-1',
+        status: 'posted',
+        date_from: '2024-01-01',
+        date_to: '2024-12-31',
+        limit: '10',
+        offset: '5',
+      },
+    })
+    const response = await GET(request)
+    const { status } = await parseJsonResponse(response)
+
+    expect(status).toBe(200)
+    expect(mockSupabase.from).toHaveBeenCalledWith('journal_entries')
+  })
+
+  it('returns 500 on database error', async () => {
+    enqueue({ data: null, error: { message: 'DB error' } })
+
+    const request = createMockRequest('/api/bookkeeping/journal-entries')
+    const response = await GET(request)
+    const { status, body } = await parseJsonResponse<{ error: string }>(response)
+
+    expect(status).toBe(500)
+    expect(body.error).toBe('DB error')
+  })
+})
+
+describe('POST /api/bookkeeping/journal-entries', () => {
+  const mockUser = { id: 'user-1', email: 'test@test.se' }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    reset()
+    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+  })
+
+  it('returns 401 when not authenticated', async () => {
+    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+
+    const request = createMockRequest('/api/bookkeeping/journal-entries', {
+      method: 'POST',
+      body: {},
+    })
+    const response = await POST(request)
+    const { status, body } = await parseJsonResponse(response)
+
+    expect(status).toBe(401)
+    expect(body).toEqual({ error: 'Unauthorized' })
+  })
+
+  it('creates journal entry and returns it', async () => {
+    const entry = makeJournalEntry()
+    mockCreateJournalEntry.mockResolvedValue(entry)
+
+    const input = {
+      fiscal_period_id: 'period-1',
+      entry_date: '2024-06-15',
+      description: 'Test entry',
+      source_type: 'manual',
+      lines: [
+        { account_number: '1930', debit_amount: 1000, credit_amount: 0 },
+        { account_number: '3001', debit_amount: 0, credit_amount: 1000 },
+      ],
+    }
+
+    const request = createMockRequest('/api/bookkeeping/journal-entries', {
+      method: 'POST',
+      body: input,
+    })
+    const response = await POST(request)
+    const { status, body } = await parseJsonResponse<{ data: unknown }>(response)
+
+    expect(status).toBe(200)
+    expect(body.data).toEqual(entry)
+    expect(mockCreateJournalEntry).toHaveBeenCalledWith('user-1', input)
+  })
+
+  it('returns 400 when engine throws', async () => {
+    mockCreateJournalEntry.mockRejectedValue(new Error('Unbalanced entry'))
+
+    const request = createMockRequest('/api/bookkeeping/journal-entries', {
+      method: 'POST',
+      body: {
+        fiscal_period_id: 'period-1',
+        entry_date: '2024-06-15',
+        description: 'Bad entry',
+        source_type: 'manual',
+        lines: [{ account_number: '1930', debit_amount: 1000, credit_amount: 0 }],
+      },
+    })
+    const response = await POST(request)
+    const { status, body } = await parseJsonResponse<{ error: string }>(response)
+
+    expect(status).toBe(400)
+    expect(body.error).toBe('Unbalanced entry')
+  })
+})
