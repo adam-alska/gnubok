@@ -1,47 +1,32 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { motion, useMotionValue, useTransform, AnimatePresence, type PanInfo } from 'framer-motion'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { checkExpenseWarnings } from '@/lib/tax/expense-warnings'
+import { getDefaultAccountForCategory, getDefaultVatTreatmentForCategory } from '@/lib/bookkeeping/category-mapping'
+import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
 import { X, ArrowLeft, ArrowRight, Building, AlertTriangle, Check, FileText, Link2, Receipt as ReceiptIcon, SkipForward } from 'lucide-react'
-import type { Transaction, TransactionCategory, Invoice, Customer } from '@/types'
+import type { TransactionCategory, VatTreatment, BASAccount } from '@/types'
 import type { SuggestedCategory } from '@/lib/transactions/category-suggestions'
-
-interface TransactionWithInvoice extends Transaction {
-  potential_invoice?: Invoice & { customer?: Customer }
-}
+import type { TransactionWithInvoice, CategorizeHandler, MatchInvoiceHandler } from './transaction-types'
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, VAT_TREATMENT_OPTIONS } from './transaction-types'
 
 interface SwipeCategorizationViewProps {
   transactions: TransactionWithInvoice[]
   suggestions?: Record<string, SuggestedCategory[]>
-  onCategorize: (id: string, isBusiness: boolean, category?: TransactionCategory) => Promise<boolean>
-  onMatchInvoice?: (transactionId: string, invoiceId: string) => Promise<boolean>
+  onCategorize: CategorizeHandler
+  onMatchInvoice?: MatchInvoiceHandler
   onClose: () => void
 }
 
-const expenseCategories: { value: TransactionCategory; label: string }[] = [
-  { value: 'expense_equipment', label: 'Utrustning' },
-  { value: 'expense_software', label: 'Programvara' },
-  { value: 'expense_travel', label: 'Resor' },
-  { value: 'expense_office', label: 'Kontor' },
-  { value: 'expense_marketing', label: 'Marknadsföring' },
-  { value: 'expense_professional_services', label: 'Konsulter' },
-  { value: 'expense_education', label: 'Utbildning' },
-  { value: 'expense_bank_fees', label: 'Bankavgift' },
-  { value: 'expense_card_fees', label: 'Kortavgift' },
-  { value: 'expense_currency_exchange', label: 'Valutaväxling' },
-  { value: 'expense_other', label: 'Övrigt' },
-]
-
-const incomeCategories: { value: TransactionCategory; label: string }[] = [
-  { value: 'income_services', label: 'Tjänster' },
-  { value: 'income_products', label: 'Produkter' },
-  { value: 'income_other', label: 'Övrigt' },
-]
+const vatTreatmentOptions = VAT_TREATMENT_OPTIONS
+const expenseCategories = EXPENSE_CATEGORIES
+const incomeCategories = INCOME_CATEGORIES
 
 export default function SwipeCategorizationView({
   transactions,
@@ -55,6 +40,29 @@ export default function SwipeCategorizationView({
   const [showCategorySelect, setShowCategorySelect] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Review step state
+  const [showReviewStep, setShowReviewStep] = useState(false)
+  const [pendingCategory, setPendingCategory] = useState<TransactionCategory | null>(null)
+  const [accountOverride, setAccountOverride] = useState('')
+  const [vatTreatment, setVatTreatment] = useState<VatTreatment | 'none'>('standard_25')
+  const [accounts, setAccounts] = useState<BASAccount[]>([])
+
+  // Fetch accounts on mount
+  useEffect(() => {
+    async function fetchAccounts() {
+      try {
+        const res = await fetch('/api/bookkeeping/accounts')
+        const data = await res.json()
+        if (data.accounts) {
+          setAccounts(data.accounts)
+        }
+      } catch {
+        // Non-critical, AccountCombobox will just be empty
+      }
+    }
+    fetchAccounts()
+  }, [])
 
   const currentTransaction = transactions[currentIndex]
   const warnings = currentTransaction
@@ -85,6 +93,19 @@ export default function SwipeCategorizationView({
     [isProcessing, x]
   )
 
+  const handleCategorySelect = useCallback((category: TransactionCategory) => {
+    // Set up review step with defaults for this category
+    const defaultAccount = getDefaultAccountForCategory(category)
+    const defaultVat = getDefaultVatTreatmentForCategory(category)
+
+    setPendingCategory(category)
+    setAccountOverride(defaultAccount)
+    setVatTreatment(defaultVat ?? 'none')
+    setShowCategorySelect(false)
+    setShowReviewStep(true)
+    setError(null)
+  }, [])
+
   const handleDragEnd = useCallback(
     async (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
       if (isProcessing || !currentTransaction) return
@@ -101,24 +122,9 @@ export default function SwipeCategorizationView({
             setShowCategorySelect(true)
             x.set(0)
           } else {
-            setIsProcessing(true)
-            setError(null)
-            try {
-              const success = await onCategorize(
-                currentTransaction.id,
-                true,
-                'income_other'
-              )
-              if (success) {
-                moveToNext()
-              } else {
-                setError('Kunde inte bokföra. Tryck "Hoppa över" för att gå vidare.')
-              }
-            } catch {
-              setError('Ett fel uppstod. Tryck "Hoppa över" för att gå vidare.')
-            } finally {
-              setIsProcessing(false)
-            }
+            // Income: go to review step with income_other default
+            handleCategorySelect('income_other')
+            x.set(0)
           }
         } else {
           // Swipe left = skip
@@ -128,16 +134,32 @@ export default function SwipeCategorizationView({
         x.set(0)
       }
     },
-    [isProcessing, currentTransaction, onCategorize, x, moveToNext]
+    [isProcessing, currentTransaction, handleCategorySelect, x, moveToNext]
   )
 
-  const handleCategorySelect = async (category: TransactionCategory) => {
+  const handleReviewConfirm = async () => {
+    if (!pendingCategory) return
+
     setIsProcessing(true)
     setError(null)
     try {
-      const success = await onCategorize(currentTransaction.id, true, category)
+      const resolvedVat = vatTreatment === 'none' ? undefined : vatTreatment
+      const defaultAccount = getDefaultAccountForCategory(pendingCategory)
+      // Only send override if it differs from the default
+      const override = accountOverride && accountOverride !== defaultAccount
+        ? accountOverride
+        : undefined
+
+      const success = await onCategorize(
+        currentTransaction.id,
+        true,
+        pendingCategory,
+        resolvedVat,
+        override
+      )
       if (success) {
-        setShowCategorySelect(false)
+        setShowReviewStep(false)
+        setPendingCategory(null)
         moveToNext()
       } else {
         setError('Kunde inte bokföra. Tryck "Hoppa över" för att gå vidare.')
@@ -174,6 +196,8 @@ export default function SwipeCategorizationView({
   const handleSkip = useCallback(() => {
     setError(null)
     setShowCategorySelect(false)
+    setShowReviewStep(false)
+    setPendingCategory(null)
     moveToNext()
   }, [moveToNext])
 
@@ -244,6 +268,123 @@ export default function SwipeCategorizationView({
             variant="ghost"
             className="w-full mt-4 text-muted-foreground"
             onClick={handleSkip}
+          >
+            <SkipForward className="mr-2 h-4 w-4" />
+            Hoppa över
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (showReviewStep && pendingCategory) {
+    const categoryLabel = [...expenseCategories, ...incomeCategories].find(
+      (c) => c.value === pendingCategory
+    )?.label || pendingCategory
+
+    // Auto-clear VAT when a class 2 (liability/equity) account is selected
+    const isLiabilityAccount = accountOverride.startsWith('2')
+
+    return (
+      <div className="fixed inset-0 bg-background z-50 flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              setShowReviewStep(false)
+              setShowCategorySelect(true)
+            }}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="font-semibold">Granska bokföring</h1>
+          <div className="w-10" />
+        </div>
+
+        <div className="flex-1 overflow-auto p-4 space-y-4">
+          {/* Transaction summary */}
+          <Card>
+            <CardContent className="pt-4 space-y-1">
+              <p className="font-medium">{currentTransaction.description}</p>
+              <p className="text-sm text-muted-foreground">{formatDate(currentTransaction.date)}</p>
+              <p className="text-2xl font-bold mt-2">
+                {currentTransaction.amount > 0 ? '+' : ''}
+                {formatCurrency(currentTransaction.amount, currentTransaction.currency)}
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Selected category */}
+          <div>
+            <label className="text-sm font-medium text-muted-foreground">Kategori</label>
+            <div className="mt-1">
+              <Badge variant="outline" className="text-sm py-1 px-3">{categoryLabel}</Badge>
+            </div>
+          </div>
+
+          {/* Account override */}
+          <div>
+            <label className="text-sm font-medium text-muted-foreground">Konto</label>
+            <div className="mt-1">
+              <AccountCombobox
+                value={accountOverride}
+                accounts={accounts}
+                onChange={setAccountOverride}
+              />
+            </div>
+          </div>
+
+          {/* VAT treatment */}
+          <div>
+            <label className="text-sm font-medium text-muted-foreground">Momsbehandling</label>
+            <div className="mt-1">
+              <Select
+                value={isLiabilityAccount ? 'none' : vatTreatment}
+                onValueChange={(v) => setVatTreatment(v as VatTreatment | 'none')}
+                disabled={isLiabilityAccount}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {vatTreatmentOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isLiabilityAccount && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Ingen moms för skuld-/eget kapital-konton
+                </p>
+              )}
+            </div>
+          </div>
+
+          {error && (
+            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="p-4 border-t space-y-2">
+          <Button
+            className="w-full"
+            onClick={handleReviewConfirm}
+            disabled={isProcessing}
+          >
+            <Check className="mr-2 h-4 w-4" />
+            {isProcessing ? 'Bokför...' : 'Bokför'}
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full text-muted-foreground"
+            onClick={handleSkip}
+            disabled={isProcessing}
           >
             <SkipForward className="mr-2 h-4 w-4" />
             Hoppa över
