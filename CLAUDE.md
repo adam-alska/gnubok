@@ -460,3 +460,6 @@ NEXT_PUBLIC_APP_URL               # App base URL
 NEXT_PUBLIC_VAPID_PUBLIC_KEY      # Web push public key
 VAPID_PRIVATE_KEY                 # Web push private key
 ```
+
+## Other
+We should never create a nul file

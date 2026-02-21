@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { syncAccountTransactions } from '@/extensions/enable-banking/lib/sync'
-import { isConsentExpiringSoon, getDaysUntilExpiry } from '@/extensions/enable-banking/lib/api-client'
-import type { StoredAccount } from '@/extensions/enable-banking/types'
+import { syncAccountTransactions } from '@/extensions/general/enable-banking/lib/sync'
+import { isConsentExpiringSoon, getDaysUntilExpiry } from '@/extensions/general/enable-banking/lib/api-client'
+import type { StoredAccount } from '@/extensions/general/enable-banking/types'
 
 /**
  * GET /api/extensions/enable-banking/sync/cron

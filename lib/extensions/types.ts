@@ -1,4 +1,53 @@
 import type { CoreEventType } from '@/lib/events/types'
+import type { EntityType } from '@/types'
+
+// ============================================================
+// Extension Marketplace Types
+// ============================================================
+
+/** Extension category for marketplace grouping */
+export type ExtensionCategory = 'accounting' | 'reports' | 'import' | 'operations'
+
+/** Sector slugs for extension organization */
+export type SectorSlug = 'general' | 'restaurant' | 'construction' | 'hotel' | 'tech' | 'ecommerce'
+
+/** How an extension gets its data */
+export type ExtensionDataPattern = 'core' | 'manual' | 'both'
+
+/** Extension metadata for the marketplace and workspace routing */
+export interface ExtensionDefinition {
+  slug: string
+  name: string
+  sector: SectorSlug
+  category: ExtensionCategory
+  description: string
+  longDescription: string
+  icon: string
+  entityTypes?: EntityType[]
+  dataPattern: ExtensionDataPattern
+  readsCoreTables?: string[]
+  hasOwnData?: boolean
+}
+
+/** Sector definition with its extensions */
+export interface Sector {
+  slug: SectorSlug
+  name: string
+  icon: string
+  description: string
+  extensions: ExtensionDefinition[]
+}
+
+/** Database row for extension toggle state */
+export interface ExtensionToggle {
+  id: string
+  user_id: string
+  sector_slug: string
+  extension_slug: string
+  enabled: boolean
+  created_at: string
+  updated_at: string
+}
 
 // ============================================================
 // Extension Interface & Supporting Types

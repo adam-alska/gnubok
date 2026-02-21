@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -24,11 +24,14 @@ import {
   Building2,
   FileInput,
 } from 'lucide-react'
+import { getExtensionDefinition } from '@/lib/extensions/sectors'
+import { resolveIcon } from '@/lib/extensions/icon-resolver'
 import type { EntityType } from '@/types'
 
 interface DashboardNavProps {
   companyName: string
   entityType: EntityType
+  enabledExtensions?: { sector_slug: string; extension_slug: string }[]
 }
 
 interface NavItem {
@@ -61,12 +64,31 @@ const groupLabels: Record<string, string> = {
   övrigt: 'Övrigt',
 }
 
-export default function DashboardNav({ companyName, entityType }: DashboardNavProps) {
+export default function DashboardNav({ companyName, entityType, enabledExtensions }: DashboardNavProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isOvrigtExpanded, setIsOvrigtExpanded] = useState(false)
+  const [isTillaggExpanded, setIsTillaggExpanded] = useState(false)
+  const [liveExtensions, setLiveExtensions] = useState(enabledExtensions ?? [])
+
+  const fetchExtensions = useCallback(async () => {
+    try {
+      const res = await fetch('/api/extensions/toggles')
+      if (res.ok) {
+        const { data } = await res.json()
+        if (data) setLiveExtensions(data)
+      }
+    } catch {
+      // keep current state on error
+    }
+  }, [])
+
+  // Refresh extensions when dropdown is opened or mobile menu is opened
+  useEffect(() => {
+    if (isTillaggExpanded || isMobileMenuOpen) fetchExtensions()
+  }, [isTillaggExpanded, isMobileMenuOpen, fetchExtensions])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -172,6 +194,53 @@ export default function DashboardNav({ companyName, entityType }: DashboardNavPr
                     )
                   })}
                 </div>
+              </div>
+
+              {/* Tillägg - collapsible */}
+              <div className="mb-4">
+                <button
+                  onClick={() => setIsTillaggExpanded(!isTillaggExpanded)}
+                  className="w-full flex items-center justify-between px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-[0.08em] hover:text-muted-foreground transition-colors"
+                >
+                  <span>Tillägg</span>
+                  <ChevronDown className={cn(
+                    "h-3 w-3 transition-transform duration-200",
+                    isTillaggExpanded && "rotate-180"
+                  )} />
+                </button>
+                {isTillaggExpanded && (
+                  <div className="space-y-px animate-fade-in">
+                    {liveExtensions.length > 0 ? liveExtensions.map((toggle) => {
+                      const def = getExtensionDefinition(toggle.sector_slug, toggle.extension_slug)
+                      if (!def) return null
+                      const ExtIcon = resolveIcon(def.icon)
+                      const href = `/e/${toggle.sector_slug}/${toggle.extension_slug}`
+                      const active = isActive(href)
+                      return (
+                        <Link
+                          key={`${toggle.sector_slug}/${toggle.extension_slug}`}
+                          href={href}
+                          className={cn(
+                            'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
+                            active
+                              ? 'bg-primary/8 text-foreground font-medium'
+                              : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                          )}
+                        >
+                          <ExtIcon className={cn(
+                            "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
+                            active ? "text-primary" : "text-muted-foreground/70 group-hover:text-muted-foreground"
+                          )} />
+                          {def.name}
+                        </Link>
+                      )
+                    }) : (
+                      <p className="px-3 py-2 text-[12px] text-muted-foreground/60">
+                        Inga tillägg aktiverade
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Övrigt group - collapsible */}
@@ -355,6 +424,40 @@ export default function DashboardNav({ companyName, entityType }: DashboardNavPr
                     </Link>
                   )
                 })}
+              </div>
+
+              {/* Tillägg */}
+              <div className="mb-4">
+                <p className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Tillägg
+                </p>
+                {liveExtensions.length > 0 ? liveExtensions.map((toggle) => {
+                  const def = getExtensionDefinition(toggle.sector_slug, toggle.extension_slug)
+                  if (!def) return null
+                  const ExtIcon = resolveIcon(def.icon)
+                  const href = `/e/${toggle.sector_slug}/${toggle.extension_slug}`
+                  const active = isActive(href)
+                  return (
+                    <Link
+                      key={`${toggle.sector_slug}/${toggle.extension_slug}`}
+                      href={href}
+                      onClick={closeMobileMenu}
+                      className={cn(
+                        'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
+                        active
+                          ? 'bg-primary/10 text-primary font-medium'
+                          : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+                      )}
+                    >
+                      <ExtIcon className="h-5 w-5" />
+                      {def.name}
+                    </Link>
+                  )
+                }) : (
+                  <p className="px-3 py-2 text-xs text-muted-foreground/60">
+                    Inga tillägg aktiverade
+                  </p>
+                )}
               </div>
 
               {/* Other section */}

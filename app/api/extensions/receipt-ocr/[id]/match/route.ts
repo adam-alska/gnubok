@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { findTransactionMatches } from '@/extensions/receipt-ocr/lib/receipt-matcher'
+import { findTransactionMatches } from '@/extensions/general/receipt-ocr/lib/receipt-matcher'
 import { eventBus } from '@/lib/events/bus'
 import { ensureInitialized } from '@/lib/init'
 import type { Receipt, Transaction } from '@/types'

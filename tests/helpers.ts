@@ -16,6 +16,7 @@ import type {
   SupplierInvoice,
   CompanySettings,
 } from '@/types'
+import type { ExtensionToggle } from '@/lib/extensions/types'
 
 // ============================================================
 // Chainable Supabase mock
@@ -435,6 +436,22 @@ export function makeCompanySettings(
     invoice_default_days: 30,
     onboarding_step: 6,
     onboarding_complete: true,
+    sector_slug: null,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
+export function makeExtensionToggle(
+  overrides: Partial<ExtensionToggle> = {}
+): ExtensionToggle {
+  return {
+    id: nextId(),
+    user_id: 'user-1',
+    sector_slug: 'general',
+    extension_slug: 'receipt-ocr',
+    enabled: true,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
     ...overrides,

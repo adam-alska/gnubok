@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { getSettings, saveSettings } from '@/extensions/ai-categorization'
+import { getSettings, saveSettings } from '@/extensions/general/ai-categorization'
 
 /**
  * GET /api/extensions/ai-categorization/settings

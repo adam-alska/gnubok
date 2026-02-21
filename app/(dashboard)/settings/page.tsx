@@ -24,7 +24,7 @@ import {
   Calendar,
 } from 'lucide-react'
 import type { CompanySettings, BankConnection } from '@/types'
-import { NotificationSettings } from '@/extensions/push-notifications/NotificationSettings'
+import { NotificationSettings } from '@/extensions/general/push-notifications/NotificationSettings'
 import { CalendarFeedSettings } from '@/components/settings/CalendarFeedSettings'
 
 export default function SettingsPage() {

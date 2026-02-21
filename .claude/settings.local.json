@@ -16,7 +16,12 @@
       "Bash(python3:*)",
       "Bash(git -C /Users/jakobwennberg/erp-base status --porcelain)",
       "Bash(__NEW_LINE_421a23f44da9923d__ echo '=== Checking which index exports are used ===' grep -r @/components/calendar /Users/jakobwennberg/erp-base/app --include=*.tsx --include=*.ts 2)",
-      "Bash(/dev/null __NEW_LINE_421a23f44da9923d__ echo -e '\\\\n=== Checking which calendar deadline components are directly imported ===' grep -rE \"DeadlineList|DeadlineCard|DeadlineForm|DeadlineFilters|PaymentSummaryCard|TaxTodoWidget|UpcomingDeadlinesWidget\" /Users/jakobwennberg/erp-base --include=*.tsx --include=*.ts)"
+      "Bash(/dev/null __NEW_LINE_421a23f44da9923d__ echo -e '\\\\n=== Checking which calendar deadline components are directly imported ===' grep -rE \"DeadlineList|DeadlineCard|DeadlineForm|DeadlineFilters|PaymentSummaryCard|TaxTodoWidget|UpcomingDeadlinesWidget\" /Users/jakobwennberg/erp-base --include=*.tsx --include=*.ts)",
+      "Bash(npm run build:*)",
+      "Bash(npx supabase:*)",
+      "Bash(curl:*)",
+      "Bash(npx tsc:*)",
+      "Bash(findstr:*)"
     ]
   }
 }

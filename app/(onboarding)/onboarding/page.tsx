@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useEffect, useMemo, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Progress } from '@/components/ui/progress'
-import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
 import { Loader2 } from 'lucide-react'
 import type { CompanySettings, EntityType, MomsPeriod } from '@/types'
@@ -13,13 +12,18 @@ import Step1EntityType from '@/components/onboarding/Step1EntityType'
 import Step2CompanyDetails from '@/components/onboarding/Step2CompanyDetails'
 import Step3TaxRegistration from '@/components/onboarding/Step3TaxRegistration'
 import Step4PreliminaryTax from '@/components/onboarding/Step4PreliminaryTax'
-import Step6ConnectBank from '@/components/onboarding/Step6ConnectBank'
+import Step5ConnectBank from '@/components/onboarding/Step6ConnectBank'
+import Step6SectorSelection from '@/components/onboarding/Step2SectorSelection'
+import Step7ExtensionSuggestions from '@/components/onboarding/Step3ExtensionSuggestions'
+
 const STEP_TITLES = [
   'Verksamhetsform',
   'Företagsuppgifter',
   'Skatteregistrering',
   'F-skatt',
   'Anslut bank',
+  'Bransch',
+  'Tillägg',
 ]
 
 export default function OnboardingPage() {
@@ -40,8 +44,9 @@ function OnboardingPageContent() {
   const [isSaving, setIsSaving] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
   const [settings, setSettings] = useState<Partial<CompanySettings>>({})
+  const [sectorSlug, setSectorSlug] = useState<string | null>(null)
 
-  const totalSteps = 5
+  const totalSteps = 7
   const stepTitles = STEP_TITLES
 
   // Load existing settings on mount
@@ -63,6 +68,9 @@ function OnboardingPageContent() {
       if (data) {
         setSettings(data)
         setCurrentStep(data.onboarding_step || 1)
+        if ((data as Record<string, unknown>).sector_slug) {
+          setSectorSlug((data as Record<string, unknown>).sector_slug as string)
+        }
       }
 
       setIsLoading(false)
@@ -74,13 +82,13 @@ function OnboardingPageContent() {
   // Handle bank_connected callback from PSD2 flow
   useEffect(() => {
     if (searchParams.get('bank_connected') === 'true') {
-      saveSettings({ onboarding_complete: true }).then((success) => {
+      toast({
+        title: 'Bank ansluten!',
+        description: 'Din bank har kopplats.',
+      })
+      saveSettings({}, 6).then((success) => {
         if (success) {
-          toast({
-            title: 'Bank ansluten!',
-            description: 'Din bank är kopplad och profilen är redo.',
-          })
-          router.push('/')
+          setCurrentStep(6)
         }
       })
     }
@@ -205,18 +213,6 @@ function OnboardingPageContent() {
     }
   }
 
-  const handleComplete = async () => {
-    const success = await saveSettings({ onboarding_complete: true })
-
-    if (success) {
-      toast({
-        title: 'Välkommen!',
-        description: 'Din profil är nu redo.',
-      })
-      router.push('/')
-    }
-  }
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -226,6 +222,41 @@ function OnboardingPageContent() {
   }
 
   const progressPercent = ((currentStep - 1) / (totalSteps - 1)) * 100
+
+  const handleSectorNext = async (data: { sector_slug: string | null }) => {
+    setSectorSlug(data.sector_slug)
+    const nextStep = currentStep + 1
+    const settingsUpdate: Partial<CompanySettings> = {}
+    if (data.sector_slug) {
+      ;(settingsUpdate as Record<string, unknown>).sector_slug = data.sector_slug
+    }
+    const success = await saveSettings(settingsUpdate, nextStep)
+    if (success) {
+      setCurrentStep(nextStep)
+    }
+  }
+
+  const handleExtensionsNext = async (data: { enabled_extensions: { sector_slug: string; extension_slug: string }[] }) => {
+    // Insert extension toggles if any were selected
+    if (data.enabled_extensions.length > 0) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const rows = data.enabled_extensions.map(ext => ({
+            user_id: user.id,
+            sector_slug: ext.sector_slug,
+            extension_slug: ext.extension_slug,
+            enabled: true,
+          }))
+          await supabase.from('extension_toggles').upsert(rows, {
+            onConflict: 'user_id,sector_slug,extension_slug',
+          })
+        }
+      } catch (err) {
+        console.error('Failed to save extension toggles:', err)
+      }
+    }
+  }
 
   const renderSteps = () => (
     <>
@@ -281,7 +312,7 @@ function OnboardingPageContent() {
       )}
 
       {currentStep === 5 && (
-        <Step6ConnectBank
+        <Step5ConnectBank
           initialData={{
             bank_name: settings.bank_name ?? undefined,
             clearing_number: settings.clearing_number ?? undefined,
@@ -291,10 +322,30 @@ function OnboardingPageContent() {
           }}
           onComplete={async (data) => {
             if (data) {
-              await saveSettings({ ...data, onboarding_complete: true })
-            } else {
-              await saveSettings({ onboarding_complete: true })
+              await saveSettings(data, 6)
             }
+            setCurrentStep(6)
+          }}
+          onBack={handleBack}
+          onSkip={() => setCurrentStep(6)}
+          isSaving={isSaving}
+        />
+      )}
+
+      {currentStep === 6 && (
+        <Step6SectorSelection
+          onNext={handleSectorNext}
+          onBack={handleBack}
+          isSaving={isSaving}
+        />
+      )}
+
+      {currentStep === 7 && (
+        <Step7ExtensionSuggestions
+          sectorSlug={sectorSlug}
+          onNext={async (data) => {
+            await handleExtensionsNext(data)
+            await saveSettings({ onboarding_complete: true }, totalSteps)
             toast({
               title: 'Välkommen!',
               description: 'Din profil är nu redo.',
@@ -302,7 +353,6 @@ function OnboardingPageContent() {
             router.push('/')
           }}
           onBack={handleBack}
-          onSkip={handleComplete}
           isSaving={isSaving}
         />
       )}
