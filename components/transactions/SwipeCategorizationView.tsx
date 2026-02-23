@@ -48,6 +48,13 @@ export default function SwipeCategorizationView({
   const [vatTreatment, setVatTreatment] = useState<VatTreatment | 'none'>('standard_25')
   const [accounts, setAccounts] = useState<BASAccount[]>([])
 
+  // Clear VAT treatment when switching to a liability/equity account (class 2)
+  useEffect(() => {
+    if (accountOverride.startsWith('2') && vatTreatment !== 'none') {
+      setVatTreatment('none')
+    }
+  }, [accountOverride]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Fetch accounts on mount
   useEffect(() => {
     async function fetchAccounts() {
@@ -375,7 +382,7 @@ export default function SwipeCategorizationView({
           <Button
             className="w-full"
             onClick={handleReviewConfirm}
-            disabled={isProcessing}
+            disabled={isProcessing || !accountOverride}
           >
             <Check className="mr-2 h-4 w-4" />
             {isProcessing ? 'Bokför...' : 'Bokför'}
