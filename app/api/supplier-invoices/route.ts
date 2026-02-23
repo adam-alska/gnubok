@@ -1,7 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { createSupplierInvoiceRegistrationEntry } from '@/lib/bookkeeping/supplier-invoice-entries'
+import { ensureInitialized } from '@/lib/init'
 import type { CreateSupplierInvoiceInput, SupplierInvoice, SupplierInvoiceItem } from '@/types'
+
+ensureInitialized()
 
 export async function GET(request: Request) {
   const supabase = await createClient()

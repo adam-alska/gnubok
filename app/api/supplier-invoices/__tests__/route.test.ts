@@ -12,6 +12,10 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: () => Promise.resolve(mockSupabase),
 }))
 
+vi.mock('@/lib/init', () => ({
+  ensureInitialized: vi.fn(),
+}))
+
 const mockFindFiscalPeriod = vi.fn()
 vi.mock('@/lib/bookkeeping/engine', () => ({
   findFiscalPeriod: (...args: unknown[]) => mockFindFiscalPeriod(...args),

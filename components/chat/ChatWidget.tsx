@@ -10,7 +10,6 @@ export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false)
   // Default to true for legacy compatibility (ai-chat defaults to enabled)
   const [enabled, setEnabled] = useState(true)
-  const [loaded, setLoaded] = useState(false)
 
   // Fetch initial toggle state
   useEffect(() => {
@@ -22,8 +21,8 @@ export function ChatWidget() {
           // Legacy: enabled by default when no toggle row exists
           setEnabled(data?.enabled ?? true)
         }
-      } finally {
-        setLoaded(true)
+      } catch {
+        // Keep default (enabled) on fetch failure
       }
     }
     check()
@@ -42,7 +41,14 @@ export function ChatWidget() {
     return () => window.removeEventListener('extension-toggle-changed', handler)
   }, [])
 
-  if (!loaded || !enabled) return null
+  // Allow other components to open the chat via custom event
+  useEffect(() => {
+    const handler = () => setIsOpen(true)
+    window.addEventListener('open-ai-chat', handler)
+    return () => window.removeEventListener('open-ai-chat', handler)
+  }, [])
+
+  if (!enabled) return null
 
   return (
     <>
