@@ -115,6 +115,24 @@ export function createReceiptMatchedPayload(
 }
 
 // ============================================================
+// Missing underlag payload
+// ============================================================
+
+export function createMissingUnderlagPayload(count: number): NotificationPayload {
+  return {
+    title: 'Saknade underlag',
+    body: `${count} verifikation(er) saknar underlag. Bifoga for att uppfylla bokforingslagen.`,
+    icon: '/icons/icon-192.png',
+    badge: '/icons/badge-72.png',
+    tag: 'missing-underlag-weekly',
+    data: {
+      url: '/bookkeeping?missingUnderlag=true',
+      type: 'missing_underlag',
+    },
+  }
+}
+
+// ============================================================
 // Cron-based payloads (moved from lib/push/web-push.ts)
 // ============================================================
 

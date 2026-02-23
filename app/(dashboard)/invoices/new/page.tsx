@@ -21,6 +21,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Loader2, Plus, Trash2, ArrowLeft, Send, Eye } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { InvoiceReviewContent } from '@/components/invoices/InvoiceReviewContent'
+import { getErrorMessage } from '@/lib/errors/get-error-message'
+import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import type { Customer, Currency, CreateInvoiceInput, InvoiceDocumentType } from '@/types'
 
 const itemSchema = z.object({
@@ -73,7 +75,7 @@ export default function NewInvoicePage() {
     handleSubmit,
     watch,
     setValue,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -85,6 +87,8 @@ export default function NewInvoicePage() {
       items: [{ description: '', quantity: 1, unit: 'st', unit_price: 0, vat_rate: 25 }],
     },
   })
+
+  useUnsavedChanges(isDirty)
 
   // Set date defaults on client only to avoid hydration mismatch
   useEffect(() => {
@@ -209,7 +213,7 @@ export default function NewInvoicePage() {
       const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.error || 'Kunde inte skapa faktura')
+        throw new Error(getErrorMessage(result, { context: 'invoice', statusCode: response.status }))
       }
 
       const docLabel = watchDocumentType === 'proforma' ? 'Proformafaktura' : watchDocumentType === 'delivery_note' ? 'Följesedel' : 'Faktura'
@@ -229,8 +233,8 @@ export default function NewInvoicePage() {
       }
     } catch (error) {
       toast({
-        title: 'Fel',
-        description: error instanceof Error ? error.message : 'Något gick fel',
+        title: 'Kunde inte skapa faktura',
+        description: getErrorMessage(error, { context: 'invoice' }),
         variant: 'destructive',
       })
     } finally {
@@ -249,7 +253,7 @@ export default function NewInvoicePage() {
 
       if (!response.ok) {
         const result = await response.json()
-        throw new Error(result.error || 'Kunde inte skicka faktura')
+        throw new Error(getErrorMessage(result, { context: 'invoice', statusCode: response.status }))
       }
 
       toast({
@@ -258,8 +262,8 @@ export default function NewInvoicePage() {
       })
     } catch (error) {
       toast({
-        title: 'Fel vid skickning',
-        description: error instanceof Error ? error.message : 'Något gick fel',
+        title: 'Kunde inte skicka faktura',
+        description: getErrorMessage(error, { context: 'invoice' }),
         variant: 'destructive',
       })
     } finally {
@@ -292,7 +296,7 @@ export default function NewInvoicePage() {
 
       if (!response.ok) {
         const result = await response.json()
-        throw new Error(result.error || 'Kunde inte generera förhandsgranskning')
+        throw new Error(getErrorMessage(result, { context: 'invoice', statusCode: response.status }))
       }
 
       const blob = await response.blob()
@@ -300,8 +304,8 @@ export default function NewInvoicePage() {
       window.open(url, '_blank')
     } catch (error) {
       toast({
-        title: 'Fel',
-        description: error instanceof Error ? error.message : 'Kunde inte generera PDF',
+        title: 'Kunde inte generera PDF',
+        description: getErrorMessage(error, { context: 'invoice' }),
         variant: 'destructive',
       })
     } finally {

@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { ArrowLeft, CheckCircle, CreditCard, FileText, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { AccountNumber } from '@/components/ui/account-number'
+import { DestructiveConfirmDialog, useDestructiveConfirm } from '@/components/ui/destructive-confirm-dialog'
 import type { SupplierInvoice, SupplierInvoiceItem, SupplierInvoicePayment } from '@/types'
 
 function formatAmount(amount: number): string {
@@ -47,6 +48,7 @@ export default function SupplierInvoiceDetailPage() {
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false)
   const [payAmount, setPayAmount] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const { dialogProps: confirmDialogProps, confirm: confirmAction } = useDestructiveConfirm()
 
   useEffect(() => {
     fetchInvoice()
@@ -100,7 +102,13 @@ export default function SupplierInvoiceDetailPage() {
   }
 
   async function handleCredit() {
-    if (!confirm('Vill du registrera en kreditfaktura för denna faktura?')) return
+    const ok = await confirmAction({
+      title: 'Registrera kreditfaktura',
+      description: 'En kreditfaktura skapas som reverserar den ursprungliga fakturan. Denna åtgärd kan inte ångras.',
+      confirmLabel: 'Registrera kreditfaktura',
+      variant: 'warning',
+    })
+    if (!ok) return
     setIsProcessing(true)
     const res = await fetch(`/api/supplier-invoices/${params.id}/credit`, { method: 'POST' })
     const result = await res.json()
@@ -114,7 +122,13 @@ export default function SupplierInvoiceDetailPage() {
   }
 
   async function handleDelete() {
-    if (!confirm('Vill du ta bort denna faktura?')) return
+    const ok = await confirmAction({
+      title: 'Ta bort faktura',
+      description: 'Fakturan och tillhörande data tas bort permanent. Denna åtgärd kan inte ångras.',
+      confirmLabel: 'Ta bort',
+      variant: 'destructive',
+    })
+    if (!ok) return
     const res = await fetch(`/api/supplier-invoices/${params.id}`, { method: 'DELETE' })
     const result = await res.json()
     if (!res.ok) {
@@ -409,6 +423,8 @@ export default function SupplierInvoiceDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      <DestructiveConfirmDialog {...confirmDialogProps} />
 
       {/* Pay Dialog */}
       <Dialog open={isPayDialogOpen} onOpenChange={setIsPayDialogOpen}>
