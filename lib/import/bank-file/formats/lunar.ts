@@ -1,38 +1,46 @@
 /**
- * SEB CSV format parser
+ * Lunar CSV format parser
  *
- * Format: Semicolon-delimited, comma decimal separator
- * Columns vary but typically: Bokföringsdag, Valutadag, Verifikationsnummer,
- *   Text/mottagare, Belopp, Saldo
+ * Format: Comma-delimited, comma decimal separator (amounts are quoted)
+ * Columns: Date, Text, Amount, Balance (English headers)
  * Date format: YYYY-MM-DD
- * Encoding: UTF-8 or Windows-1252
+ * Encoding: UTF-8
+ *
+ * Notes:
+ * - English headers distinguish Lunar from Nordea (Swedish headers)
+ * - Amounts use comma as decimal separator but are quoted since the file
+ *   delimiter is also comma
+ * - Thousand separator is period (e.g. "1.234,56")
  */
 
 import type { BankFileFormat, BankFileParseResult, ParsedBankTransaction, BankFileParseIssue } from '../types'
 import { prepareContent } from '../encoding'
+import { parseCSVLine } from './nordea'
 
-function parseCommaDecimal(value: string): number {
-  const cleaned = value.replace(/\s/g, '').replace(',', '.')
+function parseLunarAmount(value: string): number {
+  // Lunar format: "1.234,56" or "-1.234,56"
+  // Remove period (thousand separator), replace comma (decimal separator) with period
+  const cleaned = value.replace(/\./g, '').replace(',', '.')
   return parseFloat(cleaned)
 }
 
-export const sebFormat: BankFileFormat = {
-  id: 'seb',
-  name: 'SEB',
-  description: 'SEB CSV (semicolon-delimited)',
+export const lunarFormat: BankFileFormat = {
+  id: 'lunar',
+  name: 'Lunar',
+  description: 'Lunar CSV (comma-delimited, English headers)',
   fileExtensions: ['.csv', '.txt'],
 
   detect(content: string, _filename: string): boolean {
     const prepared = prepareContent(content)
     const firstLine = prepared.split('\n')[0]?.toLowerCase() || ''
-    // SEB headers contain "bokföringsdag"/"bokforingsdatum" AND "valutadag"/"verifikationsnummer"
-    // The secondary check distinguishes SEB from Länsförsäkringar (which also has "bokföringsdag")
+    // Lunar: comma-delimited with English headers
+    // Must NOT contain semicolons, must have "date", "text", "amount", "balance"
     return (
-      firstLine.includes(';') &&
-      (firstLine.includes('bokföringsdag') ||
-        firstLine.includes('bokforingsdatum') ||
-        firstLine.includes('bokföringsdag')) &&
-      (firstLine.includes('valutadag') || firstLine.includes('verifikationsnummer'))
+      !firstLine.includes(';') &&
+      firstLine.includes('date') &&
+      firstLine.includes('text') &&
+      firstLine.includes('amount') &&
+      firstLine.includes('balance')
     )
   },
 
@@ -44,19 +52,14 @@ export const sebFormat: BankFileFormat = {
     const issues: BankFileParseIssue[] = []
     let skippedRows = 0
 
-    // Parse header to find column indices
+    // Parse header
     const headerLine = lines[0] || ''
-    const headers = headerLine.split(';').map((h) => h.trim().toLowerCase().replace(/"/g, ''))
+    const headers = parseCSVLine(headerLine, ',').map((h) => h.trim().toLowerCase().replace(/"/g, ''))
 
-    // Find column indices dynamically
-    const dateIdx = headers.findIndex(
-      (h) => h.includes('bokföringsdag') || h.includes('bokforingsdatum') || h.includes('bokföringsdag')
-    )
-    const descIdx = headers.findIndex(
-      (h) => h.includes('text') || h.includes('mottagare') || h.includes('beskrivning')
-    )
-    const amountIdx = headers.findIndex((h) => h.includes('belopp'))
-    const balanceIdx = headers.findIndex((h) => h.includes('saldo'))
+    const dateIdx = headers.findIndex((h) => h === 'date')
+    const descIdx = headers.findIndex((h) => h === 'text')
+    const amountIdx = headers.findIndex((h) => h === 'amount')
+    const balanceIdx = headers.findIndex((h) => h === 'balance')
 
     if (dateIdx === -1 || amountIdx === -1) {
       issues.push({
@@ -65,8 +68,8 @@ export const sebFormat: BankFileFormat = {
         severity: 'error',
       })
       return {
-        format: 'seb',
-        format_name: 'SEB',
+        format: 'lunar',
+        format_name: 'Lunar',
         transactions: [],
         date_from: null,
         date_to: null,
@@ -79,20 +82,19 @@ export const sebFormat: BankFileFormat = {
       const line = lines[i].trim()
       if (!line) continue
 
-      const fields = line.split(';').map((f) => f.trim().replace(/^"|"$/g, ''))
+      const fields = parseCSVLine(line, ',').map((f) => f.trim().replace(/^"|"$/g, ''))
 
       const date = fields[dateIdx]
-      const description = fields[descIdx >= 0 ? descIdx : dateIdx + 1] || 'Unknown'
+      const description = descIdx >= 0 ? fields[descIdx] : 'Unknown'
       const amountStr = fields[amountIdx]
       const balanceStr = balanceIdx >= 0 ? fields[balanceIdx] : undefined
 
       if (!date || !amountStr) {
-        issues.push({ row: i + 1, message: 'Missing required fields', severity: 'warning' })
         skippedRows++
         continue
       }
 
-      const amount = parseCommaDecimal(amountStr)
+      const amount = parseLunarAmount(amountStr)
       if (isNaN(amount)) {
         issues.push({ row: i + 1, message: `Invalid amount: ${amountStr}`, severity: 'warning' })
         skippedRows++
@@ -105,11 +107,11 @@ export const sebFormat: BankFileFormat = {
         continue
       }
 
-      const balance = balanceStr ? parseCommaDecimal(balanceStr) : null
+      const balance = balanceStr ? parseLunarAmount(balanceStr) : null
 
       transactions.push({
         date,
-        description: description.trim(),
+        description: (description || 'Unknown').trim(),
         amount,
         currency: 'SEK',
         balance: isNaN(balance as number) ? null : balance,
@@ -122,8 +124,8 @@ export const sebFormat: BankFileFormat = {
     const dates = transactions.map((t) => t.date).sort()
 
     return {
-      format: 'seb',
-      format_name: 'SEB',
+      format: 'lunar',
+      format_name: 'Lunar',
       transactions,
       date_from: dates[0] || null,
       date_to: dates[dates.length - 1] || null,

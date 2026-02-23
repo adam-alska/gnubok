@@ -47,6 +47,10 @@ export type BankFileFormatId =
   | 'seb'
   | 'swedbank'
   | 'handelsbanken'
+  | 'lansforsakringar'
+  | 'ica_banken'
+  | 'skandia'
+  | 'lunar'
   | 'generic_csv'
   | 'camt053'
 

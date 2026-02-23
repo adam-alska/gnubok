@@ -904,6 +904,7 @@ export interface MappingRule {
 // Mapping engine result
 export interface MappingResult {
   rule: MappingRule | null
+  template_id?: string
   debit_account: string
   credit_account: string
   risk_level: RiskLevel

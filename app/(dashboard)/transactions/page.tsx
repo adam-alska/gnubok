@@ -185,7 +185,7 @@ export default function TransactionsPage() {
       if (!response.ok) {
         toast({ title: 'Fel', description: result.error || 'Kunde inte uppdatera transaktion', variant: 'destructive' })
         setProcessingId(null)
-        return false
+        return null
       }
 
       // Mark as exiting for animation, then update state
@@ -217,11 +217,11 @@ export default function TransactionsPage() {
         setProcessingId(null)
       }, 350)
 
-      return true
+      return result.journal_entry_id || null
     } catch {
       toast({ title: 'Fel', description: 'Något gick fel vid bokföring', variant: 'destructive' })
       setProcessingId(null)
-      return false
+      return null
     }
   }
 
@@ -458,13 +458,14 @@ export default function TransactionsPage() {
     category: TransactionCategory,
     vatTreatment: VatTreatment | undefined,
     accountOverride: string | undefined
-  ) {
-    const success = await handleCategorize(id, true, category, vatTreatment, accountOverride)
-    if (success) {
+  ): Promise<string | null> {
+    const journalEntryId = await handleCategorize(id, true, category, vatTreatment, accountOverride)
+    if (journalEntryId) {
       setQuickReviewOpen(false)
       setQuickReviewTransaction(null)
       setQuickReviewCategory(null)
     }
+    return journalEntryId
   }
 
   // Swipe view

@@ -10,13 +10,14 @@ export type ViewMode = 'inbox' | 'history'
 export type HistoryFilter = 'all' | 'business' | 'private'
 
 // Handler types
+// Returns the journal_entry_id on success, null on failure
 export type CategorizeHandler = (
   id: string,
   isBusiness: boolean,
   category?: TransactionCategory,
   vatTreatment?: VatTreatment,
   accountOverride?: string
-) => Promise<boolean>
+) => Promise<string | null>
 
 export type MatchInvoiceHandler = (
   transactionId: string,

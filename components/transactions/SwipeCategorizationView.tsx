@@ -5,12 +5,15 @@ import { motion, useMotionValue, useTransform, AnimatePresence, type PanInfo } f
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { useToast } from '@/components/ui/use-toast'
 import VatTreatmentSelect from './VatTreatmentSelect'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { checkExpenseWarnings } from '@/lib/tax/expense-warnings'
 import { getDefaultAccountForCategory, getDefaultVatTreatmentForCategory } from '@/lib/bookkeeping/category-mapping'
 import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
-import { X, ArrowLeft, ArrowRight, Building, AlertTriangle, Check, FileText, Link2, Receipt as ReceiptIcon, SkipForward } from 'lucide-react'
+import DocumentUploadZone from '@/components/bookkeeping/DocumentUploadZone'
+import type { UploadedFile } from '@/components/bookkeeping/DocumentUploadZone'
+import { X, ArrowLeft, ArrowRight, Building, AlertTriangle, Check, FileText, Link2, Receipt as ReceiptIcon, SkipForward, Paperclip, ChevronDown, ChevronUp } from 'lucide-react'
 import type { TransactionCategory, VatTreatment, BASAccount } from '@/types'
 import type { SuggestedCategory } from '@/lib/transactions/category-suggestions'
 import type { TransactionWithInvoice, CategorizeHandler, MatchInvoiceHandler } from './transaction-types'
@@ -34,6 +37,7 @@ export default function SwipeCategorizationView({
   onMatchInvoice,
   onClose,
 }: SwipeCategorizationViewProps) {
+  const { toast } = useToast()
   const [showAllCategories, setShowAllCategories] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [showCategorySelect, setShowCategorySelect] = useState(false)
@@ -46,6 +50,8 @@ export default function SwipeCategorizationView({
   const [accountOverride, setAccountOverride] = useState('')
   const [vatTreatment, setVatTreatment] = useState<VatTreatment | 'none'>('standard_25')
   const [accounts, setAccounts] = useState<BASAccount[]>([])
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
+  const [showUploadZone, setShowUploadZone] = useState(false)
 
   // Clear VAT treatment when switching to a liability/equity account (class 2)
   useEffect(() => {
@@ -143,6 +149,11 @@ export default function SwipeCategorizationView({
     [isProcessing, currentTransaction, handleCategorySelect, x, moveToNext]
   )
 
+  const resetUploadState = useCallback(() => {
+    setUploadedFiles([])
+    setShowUploadZone(false)
+  }, [])
+
   const handleReviewConfirm = async () => {
     if (!pendingCategory) return
 
@@ -156,14 +167,39 @@ export default function SwipeCategorizationView({
         ? accountOverride
         : undefined
 
-      const success = await onCategorize(
+      const journalEntryId = await onCategorize(
         currentTransaction.id,
         true,
         pendingCategory,
         resolvedVat,
         override
       )
-      if (success) {
+      if (journalEntryId) {
+        // Link uploaded documents to the journal entry
+        if (uploadedFiles.length > 0) {
+          const filesToLink = uploadedFiles.filter((f) => f.status === 'uploaded' && f.id)
+          let linkFailCount = 0
+          for (const file of filesToLink) {
+            try {
+              await fetch(`/api/documents/${file.id}/link`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ journal_entry_id: journalEntryId }),
+              })
+            } catch {
+              linkFailCount++
+            }
+          }
+          if (linkFailCount > 0) {
+            toast({
+              title: 'Underlag kunde inte bifogas',
+              description: `${linkFailCount} fil(er) kunde inte lankas till verifikationen.`,
+              variant: 'destructive',
+            })
+          }
+        }
+
+        resetUploadState()
         setShowReviewStep(false)
         setPendingCategory(null)
         moveToNext()
@@ -204,8 +240,9 @@ export default function SwipeCategorizationView({
     setShowCategorySelect(false)
     setShowReviewStep(false)
     setPendingCategory(null)
+    resetUploadState()
     moveToNext()
-  }, [moveToNext])
+  }, [moveToNext, resetUploadState])
 
   if (!currentTransaction) {
     return (
@@ -352,10 +389,43 @@ export default function SwipeCategorizationView({
               />
               {isLiabilityAccount && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Ingen moms för skuld-/eget kapital-konton
+                  Ingen moms for skuld-/eget kapital-konton
                 </p>
               )}
             </div>
+          </div>
+
+          {/* Document upload */}
+          <div className="rounded-lg border">
+            <button
+              type="button"
+              onClick={() => setShowUploadZone(!showUploadZone)}
+              className="flex items-center justify-between w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Paperclip className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">Underlag</span>
+                {uploadedFiles.filter((f) => f.status === 'uploaded').length > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {uploadedFiles.filter((f) => f.status === 'uploaded').length} bifogade
+                  </span>
+                )}
+              </div>
+              {showUploadZone ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              )}
+            </button>
+            {showUploadZone && (
+              <div className="px-3 pb-3">
+                <DocumentUploadZone
+                  files={uploadedFiles}
+                  onFilesChange={setUploadedFiles}
+                  compact
+                />
+              </div>
+            )}
           </div>
 
           {error && (
@@ -373,7 +443,7 @@ export default function SwipeCategorizationView({
             disabled={isProcessing || !accountOverride}
           >
             <Check className="mr-2 h-4 w-4" />
-            {isProcessing ? 'Bokför...' : 'Bokför'}
+            {isProcessing ? 'Bokfor...' : 'Bokfor'}
           </Button>
           <Button
             variant="ghost"
