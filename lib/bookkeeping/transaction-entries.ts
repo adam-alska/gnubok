@@ -39,6 +39,12 @@ export async function createTransactionJournalEntry(
   transaction: Transaction,
   mappingResult: MappingResult
 ): Promise<JournalEntry | null> {
+  if (!mappingResult.debit_account || !mappingResult.credit_account) {
+    throw new Error(
+      `Invalid mapping result: debit_account="${mappingResult.debit_account}", credit_account="${mappingResult.credit_account}". Both must be non-empty.`
+    )
+  }
+
   const fiscalPeriodId = await findFiscalPeriod(userId, transaction.date)
   if (!fiscalPeriodId) {
     console.warn('No open fiscal period found for transaction date:', transaction.date)

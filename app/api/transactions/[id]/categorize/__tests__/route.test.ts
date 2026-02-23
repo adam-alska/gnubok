@@ -228,6 +228,33 @@ describe('POST /api/transactions/[id]/categorize', () => {
     expect(body.error).toBe('Failed to update transaction')
   })
 
+  it('returns 400 when mapping result has empty debit_account', async () => {
+    const tx = makeTransaction({
+      id: 'tx-1',
+      amount: -500,
+      journal_entry_id: null,
+    })
+
+    enqueue({ data: tx, error: null })
+    enqueue({ data: { entity_type: 'enskild_firma', fiscal_year_start_month: 1 }, error: null })
+
+    mockBuildMappingResultFromCategory.mockReturnValue({
+      ...defaultMappingResult,
+      debit_account: '',
+    })
+
+    const request = createMockRequest('/api/transactions/tx-1/categorize', {
+      method: 'POST',
+      body: { is_business: true, category: 'expense_software' },
+    })
+    const response = await POST(request, createMockRouteParams({ id: 'tx-1' }))
+    const { status, body } = await parseJsonResponse<{ error: string }>(response)
+
+    expect(status).toBe(400)
+    expect(body.error).toBe('Invalid account mapping: debit and credit accounts are required')
+    expect(mockCreateTransactionJournalEntry).not.toHaveBeenCalled()
+  })
+
   it('categorizes as private when is_business is false', async () => {
     const tx = makeTransaction({
       id: 'tx-1',

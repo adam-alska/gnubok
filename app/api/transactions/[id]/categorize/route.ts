@@ -199,6 +199,14 @@ export async function POST(
     }
   }
 
+  // Validate that both accounts are present before proceeding
+  if (!mappingResult.debit_account || !mappingResult.credit_account) {
+    return NextResponse.json(
+      { error: 'Invalid account mapping: debit and credit accounts are required' },
+      { status: 400 }
+    )
+  }
+
   // Ensure fiscal period exists for the transaction date
   await ensureFiscalPeriod(supabase, user.id, transaction.date, fiscalYearStartMonth)
 
