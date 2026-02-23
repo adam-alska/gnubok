@@ -1,5 +1,5 @@
 import type { TransactionCategory, MappingResult, VatJournalLine, Transaction, EntityType, VatTreatment } from '@/types'
-import { getVatRate } from './vat-entries'
+import { getVatRate, generateReverseChargeLines } from './vat-entries'
 
 /**
  * Maps TransactionCategory to BAS accounts for journal entry creation
@@ -176,7 +176,19 @@ export function buildMappingResultFromCategory(
   const treatment = mapping.vatTreatment as VatTreatment | null
   if (isBusiness && treatment) {
     const vatRate = getVatRate(treatment)
-    if (vatRate > 0) {
+    if (treatment === 'reverse_charge' && transaction.amount < 0) {
+      // EU reverse charge: fiktiv moms (offsetting entries)
+      const absAmount = Math.abs(transaction.amount)
+      const rcLines = generateReverseChargeLines(absAmount)
+      for (const rcl of rcLines) {
+        vatLines.push({
+          account_number: rcl.account_number,
+          debit_amount: rcl.debit_amount,
+          credit_amount: rcl.credit_amount,
+          description: rcl.line_description || '',
+        })
+      }
+    } else if (vatRate > 0) {
       const grossAmount = Math.abs(transaction.amount)
       const vatAmount = Math.round((grossAmount * vatRate / (1 + vatRate)) * 100) / 100
 

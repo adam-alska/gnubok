@@ -4,7 +4,10 @@ import {
   getExpenseAccountForCategory,
   getDefaultAccountForCategory,
   getDefaultVatTreatmentForCategory,
+  buildMappingResultFromCategory,
 } from '../category-mapping'
+import { makeTransaction } from '@/tests/helpers'
+import type { TransactionCategory } from '@/types'
 
 describe('getCategoryAccountMapping', () => {
   describe('income_products uses correct account', () => {
@@ -78,6 +81,79 @@ describe('getDefaultAccountForCategory', () => {
 
   it('returns fallback for uncategorized', () => {
     expect(getDefaultAccountForCategory('uncategorized')).toBe('6991')
+  })
+})
+
+describe('buildMappingResultFromCategory', () => {
+  describe('reverse charge handling', () => {
+    it('generates fiktiv moms lines for reverse charge expense', () => {
+      const tx = makeTransaction({ amount: -1000 })
+      const result = buildMappingResultFromCategory('expense_software', tx, true, 'enskild_firma', 'reverse_charge')
+
+      expect(result.vat_lines).toHaveLength(2)
+
+      const debitLine = result.vat_lines.find((l) => l.account_number === '2645')
+      expect(debitLine).toBeDefined()
+      expect(debitLine!.debit_amount).toBe(250)
+      expect(debitLine!.credit_amount).toBe(0)
+
+      const creditLine = result.vat_lines.find((l) => l.account_number === '2614')
+      expect(creditLine).toBeDefined()
+      expect(creditLine!.debit_amount).toBe(0)
+      expect(creditLine!.credit_amount).toBe(250)
+    })
+
+    it('does not generate regular input VAT (2641) for reverse charge', () => {
+      const tx = makeTransaction({ amount: -1000 })
+      const result = buildMappingResultFromCategory('expense_equipment', tx, true, 'enskild_firma', 'reverse_charge')
+
+      const hasRegularVat = result.vat_lines.some((l) => l.account_number === '2641')
+      expect(hasRegularVat).toBe(false)
+    })
+
+    it('does not generate VAT lines for reverse charge on income', () => {
+      const tx = makeTransaction({ amount: 1000 })
+      const result = buildMappingResultFromCategory('income_services', tx, true, 'enskild_firma', 'reverse_charge')
+
+      expect(result.vat_lines).toHaveLength(0)
+    })
+
+    it('does not generate VAT lines for reverse charge on private transactions', () => {
+      const tx = makeTransaction({ amount: -1000 })
+      const result = buildMappingResultFromCategory('expense_software', tx, false, 'enskild_firma', 'reverse_charge')
+
+      expect(result.vat_lines).toHaveLength(0)
+    })
+  })
+})
+
+describe('buildMappingResultFromCategory returns non-empty accounts', () => {
+  const allCategories: TransactionCategory[] = [
+    'income_services',
+    'income_products',
+    'income_other',
+    'expense_equipment',
+    'expense_software',
+    'expense_travel',
+    'expense_office',
+    'expense_marketing',
+    'expense_professional_services',
+    'expense_education',
+    'expense_bank_fees',
+    'expense_card_fees',
+    'expense_currency_exchange',
+    'expense_other',
+    'private',
+    'uncategorized',
+  ]
+
+  it.each(allCategories)('returns non-empty debit_account and credit_account for "%s"', (category) => {
+    const tx = makeTransaction({ amount: category.startsWith('income') ? 1000 : -1000 })
+    const isBusiness = category !== 'private'
+    const result = buildMappingResultFromCategory(category, tx, isBusiness)
+
+    expect(result.debit_account).toBeTruthy()
+    expect(result.credit_account).toBeTruthy()
   })
 })
 

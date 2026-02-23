@@ -114,7 +114,7 @@ function buildResult(rule: MappingRule, transaction: Transaction): MappingResult
   const absAmount = Math.abs(transaction.amount)
   const isExpense = transaction.amount < 0
 
-  let debitAccount = rule.debit_account || (isExpense ? '6900' : '1930')
+  let debitAccount = rule.debit_account || (isExpense ? '6991' : '1930')
   let creditAccount = rule.credit_account || (isExpense ? '1930' : '3001')
 
   // Check capitalization threshold for equipment
@@ -183,7 +183,7 @@ function getDefaultResult(transaction: Transaction): MappingResult {
 
   return {
     rule: null,
-    debit_account: isExpense ? '6900' : '1930',
+    debit_account: isExpense ? '6991' : '1930',
     credit_account: isExpense ? '1930' : '3001',
     risk_level: 'MEDIUM',
     confidence: 0.1,
