@@ -148,7 +148,7 @@ export const CreateInvoiceItemSchema = z.object({
   quantity: z.number().positive('Quantity must be positive'),
   unit: z.string().min(1, 'Unit is required'),
   unit_price: z.number(),
-  vat_rate: z.number().min(0).max(1).optional(),
+  vat_rate: z.number().min(0).max(100).optional(),
 })
 
 export const CreateInvoiceSchema = z.object({
@@ -213,7 +213,7 @@ export const CreateSupplierSchema = z.object({
   bic: z.string().optional(),
   default_expense_account: accountNumber.optional(),
   default_payment_terms: z.number().int().positive().optional(),
-  default_currency: z.string().optional(),
+  default_currency: CurrencySchema.nullable().optional(),
   notes: z.string().optional(),
 })
 
@@ -227,7 +227,7 @@ export const CreateSupplierInvoiceItemSchema = z.object({
   description: z.string().min(1, 'Item description is required'),
   amount: z.number().optional(),
   account_number: accountNumber,
-  vat_rate: z.number().min(0).max(1).optional(),
+  vat_rate: z.number().min(0).max(100).optional(),
   vat_code: z.string().optional(),
   quantity: z.number().optional(),
   unit: z.string().optional(),
@@ -240,7 +240,7 @@ export const CreateSupplierInvoiceSchema = z.object({
   invoice_date: isoDate,
   due_date: isoDate,
   delivery_date: isoDate.optional(),
-  currency: z.string().optional(),
+  currency: CurrencySchema.optional(),
   exchange_rate: z.number().positive().optional(),
   vat_treatment: VatTreatmentSchema.optional(),
   reverse_charge: z.boolean().optional(),
@@ -303,6 +303,7 @@ export const CorrectJournalEntrySchema = z.object({
 export const CategorizeTransactionSchema = z.object({
   is_business: z.boolean(),
   category: TransactionCategorySchema.optional(),
+  template_id: z.string().optional(),
   vat_treatment: VatTreatmentSchema.optional(),
   account_override: accountNumber.optional(),
 })
@@ -347,10 +348,10 @@ export const UpdateSettingsSchema = z.object({
   iban: z.string().optional(),
   bic: z.string().optional(),
   accounting_method: AccountingMethodSchema.optional(),
-  invoice_prefix: z.string().optional(),
+  invoice_prefix: z.string().nullable().optional(),
   next_invoice_number: z.number().int().positive().optional(),
   invoice_default_days: z.number().int().positive().optional(),
-  invoice_default_notes: z.string().optional(),
+  invoice_default_notes: z.string().nullable().optional(),
   email: z.string().email().optional(),
   pays_salaries: z.boolean().optional(),
   sector_slug: z.string().nullable().optional(),

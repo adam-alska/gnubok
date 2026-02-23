@@ -347,11 +347,18 @@ describe('CreateInvoiceSchema', () => {
     expect(result.success).toBe(false)
   })
 
-  it('rejects vat_rate > 1 (must be decimal)', () => {
+  it('rejects vat_rate > 100', () => {
+    const result = CreateInvoiceSchema.safeParse(validInvoice({
+      items: [validInvoiceItem({ vat_rate: 101 })],
+    }))
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts vat_rate of 25 (standard Swedish VAT)', () => {
     const result = CreateInvoiceSchema.safeParse(validInvoice({
       items: [validInvoiceItem({ vat_rate: 25 })],
     }))
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
   })
 
   it('accepts vat_rate of 0 (export/exempt)', () => {

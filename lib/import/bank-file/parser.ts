@@ -11,12 +11,17 @@ import { nordeaFormat } from './formats/nordea'
 import { sebFormat } from './formats/seb'
 import { swedbankFormat } from './formats/swedbank'
 import { handelsbankenFormat } from './formats/handelsbanken'
+import { lansforsakringarFormat } from './formats/lansforsakringar'
+import { icaBankenFormat } from './formats/ica-banken'
+import { skandiaFormat } from './formats/skandia'
+import { lunarFormat } from './formats/lunar'
 import { camt053Format } from './formats/camt053'
 import { genericCSVFormat } from './formats/generic-csv'
 
 /**
  * Ordered list of format detectors.
  * camt.053 first (XML detection is unambiguous), then bank-specific CSV formats.
+ * New bank formats go after existing ones but before generic_csv.
  * Generic CSV is last — it never auto-detects (manual fallback only).
  */
 const FORMATS: BankFileFormat[] = [
@@ -25,6 +30,10 @@ const FORMATS: BankFileFormat[] = [
   sebFormat,
   swedbankFormat,
   handelsbankenFormat,
+  lansforsakringarFormat,
+  icaBankenFormat,
+  skandiaFormat,
+  lunarFormat,
   genericCSVFormat,
 ]
 

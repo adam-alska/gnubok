@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { eventBus } from '@/lib/events'
 import { ensureInitialized } from '@/lib/init'
 import { buildMappingResultFromCategory } from '@/lib/bookkeeping/category-mapping'
+import { getTemplateById, buildMappingResultFromTemplate } from '@/lib/bookkeeping/booking-templates'
 import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-entries'
 import { saveUserMappingRule } from '@/lib/bookkeeping/mapping-engine'
 import { validateBody } from '@/lib/api/validate'
@@ -153,18 +154,36 @@ export async function POST(
   const fiscalYearStartMonth: number = settings?.fiscal_year_start_month ?? 1
 
   // Determine the category to use
-  const finalCategory: TransactionCategory = is_business
-    ? (category || 'uncategorized')
-    : 'private'
+  let finalCategory: TransactionCategory
+  if (body.template_id) {
+    const template = getTemplateById(body.template_id)
+    if (template) {
+      finalCategory = is_business ? template.fallback_category : 'private'
+    } else {
+      return NextResponse.json({ error: 'Invalid template_id' }, { status: 400 })
+    }
+  } else {
+    finalCategory = is_business ? (category || 'uncategorized') : 'private'
+  }
 
-  // Build mapping result from category
-  const mappingResult = buildMappingResultFromCategory(
-    finalCategory,
-    transaction as Transaction,
-    is_business,
-    entityType,
-    body.vat_treatment
-  )
+  // Build mapping result from template or category
+  let mappingResult
+  if (body.template_id) {
+    const template = getTemplateById(body.template_id)!
+    mappingResult = buildMappingResultFromTemplate(
+      template,
+      transaction as Transaction,
+      entityType
+    )
+  } else {
+    mappingResult = buildMappingResultFromCategory(
+      finalCategory,
+      transaction as Transaction,
+      is_business,
+      entityType,
+      body.vat_treatment
+    )
+  }
 
   // Apply account override if provided (only for business transactions)
   if (is_business && body.account_override) {

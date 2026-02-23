@@ -1,11 +1,14 @@
 /**
- * SEB CSV format parser
+ * Skandia CSV format parser
  *
  * Format: Semicolon-delimited, comma decimal separator
- * Columns vary but typically: Bokföringsdag, Valutadag, Verifikationsnummer,
- *   Text/mottagare, Belopp, Saldo
+ * Columns: Datum, Beskrivning/Text, Belopp, Saldo (possibly Bankkategori)
  * Date format: YYYY-MM-DD
  * Encoding: UTF-8 or Windows-1252
+ *
+ * Notes:
+ * - Header contains "beskrivning" (unique keyword not used by SEB/Handelsbanken)
+ *   or "bankkategori" (Skandia-specific column)
  */
 
 import type { BankFileFormat, BankFileParseResult, ParsedBankTransaction, BankFileParseIssue } from '../types'
@@ -16,24 +19,35 @@ function parseCommaDecimal(value: string): number {
   return parseFloat(cleaned)
 }
 
-export const sebFormat: BankFileFormat = {
-  id: 'seb',
-  name: 'SEB',
-  description: 'SEB CSV (semicolon-delimited)',
+export const skandiaFormat: BankFileFormat = {
+  id: 'skandia',
+  name: 'Skandia',
+  description: 'Skandia CSV (semicolon-delimited)',
   fileExtensions: ['.csv', '.txt'],
 
   detect(content: string, _filename: string): boolean {
     const prepared = prepareContent(content)
-    const firstLine = prepared.split('\n')[0]?.toLowerCase() || ''
-    // SEB headers contain "bokföringsdag"/"bokforingsdatum" AND "valutadag"/"verifikationsnummer"
-    // The secondary check distinguishes SEB from Länsförsäkringar (which also has "bokföringsdag")
-    return (
-      firstLine.includes(';') &&
-      (firstLine.includes('bokföringsdag') ||
-        firstLine.includes('bokforingsdatum') ||
-        firstLine.includes('bokföringsdag')) &&
-      (firstLine.includes('valutadag') || firstLine.includes('verifikationsnummer'))
-    )
+    const firstLine = prepared.split('\n')[0]?.toLowerCase().replace(/"/g, '') || ''
+    if (!firstLine.includes(';')) return false
+
+    const fields = firstLine.split(';').map((f) => f.trim())
+
+    // "bankkategori" is unique to Skandia
+    if (fields.some((f) => f.includes('bankkategori'))) return true
+
+    // "beskrivning" as a standalone column header with semicolon delimiter
+    // Must also have "datum" and "belopp" to confirm it's a bank export
+    // Note: Handelsbanken uses "beskrivning" only as a fallback in descIdx logic,
+    // but its header detection is "reskontradatum"/"transaktionsdatum" which is checked first
+    if (
+      fields.some((f) => f === 'beskrivning') &&
+      fields.some((f) => f === 'datum') &&
+      fields.some((f) => f === 'belopp')
+    ) {
+      return true
+    }
+
+    return false
   },
 
   parse(content: string): BankFileParseResult {
@@ -44,29 +58,24 @@ export const sebFormat: BankFileFormat = {
     const issues: BankFileParseIssue[] = []
     let skippedRows = 0
 
-    // Parse header to find column indices
+    // Parse header
     const headerLine = lines[0] || ''
     const headers = headerLine.split(';').map((h) => h.trim().toLowerCase().replace(/"/g, ''))
 
-    // Find column indices dynamically
-    const dateIdx = headers.findIndex(
-      (h) => h.includes('bokföringsdag') || h.includes('bokforingsdatum') || h.includes('bokföringsdag')
-    )
-    const descIdx = headers.findIndex(
-      (h) => h.includes('text') || h.includes('mottagare') || h.includes('beskrivning')
-    )
-    const amountIdx = headers.findIndex((h) => h.includes('belopp'))
-    const balanceIdx = headers.findIndex((h) => h.includes('saldo'))
+    const dateIdx = headers.findIndex((h) => h === 'datum')
+    const descIdx = headers.findIndex((h) => h === 'beskrivning' || h === 'text')
+    const amountIdx = headers.findIndex((h) => h === 'belopp')
+    const balanceIdx = headers.findIndex((h) => h === 'saldo')
 
     if (dateIdx === -1 || amountIdx === -1) {
       issues.push({
         row: 1,
-        message: 'Could not identify required columns (date, amount)',
+        message: 'Could not identify required columns (datum, belopp)',
         severity: 'error',
       })
       return {
-        format: 'seb',
-        format_name: 'SEB',
+        format: 'skandia',
+        format_name: 'Skandia',
         transactions: [],
         date_from: null,
         date_to: null,
@@ -82,12 +91,11 @@ export const sebFormat: BankFileFormat = {
       const fields = line.split(';').map((f) => f.trim().replace(/^"|"$/g, ''))
 
       const date = fields[dateIdx]
-      const description = fields[descIdx >= 0 ? descIdx : dateIdx + 1] || 'Unknown'
+      const description = descIdx >= 0 ? fields[descIdx] : 'Unknown'
       const amountStr = fields[amountIdx]
       const balanceStr = balanceIdx >= 0 ? fields[balanceIdx] : undefined
 
       if (!date || !amountStr) {
-        issues.push({ row: i + 1, message: 'Missing required fields', severity: 'warning' })
         skippedRows++
         continue
       }
@@ -109,7 +117,7 @@ export const sebFormat: BankFileFormat = {
 
       transactions.push({
         date,
-        description: description.trim(),
+        description: (description || 'Unknown').trim(),
         amount,
         currency: 'SEK',
         balance: isNaN(balance as number) ? null : balance,
@@ -122,8 +130,8 @@ export const sebFormat: BankFileFormat = {
     const dates = transactions.map((t) => t.date).sort()
 
     return {
-      format: 'seb',
-      format_name: 'SEB',
+      format: 'skandia',
+      format_name: 'Skandia',
       transactions,
       date_from: dates[0] || null,
       date_to: dates[dates.length - 1] || null,

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
+import { Paperclip } from 'lucide-react'
 import VatTreatmentSelect from './VatTreatmentSelect'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from './transaction-types'
 import type { TransactionCategory, VatTreatment } from '@/types'
@@ -59,6 +60,14 @@ export default function BatchCategorySelector({
           </div>
         ) : (
           <div className="space-y-4 py-2">
+            {/* Underlag reminder */}
+            <div className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3">
+              <Paperclip className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+              <p className="text-xs text-amber-800 dark:text-amber-300">
+                Underlag behover bifogas separat for varje transaktion efter bokforing.
+              </p>
+            </div>
+
             <div>
               <h4 className="text-sm font-medium text-muted-foreground mb-2">Momsbehandling</h4>
               <VatTreatmentSelect

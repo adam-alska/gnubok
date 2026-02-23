@@ -5,11 +5,13 @@ import {
   extractNetAmount,
   extractVatAmount,
 } from './vat-entries'
+import { findMatchingTemplates, buildMappingResultFromTemplate } from './booking-templates'
 import type {
   MappingRule,
   MappingResult,
   RiskLevel,
   Transaction,
+  EntityType,
   VatJournalLine,
 } from '@/types'
 
@@ -28,7 +30,8 @@ const CAPITALIZATION_THRESHOLD = 29400
  */
 export async function evaluateMappingRules(
   userId: string,
-  transaction: Transaction
+  transaction: Transaction,
+  entityType?: EntityType
 ): Promise<MappingResult> {
   const supabase = await createClient()
 
@@ -41,6 +44,9 @@ export async function evaluateMappingRules(
     .order('priority', { ascending: true })
 
   if (error || !rules || rules.length === 0) {
+    // Try template-based matching before default fallback
+    const templateResult = evaluateTemplateRules(transaction, entityType)
+    if (templateResult) return templateResult
     return getDefaultResult(transaction)
   }
 
@@ -51,7 +57,33 @@ export async function evaluateMappingRules(
     }
   }
 
+  // Try template-based matching before default fallback
+  const templateResult = evaluateTemplateRules(transaction, entityType)
+  if (templateResult) return templateResult
+
   return getDefaultResult(transaction)
+}
+
+/**
+ * Evaluate booking templates as a fallback when no DB mapping rule matches.
+ * Returns the best template match if confidence >= 0.3, otherwise null.
+ */
+function evaluateTemplateRules(
+  transaction: Transaction,
+  entityType?: EntityType
+): MappingResult | null {
+  const matches = findMatchingTemplates(transaction, entityType)
+  if (matches.length === 0 || matches[0].confidence < 0.3) return null
+
+  const best = matches[0]
+  const result = buildMappingResultFromTemplate(
+    best.template,
+    transaction,
+    entityType || 'enskild_firma'
+  )
+  // Override the confidence with the auto-match confidence (not 1.0)
+  result.confidence = best.confidence
+  return result
 }
 
 /**
