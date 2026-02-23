@@ -55,24 +55,32 @@ export async function POST(request: Request) {
   const docType: InvoiceDocumentType = document_type || 'invoice'
   const isDeliveryNote = docType === 'delivery_note'
 
-  // Build items with line totals
-  const invoiceItems: InvoiceItem[] = items.map((item: { description: string; quantity: number; unit: string; unit_price: number; vat_rate?: number }, index: number) => ({
-    id: `preview-${index}`,
-    invoice_id: 'preview',
-    sort_order: index,
-    description: item.description,
-    quantity: item.quantity,
-    unit: item.unit,
-    unit_price: item.unit_price,
-    line_total: Math.round(item.quantity * item.unit_price * 100) / 100,
-    vat_rate: item.vat_rate ?? vatRules.rate,
-    vat_amount: 0,
-    created_at: new Date().toISOString(),
-  }))
+  // Build items with line totals and per-item VAT
+  const invoiceItems: InvoiceItem[] = items.map((item: { description: string; quantity: number; unit: string; unit_price: number; vat_rate?: number }, index: number) => {
+    const lineTotal = Math.round(item.quantity * item.unit_price * 100) / 100
+    const rate = item.vat_rate ?? vatRules.rate
+    return {
+      id: `preview-${index}`,
+      invoice_id: 'preview',
+      sort_order: index,
+      description: item.description,
+      quantity: item.quantity,
+      unit: item.unit,
+      unit_price: item.unit_price,
+      line_total: lineTotal,
+      vat_rate: rate,
+      vat_amount: isDeliveryNote ? 0 : Math.round(lineTotal * (rate / 100) * 100) / 100,
+      created_at: new Date().toISOString(),
+    }
+  })
 
   const subtotal = invoiceItems.reduce((sum, item) => sum + item.line_total, 0)
-  const vatAmount = isDeliveryNote ? 0 : Math.round(subtotal * (vatRules.rate / 100) * 100) / 100
+  const vatAmount = isDeliveryNote ? 0 : invoiceItems.reduce((sum, item) => sum + item.vat_amount, 0)
   const total = isDeliveryNote ? 0 : subtotal + vatAmount
+
+  // Derive vat_rate from items: single rate → that rate, mixed → null
+  const itemRates = new Set(invoiceItems.map((item) => item.vat_rate))
+  const effectiveVatRate = isDeliveryNote ? 0 : (itemRates.size === 1 ? itemRates.values().next().value! : null)
 
   // Construct a temporary Invoice-like object
   const previewInvoice = {
@@ -93,7 +101,7 @@ export async function POST(request: Request) {
     total,
     total_sek: null,
     vat_treatment: vatRules.treatment,
-    vat_rate: isDeliveryNote ? 0 : vatRules.rate,
+    vat_rate: effectiveVatRate,
     moms_ruta: vatRules.momsRuta,
     your_reference: your_reference || null,
     our_reference: our_reference || null,
