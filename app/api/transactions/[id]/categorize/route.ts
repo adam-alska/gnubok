@@ -13,6 +13,7 @@ interface CategorizeRequest {
   is_business: boolean
   category?: TransactionCategory
   vat_treatment?: VatTreatment
+  account_override?: string
 }
 
 /**
@@ -167,6 +168,36 @@ export async function POST(
     entityType,
     body.vat_treatment
   )
+
+  // Apply account override if provided (only for business transactions)
+  if (is_business && body.account_override) {
+    // Validate the account exists in the user's chart of accounts
+    const { data: accountExists } = await supabase
+      .from('accounts')
+      .select('account_number, account_class')
+      .eq('user_id', user.id)
+      .eq('account_number', body.account_override)
+      .single()
+
+    if (!accountExists) {
+      return NextResponse.json(
+        { error: 'Invalid account number' },
+        { status: 400 }
+      )
+    }
+
+    // Apply override: expenses override debit account, income overrides credit account
+    if (transaction.amount < 0) {
+      mappingResult.debit_account = body.account_override
+    } else {
+      mappingResult.credit_account = body.account_override
+    }
+
+    // If override account is a liability/equity account (class 2), clear VAT lines
+    if (accountExists.account_class === 2) {
+      mappingResult.vat_lines = []
+    }
+  }
 
   // Ensure fiscal period exists for the transaction date
   await ensureFiscalPeriod(supabase, user.id, transaction.date, fiscalYearStartMonth)

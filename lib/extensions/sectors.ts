@@ -65,6 +65,18 @@ export const SECTORS: Sector[] = [
           'Få push-notiser direkt i webbläsaren när viktiga händelser sker — nya fakturor, förfallna betalningar, slutförda bokföringar med mera.',
       },
       {
+        slug: 'invoice-inbox',
+        name: 'Leverantörsfaktura-inbox',
+        sector: 'general',
+        category: 'import',
+        icon: 'Inbox',
+        dataPattern: 'manual',
+        hasOwnData: true,
+        description: 'Ta emot leverantörsfakturor via e-post eller uppladdning',
+        longDescription:
+          'Skicka leverantörsfakturor till en dedikerad e-postadress eller ladda upp manuellt. AI extraherar automatiskt leverantörsdata, belopp och moms. Granska och bekräfta med ett klick för att skapa leverantörsfakturor.',
+      },
+      {
         slug: 'enable-banking',
         name: 'Bankintegration (PSD2)',
         sector: 'general',

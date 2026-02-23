@@ -1,7 +1,15 @@
-import { SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { getTransactions, getAccountBalance } from './api-client'
-import { ingestTransactions, type RawTransaction } from '@/lib/transactions/ingest'
+import { ingestTransactions as defaultIngest } from '@/lib/transactions/ingest'
+import type { RawTransaction, IngestResult } from '@/types'
 import type { StoredAccount } from '../types'
+
+/** Ingest function signature — matches lib/transactions/ingest */
+export type IngestFn = (
+  supabase: SupabaseClient,
+  userId: string,
+  raw: RawTransaction[]
+) => Promise<IngestResult>
 
 export interface SyncResult {
   imported: number
@@ -14,6 +22,10 @@ export interface SyncResult {
  *
  * Fetches transactions from the Enable Banking API, converts to RawTransaction
  * format, and delegates to the shared ingestion pipeline.
+ *
+ * @param ingest - Optional ingest function override (defaults to core ingestTransactions).
+ *                 When called from an extension handler with ctx.services.ingestTransactions,
+ *                 pass that function to avoid direct @/lib imports.
  */
 export async function syncAccountTransactions(
   supabase: SupabaseClient,
@@ -21,7 +33,8 @@ export async function syncAccountTransactions(
   connectionId: string,
   account: StoredAccount,
   fromDate: string,
-  toDate: string
+  toDate: string,
+  ingest: IngestFn = defaultIngest
 ): Promise<SyncResult> {
   const bankTransactions = await getTransactions(
     account.uid,
@@ -44,7 +57,7 @@ export async function syncAccountTransactions(
     import_source: 'enable_banking',
   }))
 
-  const ingestResult = await ingestTransactions(supabase, userId, rawTransactions)
+  const ingestResult = await ingest(supabase, userId, rawTransactions)
 
   // Update account balance
   try {

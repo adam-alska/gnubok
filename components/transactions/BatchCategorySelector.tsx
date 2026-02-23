@@ -1,35 +1,22 @@
 'use client'
 
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
-import type { TransactionCategory } from '@/types'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, VAT_TREATMENT_OPTIONS } from './transaction-types'
+import type { TransactionCategory, VatTreatment } from '@/types'
 
-const expenseCategories: { value: TransactionCategory; label: string }[] = [
-  { value: 'expense_equipment', label: 'Utrustning' },
-  { value: 'expense_software', label: 'Programvara' },
-  { value: 'expense_travel', label: 'Resor' },
-  { value: 'expense_office', label: 'Kontor' },
-  { value: 'expense_marketing', label: 'Marknadsföring' },
-  { value: 'expense_professional_services', label: 'Konsulter' },
-  { value: 'expense_education', label: 'Utbildning' },
-  { value: 'expense_bank_fees', label: 'Bankavgift' },
-  { value: 'expense_card_fees', label: 'Kortavgift' },
-  { value: 'expense_currency_exchange', label: 'Valutaväxling' },
-  { value: 'expense_other', label: 'Övrigt' },
-]
-
-const incomeCategories: { value: TransactionCategory; label: string }[] = [
-  { value: 'income_services', label: 'Tjänster' },
-  { value: 'income_products', label: 'Produkter' },
-  { value: 'income_other', label: 'Övrigt' },
-]
+const expenseCategories = EXPENSE_CATEGORIES
+const incomeCategories = INCOME_CATEGORIES
+const vatTreatmentOptions = VAT_TREATMENT_OPTIONS
 
 interface BatchCategorySelectorProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   selectedCount: number
-  onSelectCategory: (category: TransactionCategory) => void
+  onSelectCategory: (category: TransactionCategory, vatTreatment?: VatTreatment) => void
   progress: { done: number; total: number } | null
 }
 
@@ -40,7 +27,13 @@ export default function BatchCategorySelector({
   onSelectCategory,
   progress,
 }: BatchCategorySelectorProps) {
+  const [vatTreatment, setVatTreatment] = useState<VatTreatment | 'none'>('standard_25')
   const isProcessing = progress !== null
+
+  const handleSelectCategory = (category: TransactionCategory) => {
+    const resolvedVat = vatTreatment === 'none' ? undefined : vatTreatment
+    onSelectCategory(category, resolvedVat)
+  }
 
   return (
     <Dialog open={open} onOpenChange={isProcessing ? undefined : onOpenChange}>
@@ -68,6 +61,24 @@ export default function BatchCategorySelector({
         ) : (
           <div className="space-y-4 py-2">
             <div>
+              <h4 className="text-sm font-medium text-muted-foreground mb-2">Momsbehandling</h4>
+              <Select
+                value={vatTreatment}
+                onValueChange={(v) => setVatTreatment(v as VatTreatment | 'none')}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {vatTreatmentOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <h4 className="text-sm font-medium text-muted-foreground mb-2">Kostnader</h4>
               <div className="grid grid-cols-2 gap-1.5">
                 {expenseCategories.map((cat) => (
@@ -76,7 +87,7 @@ export default function BatchCategorySelector({
                     variant="outline"
                     size="sm"
                     className="justify-start text-xs"
-                    onClick={() => onSelectCategory(cat.value)}
+                    onClick={() => handleSelectCategory(cat.value)}
                   >
                     {cat.label}
                   </Button>
@@ -92,7 +103,7 @@ export default function BatchCategorySelector({
                     variant="outline"
                     size="sm"
                     className="justify-start text-xs"
-                    onClick={() => onSelectCategory(cat.value)}
+                    onClick={() => handleSelectCategory(cat.value)}
                   >
                     {cat.label}
                   </Button>

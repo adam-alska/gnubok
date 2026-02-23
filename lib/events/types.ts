@@ -11,6 +11,8 @@ import type {
   CAMT054Notification,
   AuditSecurityEvent,
   ReconciliationMethod,
+  InvoiceInboxItem,
+  SupplierInvoice,
 } from '@/types'
 
 // ============================================================
@@ -62,6 +64,10 @@ export type CoreEvent =
       privateTotal: number;
       userId: string;
     }}
+  // Supplier Invoice Inbox
+  | { type: 'supplier_invoice.received'; payload: { inboxItem: InvoiceInboxItem; userId: string } }
+  | { type: 'supplier_invoice.extracted'; payload: { inboxItem: InvoiceInboxItem; confidence: number; userId: string } }
+  | { type: 'supplier_invoice.confirmed'; payload: { inboxItem: InvoiceInboxItem; supplierInvoice: SupplierInvoice; userId: string } }
   // Audit
   | { type: 'audit.security_event'; payload: { event: AuditSecurityEvent; userId: string } }
 
