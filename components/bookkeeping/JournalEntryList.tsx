@@ -209,7 +209,7 @@ export default function JournalEntryList({ periodId }: Props) {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b text-left text-muted-foreground">
-                        <th className="py-2 w-24">Konto</th>
+                        <th className="py-2 w-48">Konto</th>
                         <th className="py-2">Beskrivning</th>
                         <th className="py-2 w-28 text-right">Debet</th>
                         <th className="py-2 w-28 text-right">Kredit</th>
@@ -220,7 +220,7 @@ export default function JournalEntryList({ periodId }: Props) {
                         .sort((a, b) => a.sort_order - b.sort_order)
                         .map((line) => (
                           <tr key={line.id} className="border-b last:border-0">
-                            <td className="py-2"><AccountNumber number={line.account_number} /></td>
+                            <td className="py-2"><AccountNumber number={line.account_number} showName /></td>
                             <td className="py-2 text-muted-foreground">
                               {line.line_description || ''}
                             </td>
