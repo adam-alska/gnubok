@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { FileText, ImageIcon, Download, ChevronDown, ChevronUp, Plus } from 'lucide-react'
 import DocumentUploadZone from '@/components/bookkeeping/DocumentUploadZone'
@@ -41,6 +41,9 @@ export default function JournalEntryAttachments({
   const [showUpload, setShowUpload] = useState(false)
   const [uploadFiles, setUploadFiles] = useState<UploadedFile[]>([])
 
+  const onCountChangeRef = useRef(onCountChange)
+  onCountChangeRef.current = onCountChange
+
   const fetchDocuments = useCallback(async () => {
     try {
       const res = await fetch(
@@ -48,13 +51,13 @@ export default function JournalEntryAttachments({
       )
       const { data } = await res.json()
       setDocuments(data || [])
-      onCountChange?.(data?.length || 0)
+      onCountChangeRef.current?.(data?.length || 0)
     } catch {
       console.error('Failed to fetch documents')
     } finally {
       setLoading(false)
     }
-  }, [journalEntryId, onCountChange])
+  }, [journalEntryId])
 
   useEffect(() => {
     fetchDocuments()

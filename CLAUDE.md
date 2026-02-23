@@ -87,6 +87,9 @@ extensions/               Sector-based extension hierarchy
   sru-export/             SRU file export (top-level)
 
 lib/
+  api/                    Zod validation schemas and utilities for API routes
+    schemas.ts            Zod schemas for all API request bodies and query params
+    validate.ts           validateBody() and validateQuery() helpers
   bookkeeping/            Core journal entry engine and all entry generators
     engine.ts             Draft/commit workflow, balance validation, voucher numbering
     invoice-entries.ts    Sales invoice journal entries (supports per-line VAT rates)
@@ -147,6 +150,8 @@ scripts/                  Utility scripts (clear-user-data.sql, copy-extensions.
                           move-extensions.js, setup-phase8.js)
 dev_docs/                 Project documentation (BAS account guides, gap analysis,
                           Enable Banking docs, Bokio reference screenshots)
+extensions.md             Extension system design document (architecture, data patterns,
+                          sector model, workspace pattern, migration plan)
 ```
 
 ### Key Relationships
@@ -421,6 +426,8 @@ mockResult({ data: makeTransaction(), error: null })
 
 ### Reference Tests
 
+- `lib/api/__tests__/schemas.test.ts` — Zod schema validation
+- `lib/api/__tests__/validate.test.ts` — Body/query validation helpers
 - `lib/bookkeeping/__tests__/engine.test.ts` — Balance validation
 - `lib/bookkeeping/__tests__/invoice-entries.test.ts` — Per-line VAT, mixed-rate invoices, credit notes
 - `lib/core/bookkeeping/__tests__/storno-service.test.ts` — Complex mock queues
@@ -510,6 +517,8 @@ Standard pattern for new API routes:
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { ensureInitialized } from '@/lib/init'
+import { validateBody } from '@/lib/api/validate'
+import { CreateInvoiceSchema } from '@/lib/api/schemas'
 
 ensureInitialized()  // Module-level — loads extensions for event emission
 
@@ -521,7 +530,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Business logic...
+  // Validate request body with Zod schema
+  const result = await validateBody(request, CreateInvoiceSchema)
+  if (!result.success) return result.response
+  const { data } = result
+
+  // Business logic using validated `data`...
   // Always filter by user_id (defense in depth alongside RLS)
   // Wrap journal entry creation in try/catch (non-blocking side effect)
   // Emit events after successful operations
@@ -532,6 +546,7 @@ export async function POST(request: Request) {
 
 **Key conventions**:
 - Call `ensureInitialized()` at module level in any route that emits events
+- **Validate all input** with `validateBody()` / `validateQuery()` from `lib/api/validate.ts` using schemas from `lib/api/schemas.ts`
 - Dynamic route params use `{ params }: { params: Promise<{ id: string }> }` (Next.js 16)
 - Response shapes: `{ data }` for success, `{ error }` for failures
 - Journal entry creation is non-blocking: catch errors and continue
@@ -582,13 +597,19 @@ Hosted on **Vercel** with cron jobs defined in `vercel.json`:
 NEXT_PUBLIC_SUPABASE_URL          # Supabase project URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY     # Supabase anonymous key
 SUPABASE_SERVICE_ROLE_KEY         # Supabase service role key
+RESEND_API_KEY                    # Resend email service API key
+RESEND_FROM_EMAIL                 # Sender email for transactional mail
+RESEND_WEBHOOK_SECRET             # Webhook auth for Resend
 ENABLE_BANKING_APP_ID             # Enable Banking app ID
 ENABLE_BANKING_PRIVATE_KEY        # Enable Banking private key (base64-encoded)
+ENABLE_BANKING_SANDBOX            # Enable Banking sandbox mode flag
 ANTHROPIC_API_KEY                 # Claude API key (ai-chat)
 OPENAI_API_KEY                    # OpenAI API key (embeddings)
 NEXT_PUBLIC_APP_URL               # App base URL
+CRON_SECRET                       # Auth secret for Vercel cron jobs
 NEXT_PUBLIC_VAPID_PUBLIC_KEY      # Web push public key
 VAPID_PRIVATE_KEY                 # Web push private key
+VAPID_SUBJECT                     # VAPID subject (mailto: URI) for web push
 ```
 
 ## Other
