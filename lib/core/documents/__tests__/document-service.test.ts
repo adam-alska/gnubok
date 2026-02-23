@@ -25,6 +25,8 @@ function makeClient(storageOverrides: Record<string, unknown> = {}) {
     from: vi.fn().mockImplementation(() => makeBuilder()),
     rpc: vi.fn().mockImplementation(async () => results[resultIdx++] ?? { data: null, error: null }),
     storage: {
+      getBucket: vi.fn().mockResolvedValue({ data: { id: 'documents' }, error: null }),
+      createBucket: vi.fn().mockResolvedValue({ data: { name: 'documents' }, error: null }),
       from: vi.fn().mockReturnValue({
         upload: vi.fn().mockResolvedValue({ data: {}, error: null }),
         download: vi.fn().mockResolvedValue({
@@ -43,14 +45,16 @@ function makeClient(storageOverrides: Record<string, unknown> = {}) {
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => makeClient()),
+  createServiceClient: vi.fn(async () => makeClient()),
 }))
 
-import { uploadDocument, createNewVersion, verifyIntegrity } from '../document-service'
+import { uploadDocument, createNewVersion, verifyIntegrity, _resetBucketVerified } from '../document-service'
 import { createClient } from '@/lib/supabase/server'
 
 beforeEach(() => {
   vi.clearAllMocks()
   eventBus.clear()
+  _resetBucketVerified()
   resultIdx = 0
   results = []
   // Reset the mock to use default makeClient

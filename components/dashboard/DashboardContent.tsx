@@ -27,6 +27,7 @@ import {
   Landmark,
   CheckCircle2,
   ClipboardList,
+  MessageCircle,
 } from 'lucide-react'
 import type { CompanySettings, EntityType, Deadline, ReceiptQueueSummary, OnboardingProgress } from '@/types'
 
@@ -178,6 +179,8 @@ export default function DashboardContent({ firstName, settings, summary, onboard
   const MAX_VISIBLE_ALERTS = 3
   const visibleAlerts = showAllAlerts ? alertItems : alertItems.slice(0, MAX_VISIBLE_ALERTS)
   const hasMoreAlerts = alertItems.length > MAX_VISIBLE_ALERTS
+
+  const openAiChat = () => window.dispatchEvent(new Event('open-ai-chat'))
 
   // Quick action items
   const quickActions = [
@@ -400,6 +403,18 @@ export default function DashboardContent({ firstName, settings, summary, onboard
               </Link>
             )
           })}
+          {/* AI assistant quick action */}
+          <button onClick={openAiChat} className="group text-left">
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/40 hover:bg-muted/30 transition-colors duration-150">
+              <div className="p-2 rounded-lg bg-muted/50">
+                <MessageCircle className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">AI-assistent</p>
+                <p className="text-xs text-muted-foreground truncate hidden md:block">Fråga om bokföring</p>
+              </div>
+            </div>
+          </button>
         </div>
       </section>
 

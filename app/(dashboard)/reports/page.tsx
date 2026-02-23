@@ -103,9 +103,8 @@ export default function ReportsPage() {
 
       {selectedPeriod ? (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div className="relative">
-            <TabsList className="w-full justify-start overflow-x-auto flex-nowrap scrollbar-hide">
-              <TabsTrigger value="trial-balance">
+          <TabsList className="h-auto w-full flex-wrap justify-start gap-1 p-1">
+            <TabsTrigger value="trial-balance">
               <Scale className="h-4 w-4 mr-1" />
               Saldobalans
             </TabsTrigger>
@@ -151,9 +150,7 @@ export default function ReportsPage() {
               <ArrowLeftRight className="h-4 w-4 mr-1" />
               Bankavstämning
             </TabsTrigger>
-            </TabsList>
-            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent pointer-events-none md:hidden" />
-          </div>
+          </TabsList>
 
           <TabsContent value="trial-balance">
             <TrialBalanceView periodId={selectedPeriod} />

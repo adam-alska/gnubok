@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency } from '@/lib/utils'
-import { getVatRules, getVatTreatmentLabel, getAvailableVatRates } from '@/lib/invoices/vat-rules'
+import { getVatRules, getAvailableVatRates, getVatSummaryFromItems } from '@/lib/invoices/vat-rules'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Loader2, Plus, Trash2, ArrowLeft, Send, Eye } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
@@ -369,7 +369,7 @@ export default function NewInvoicePage() {
                 {selectedCustomer && vatRules && (
                   <div className="mt-4 p-3 bg-muted rounded-lg">
                     <p className="text-sm">
-                      <strong>Momsbehandling:</strong> {getVatTreatmentLabel(vatRules.treatment)}
+                      <strong>Momsbehandling:</strong> {getVatSummaryFromItems(watchItems).label}
                     </p>
                     {vatRules.reverseChargeText && (
                       <p className="text-xs text-muted-foreground mt-1">
@@ -664,10 +664,8 @@ export default function NewInvoicePage() {
               vat_rate: item.vat_rate ?? (vatRules?.rate || 25),
             }))}
             subtotal={subtotal}
-            vatRate={vatRules.rate}
             vatAmount={vatAmount}
             total={total}
-            vatTreatment={vatRules.treatment}
             yourReference={pendingData?.your_reference}
             ourReference={pendingData?.our_reference}
             notes={pendingData?.notes}

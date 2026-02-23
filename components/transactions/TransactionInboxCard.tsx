@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { ArrowUpRight, ArrowDownRight, FileText, MoreHorizontal, Loader2 } from 'lucide-react'
+import { ArrowUpRight, ArrowDownRight, FileText, Loader2 } from 'lucide-react'
 import type { TransactionWithInvoice, CategorizeHandler } from './transaction-types'
 import type { SuggestedCategory } from '@/lib/transactions/category-suggestions'
 
@@ -178,15 +178,15 @@ export default function TransactionInboxCard({
                 Privat
               </Button>
 
-              {/* More options */}
+              {/* Open category dialog */}
               <Button
                 size="sm"
-                variant="ghost"
-                className="h-8 w-8 p-0 text-muted-foreground"
+                variant={!hasInvoiceMatch && !topSuggestion ? 'default' : 'outline'}
+                className="h-8 text-xs"
                 onClick={() => onOpenCategoryDialog(transaction)}
                 disabled={isProcessing || isDisabled}
               >
-                <MoreHorizontal className="h-4 w-4" />
+                {!hasInvoiceMatch && !topSuggestion ? 'Bokför' : 'Bokför manuellt...'}
               </Button>
             </div>
           )}
