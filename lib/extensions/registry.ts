@@ -1,6 +1,25 @@
 import { eventBus } from '@/lib/events/bus'
 import type { CoreEventType } from '@/lib/events/types'
-import type { Extension } from './types'
+import type { Extension, ExtensionContext } from './types'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+/** Factory function type for creating extension contexts */
+export type ContextFactory = (
+  supabase: SupabaseClient,
+  userId: string,
+  extensionId: string
+) => ExtensionContext
+
+/** Lazy-loaded context factory — set during initialization */
+let contextFactory: ContextFactory | null = null
+
+/**
+ * Set the context factory used to build ExtensionContext for event handlers.
+ * Called once during system initialization.
+ */
+export function setContextFactory(factory: ContextFactory): void {
+  contextFactory = factory
+}
 
 /**
  * Extension Registry — singleton that manages extension lifecycle.
@@ -15,6 +34,10 @@ class ExtensionRegistry {
 
   /**
    * Register an extension: store it and wire its event handlers to the bus.
+   *
+   * Each handler is wrapped so it receives `(payload, ctx)`. The context is
+   * built lazily when the event fires, using the userId from the payload and
+   * a Supabase client created from the current request cookies.
    */
   register(extension: Extension): void {
     if (this.extensions.has(extension.id)) {
@@ -28,8 +51,24 @@ class ExtensionRegistry {
     const unsubs: (() => void)[] = []
     if (extension.eventHandlers) {
       for (const { eventType, handler } of extension.eventHandlers) {
-        // Cast is safe: the handler is stored by eventType key, so it only receives matching payloads
-        const unsub = eventBus.on(eventType as CoreEventType, handler)
+        // Wrap handler to inject ExtensionContext as second argument
+        const wrappedHandler = async (payload: { userId: string; [key: string]: unknown }) => {
+          let ctx: ExtensionContext | undefined
+          if (contextFactory && payload.userId) {
+            try {
+              // Dynamic import to avoid circular deps at module load time
+              const { createClient } = await import('@/lib/supabase/server')
+              const supabase = await createClient()
+              ctx = contextFactory(supabase, payload.userId, extension.id)
+            } catch {
+              // Context creation failed (e.g. no request cookies in cron jobs).
+              // Handler still gets called — ctx will be undefined.
+            }
+          }
+          return handler(payload, ctx)
+        }
+
+        const unsub = eventBus.on(eventType as CoreEventType, wrappedHandler)
         unsubs.push(unsub)
       }
     }

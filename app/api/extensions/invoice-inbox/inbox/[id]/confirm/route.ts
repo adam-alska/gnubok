@@ -2,9 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { ensureInitialized } from '@/lib/init'
 import { eventBus } from '@/lib/events/bus'
-import { createSupplierInvoiceRegistrationEntry } from '@/lib/bookkeeping/supplier-invoice-entries'
 import type { InvoiceExtractionResult } from '@/extensions/general/invoice-inbox/types'
-import type { SupplierInvoice, SupplierInvoiceItem } from '@/types'
+import type { SupplierInvoice } from '@/types'
 
 ensureInitialized()
 
@@ -192,36 +191,6 @@ export async function POST(
       return NextResponse.json({ error: itemsError.message }, { status: 500 })
     }
 
-    // Accrual method: create registration journal entry
-    const { data: settings } = await supabase
-      .from('company_settings')
-      .select('accounting_method')
-      .eq('user_id', user.id)
-      .single()
-
-    const accountingMethod = settings?.accounting_method || 'accrual'
-    let registrationJournalEntryId: string | null = null
-
-    if (accountingMethod === 'accrual') {
-      try {
-        const journalEntry = await createSupplierInvoiceRegistrationEntry(
-          user.id,
-          invoice as SupplierInvoice,
-          items as SupplierInvoiceItem[],
-          supplier.supplier_type
-        )
-        if (journalEntry) {
-          registrationJournalEntryId = journalEntry.id
-          await supabase
-            .from('supplier_invoices')
-            .update({ registration_journal_entry_id: journalEntry.id })
-            .eq('id', invoice.id)
-        }
-      } catch (err) {
-        console.error('[invoice-inbox] Failed to create registration journal entry:', err)
-      }
-    }
-
     // Update inbox item as confirmed
     await supabase
       .from('invoice_inbox_items')
@@ -246,11 +215,12 @@ export async function POST(
       // Non-blocking
     }
 
+    // Journal entry creation is handled asynchronously by the core
+    // supplier_invoice.confirmed event handler (see lib/bookkeeping/handlers/)
     return NextResponse.json({
       data: {
         ...invoice,
         items: itemInserts,
-        registration_journal_entry_id: registrationJournalEntryId,
       },
     })
   } catch (error) {

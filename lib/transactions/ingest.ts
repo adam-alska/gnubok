@@ -4,34 +4,10 @@ import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-ent
 import { getBestInvoiceMatch } from '@/lib/invoices/invoice-matching'
 import { tryReconcileTransaction, fetchUnlinkedGLLines } from '@/lib/reconciliation/bank-reconciliation'
 import type { UnlinkedGLLine } from '@/lib/reconciliation/bank-reconciliation'
-import type { Transaction } from '@/types'
+import type { Transaction, RawTransaction, IngestResult } from '@/types'
 
-/**
- * Normalized transaction input for the generic ingestion pipeline.
- * Both file import and PSD2 sync convert to this format before ingesting.
- */
-export interface RawTransaction {
-  date: string
-  description: string
-  amount: number
-  currency: string
-  external_id: string // dedup key
-  mcc_code?: number | null
-  merchant_name?: string | null
-  reference?: string | null // OCR number, Bankgiro ref, etc.
-  bank_connection_id?: string | null
-  import_source?: string // 'csv_nordea', 'camt053', 'enable_banking', etc.
-}
-
-export interface IngestResult {
-  imported: number
-  duplicates: number
-  reconciled: number
-  auto_categorized: number
-  auto_matched_invoices: number
-  errors: number
-  transaction_ids: string[]
-}
+// Re-export types for backward compatibility
+export type { RawTransaction, IngestResult } from '@/types'
 
 /**
  * Generic transaction ingestion pipeline.

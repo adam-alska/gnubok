@@ -1659,3 +1659,32 @@ export const REMINDER_LEVEL_DESCRIPTIONS: Record<1 | 2 | 3, string> = {
   2: '30 dagar efter förfallodatum',
   3: '45 dagar efter förfallodatum'
 }
+
+// ============================================================
+// Transaction Ingestion Types (re-exported for extension use)
+// ============================================================
+
+/** Normalized transaction input for the generic ingestion pipeline */
+export interface RawTransaction {
+  date: string
+  description: string
+  amount: number
+  currency: string
+  external_id: string
+  mcc_code?: number | null
+  merchant_name?: string | null
+  reference?: string | null
+  bank_connection_id?: string | null
+  import_source?: string
+}
+
+/** Result of the transaction ingestion pipeline */
+export interface IngestResult {
+  imported: number
+  duplicates: number
+  reconciled: number
+  auto_categorized: number
+  auto_matched_invoices: number
+  errors: number
+  transaction_ids: string[]
+}

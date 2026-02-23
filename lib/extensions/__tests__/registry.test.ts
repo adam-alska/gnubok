@@ -1,7 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { extensionRegistry } from '../registry'
+import { extensionRegistry, setContextFactory } from '../registry'
 import { eventBus } from '@/lib/events/bus'
-import type { Extension } from '../types'
+import type { Extension, ExtensionContext } from '../types'
+
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: vi.fn().mockResolvedValue({
+    from: vi.fn(),
+    storage: { from: vi.fn() },
+  }),
+}))
 
 beforeEach(() => {
   extensionRegistry.clear()
@@ -40,7 +47,8 @@ describe('ExtensionRegistry', () => {
       payload: { entry: { id: 'e1' } as never, userId: 'u1' },
     })
 
-    expect(handler).toHaveBeenCalledWith({ entry: { id: 'e1' }, userId: 'u1' })
+    expect(handler).toHaveBeenCalled()
+    expect(handler.mock.calls[0][0]).toEqual({ entry: { id: 'e1' }, userId: 'u1' })
   })
 
   it('register() skips duplicate registration (same id)', () => {
@@ -125,5 +133,29 @@ describe('ExtensionRegistry', () => {
 
     expect(handler1).not.toHaveBeenCalled()
     expect(handler2).not.toHaveBeenCalled()
+  })
+
+  it('handler receives ExtensionContext when context factory is set', async () => {
+    const handler = vi.fn()
+    const mockCtx = { extensionId: 'ctx-ext', userId: 'u1' } as ExtensionContext
+
+    setContextFactory((_supabase, _userId, _extId) => mockCtx)
+
+    const ext = makeExtension({
+      id: 'ctx-ext',
+      eventHandlers: [{ eventType: 'journal_entry.committed', handler }],
+    })
+
+    extensionRegistry.register(ext)
+
+    await eventBus.emit({
+      type: 'journal_entry.committed',
+      payload: { entry: { id: 'e1' } as never, userId: 'u1' },
+    })
+
+    expect(handler).toHaveBeenCalledWith(
+      { entry: { id: 'e1' }, userId: 'u1' },
+      mockCtx
+    )
   })
 })
