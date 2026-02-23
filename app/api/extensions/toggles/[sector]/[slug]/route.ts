@@ -1,6 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+// Legacy general extensions default to enabled when no toggle row exists
+const LEGACY_GENERAL_EXTENSIONS = [
+  'receipt-ocr',
+  'ai-categorization',
+  'ai-chat',
+  'push-notifications',
+  'enable-banking',
+]
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ sector: string; slug: string }> }
@@ -21,7 +30,14 @@ export async function GET(
     .eq('extension_slug', slug)
     .single()
 
-  return NextResponse.json({ data: data ?? { enabled: false } })
+  if (data) {
+    return NextResponse.json({ data })
+  }
+
+  // No toggle row: legacy general extensions default to enabled
+  const defaultEnabled =
+    sector === 'general' && LEGACY_GENERAL_EXTENSIONS.includes(slug)
+  return NextResponse.json({ data: { enabled: defaultEnabled } })
 }
 
 export async function DELETE(

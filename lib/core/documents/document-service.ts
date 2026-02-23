@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { eventBus } from '@/lib/events'
 import type { DocumentAttachment, CreateDocumentAttachmentInput, DocumentUploadSource } from '@/types'
 
@@ -9,6 +9,33 @@ import type { DocumentAttachment, CreateDocumentAttachmentInput, DocumentUploadS
  * and linking to journal entries. Deletion is blocked by DB triggers
  * for documents linked to committed entries.
  */
+
+let bucketVerified = false
+
+/** @internal Reset bucket verification flag — for testing only */
+export function _resetBucketVerified() {
+  bucketVerified = false
+}
+
+/**
+ * Ensure the 'documents' storage bucket exists, creating it if missing.
+ * Runs once per process lifetime (same pattern as ensureInitialized).
+ */
+async function ensureDocumentsBucket(): Promise<void> {
+  if (bucketVerified) return
+
+  const supabase = await createServiceClient()
+  const { data: bucket } = await supabase.storage.getBucket('documents')
+
+  if (!bucket) {
+    await supabase.storage.createBucket('documents', {
+      public: false,
+      fileSizeLimit: 52428800, // 50 MB
+    })
+  }
+
+  bucketVerified = true
+}
 
 /**
  * Compute SHA-256 hash of a file buffer
@@ -31,6 +58,7 @@ export async function uploadDocument(
     journal_entry_line_id?: string
   } = {}
 ): Promise<DocumentAttachment> {
+  await ensureDocumentsBucket()
   const supabase = await createClient()
 
   // Compute SHA-256 hash
@@ -102,6 +130,7 @@ export async function createNewVersion(
   originalId: string,
   file: { name: string; buffer: ArrayBuffer; type?: string }
 ): Promise<DocumentAttachment> {
+  await ensureDocumentsBucket()
   const supabase = await createClient()
 
   // Compute SHA-256 hash
