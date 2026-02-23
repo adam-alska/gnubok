@@ -21,7 +21,9 @@
       "Bash(npx supabase:*)",
       "Bash(curl:*)",
       "Bash(npx tsc:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
