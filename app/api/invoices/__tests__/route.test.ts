@@ -111,6 +111,9 @@ describe('GET /api/invoices', () => {
   })
 })
 
+const VALID_UUID = '550e8400-e29b-41d4-a716-446655440000'
+const VALID_UUID_2 = '550e8400-e29b-41d4-a716-446655440001'
+
 describe('POST /api/invoices (create invoice)', () => {
   const mockUser = { id: 'user-1', email: 'test@test.se' }
 
@@ -126,7 +129,7 @@ describe('POST /api/invoices (create invoice)', () => {
 
     const request = createMockRequest('/api/invoices', {
       method: 'POST',
-      body: { customer_id: 'cust-1', items: [] },
+      body: { customer_id: VALID_UUID, items: [] },
     })
     const response = await POST(request)
     const { status, body } = await parseJsonResponse(response)
@@ -141,7 +144,7 @@ describe('POST /api/invoices (create invoice)', () => {
     const request = createMockRequest('/api/invoices', {
       method: 'POST',
       body: {
-        customer_id: 'cust-999',
+        customer_id: VALID_UUID_2,
         invoice_date: '2024-06-15',
         due_date: '2024-07-15',
         currency: 'SEK',
@@ -156,7 +159,7 @@ describe('POST /api/invoices (create invoice)', () => {
   })
 
   it('creates invoice with items and emits event', async () => {
-    const customer = makeCustomer({ id: 'cust-1' })
+    const customer = makeCustomer({ id: VALID_UUID })
     const createdInvoice = makeInvoice({ id: 'inv-1' })
 
     mockGetVatRules.mockReturnValue({
@@ -189,7 +192,7 @@ describe('POST /api/invoices (create invoice)', () => {
     const request = createMockRequest('/api/invoices', {
       method: 'POST',
       body: {
-        customer_id: 'cust-1',
+        customer_id: VALID_UUID,
         invoice_date: '2024-06-15',
         due_date: '2024-07-15',
         currency: 'SEK',
@@ -207,7 +210,7 @@ describe('POST /api/invoices (create invoice)', () => {
   })
 
   it('rolls back invoice when items insertion fails', async () => {
-    const customer = makeCustomer({ id: 'cust-1' })
+    const customer = makeCustomer({ id: VALID_UUID })
     const createdInvoice = makeInvoice({ id: 'inv-1' })
 
     mockGetVatRules.mockReturnValue({
@@ -235,7 +238,7 @@ describe('POST /api/invoices (create invoice)', () => {
     const request = createMockRequest('/api/invoices', {
       method: 'POST',
       body: {
-        customer_id: 'cust-1',
+        customer_id: VALID_UUID,
         invoice_date: '2024-06-15',
         due_date: '2024-07-15',
         currency: 'SEK',
@@ -265,7 +268,7 @@ describe('POST /api/invoices (create credit note)', () => {
 
     const request = createMockRequest('/api/invoices', {
       method: 'POST',
-      body: { credited_invoice_id: 'inv-999' },
+      body: { credited_invoice_id: VALID_UUID_2 },
     })
     const response = await POST(request)
     const { status, body } = await parseJsonResponse<{ error: string }>(response)
@@ -275,12 +278,12 @@ describe('POST /api/invoices (create credit note)', () => {
   })
 
   it('returns 400 when invoice is already credited', async () => {
-    const original = makeInvoice({ id: 'inv-1', status: 'credited' })
+    const original = makeInvoice({ id: VALID_UUID, status: 'credited' })
     enqueue({ data: original, error: null })
 
     const request = createMockRequest('/api/invoices', {
       method: 'POST',
-      body: { credited_invoice_id: 'inv-1' },
+      body: { credited_invoice_id: VALID_UUID },
     })
     const response = await POST(request)
     const { status, body } = await parseJsonResponse<{ error: string }>(response)
@@ -290,12 +293,12 @@ describe('POST /api/invoices (create credit note)', () => {
   })
 
   it('returns 400 when invoice is in draft status', async () => {
-    const original = makeInvoice({ id: 'inv-1', status: 'draft' })
+    const original = makeInvoice({ id: VALID_UUID, status: 'draft' })
     enqueue({ data: original, error: null })
 
     const request = createMockRequest('/api/invoices', {
       method: 'POST',
-      body: { credited_invoice_id: 'inv-1' },
+      body: { credited_invoice_id: VALID_UUID },
     })
     const response = await POST(request)
     const { status, body } = await parseJsonResponse<{ error: string }>(response)
@@ -319,7 +322,7 @@ describe('POST /api/invoices (create credit note)', () => {
       },
     ]
     const original = makeInvoice({
-      id: 'inv-1',
+      id: VALID_UUID,
       status: 'sent',
       subtotal: 10000,
       vat_amount: 2500,
@@ -328,7 +331,7 @@ describe('POST /api/invoices (create credit note)', () => {
     })
     const creditNote = makeInvoice({
       id: 'cn-1',
-      credited_invoice_id: 'inv-1',
+      credited_invoice_id: VALID_UUID,
       subtotal: -10000,
       vat_amount: -2500,
       total: -12500,
@@ -356,7 +359,7 @@ describe('POST /api/invoices (create credit note)', () => {
 
     const request = createMockRequest('/api/invoices', {
       method: 'POST',
-      body: { credited_invoice_id: 'inv-1' },
+      body: { credited_invoice_id: VALID_UUID },
     })
     const response = await POST(request)
     const { status, body } = await parseJsonResponse<{ data: unknown }>(response)
@@ -370,7 +373,7 @@ describe('POST /api/invoices (create credit note)', () => {
 
   it('rolls back credit note when items insertion fails', async () => {
     const original = makeInvoice({
-      id: 'inv-1',
+      id: VALID_UUID,
       status: 'sent',
       items: [
         {
@@ -397,7 +400,7 @@ describe('POST /api/invoices (create credit note)', () => {
 
     const request = createMockRequest('/api/invoices', {
       method: 'POST',
-      body: { credited_invoice_id: 'inv-1' },
+      body: { credited_invoice_id: VALID_UUID },
     })
     const response = await POST(request)
     const { status, body } = await parseJsonResponse<{ error: string }>(response)

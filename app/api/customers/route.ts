@@ -2,7 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { eventBus } from '@/lib/events'
 import { ensureInitialized } from '@/lib/init'
-import type { CreateCustomerInput, Customer } from '@/types'
+import { validateBody } from '@/lib/api/validate'
+import { CreateCustomerSchema } from '@/lib/api/schemas'
+import type { Customer } from '@/types'
 
 ensureInitialized()
 
@@ -37,7 +39,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body: CreateCustomerInput = await request.json()
+  const result = await validateBody(request, CreateCustomerSchema)
+  if (!result.success) return result.response
+  const body = result.data
 
   const { data, error } = await supabase
     .from('customers')

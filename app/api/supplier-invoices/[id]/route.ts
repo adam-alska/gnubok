@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { validateBody } from '@/lib/api/validate'
+import { UpdateSupplierInvoiceSchema } from '@/lib/api/schemas'
 
 export async function GET(
   _request: Request,
@@ -60,18 +62,13 @@ export async function PUT(
     )
   }
 
-  const body = await request.json()
+  const validation = await validateBody(request, UpdateSupplierInvoiceSchema)
+  if (!validation.success) return validation.response
+  const body = validation.data
 
   const { data, error } = await supabase
     .from('supplier_invoices')
-    .update({
-      supplier_invoice_number: body.supplier_invoice_number,
-      invoice_date: body.invoice_date,
-      due_date: body.due_date,
-      delivery_date: body.delivery_date,
-      payment_reference: body.payment_reference,
-      notes: body.notes,
-    })
+    .update(body)
     .eq('id', id)
     .eq('user_id', user.id)
     .select()

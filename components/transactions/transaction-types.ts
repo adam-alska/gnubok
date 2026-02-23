@@ -50,12 +50,18 @@ export const INCOME_CATEGORIES: CategoryOption[] = [
   { value: 'income_other', label: 'Övrigt' },
 ]
 
-export const VAT_TREATMENT_OPTIONS: { value: VatTreatment | 'none'; label: string }[] = [
+export interface VatTreatmentOption {
+  value: VatTreatment | 'none'
+  label: string
+  description?: string
+}
+
+export const VAT_TREATMENT_OPTIONS: VatTreatmentOption[] = [
   { value: 'standard_25', label: 'Moms 25%' },
-  { value: 'reduced_12', label: 'Moms 12%' },
-  { value: 'reduced_6', label: 'Moms 6%' },
-  { value: 'reverse_charge', label: 'Omvänd skattskyldighet' },
-  { value: 'export', label: 'Export' },
-  { value: 'exempt', label: 'Momsfri' },
-  { value: 'none', label: 'Ingen moms' },
+  { value: 'reduced_12', label: 'Moms 12%', description: 'Livsmedel, hotell, camping' },
+  { value: 'reduced_6', label: 'Moms 6%', description: 'Böcker, tidningar, kollektivtrafik' },
+  { value: 'reverse_charge', label: 'Omvänd skattskyldighet', description: 'Köparen redovisar momsen (EU-tjänster m.m.)' },
+  { value: 'export', label: 'Export', description: 'Försäljning utanför EU (behåller avdragsrätt)' },
+  { value: 'exempt', label: 'Momsfri', description: 'Undantaget enligt ML (vård, utbildning, finans)' },
+  { value: 'none', label: 'Ingen moms', description: 'Ej momspliktigt (t.ex. lön, privata uttag)' },
 ]

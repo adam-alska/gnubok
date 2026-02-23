@@ -1,0 +1,327 @@
+'use client'
+
+import { useState } from 'react'
+import type { InvoiceInboxItem, Supplier } from '@/types'
+import type { InvoiceExtractionResult } from '@/extensions/general/invoice-inbox/types'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Progress } from '@/components/ui/progress'
+import {
+  getStatusLabel,
+  getStatusVariant,
+  getConfidenceLabel,
+} from '@/lib/extensions/invoice-inbox-utils'
+import { Loader2, RefreshCw, Check, X } from 'lucide-react'
+
+interface InboxDetailDialogProps {
+  item: InvoiceInboxItem | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onConfirm: (itemId: string, supplierId?: string) => Promise<void>
+  onReject: (itemId: string) => Promise<void>
+  onReprocess: (itemId: string) => Promise<void>
+  suppliers: Supplier[]
+}
+
+function formatSEK(amount: number | null): string {
+  if (amount == null) return '-'
+  return new Intl.NumberFormat('sv-SE', {
+    style: 'currency',
+    currency: 'SEK',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount)
+}
+
+export default function InboxDetailDialog({
+  item,
+  open,
+  onOpenChange,
+  onConfirm,
+  onReject,
+  onReprocess,
+  suppliers,
+}: InboxDetailDialogProps) {
+  const [loading, setLoading] = useState<'confirm' | 'reject' | 'reprocess' | null>(null)
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string | undefined>(undefined)
+
+  if (!item) return null
+
+  const extraction = item.extracted_data as unknown as InvoiceExtractionResult | null
+  const confidence = getConfidenceLabel(item.confidence)
+  const confidenceVariant = confidence.variant as 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning'
+  const statusVariant = getStatusVariant(item.status) as 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning'
+
+  const matchedSupplierName = (item.supplier as { name?: string } | undefined)?.name
+  const supplierId = selectedSupplierId ?? item.matched_supplier_id ?? undefined
+
+  const canConfirm = item.status === 'ready' && extraction != null
+  const canReprocess = item.status !== 'confirmed'
+  const canReject = item.status !== 'confirmed' && item.status !== 'rejected'
+
+  async function handleAction(action: 'confirm' | 'reject' | 'reprocess') {
+    setLoading(action)
+    try {
+      if (action === 'confirm') {
+        await onConfirm(item!.id, supplierId)
+      } else if (action === 'reject') {
+        await onReject(item!.id)
+      } else {
+        await onReprocess(item!.id)
+      }
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <div className="flex items-center gap-2">
+            <DialogTitle>Granska faktura</DialogTitle>
+            <Badge variant={statusVariant}>
+              {getStatusLabel(item.status)}
+            </Badge>
+          </div>
+        </DialogHeader>
+
+        {/* Confidence */}
+        {item.confidence != null && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">AI-konfidens</span>
+              <Badge variant={confidenceVariant}>{confidence.label} ({Math.round(item.confidence * 100)}%)</Badge>
+            </div>
+            <Progress value={item.confidence * 100} className="h-1.5" />
+          </div>
+        )}
+
+        {item.error_message && (
+          <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+            {item.error_message}
+          </div>
+        )}
+
+        {extraction && (
+          <>
+            <Separator />
+
+            {/* Supplier info */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium">Leverantör</h4>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Namn</span>
+                  <p className="font-medium">{extraction.supplier.name ?? '-'}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Org.nr</span>
+                  <p className="font-medium">{extraction.supplier.orgNumber ?? '-'}</p>
+                </div>
+                {extraction.supplier.bankgiro && (
+                  <div>
+                    <span className="text-muted-foreground">Bankgiro</span>
+                    <p className="font-medium">{extraction.supplier.bankgiro}</p>
+                  </div>
+                )}
+                {extraction.supplier.plusgiro && (
+                  <div>
+                    <span className="text-muted-foreground">Plusgiro</span>
+                    <p className="font-medium">{extraction.supplier.plusgiro}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Supplier match override */}
+              <div className="space-y-1.5">
+                <label className="text-sm text-muted-foreground">
+                  Matchad leverantör
+                  {matchedSupplierName && (
+                    <span className="ml-1 text-xs">
+                      (auto: {matchedSupplierName})
+                    </span>
+                  )}
+                </label>
+                <Select
+                  value={supplierId ?? '__new__'}
+                  onValueChange={(v) => setSelectedSupplierId(v === '__new__' ? undefined : v)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Skapa ny leverantör" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__new__">Skapa ny leverantör</SelectItem>
+                    {suppliers.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                        {s.org_number ? ` (${s.org_number})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Invoice details */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium">Fakturadetaljer</h4>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Fakturanummer</span>
+                  <p className="font-medium">{extraction.invoice.invoiceNumber ?? '-'}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Valuta</span>
+                  <p className="font-medium">{extraction.invoice.currency}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Fakturadatum</span>
+                  <p className="font-medium">{extraction.invoice.invoiceDate ?? '-'}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Förfallodatum</span>
+                  <p className="font-medium">{extraction.invoice.dueDate ?? '-'}</p>
+                </div>
+                {extraction.invoice.paymentReference && (
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">Betalningsreferens</span>
+                    <p className="font-medium font-mono">{extraction.invoice.paymentReference}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Line items */}
+            {extraction.lineItems.length > 0 && (
+              <>
+                <Separator />
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium">Rader</h4>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Beskrivning</TableHead>
+                          <TableHead className="text-right w-16">Antal</TableHead>
+                          <TableHead className="text-right w-24">À-pris</TableHead>
+                          <TableHead className="text-right w-24">Belopp</TableHead>
+                          <TableHead className="text-right w-16">Moms</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {extraction.lineItems.map((line, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="text-sm">{line.description}</TableCell>
+                            <TableCell className="text-right text-sm">{line.quantity}</TableCell>
+                            <TableCell className="text-right text-sm">
+                              {line.unitPrice != null ? formatSEK(line.unitPrice) : '-'}
+                            </TableCell>
+                            <TableCell className="text-right text-sm font-medium">
+                              {formatSEK(line.lineTotal)}
+                            </TableCell>
+                            <TableCell className="text-right text-sm">
+                              {line.vatRate != null ? `${line.vatRate}%` : '-'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <Separator />
+
+            {/* Totals */}
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Netto</span>
+                <span>{formatSEK(extraction.totals.subtotal)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Moms</span>
+                <span>{formatSEK(extraction.totals.vatAmount)}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between font-medium text-base">
+                <span>Totalt</span>
+                <span>{formatSEK(extraction.totals.total)}</span>
+              </div>
+            </div>
+          </>
+        )}
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          {canReject && (
+            <Button
+              variant="outline"
+              onClick={() => handleAction('reject')}
+              disabled={loading !== null}
+            >
+              {loading === 'reject' ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <X className="h-4 w-4 mr-2" />
+              )}
+              Avvisa
+            </Button>
+          )}
+          {canReprocess && (
+            <Button
+              variant="outline"
+              onClick={() => handleAction('reprocess')}
+              disabled={loading !== null}
+            >
+              {loading === 'reprocess' ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              Bearbeta igen
+            </Button>
+          )}
+          {canConfirm && (
+            <Button
+              onClick={() => handleAction('confirm')}
+              disabled={loading !== null}
+            >
+              {loading === 'confirm' ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Check className="h-4 w-4 mr-2" />
+              )}
+              Bekräfta
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}

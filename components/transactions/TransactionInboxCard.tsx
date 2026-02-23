@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { ArrowUpRight, ArrowDownRight, FileText, Loader2 } from 'lucide-react'
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/info-tooltip'
 import type { TransactionWithInvoice, CategorizeHandler } from './transaction-types'
 import type { SuggestedCategory } from '@/lib/transactions/category-suggestions'
 
@@ -16,10 +17,12 @@ interface TransactionInboxCardProps {
   processingId: string | null
   isBatchMode: boolean
   isSelected: boolean
+  entityType?: string
   onCategorize: CategorizeHandler
   onMarkPrivate: (id: string) => void
   onOpenMatchDialog: (transaction: TransactionWithInvoice) => void
   onOpenCategoryDialog: (transaction: TransactionWithInvoice) => void
+  onOpenQuickReview?: (transaction: TransactionWithInvoice, suggestion: SuggestedCategory) => void
   onToggleSelect: (id: string) => void
   onAnimationComplete?: (id: string) => void
 }
@@ -30,10 +33,12 @@ export default function TransactionInboxCard({
   processingId,
   isBatchMode,
   isSelected,
+  entityType = 'enskild_firma',
   onCategorize,
   onMarkPrivate,
   onOpenMatchDialog,
   onOpenCategoryDialog,
+  onOpenQuickReview,
   onToggleSelect,
   onAnimationComplete,
 }: TransactionInboxCardProps) {
@@ -45,8 +50,12 @@ export default function TransactionInboxCard({
   const isUncategorized = transaction.is_business === null && !transaction.journal_entry_id
   const showCheckbox = isBatchMode && isUncategorized
 
-  async function handleSuggestionClick(suggestion: SuggestedCategory) {
-    await onCategorize(transaction.id, true, suggestion.category)
+  function handleSuggestionClick(suggestion: SuggestedCategory) {
+    if (onOpenQuickReview) {
+      onOpenQuickReview(transaction, suggestion)
+    } else {
+      onCategorize(transaction.id, true, suggestion.category)
+    }
   }
 
   return (
@@ -168,15 +177,28 @@ export default function TransactionInboxCard({
               )}
 
               {/* Private button */}
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-8 text-xs text-muted-foreground"
-                onClick={() => onMarkPrivate(transaction.id)}
-                disabled={isProcessing || isDisabled}
-              >
-                Privat
-              </Button>
+              <TooltipProvider delayDuration={300}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 text-xs text-muted-foreground"
+                      onClick={() => onMarkPrivate(transaction.id)}
+                      disabled={isProcessing || isDisabled}
+                    >
+                      Privat
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[260px]">
+                    <p className="text-sm leading-relaxed">
+                      {entityType === 'aktiebolag'
+                        ? 'Privat utgift med företagets kort \u2014 bokförs som skuld till ägaren (konto 2893)'
+                        : 'Privat uttag \u2014 bokförs mot konto 2013 (Övriga egna uttag)'}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
               {/* Open category dialog */}
               <Button

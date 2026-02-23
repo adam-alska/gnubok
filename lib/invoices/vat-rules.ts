@@ -162,7 +162,7 @@ export function getVatTreatmentLabel(treatment: VatTreatment): string {
 export function getVatSummaryFromItems(
   items: { vat_rate?: number | null }[]
 ): { label: string; treatment: VatTreatment | null; rate: number | null; isMixed: boolean } {
-  const rates = new Set(items.map((item) => item.vat_rate ?? 25))
+  const rates = new Set(items.map((item) => item.vat_rate ?? 0))
 
   if (rates.size === 1) {
     const rate = rates.values().next().value!

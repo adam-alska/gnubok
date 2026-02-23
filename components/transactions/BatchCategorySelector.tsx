@@ -4,13 +4,12 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, VAT_TREATMENT_OPTIONS } from './transaction-types'
+import VatTreatmentSelect from './VatTreatmentSelect'
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from './transaction-types'
 import type { TransactionCategory, VatTreatment } from '@/types'
 
 const expenseCategories = EXPENSE_CATEGORIES
 const incomeCategories = INCOME_CATEGORIES
-const vatTreatmentOptions = VAT_TREATMENT_OPTIONS
 
 interface BatchCategorySelectorProps {
   open: boolean
@@ -62,21 +61,10 @@ export default function BatchCategorySelector({
           <div className="space-y-4 py-2">
             <div>
               <h4 className="text-sm font-medium text-muted-foreground mb-2">Momsbehandling</h4>
-              <Select
+              <VatTreatmentSelect
                 value={vatTreatment}
-                onValueChange={(v) => setVatTreatment(v as VatTreatment | 'none')}
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {vatTreatmentOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onValueChange={setVatTreatment}
+              />
             </div>
             <div>
               <h4 className="text-sm font-medium text-muted-foreground mb-2">Kostnader</h4>

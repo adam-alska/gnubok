@@ -2,7 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { eventBus } from '@/lib/events'
 import { ensureInitialized } from '@/lib/init'
-import type { CreateInvoiceInput, EntityType, AccountingMethod, Invoice, CreditNote, InvoiceDocumentType } from '@/types'
+import { CreateInvoiceSchema, CreateCreditNoteSchema } from '@/lib/api/schemas'
+import type { EntityType, AccountingMethod, Invoice, CreditNote, InvoiceDocumentType } from '@/types'
 import { getVatRules, calculateVat, calculateTotal, getAvailableVatRates, getVatTreatmentForRate } from '@/lib/invoices/vat-rules'
 import { fetchExchangeRate, convertToSEK } from '@/lib/currency/riksbanken'
 import {
@@ -10,11 +11,6 @@ import {
 } from '@/lib/bookkeeping/invoice-entries'
 
 ensureInitialized()
-
-interface CreateCreditNoteInput {
-  credited_invoice_id: string
-  reason?: string
-}
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -59,15 +55,45 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json()
-
-  // Check if this is a credit note creation request
-  if (body.credited_invoice_id) {
-    return createCreditNote(supabase, user.id, body as CreateCreditNoteInput)
+  let rawBody: unknown
+  try {
+    rawBody = await request.json()
+  } catch {
+    return NextResponse.json(
+      { error: 'Invalid JSON in request body', type: 'validation_error' },
+      { status: 400 },
+    )
   }
 
-  const invoiceInput = body as CreateInvoiceInput
-  const documentType: InvoiceDocumentType = body.document_type || 'invoice'
+  // Check if this is a credit note creation request
+  if (typeof rawBody === 'object' && rawBody !== null && 'credited_invoice_id' in rawBody) {
+    const parsed = CreateCreditNoteSchema.safeParse(rawBody)
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error: 'Validation failed',
+          type: 'validation_error',
+          errors: parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message, code: i.code })),
+        },
+        { status: 400 },
+      )
+    }
+    return createCreditNote(supabase, user.id, parsed.data)
+  }
+
+  const parsed = CreateInvoiceSchema.safeParse(rawBody)
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        error: 'Validation failed',
+        type: 'validation_error',
+        errors: parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message, code: i.code })),
+      },
+      { status: 400 },
+    )
+  }
+  const invoiceInput = parsed.data
+  const documentType: InvoiceDocumentType = invoiceInput.document_type || 'invoice'
 
   // Get customer for VAT calculation
   const { data: customer, error: customerError } = await supabase
@@ -225,7 +251,7 @@ export async function POST(request: Request) {
 async function createCreditNote(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
-  input: CreateCreditNoteInput
+  input: { credited_invoice_id: string; reason?: string }
 ) {
   // Fetch the original invoice with items
   const { data: originalInvoice, error: originalError } = await supabase
@@ -310,7 +336,7 @@ async function createCreditNote(
     unit: item.unit,
     unit_price: item.unit_price,
     line_total: -Math.abs(item.line_total),
-    vat_rate: item.vat_rate ?? 25,
+    vat_rate: item.vat_rate ?? 0,
     vat_amount: -(item.vat_amount ? Math.abs(item.vat_amount) : 0),
   }))
 

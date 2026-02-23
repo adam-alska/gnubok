@@ -2,7 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { createSupplierInvoiceRegistrationEntry } from '@/lib/bookkeeping/supplier-invoice-entries'
 import { ensureInitialized } from '@/lib/init'
-import type { CreateSupplierInvoiceInput, SupplierInvoice, SupplierInvoiceItem } from '@/types'
+import { validateBody } from '@/lib/api/validate'
+import { CreateSupplierInvoiceSchema } from '@/lib/api/schemas'
+import type { SupplierInvoice, SupplierInvoiceItem } from '@/types'
 
 ensureInitialized()
 
@@ -49,7 +51,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body: CreateSupplierInvoiceInput = await request.json()
+  const validation = await validateBody(request, CreateSupplierInvoiceSchema)
+  if (!validation.success) return validation.response
+  const body = validation.data
 
   // Validate supplier exists and belongs to user
   const { data: supplier, error: supplierError } = await supabase

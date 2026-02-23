@@ -5,16 +5,11 @@ import { ensureInitialized } from '@/lib/init'
 import { buildMappingResultFromCategory } from '@/lib/bookkeeping/category-mapping'
 import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-entries'
 import { saveUserMappingRule } from '@/lib/bookkeeping/mapping-engine'
-import type { Transaction, TransactionCategory, EntityType, VatTreatment } from '@/types'
+import { validateBody } from '@/lib/api/validate'
+import { CategorizeTransactionSchema } from '@/lib/api/schemas'
+import type { Transaction, TransactionCategory, EntityType } from '@/types'
 
 ensureInitialized()
-
-interface CategorizeRequest {
-  is_business: boolean
-  category?: TransactionCategory
-  vat_treatment?: VatTreatment
-  account_override?: string
-}
 
 /**
  * Ensure a fiscal period exists for the given date, create one if needed
@@ -98,8 +93,10 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Parse request body
-  const body: CategorizeRequest = await request.json()
+  // Parse and validate request body
+  const validation = await validateBody(request, CategorizeTransactionSchema)
+  if (!validation.success) return validation.response
+  const body = validation.data
   const { is_business, category } = body
 
   // Fetch the transaction (validates ownership)

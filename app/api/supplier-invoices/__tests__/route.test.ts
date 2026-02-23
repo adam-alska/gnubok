@@ -98,6 +98,9 @@ describe('GET /api/supplier-invoices', () => {
   })
 })
 
+const VALID_UUID = '550e8400-e29b-41d4-a716-446655440000'
+const VALID_UUID_2 = '550e8400-e29b-41d4-a716-446655440001'
+
 describe('POST /api/supplier-invoices', () => {
   const mockUser = { id: 'user-1', email: 'test@test.se' }
 
@@ -112,7 +115,7 @@ describe('POST /api/supplier-invoices', () => {
 
     const request = createMockRequest('/api/supplier-invoices', {
       method: 'POST',
-      body: { supplier_id: 'sup-1', items: [] },
+      body: { supplier_id: VALID_UUID, items: [] },
     })
     const response = await POST(request)
     const { status, body } = await parseJsonResponse(response)
@@ -127,7 +130,7 @@ describe('POST /api/supplier-invoices', () => {
     const request = createMockRequest('/api/supplier-invoices', {
       method: 'POST',
       body: {
-        supplier_id: 'sup-999',
+        supplier_id: VALID_UUID_2,
         supplier_invoice_number: 'LF-001',
         invoice_date: '2024-06-01',
         due_date: '2024-07-01',
@@ -142,7 +145,7 @@ describe('POST /api/supplier-invoices', () => {
   })
 
   it('creates supplier invoice with items and arrival number', async () => {
-    const supplier = makeSupplier({ id: 'sup-1' })
+    const supplier = makeSupplier({ id: VALID_UUID })
     const createdInvoice = makeSupplierInvoice({ id: 'si-1' })
 
     // Fetch supplier
@@ -163,7 +166,7 @@ describe('POST /api/supplier-invoices', () => {
     const request = createMockRequest('/api/supplier-invoices', {
       method: 'POST',
       body: {
-        supplier_id: 'sup-1',
+        supplier_id: VALID_UUID,
         supplier_invoice_number: 'LF-001',
         invoice_date: '2024-06-01',
         due_date: '2024-07-01',
@@ -190,7 +193,7 @@ describe('POST /api/supplier-invoices', () => {
   })
 
   it('skips registration entry for cash method', async () => {
-    const supplier = makeSupplier({ id: 'sup-1' })
+    const supplier = makeSupplier({ id: VALID_UUID })
     const createdInvoice = makeSupplierInvoice({ id: 'si-1' })
 
     enqueue({ data: supplier, error: null })
@@ -202,7 +205,7 @@ describe('POST /api/supplier-invoices', () => {
     const request = createMockRequest('/api/supplier-invoices', {
       method: 'POST',
       body: {
-        supplier_id: 'sup-1',
+        supplier_id: VALID_UUID,
         supplier_invoice_number: 'LF-002',
         invoice_date: '2024-06-01',
         due_date: '2024-07-01',
@@ -220,7 +223,7 @@ describe('POST /api/supplier-invoices', () => {
   })
 
   it('rolls back on items insertion failure', async () => {
-    const supplier = makeSupplier({ id: 'sup-1' })
+    const supplier = makeSupplier({ id: VALID_UUID })
     const createdInvoice = makeSupplierInvoice({ id: 'si-1' })
 
     enqueue({ data: supplier, error: null })
@@ -234,7 +237,7 @@ describe('POST /api/supplier-invoices', () => {
     const request = createMockRequest('/api/supplier-invoices', {
       method: 'POST',
       body: {
-        supplier_id: 'sup-1',
+        supplier_id: VALID_UUID,
         supplier_invoice_number: 'LF-003',
         invoice_date: '2024-06-01',
         due_date: '2024-07-01',

@@ -23,7 +23,9 @@
       "Bash(npx tsc:*)",
       "Bash(findstr:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:support.fortnox.se)"
     ]
   }
 }

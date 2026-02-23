@@ -289,7 +289,7 @@ export function InvoicePDF({ invoice, customer, items, company, originalInvoiceN
   const vatByRate = new Map<number, { base: number; vat: number }>()
   if (hasPerLineVat) {
     for (const item of items) {
-      const rate = item.vat_rate ?? 25
+      const rate = item.vat_rate ?? 0
       const group = vatByRate.get(rate) || { base: 0, vat: 0 }
       group.base += Math.abs(item.line_total)
       group.vat += Math.abs(item.vat_amount || 0)
@@ -411,7 +411,7 @@ export function InvoicePDF({ invoice, customer, items, company, originalInvoiceN
                   <Text style={styles.colPrice}>{formatCurrency(item.unit_price, invoice.currency)}</Text>
                 )}
                 {!isDeliveryNote && showVatColumn && (
-                  <Text style={styles.colVat}>{item.vat_rate ?? 25}%</Text>
+                  <Text style={styles.colVat}>{item.vat_rate ?? 0}%</Text>
                 )}
                 {!isDeliveryNote && (
                   <Text style={styles.colTotal}>{formatCurrency(item.line_total, invoice.currency)}</Text>
@@ -440,7 +440,7 @@ export function InvoicePDF({ invoice, customer, items, company, originalInvoiceN
                 ))
             ) : (
               <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Moms ({invoice.vat_rate ?? (vatByRate.size === 1 ? vatByRate.keys().next().value : 25)}%):</Text>
+                <Text style={styles.totalLabel}>Moms ({invoice.vat_rate ?? (vatByRate.size === 1 ? vatByRate.keys().next().value : 0)}%):</Text>
                 <Text style={styles.totalValue}>{formatCurrency(invoice.vat_amount, invoice.currency)}</Text>
               </View>
             )}

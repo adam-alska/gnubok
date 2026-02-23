@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { validateBody } from '@/lib/api/validate'
+import { UpdateAccountSchema } from '@/lib/api/schemas'
 
 export async function DELETE(
   request: Request,
@@ -70,19 +72,13 @@ export async function PUT(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json()
-
-  // Build update object with only provided fields
-  const updates: Record<string, unknown> = {}
-  if (body.account_name !== undefined) updates.account_name = body.account_name
-  if (body.is_active !== undefined) updates.is_active = body.is_active
-  if (body.description !== undefined) updates.description = body.description
-  if (body.default_vat_code !== undefined) updates.default_vat_code = body.default_vat_code
-  if (body.sru_code !== undefined) updates.sru_code = body.sru_code
+  const validation = await validateBody(request, UpdateAccountSchema)
+  if (!validation.success) return validation.response
+  const body = validation.data
 
   const { data, error } = await supabase
     .from('chart_of_accounts')
-    .update(updates)
+    .update(body)
     .eq('user_id', user.id)
     .eq('account_number', number)
     .select()

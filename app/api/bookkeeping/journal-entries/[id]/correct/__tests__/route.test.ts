@@ -57,7 +57,7 @@ describe('POST /api/bookkeeping/journal-entries/[id]/correct', () => {
     const { status, body } = await parseJsonResponse<{ error: string }>(response)
 
     expect(status).toBe(400)
-    expect(body.error).toBe('Lines are required')
+    expect(body.error).toBe('Validation failed')
   })
 
   it('returns 400 when lines array is empty', async () => {
@@ -69,7 +69,7 @@ describe('POST /api/bookkeeping/journal-entries/[id]/correct', () => {
     const { status, body } = await parseJsonResponse<{ error: string }>(response)
 
     expect(status).toBe(400)
-    expect(body.error).toBe('Lines are required')
+    expect(body.error).toBe('Validation failed')
   })
 
   it('returns reversal and corrected entries on success', async () => {

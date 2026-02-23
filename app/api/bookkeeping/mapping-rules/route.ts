@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { validateBody } from '@/lib/api/validate'
+import { CreateMappingRuleSchema } from '@/lib/api/schemas'
 
 export async function GET() {
   const supabase = await createClient()
@@ -31,7 +33,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json()
+  const result = await validateBody(request, CreateMappingRuleSchema)
+  if (!result.success) return result.response
+  const body = result.data
 
   const { data, error } = await supabase
     .from('mapping_rules')
