@@ -52,7 +52,7 @@ function generatePerRateLines(
   // Group items by vat_rate
   const rateGroups = new Map<number, { subtotal: number; vatAmount: number }>()
   for (const item of items) {
-    const rate = item.vat_rate ?? 25
+    const rate = item.vat_rate ?? 0
     const group = rateGroups.get(rate) || { subtotal: 0, vatAmount: 0 }
     group.subtotal += item.line_total
     group.vatAmount += item.vat_amount || 0

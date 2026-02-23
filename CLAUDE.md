@@ -6,7 +6,7 @@ erp-base is a Swedish-focused accounting SaaS for sole traders (enskild firma) a
 
 **Tech stack**: Next.js 16 (App Router), React 19, TypeScript (strict), Supabase (PostgreSQL + RLS + magic link auth), Tailwind CSS 4 + shadcn/ui, Vercel hosting.
 
-**Integrations**: Enable Banking (PSD2), Anthropic SDK, OpenAI (embeddings), Resend (email), web-push (VAPID).
+**Integrations**: Enable Banking (PSD2), Anthropic SDK, LangChain, OpenAI (embeddings), Resend (email), web-push (VAPID).
 
 **Path alias**: `@/*` maps to the project root (tsconfig.json).
 
@@ -34,7 +34,8 @@ app/
   (onboarding)/           6-step setup wizard
   (dashboard)/            Authenticated routes (invoices, customers, transactions,
                           bookkeeping, reports, suppliers, supplier-invoices,
-                          receipts, settings, calendar, help, import)
+                          receipts, settings, calendar, help, import,
+                          extensions, e/[sector]/[slug])
   (public)/               Public invoice action links (no auth)
   api/                    API routes organized by domain
 
@@ -43,20 +44,47 @@ components/
   bookkeeping/            Chart of accounts manager, account combobox, add/edit dialogs
   calendar/               Calendar views, deadline cards, payment summary, todo widgets
   chat/                   ChatWidget, ChatPanel, ChatInput, ChatMessage
+  customers/              CustomerForm
   dashboard/              DashboardContent, DashboardNav, FSkattWarningCard
+  extensions/             Extension marketplace UI (ExtensionCard, SectorCard,
+                          ExtensionToggleButton, workspace components,
+                          per-sector subdirectories)
+  import/                 Bank file import workflow components
+  invoices/               InvoiceReviewContent
+  onboarding/             NewUserChecklist, setup step components
   reports/                Report views (including BankReconciliationView)
   settings/               CalendarFeedSettings
-  [feature]/              Feature-organized components (invoices, suppliers, import, etc.)
+  suppliers/              Supplier-related components
+  transactions/           Transaction list, categorization, booking components
 
-extensions/               First-party extension implementations
-  ai-categorization/      AI-powered transaction categorization
-  ai-chat/                Claude-based chat assistant
-  enable-banking/         PSD2 bank integration via Enable Banking (JWT auth, sync)
-  ne-bilaga/              NE tax form attachment generation
-  push-notifications/     Web push notification system
-  receipt-ocr/            Receipt image OCR processing
-  sru-export/             SRU file export
-  example-logger/         Minimal reference extension (not loaded by default)
+extensions/               Sector-based extension hierarchy
+  general/                General-purpose extensions (all businesses)
+    ai-categorization/    AI-powered transaction categorization
+    ai-chat/              Claude-based chat assistant (LangChain RAG)
+    enable-banking/       PSD2 bank integration (opt-in, commented out in loader)
+    example-logger/       Minimal reference extension (not loaded)
+    invoice-inbox/        Supplier invoice intake via email/upload with AI extraction
+    push-notifications/   Web push notification system
+    receipt-ocr/          Receipt image OCR processing (includes components/pages)
+  restaurant/             Restaurant & cafe sector
+    food-cost/            Food cost percentage calculator
+    earnings-per-liter/   Revenue per liter of alcohol
+    pos-import/           POS Z-report import
+    tip-tracking/         Tip tracking per shift/employee
+  construction/           Construction & trades sector
+    rot-calculator/       ROT tax deduction calculator
+    project-cost/         Project cost tracking
+  hotel/                  Hotel & lodging sector
+    revpar/               Revenue Per Available Room
+    occupancy/            Occupancy rate tracking
+  tech/                   IT & consulting sector
+    billable-hours/       Billable hours & utilization rate
+    project-billing/      Project billing analysis
+  ecommerce/              E-commerce sector
+    shopify-import/       Shopify order import
+    multichannel-revenue/ Multi-channel revenue analysis
+  ne-bilaga/              NE tax form attachment generation (top-level)
+  sru-export/             SRU file export (top-level)
 
 lib/
   bookkeeping/            Core journal entry engine and all entry generators
@@ -70,23 +98,34 @@ lib/
     bas-reference.ts      BAS account catalog (~180 accounts with metadata, SRU codes)
     account-descriptions.ts Human-readable account name lookup
     validate-period-duration.ts Fiscal period duration validation (BFL 3 kap.)
+    handlers/             Booking handler functions (supplier-invoice-handler.ts)
   core/
     bookkeeping/          Period service, storno reversal, year-end closing
     documents/            Document archive (upload, versioning, SHA-256 integrity)
     audit/                Audit trail service
     tax/                  Tax code service
-  calendar/               Calendar and scheduling utilities
+  calendar/               Calendar utilities, ICS feed generation
   currency/               Riksbanken exchange rates
-  customers/              Customer management helpers
-  deadlines/              Tax deadline tracking
-  email/                  Email service (Resend integration)
+  deadlines/              Tax deadline tracking, status engine
+  email/                  Email service (Resend), invoice/reminder templates
   events/                 Event bus (bus.ts, types.ts)
-  extensions/             Extension registry, loader, types
-  import/                 SIE and bank file parser
+  extensions/             Extension system
+    loader.ts             FIRST_PARTY_EXTENSIONS array, static imports
+    registry.ts           Runtime extension registry
+    types.ts              Extension, Sector, ExtensionDefinition, toggle types
+    sectors.ts            Sector & extension metadata registry (pure data)
+    hooks.ts              React hooks for extension state
+    context-factory.ts    Extension context builder
+    toggle-check.ts       Extension enable/disable logic
+    validation.ts         Extension data validation
+    workspace-registry.tsx Extension workspace component registry
+    icon-resolver.tsx     Dynamic icon lookup for extensions
+    use-account-totals.ts Hook for account balance queries
+    use-extension-data.ts Hook for extension-specific data
+  import/                 SIE parser, SIE import orchestrator, bank file parser
     bank-file/            Bank file parser with format modules
       formats/            camt053, generic-csv, handelsbanken, nordea, seb, swedbank
-  invoice/                VAT rules, invoice matching (vat-rules.ts, invoice-matching.ts)
-  invoices/               Invoice business logic (reminder-processor)
+  invoices/               VAT rules, invoice matching, PDF template, reminder processor
   reconciliation/         Bank reconciliation engine (4-pass matching algorithm)
   reports/                Financial reports (trial-balance, income-statement,
                           balance-sheet, vat-declaration, sie-export,
@@ -94,18 +133,20 @@ lib/
                           general-ledger, journal-register,
                           ar-ledger, ar-reconciliation, monthly-breakdown)
   supabase/               Client setup (client.ts = browser, server.ts = server/admin,
-                          fetch-all.ts = pagination helper for large queries)
-  tax/                    Tax calculations, deadlines, Swedish holidays
-  transactions/           Transaction processing helpers
+                          fetch-all.ts = pagination helper, middleware.ts)
+  tax/                    Tax calculations, deadlines, Swedish holidays, expense warnings
+  transactions/           Transaction processing, category suggestions
   init.ts                 Extension loader (idempotent, called by API routes)
   utils.ts                Shared utility functions
 
-types/index.ts            Canonical type definitions (120+ types, single source of truth)
+types/index.ts            Canonical type definitions (single source of truth)
 types/chat.ts             Chat-specific type definitions
 tests/helpers.ts          Mock factories and fixture builders
 supabase/migrations/      SQL migration files
-scripts/                  Utility scripts (clear-user-data.sql)
-dev_docs/                 Extensive project documentation (PRD, architecture, BAS guide, etc.)
+scripts/                  Utility scripts (clear-user-data.sql, copy-extensions.mjs,
+                          move-extensions.js, setup-phase8.js)
+dev_docs/                 Project documentation (BAS account guides, gap analysis,
+                          Enable Banking docs, Bokio reference screenshots)
 ```
 
 ### Key Relationships
@@ -114,6 +155,7 @@ dev_docs/                 Extensive project documentation (PRD, architecture, BA
 - **API routes** that emit events must call `ensureInitialized()` (from `lib/init.ts`) at module level to load extensions.
 - **Event bus** (`lib/events/bus.ts`) is a module-level singleton. Core services emit, extensions subscribe.
 - **Supabase clients**: browser (`lib/supabase/client.ts`), server with user cookies (`createClient()` from `lib/supabase/server.ts`), and service role (`createServiceClient()`).
+- **Extension sector system**: Extensions are organized by business sector (`lib/extensions/sectors.ts`). Users can browse/toggle extensions via the marketplace UI (`app/(dashboard)/extensions/`). Sector-specific extension workspaces are rendered at `app/(dashboard)/e/[sector]/[slug]/`.
 
 ---
 
@@ -163,7 +205,7 @@ The bookkeeping engine (`lib/bookkeeping/engine.ts`) is the most critical system
 
 ### Per-Line VAT
 
-Invoice items support individual `vat_rate` values, enabling mixed-rate invoices. The helper `generatePerRateLines()` in `invoice-entries.ts` groups items by VAT rate and creates separate revenue + VAT account lines per rate group. Available rates depend on customer type — use `getAvailableVatRates(customerType, vatNumberValidated)` from `lib/invoice/vat-rules.ts`.
+Invoice items support individual `vat_rate` values, enabling mixed-rate invoices. The helper `generatePerRateLines()` in `invoice-entries.ts` groups items by VAT rate and creates separate revenue + VAT account lines per rate group. Available rates depend on customer type — use `getAvailableVatRates(customerType, vatNumberValidated)` from `lib/invoices/vat-rules.ts`.
 
 ### Bank Reconciliation
 
@@ -199,14 +241,39 @@ These rules exist for legal compliance and are enforced by database triggers. **
 
 ## Extension Development
 
-Extensions are first-party plugins in the `/extensions/` directory, loaded statically at startup.
+Extensions are first-party plugins organized by business sector in the `/extensions/` directory, loaded statically at startup.
+
+### Sector System
+
+Extensions are grouped into sectors defined in `lib/extensions/sectors.ts`. Each sector targets a specific industry (restaurant, construction, hotel, tech, ecommerce) or serves all businesses (general). The sector registry provides metadata used by the extension marketplace UI.
+
+Key types (from `lib/extensions/types.ts`):
+- `SectorSlug` — `'general' | 'restaurant' | 'construction' | 'hotel' | 'tech' | 'ecommerce'`
+- `ExtensionDefinition` — Marketplace metadata (slug, name, sector, category, icon, dataPattern, description)
+- `ExtensionCategory` — `'import' | 'operations' | 'reports' | 'accounting'`
+- `ExtensionDataPattern` — `'core' | 'manual' | 'both'` (how extension accesses data)
+- `ExtensionToggle` — Per-user enable/disable state for extensions
 
 ### Creating a New Extension
 
-1. Create `extensions/<name>/index.ts`
+1. Create `extensions/<sector>/<name>/index.ts`
 2. Export an object implementing the `Extension` interface from `lib/extensions/types.ts`
 3. Add a static import to the `FIRST_PARTY_EXTENSIONS` array in `lib/extensions/loader.ts`
-4. Extensions **cannot** use dynamic imports (Next.js bundling constraint)
+4. Add metadata to the appropriate sector in `lib/extensions/sectors.ts`
+5. Extensions **cannot** use dynamic imports (Next.js bundling constraint)
+
+### Currently Loaded Extensions (FIRST_PARTY_EXTENSIONS)
+
+```
+receiptOcrExtension        @/extensions/general/receipt-ocr
+aiCategorizationExtension  @/extensions/general/ai-categorization
+pushNotificationsExtension @/extensions/general/push-notifications
+sruExportExtension         @/extensions/sru-export
+neBilagaExtension          @/extensions/ne-bilaga
+aiChatExtension            @/extensions/general/ai-chat
+invoiceInboxExtension      @/extensions/general/invoice-inbox
+# enableBankingExtension   @/extensions/general/enable-banking  (commented out, opt-in)
+```
 
 ### Extension Interface
 
@@ -235,7 +302,7 @@ interface Extension {
 
 ### Minimal Example
 
-See `extensions/example-logger/index.ts`:
+See `extensions/general/example-logger/index.ts`:
 
 ```typescript
 import type { Extension } from '@/lib/extensions/types'
@@ -273,6 +340,7 @@ All defined in `lib/events/types.ts`:
 | `credit_note.created` | `{ creditNote, userId }` |
 | `transaction.synced` | `{ transactions[], userId }` |
 | `transaction.categorized` | `{ transaction, account, taxCode, userId }` |
+| `transaction.reconciled` | `{ transaction, journalEntryId, method, userId }` |
 | `bank.statement_received` | `{ statement, userId }` |
 | `bank.payment_notification` | `{ notification, userId }` |
 | `period.locked` | `{ period, userId }` |
@@ -282,7 +350,9 @@ All defined in `lib/events/types.ts`:
 | `receipt.extracted` | `{ receipt, documentId, confidence, userId }` |
 | `receipt.matched` | `{ receipt, transaction, confidence, autoMatched, userId }` |
 | `receipt.confirmed` | `{ receipt, businessTotal, privateTotal, userId }` |
-| `transaction.reconciled` | `{ transaction, journalEntryId, method, userId }` |
+| `supplier_invoice.received` | `{ inboxItem, userId }` |
+| `supplier_invoice.extracted` | `{ inboxItem, confidence, userId }` |
+| `supplier_invoice.confirmed` | `{ inboxItem, supplierInvoice, userId }` |
 | `audit.security_event` | `{ event, userId }` |
 
 ### Event Bus Behavior
@@ -325,6 +395,13 @@ mockResult({ data: makeTransaction(), error: null })
 - `makeJournalEntryLine()` — Line with account number, zero amounts
 - `makeDocumentAttachment()` — Document with hash, storage path
 - `makeTaxCode()` — TaxCode with default output VAT 25%
+- `makeInvoice()` — Invoice with default customer, amounts, dates
+- `makeCustomer()` — Customer with default name, address
+- `makeSupplier()` — Supplier with default details
+- `makeSupplierInvoice()` — Supplier invoice with default amounts
+- `makeCompanySettings()` — Company settings with defaults
+- `makeInvoiceInboxItem()` — Invoice inbox item for supplier invoice intake
+- `makeExtensionToggle()` — Extension toggle state
 
 ### Patterns
 
@@ -363,11 +440,11 @@ mockResult({ data: makeTransaction(), error: null })
 
 ### Location
 
-`supabase/migrations/` — currently 32 files numbered `20240101000001` through `20240101000032`.
+`supabase/migrations/` — currently 39 files numbered `20240101000001` through `20240101000038` (note: two files share number `000033`).
 
 ### Naming Convention
 
-`YYYYMMDD00NNNN_descriptive_name.sql` — next migration: `20240101000033_*.sql`
+`YYYYMMDD00NNNN_descriptive_name.sql` — next migration: `20240101000039_*.sql`
 
 ### Migration Rules
 
@@ -406,6 +483,13 @@ mockResult({ data: makeTransaction(), error: null })
 - **Migration 030 (`bank_reconciliation`)** — Adds `reconciliation_method` column to `transactions` (CHECK constraint for method types), indexes for unmatched transaction lookup, and RPC `get_unlinked_1930_lines()` for finding unreconciled GL lines.
 - **Migration 031 (`invoice_document_type`)** — Adds `document_type` column to `invoices` (CHECK: invoice/proforma/delivery_note, default 'invoice') and `converted_from_id` FK for tracking proforma-to-invoice conversions.
 - **Migration 032 (`add_accounting_method`)** — Adds `accounting_method` column to `company_settings` (CHECK: accrual/cash, default 'accrual') to support kontantmetoden vs faktureringsmetoden.
+- **Migration 033 (`ai_chat_schema`)** — AI chat conversation and message storage.
+- **Migration 033 (`invoice_inbox`)** — Invoice inbox table for supplier invoice intake. (Note: shares number with ai_chat_schema.)
+- **Migration 034 (`fix_extension_data_trigger`)** — Fixes extension data trigger.
+- **Migration 035 (`fix_push_notifications`)** — Push notifications schema fix.
+- **Migration 036 (`fix_enable_banking`)** — Enable Banking schema fix.
+- **Migration 037 (`extension_toggles`)** — Extension toggle table for per-user enable/disable.
+- **Migration 038 (`fix_match_documents_search_path`)** — Fixes search path for document matching function.
 
 ---
 

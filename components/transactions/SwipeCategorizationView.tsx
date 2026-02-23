@@ -5,7 +5,7 @@ import { motion, useMotionValue, useTransform, AnimatePresence, type PanInfo } f
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import VatTreatmentSelect from './VatTreatmentSelect'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { checkExpenseWarnings } from '@/lib/tax/expense-warnings'
 import { getDefaultAccountForCategory, getDefaultVatTreatmentForCategory } from '@/lib/bookkeeping/category-mapping'
@@ -14,7 +14,7 @@ import { X, ArrowLeft, ArrowRight, Building, AlertTriangle, Check, FileText, Lin
 import type { TransactionCategory, VatTreatment, BASAccount } from '@/types'
 import type { SuggestedCategory } from '@/lib/transactions/category-suggestions'
 import type { TransactionWithInvoice, CategorizeHandler, MatchInvoiceHandler } from './transaction-types'
-import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, VAT_TREATMENT_OPTIONS } from './transaction-types'
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from './transaction-types'
 
 interface SwipeCategorizationViewProps {
   transactions: TransactionWithInvoice[]
@@ -24,7 +24,6 @@ interface SwipeCategorizationViewProps {
   onClose: () => void
 }
 
-const vatTreatmentOptions = VAT_TREATMENT_OPTIONS
 const expenseCategories = EXPENSE_CATEGORIES
 const incomeCategories = INCOME_CATEGORIES
 
@@ -346,22 +345,11 @@ export default function SwipeCategorizationView({
           <div>
             <label className="text-sm font-medium text-muted-foreground">Momsbehandling</label>
             <div className="mt-1">
-              <Select
+              <VatTreatmentSelect
                 value={isLiabilityAccount ? 'none' : vatTreatment}
-                onValueChange={(v) => setVatTreatment(v as VatTreatment | 'none')}
+                onValueChange={setVatTreatment}
                 disabled={isLiabilityAccount}
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {vatTreatmentOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
               {isLiabilityAccount && (
                 <p className="text-xs text-muted-foreground mt-1">
                   Ingen moms för skuld-/eget kapital-konton

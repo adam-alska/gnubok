@@ -1,4 +1,4 @@
-import type { NEDeclaration, SRUFile, SRURecord } from '@/types'
+import type { NEDeclaration, SRUFile, SRURecord } from '@/extensions/ne-bilaga/types'
 
 /**
  * SRU File Generator

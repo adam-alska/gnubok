@@ -3,16 +3,11 @@ import { NextResponse } from 'next/server'
 import { eventBus } from '@/lib/events'
 import { ensureInitialized } from '@/lib/init'
 import { createJournalEntry } from '@/lib/bookkeeping/engine'
-import type { CreateJournalEntryLineInput, Transaction } from '@/types'
+import { validateBody } from '@/lib/api/validate'
+import { BookTransactionSchema } from '@/lib/api/schemas'
+import type { Transaction } from '@/types'
 
 ensureInitialized()
-
-interface BookRequest {
-  fiscal_period_id: string
-  entry_date: string
-  description: string
-  lines: CreateJournalEntryLineInput[]
-}
 
 export async function POST(
   request: Request,
@@ -27,15 +22,9 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body: BookRequest = await request.json()
-  const { fiscal_period_id, entry_date, description, lines } = body
-
-  if (!fiscal_period_id || !entry_date || !description || !lines?.length) {
-    return NextResponse.json(
-      { error: 'Missing required fields: fiscal_period_id, entry_date, description, lines' },
-      { status: 400 }
-    )
-  }
+  const validation = await validateBody(request, BookTransactionSchema)
+  if (!validation.success) return validation.response
+  const { fiscal_period_id, entry_date, description, lines } = validation.data
 
   // Fetch transaction (validates ownership)
   const { data: transaction, error: fetchError } = await supabase

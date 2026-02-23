@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { didTaxFieldsChange, regenerateTaxDeadlinesForUser } from '@/lib/tax/deadline-generator'
+import { validateBody } from '@/lib/api/validate'
+import { UpdateSettingsSchema } from '@/lib/api/schemas'
 
 export async function GET() {
   const supabase = await createClient()
@@ -40,7 +42,9 @@ export async function PUT(request: Request) {
     .eq('user_id', user.id)
     .single()
 
-  const body = await request.json()
+  const validation = await validateBody(request, UpdateSettingsSchema)
+  if (!validation.success) return validation.response
+  const body = validation.data
 
   // Validate: enskild firma must use calendar year (BFL 3 kap.)
   const effectiveEntityType = body.entity_type || oldSettings?.entity_type

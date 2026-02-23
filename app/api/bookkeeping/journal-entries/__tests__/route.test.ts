@@ -88,6 +88,8 @@ describe('GET /api/bookkeeping/journal-entries', () => {
   })
 })
 
+const VALID_UUID = '550e8400-e29b-41d4-a716-446655440000'
+
 describe('POST /api/bookkeeping/journal-entries', () => {
   const mockUser = { id: 'user-1', email: 'test@test.se' }
 
@@ -116,7 +118,7 @@ describe('POST /api/bookkeeping/journal-entries', () => {
     mockCreateJournalEntry.mockResolvedValue(entry)
 
     const input = {
-      fiscal_period_id: 'period-1',
+      fiscal_period_id: VALID_UUID,
       entry_date: '2024-06-15',
       description: 'Test entry',
       source_type: 'manual',
@@ -144,11 +146,14 @@ describe('POST /api/bookkeeping/journal-entries', () => {
     const request = createMockRequest('/api/bookkeeping/journal-entries', {
       method: 'POST',
       body: {
-        fiscal_period_id: 'period-1',
+        fiscal_period_id: VALID_UUID,
         entry_date: '2024-06-15',
         description: 'Bad entry',
         source_type: 'manual',
-        lines: [{ account_number: '1930', debit_amount: 1000, credit_amount: 0 }],
+        lines: [
+          { account_number: '1930', debit_amount: 1000, credit_amount: 0 },
+          { account_number: '3001', debit_amount: 0, credit_amount: 500 },
+        ],
       },
     })
     const response = await POST(request)

@@ -25,10 +25,12 @@ vi.mock('@/lib/bookkeeping/engine', () => ({
 
 import { POST } from '../route'
 
+const VALID_UUID = '550e8400-e29b-41d4-a716-446655440000'
+
 describe('POST /api/transactions/[id]/book', () => {
   const mockUser = { id: 'user-1', email: 'test@test.se' }
   const validBody = {
-    fiscal_period_id: 'period-1',
+    fiscal_period_id: VALID_UUID,
     entry_date: '2025-01-15',
     description: 'Test booking',
     lines: [
@@ -61,13 +63,13 @@ describe('POST /api/transactions/[id]/book', () => {
   it('returns 400 when missing required fields', async () => {
     const request = createMockRequest('/api/transactions/tx-1/book', {
       method: 'POST',
-      body: { fiscal_period_id: 'period-1' },
+      body: { fiscal_period_id: VALID_UUID },
     })
     const response = await POST(request, createMockRouteParams({ id: 'tx-1' }))
     const { status, body } = await parseJsonResponse<{ error: string }>(response)
 
     expect(status).toBe(400)
-    expect(body.error).toContain('Missing required fields')
+    expect(body.error).toBe('Validation failed')
   })
 
   it('returns 404 when transaction not found', async () => {
@@ -154,7 +156,7 @@ describe('POST /api/transactions/[id]/book', () => {
     expect(body.data.id).toBe('je-new')
 
     expect(mockCreateJournalEntry).toHaveBeenCalledWith('user-1', {
-      fiscal_period_id: 'period-1',
+      fiscal_period_id: VALID_UUID,
       entry_date: '2025-01-15',
       description: 'Test booking',
       source_type: 'bank_transaction',

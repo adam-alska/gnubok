@@ -54,7 +54,7 @@ export function InvoiceReviewContent({
   // Calculate per-rate VAT breakdown
   const vatByRate = new Map<number, number>()
   for (const item of items) {
-    const rate = item.vat_rate ?? 25
+    const rate = item.vat_rate ?? 0
     const lineTotal = item.quantity * item.unit_price
     const lineVat = Math.round(lineTotal * rate / 100 * 100) / 100
     vatByRate.set(rate, (vatByRate.get(rate) || 0) + lineVat)
@@ -112,7 +112,7 @@ export function InvoiceReviewContent({
               <td className="py-2 text-center">{item.unit}</td>
               <td className="py-2 text-right">{formatCurrency(item.unit_price, currency)}</td>
               {showVatColumn && (
-                <td className="py-2 text-right">{item.vat_rate ?? 25}%</td>
+                <td className="py-2 text-right">{item.vat_rate ?? 0}%</td>
               )}
               <td className="py-2 text-right">
                 {formatCurrency(item.quantity * item.unit_price, currency)}

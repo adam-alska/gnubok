@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { NE_ACCOUNT_MAPPINGS } from '../ne-engine'
-import type { NEAccountMapping } from '@/types'
+import type { NEAccountMapping } from '@/extensions/ne-bilaga/types'
 
 /**
  * Helper to check if an account falls into a specific ruta

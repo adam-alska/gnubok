@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import type { CreateDeadlineInput } from '@/types'
+import { validateBody } from '@/lib/api/validate'
+import { CreateDeadlineSchema } from '@/lib/api/schemas'
 
 /**
  * GET /api/deadlines
@@ -78,12 +79,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body: CreateDeadlineInput = await request.json()
-
-  // Validate required fields
-  if (!body.title || !body.due_date || !body.deadline_type) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-  }
+  const validation = await validateBody(request, CreateDeadlineSchema)
+  if (!validation.success) return validation.response
+  const body = validation.data
 
   // Insert the deadline
   const { data, error } = await supabase

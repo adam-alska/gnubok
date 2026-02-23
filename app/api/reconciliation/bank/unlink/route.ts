@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { unlinkReconciliation } from '@/lib/reconciliation/bank-reconciliation'
+import { validateBody } from '@/lib/api/validate'
+import { BankUnlinkSchema } from '@/lib/api/schemas'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -10,15 +12,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json()
-  const { transaction_id } = body
-
-  if (!transaction_id) {
-    return NextResponse.json(
-      { error: 'transaction_id is required' },
-      { status: 400 }
-    )
-  }
+  const validation = await validateBody(request, BankUnlinkSchema)
+  if (!validation.success) return validation.response
+  const { transaction_id } = validation.data
 
   const result = await unlinkReconciliation(supabase, user.id, transaction_id)
 
