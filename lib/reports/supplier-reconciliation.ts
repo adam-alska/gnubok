@@ -24,21 +24,31 @@ export async function generateReconciliation(
     .in('status', ['registered', 'approved', 'partially_paid', 'overdue'])
 
   const supplierLedgerTotal = (invoices || [])
-    .reduce((sum, inv) => sum + (inv.remaining_amount || 0), 0)
+    .reduce((sum, inv) => Math.round((sum + (inv.remaining_amount || 0)) * 100) / 100, 0)
 
-  // Get account 2440 balance from journal entry lines
+  // Get account 2440 balance from posted journal entry lines in this period
   const { data: journalLines } = await supabase
     .from('journal_entry_lines')
-    .select('debit_amount, credit_amount, journal_entry_id')
+    .select(`
+      debit_amount,
+      credit_amount,
+      journal_entry:journal_entries!inner(
+        status,
+        user_id,
+        fiscal_period_id
+      )
+    `)
     .eq('account_number', '2440')
+    .eq('journal_entries.user_id', userId)
+    .eq('journal_entries.fiscal_period_id', periodId)
+    .eq('journal_entries.status', 'posted')
 
-  // Filter to posted entries in the period
+  // Account 2440 is a liability: credit normal balance
+  // Balance = credits - debits
   let account2440Balance = 0
   if (journalLines) {
-    // Account 2440 is a liability: credit normal balance
-    // Balance = credits - debits
     for (const line of journalLines) {
-      account2440Balance += (line.credit_amount || 0) - (line.debit_amount || 0)
+      account2440Balance = Math.round((account2440Balance + (line.credit_amount || 0) - (line.debit_amount || 0)) * 100) / 100
     }
   }
 
