@@ -105,26 +105,26 @@ describe('generateMonthlyBreakdown', () => {
                   data: [
                     {
                       account_number: '3001',
-                      debit: 0,
-                      credit: 10000,
+                      debit_amount: 0,
+                      credit_amount: 10000,
                       journal_entry: { entry_date: '2024-01-15', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
                     },
                     {
                       account_number: '5010',
-                      debit: 3000,
-                      credit: 0,
+                      debit_amount: 3000,
+                      credit_amount: 0,
                       journal_entry: { entry_date: '2024-01-20', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
                     },
                     {
                       account_number: '3001',
-                      debit: 0,
-                      credit: 5000,
+                      debit_amount: 0,
+                      credit_amount: 5000,
                       journal_entry: { entry_date: '2024-02-10', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
                     },
                     {
                       account_number: '6200',
-                      debit: 1500,
-                      credit: 0,
+                      debit_amount: 1500,
+                      credit_amount: 0,
                       journal_entry: { entry_date: '2024-02-15', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
                     },
                   ],
@@ -156,7 +156,7 @@ describe('generateMonthlyBreakdown', () => {
     expect(mar.expenses).toBe(0)
   })
 
-  it('ignores non-revenue/expense accounts (class 1, 2, 8)', async () => {
+  it('ignores balance sheet accounts (class 1, 2) but includes class 8 financial items', async () => {
     let callCount = 0
     supabase.from.mockImplementation(() => {
       callCount++
@@ -184,21 +184,27 @@ describe('generateMonthlyBreakdown', () => {
                   data: [
                     {
                       account_number: '1930',
-                      debit: 10000,
-                      credit: 0,
+                      debit_amount: 10000,
+                      credit_amount: 0,
                       journal_entry: { entry_date: '2024-01-15', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
                     },
                     {
                       account_number: '2611',
-                      debit: 0,
-                      credit: 2500,
+                      debit_amount: 0,
+                      credit_amount: 2500,
                       journal_entry: { entry_date: '2024-01-15', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
                     },
                     {
-                      account_number: '8999',
-                      debit: 500,
-                      credit: 0,
+                      account_number: '8400',
+                      debit_amount: 500,
+                      credit_amount: 0,
                       journal_entry: { entry_date: '2024-01-20', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
+                    },
+                    {
+                      account_number: '8300',
+                      debit_amount: 0,
+                      credit_amount: 200,
+                      journal_entry: { entry_date: '2024-01-25', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
                     },
                   ],
                   error: null,
@@ -211,7 +217,10 @@ describe('generateMonthlyBreakdown', () => {
 
     const result = await generateMonthlyBreakdown('user-1', 'period-1')
     const jan = result.months.find((m) => m.label === 'Jan')!
-    expect(jan.income).toBe(0)
-    expect(jan.expenses).toBe(0)
+    // Class 1 and 2 are ignored
+    // Class 8 debit (8400 interest expense) → expense
+    expect(jan.expenses).toBe(500)
+    // Class 8 credit (8300 interest income) → income
+    expect(jan.income).toBe(200)
   })
 })

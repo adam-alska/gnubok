@@ -46,8 +46,8 @@ export async function generateMonthlyBreakdown(
     .from('journal_entry_lines')
     .select(`
       account_number,
-      debit,
-      credit,
+      debit_amount,
+      credit_amount,
       journal_entry:journal_entries!inner(
         entry_date,
         status,
@@ -63,17 +63,21 @@ export async function generateMonthlyBreakdown(
     return { months: [] }
   }
 
-  // Build monthly aggregates
-  const monthMap = new Map<number, { income: number; expenses: number }>()
+  // Build monthly aggregates using year-aware keys ("2024-03", "2024-04", etc.)
+  // to avoid data corruption for non-calendar fiscal years (e.g., Apr-Mar)
+  const monthMap = new Map<string, { year: number; month: number; income: number; expenses: number }>()
 
   // Initialize all months in the period range
   const startDate = new Date(period.period_start)
   const endDate = new Date(period.period_end)
-  const startMonth = startDate.getMonth()
-  const endMonth = endDate.getMonth() + (endDate.getFullYear() - startDate.getFullYear()) * 12
 
-  for (let m = startMonth; m <= endMonth; m++) {
-    monthMap.set(m % 12, { income: 0, expenses: 0 })
+  for (
+    let y = startDate.getFullYear(), m = startDate.getMonth();
+    y < endDate.getFullYear() || (y === endDate.getFullYear() && m <= endDate.getMonth());
+    m === 11 ? (y++, m = 0) : m++
+  ) {
+    const key = `${y}-${String(m).padStart(2, '0')}`
+    monthMap.set(key, { year: y, month: m, income: 0, expenses: 0 })
   }
 
   for (const line of lines) {
@@ -85,35 +89,39 @@ export async function generateMonthlyBreakdown(
     }
     const accountClass = parseInt(line.account_number.charAt(0))
     const entryDate = new Date(entry.entry_date)
-    const month = entryDate.getMonth()
+    const key = `${entryDate.getFullYear()}-${String(entryDate.getMonth()).padStart(2, '0')}`
 
-    if (!monthMap.has(month)) {
-      monthMap.set(month, { income: 0, expenses: 0 })
+    if (!monthMap.has(key)) {
+      monthMap.set(key, { year: entryDate.getFullYear(), month: entryDate.getMonth(), income: 0, expenses: 0 })
     }
 
-    const bucket = monthMap.get(month)!
+    const bucket = monthMap.get(key)!
 
     if (accountClass === 3) {
       // Revenue accounts: credit side represents revenue
-      bucket.income = Math.round((bucket.income + line.credit - line.debit) * 100) / 100
+      bucket.income = Math.round((bucket.income + line.credit_amount - line.debit_amount) * 100) / 100
     } else if (accountClass >= 4 && accountClass <= 7) {
       // Expense accounts: debit side represents expenses
-      bucket.expenses = Math.round((bucket.expenses + line.debit - line.credit) * 100) / 100
+      bucket.expenses = Math.round((bucket.expenses + line.debit_amount - line.credit_amount) * 100) / 100
+    } else if (accountClass === 8) {
+      // Financial items (class 8): interest, exchange gains/losses, etc.
+      const amount = line.credit_amount - line.debit_amount
+      if (amount >= 0) {
+        bucket.income = Math.round((bucket.income + amount) * 100) / 100
+      } else {
+        bucket.expenses = Math.round((bucket.expenses + Math.abs(amount)) * 100) / 100
+      }
     }
   }
 
-  // Convert to sorted array
+  // Convert to sorted array (keys sort naturally as "YYYY-MM")
   const months: MonthlyBreakdownMonth[] = []
-  const sortedMonths = Array.from(monthMap.entries()).sort((a, b) => {
-    // Handle year boundaries (e.g., Nov-Dec-Jan for broken fiscal year)
-    const aAdj = a[0] < startMonth ? a[0] + 12 : a[0]
-    const bAdj = b[0] < startMonth ? b[0] + 12 : b[0]
-    return aAdj - bAdj
-  })
+  const sortedKeys = Array.from(monthMap.keys()).sort()
 
-  for (const [month, data] of sortedMonths) {
+  for (const key of sortedKeys) {
+    const data = monthMap.get(key)!
     months.push({
-      label: MONTH_LABELS[month],
+      label: MONTH_LABELS[data.month],
       income: data.income,
       expenses: data.expenses,
       net: Math.round((data.income - data.expenses) * 100) / 100,

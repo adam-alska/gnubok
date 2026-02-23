@@ -195,7 +195,8 @@ function dateStringToSIE(dateStr: string): string {
  * Format amount for SIE (no thousands separator, . as decimal)
  */
 function formatAmount(amount: number): string {
-  return amount.toFixed(2)
+  const rounded = Math.round(amount * 100) / 100
+  return rounded.toFixed(2)
 }
 
 /**
@@ -218,7 +219,7 @@ function calculateBalances(
     for (const line of lines) {
       const current = balances.get(line.account_number) || 0
       const netAmount = (Number(line.debit_amount) || 0) - (Number(line.credit_amount) || 0)
-      balances.set(line.account_number, current + netAmount)
+      balances.set(line.account_number, Math.round((current + netAmount) * 100) / 100)
     }
   }
 
