@@ -17,7 +17,7 @@ import TransactionInboxCard from '@/components/transactions/TransactionInboxCard
 import TransactionHistoryList from '@/components/transactions/TransactionHistoryList'
 import InboxZeroState from '@/components/transactions/InboxZeroState'
 import InvoiceMatchDialog from '@/components/transactions/InvoiceMatchDialog'
-import CategoryExpandedDialog from '@/components/transactions/CategoryExpandedDialog'
+import TransactionBookingDialog from '@/components/transactions/TransactionBookingDialog'
 import type { TransactionWithInvoice, ViewMode, CategorizeHandler } from '@/components/transactions/transaction-types'
 import type { TransactionCategory, CreateTransactionInput, Invoice, Customer, VatTreatment } from '@/types'
 import type { SuggestedCategory } from '@/lib/transactions/category-suggestions'
@@ -44,10 +44,9 @@ export default function TransactionsPage() {
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionWithInvoice | null>(null)
   const [isConfirmingMatch, setIsConfirmingMatch] = useState(false)
 
-  // Category expanded dialog
-  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false)
-  const [categoryDialogTransaction, setCategoryDialogTransaction] = useState<TransactionWithInvoice | null>(null)
-  const [categoryDialogProcessing, setCategoryDialogProcessing] = useState(false)
+  // Booking dialog (journal entry form)
+  const [bookingDialogOpen, setBookingDialogOpen] = useState(false)
+  const [bookingDialogTransaction, setBookingDialogTransaction] = useState<TransactionWithInvoice | null>(null)
 
   // Set of transaction IDs that are animating out (just categorized)
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set())
@@ -164,7 +163,16 @@ export default function TransactionsPage() {
       // Mark as exiting for animation, then update state
       setExitingIds((prev) => new Set(prev).add(id))
 
+      if (result.journal_entry_created) {
+        toast({ title: 'Bokförd', description: 'Transaktion bokförd och verifikation skapad' })
+      } else if (result.journal_entry_error) {
+        toast({ title: 'Delvis bokförd', description: `Verifikation kunde inte skapas: ${result.journal_entry_error}`, variant: 'destructive' })
+      } else {
+        toast({ title: 'Delvis bokförd', description: 'Transaktion uppdaterad men verifikation kunde inte skapas' })
+      }
+
       // Update transaction in state after a brief delay for animation
+      setExitingIds((prev) => new Set(prev).add(id))
       setTimeout(() => {
         setTransactions((prev) =>
           prev.map((t) =>
@@ -178,17 +186,9 @@ export default function TransactionsPage() {
           next.delete(id)
           return next
         })
+        setProcessingId(null)
       }, 350)
 
-      if (result.journal_entry_created) {
-        toast({ title: 'Bokförd', description: 'Transaktion bokförd och verifikation skapad' })
-      } else if (result.journal_entry_error) {
-        toast({ title: 'Delvis bokförd', description: `Verifikation kunde inte skapas: ${result.journal_entry_error}`, variant: 'destructive' })
-      } else {
-        toast({ title: 'Delvis bokförd', description: 'Transaktion uppdaterad men verifikation kunde inte skapas' })
-      }
-
-      setProcessingId(null)
       return true
     } catch {
       toast({ title: 'Fel', description: 'Något gick fel vid bokföring', variant: 'destructive' })
@@ -218,6 +218,12 @@ export default function TransactionsPage() {
         return
       }
 
+      toast({
+        title: 'Faktura matchad',
+        description: `Faktura ${selectedTransaction.potential_invoice.invoice_number} markerad som betald`,
+      })
+      setMatchDialogOpen(false)
+
       // Mark as exiting for animation
       setExitingIds((prev) => new Set(prev).add(selectedTransaction.id))
       setTimeout(() => {
@@ -241,18 +247,13 @@ export default function TransactionsPage() {
           next.delete(selectedTransaction.id)
           return next
         })
+        setSelectedTransaction(null)
+        setIsConfirmingMatch(false)
       }, 350)
-
-      toast({
-        title: 'Faktura matchad',
-        description: `Faktura ${selectedTransaction.potential_invoice.invoice_number} markerad som betald`,
-      })
-      setMatchDialogOpen(false)
-      setSelectedTransaction(null)
     } catch {
       toast({ title: 'Fel', description: 'Något gick fel vid matchning', variant: 'destructive' })
+      setIsConfirmingMatch(false)
     }
-    setIsConfirmingMatch(false)
   }
 
   async function handleMatchInvoice(transactionId: string, invoiceId: string): Promise<boolean> {
@@ -329,15 +330,25 @@ export default function TransactionsPage() {
     setIsCreating(false)
   }
 
-  async function handleCategoryDialogSelect(category: TransactionCategory) {
-    if (!categoryDialogTransaction) return
-    setCategoryDialogProcessing(true)
-    const success = await handleCategorize(categoryDialogTransaction.id, true, category)
-    setCategoryDialogProcessing(false)
-    if (success) {
-      setCategoryDialogOpen(false)
-      setCategoryDialogTransaction(null)
-    }
+  function handleTransactionBooked(transactionId: string, journalEntryId: string) {
+    setExitingIds((prev) => new Set(prev).add(transactionId))
+    setTimeout(() => {
+      setTransactions((prev) =>
+        prev.map((t) =>
+          t.id === transactionId
+            ? { ...t, is_business: true, journal_entry_id: journalEntryId }
+            : t
+        )
+      )
+      setExitingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(transactionId)
+        return next
+      })
+    }, 350)
+    setBookingDialogOpen(false)
+    setBookingDialogTransaction(null)
+    toast({ title: 'Bokförd', description: 'Transaktion bokförd och verifikation skapad' })
   }
 
   // Batch mode handlers
@@ -401,8 +412,8 @@ export default function TransactionsPage() {
   }
 
   function openCategoryDialog(transaction: TransactionWithInvoice) {
-    setCategoryDialogTransaction(transaction)
-    setCategoryDialogOpen(true)
+    setBookingDialogTransaction(transaction)
+    setBookingDialogOpen(true)
   }
 
   // Swipe view
@@ -481,6 +492,7 @@ export default function TransactionsPage() {
         <TransactionHistoryList
           transactions={transactions}
           onOpenMatchDialog={openMatchDialog}
+          onOpenCategoryDialog={openCategoryDialog}
         />
       )}
 
@@ -518,12 +530,11 @@ export default function TransactionsPage() {
         onConfirm={handleConfirmInvoiceMatch}
       />
 
-      <CategoryExpandedDialog
-        open={categoryDialogOpen}
-        onOpenChange={setCategoryDialogOpen}
-        transaction={categoryDialogTransaction}
-        onSelectCategory={handleCategoryDialogSelect}
-        isProcessing={categoryDialogProcessing}
+      <TransactionBookingDialog
+        open={bookingDialogOpen}
+        onOpenChange={setBookingDialogOpen}
+        transaction={bookingDialogTransaction}
+        onBooked={handleTransactionBooked}
       />
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

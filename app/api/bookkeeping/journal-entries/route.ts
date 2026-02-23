@@ -1,7 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { createJournalEntry } from '@/lib/bookkeeping/engine'
+import { ensureInitialized } from '@/lib/init'
 import type { CreateJournalEntryInput } from '@/types'
+
+ensureInitialized()
 
 export async function GET(request: Request) {
   const supabase = await createClient()

@@ -512,10 +512,33 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     <span className="text-muted-foreground">Delsumma</span>
                     <span>{formatCurrency(invoice.subtotal, invoice.currency)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Moms ({invoice.vat_rate}%)</span>
-                    <span>{formatCurrency(invoice.vat_amount, invoice.currency)}</span>
-                  </div>
+                  {(() => {
+                    const vatByRate = new Map<number, number>()
+                    for (const item of invoice.items) {
+                      const rate = item.vat_rate ?? 25
+                      const lineVat = Math.round(item.line_total * (rate / 100) * 100) / 100
+                      vatByRate.set(rate, (vatByRate.get(rate) || 0) + lineVat)
+                    }
+                    const entries = Array.from(vatByRate.entries())
+                      .filter(([, vat]) => vat > 0)
+                      .sort(([a], [b]) => b - a)
+
+                    if (entries.length === 0) {
+                      return (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Moms</span>
+                          <span>{formatCurrency(0, invoice.currency)}</span>
+                        </div>
+                      )
+                    }
+
+                    return entries.map(([rate, vat]) => (
+                      <div key={rate} className="flex justify-between">
+                        <span className="text-muted-foreground">Moms {rate}%</span>
+                        <span>{formatCurrency(vat, invoice.currency)}</span>
+                      </div>
+                    ))
+                  })()}
                   <Separator />
                   <div className="flex justify-between font-bold text-lg">
                     <span>Totalt</span>

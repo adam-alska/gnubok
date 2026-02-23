@@ -14,11 +14,13 @@ import type { HistoryFilter } from './transaction-types'
 interface TransactionHistoryListProps {
   transactions: TransactionWithInvoice[]
   onOpenMatchDialog: (transaction: TransactionWithInvoice) => void
+  onOpenCategoryDialog: (transaction: TransactionWithInvoice) => void
 }
 
 export default function TransactionHistoryList({
   transactions,
   onOpenMatchDialog,
+  onOpenCategoryDialog,
 }: TransactionHistoryListProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [filter, setFilter] = useState<HistoryFilter>('all')
@@ -134,7 +136,11 @@ export default function TransactionHistoryList({
                         ) : transaction.is_business === null ? (
                           <>
                             <span>·</span>
-                            <Badge variant="outline" className="text-warning border-warning">
+                            <Badge
+                              variant="outline"
+                              className="text-warning border-warning cursor-pointer hover:bg-warning/10"
+                              onClick={() => onOpenCategoryDialog(transaction)}
+                            >
                               Ej bokförd
                             </Badge>
                           </>
@@ -155,20 +161,32 @@ export default function TransactionHistoryList({
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p
-                      className={`font-medium ${
-                        transaction.amount > 0 ? 'text-success' : ''
-                      }`}
-                    >
-                      {transaction.amount > 0 ? '+' : ''}
-                      {formatCurrency(transaction.amount, transaction.currency)}
-                    </p>
-                    {transaction.currency !== 'SEK' && transaction.amount_sek && (
-                      <p className="text-sm text-muted-foreground">
-                        {formatCurrency(transaction.amount_sek)}
-                      </p>
+                  <div className="flex items-center gap-3">
+                    {transaction.is_business === null && !transaction.journal_entry_id && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="h-7 text-xs"
+                        onClick={() => onOpenCategoryDialog(transaction)}
+                      >
+                        Bokför
+                      </Button>
                     )}
+                    <div className="text-right">
+                      <p
+                        className={`font-medium ${
+                          transaction.amount > 0 ? 'text-success' : ''
+                        }`}
+                      >
+                        {transaction.amount > 0 ? '+' : ''}
+                        {formatCurrency(transaction.amount, transaction.currency)}
+                      </p>
+                      {transaction.currency !== 'SEK' && transaction.amount_sek && (
+                        <p className="text-sm text-muted-foreground">
+                          {formatCurrency(transaction.amount_sek)}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </CardContent>

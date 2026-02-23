@@ -139,7 +139,10 @@ export default function AccountCombobox({ value, accounts, onChange }: AccountCo
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
     setSearch(newValue)
-    onChange(newValue)
+    // Only emit valid account numbers to parent
+    if (/^\d{4}$/.test(newValue) && accounts.some(a => a.account_number === newValue)) {
+      onChange(newValue)
+    }
     if (!isOpen) {
       setIsOpen(true)
     }
@@ -147,6 +150,15 @@ export default function AccountCombobox({ value, accounts, onChange }: AccountCo
 
   const handleFocus = () => {
     setIsOpen(true)
+  }
+
+  const handleBlur = () => {
+    // Small delay to allow dropdown click to fire first
+    setTimeout(() => {
+      if (!accounts.some(a => a.account_number === search)) {
+        setSearch(value)
+      }
+    }, 150)
   }
 
   // Find matching account for helper text
@@ -162,16 +174,16 @@ export default function AccountCombobox({ value, accounts, onChange }: AccountCo
         value={search}
         onChange={handleInputChange}
         onFocus={handleFocus}
+        onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         placeholder="1930"
         className="font-mono h-8"
-        maxLength={4}
         autoComplete="off"
       />
 
-      {/* Account name helper text (md+ screens only) */}
+      {/* Account name helper text */}
       {matchedAccount && (
-        <p className="hidden md:block text-[11px] text-muted-foreground truncate mt-0.5 leading-tight">
+        <p className="text-[11px] text-muted-foreground truncate mt-0.5 leading-tight">
           {matchedAccount.account_name}
         </p>
       )}

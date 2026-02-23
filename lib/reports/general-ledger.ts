@@ -57,7 +57,7 @@ export async function generateGeneralLedger(
     .select('id, entry_date, voucher_number, voucher_series, description, source_type')
     .eq('user_id', userId)
     .eq('fiscal_period_id', periodId)
-    .in('status', ['posted', 'reversed'])
+    .eq('status', 'posted')
 
   if (!entries || entries.length === 0) {
     return { accounts: [], period: { start: period.period_start, end: period.period_end } }
@@ -95,7 +95,7 @@ export async function generateGeneralLedger(
     .from('journal_entries')
     .select('id')
     .eq('user_id', userId)
-    .in('status', ['posted', 'reversed'])
+    .eq('status', 'posted')
     .lt('entry_date', period.period_start)
 
   const openingBalances = new Map<string, number>()

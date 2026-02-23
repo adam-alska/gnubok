@@ -159,9 +159,14 @@ describe('generateBalanceSheet', () => {
     const report = await generateBalanceSheet('user-1', 'period-1')
 
     expect(report.asset_sections).toHaveLength(1) // Only 1930
-    expect(report.equity_liability_sections).toEqual([])
+    // Class 3-8 accounts are not included as balance sheet rows, but their
+    // net result (credit - debit = 40000 + 500 - 8000 = 32500) appears as
+    // "Årets resultat" in equity so the balance sheet can balance.
+    expect(report.equity_liability_sections).toHaveLength(1)
+    expect(report.equity_liability_sections[0].title).toBe('Årets resultat')
+    expect(report.equity_liability_sections[0].subtotal).toBe(32500)
     expect(report.total_assets).toBe(50000)
-    expect(report.total_equity_liabilities).toBe(0)
+    expect(report.total_equity_liabilities).toBe(32500)
   })
 
   it('uses Math.round for monetary precision on subtotals', async () => {

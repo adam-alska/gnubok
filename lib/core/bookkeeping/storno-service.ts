@@ -128,81 +128,105 @@ export async function correctEntry(
     .eq('id', originalEntryId)
 
   // ===== Step 2: Create corrected entry =====
-  const correctedVoucherNumber = await getNextVoucherNumber(
-    userId,
-    original.fiscal_period_id,
-    original.voucher_series || 'A'
-  )
-
-  // Resolve account IDs for corrected lines
-  const accountNumbers = [...new Set(correctedLines.map((l) => l.account_number))]
-  const { data: accounts } = await supabase
-    .from('chart_of_accounts')
-    .select('id, account_number')
-    .eq('user_id', userId)
-    .in('account_number', accountNumbers)
-
-  const accountIdMap = new Map<string, string>()
-  for (const account of accounts || []) {
-    accountIdMap.set(account.account_number, account.id)
+  // If anything in this step fails, we must roll back the reversal from step 1
+  // to avoid leaving the ledger in an inconsistent state.
+  async function rollbackReversal() {
+    // Restore original entry to 'posted' status
+    await supabase
+      .from('journal_entries')
+      .update({ status: 'posted', reversed_by_id: null })
+      .eq('id', originalEntryId)
+    // Delete the reversal entry (it was just created, safe to remove since
+    // the DB trigger allows deleting draft entries and we need to clean up)
+    await supabase.from('journal_entry_lines').delete().eq('journal_entry_id', reversalEntry.id)
+    await supabase.from('journal_entries').delete().eq('id', reversalEntry.id)
   }
 
-  const { data: correctedEntry, error: correctedError } = await supabase
-    .from('journal_entries')
-    .insert({
-      user_id: userId,
-      fiscal_period_id: original.fiscal_period_id,
-      voucher_number: correctedVoucherNumber,
-      voucher_series: original.voucher_series || 'A',
-      entry_date: new Date().toISOString().split('T')[0],
-      description: `Rättelse: ${original.description}`,
-      source_type: 'correction',
-      correction_of_id: originalEntryId,
-      status: 'draft',
-    })
-    .select()
-    .single()
+  let correctedEntry: typeof reversalEntry
 
-  if (correctedError || !correctedEntry) {
-    throw new Error(`Failed to create corrected entry: ${correctedError?.message}`)
-  }
+  try {
+    const correctedVoucherNumber = await getNextVoucherNumber(
+      userId,
+      original.fiscal_period_id,
+      original.voucher_series || 'A'
+    )
 
-  // Insert corrected lines
-  const correctedLineInserts = correctedLines.map((line, index) => ({
-    journal_entry_id: correctedEntry.id,
-    account_number: line.account_number,
-    account_id: accountIdMap.get(line.account_number) || null,
-    debit_amount: Math.round((line.debit_amount || 0) * 100) / 100,
-    credit_amount: Math.round((line.credit_amount || 0) * 100) / 100,
-    currency: line.currency || 'SEK',
-    amount_in_currency: line.amount_in_currency
-      ? Math.round(line.amount_in_currency * 100) / 100
-      : null,
-    exchange_rate: line.exchange_rate || null,
-    line_description: line.line_description || null,
-    tax_code: line.tax_code || null,
-    cost_center: line.cost_center || null,
-    project: line.project || null,
-    sort_order: index,
-  }))
+    // Resolve account IDs for corrected lines
+    const accountNumbers = [...new Set(correctedLines.map((l) => l.account_number))]
+    const { data: accounts } = await supabase
+      .from('chart_of_accounts')
+      .select('id, account_number')
+      .eq('user_id', userId)
+      .in('account_number', accountNumbers)
 
-  const { error: correctedLinesError } = await supabase
-    .from('journal_entry_lines')
-    .insert(correctedLineInserts)
+    const accountIdMap = new Map<string, string>()
+    for (const account of accounts || []) {
+      accountIdMap.set(account.account_number, account.id)
+    }
 
-  if (correctedLinesError) {
-    await supabase.from('journal_entries').delete().eq('id', correctedEntry.id)
-    throw new Error(`Failed to create corrected lines: ${correctedLinesError.message}`)
-  }
+    const { data: newEntry, error: correctedError } = await supabase
+      .from('journal_entries')
+      .insert({
+        user_id: userId,
+        fiscal_period_id: original.fiscal_period_id,
+        voucher_number: correctedVoucherNumber,
+        voucher_series: original.voucher_series || 'A',
+        entry_date: new Date().toISOString().split('T')[0],
+        description: `Rättelse: ${original.description}`,
+        source_type: 'correction',
+        correction_of_id: originalEntryId,
+        status: 'draft',
+      })
+      .select()
+      .single()
 
-  // Post the corrected entry
-  const { error: postCorrectedError } = await supabase
-    .from('journal_entries')
-    .update({ status: 'posted' })
-    .eq('id', correctedEntry.id)
+    if (correctedError || !newEntry) {
+      throw new Error(`Failed to create corrected entry: ${correctedError?.message}`)
+    }
 
-  if (postCorrectedError) {
-    throw new Error(`Failed to post corrected entry: ${postCorrectedError.message}`)
+    correctedEntry = newEntry
+
+    // Insert corrected lines
+    const correctedLineInserts = correctedLines.map((line, index) => ({
+      journal_entry_id: correctedEntry.id,
+      account_number: line.account_number,
+      account_id: accountIdMap.get(line.account_number) || null,
+      debit_amount: Math.round((line.debit_amount || 0) * 100) / 100,
+      credit_amount: Math.round((line.credit_amount || 0) * 100) / 100,
+      currency: line.currency || 'SEK',
+      amount_in_currency: line.amount_in_currency
+        ? Math.round(line.amount_in_currency * 100) / 100
+        : null,
+      exchange_rate: line.exchange_rate || null,
+      line_description: line.line_description || null,
+      tax_code: line.tax_code || null,
+      cost_center: line.cost_center || null,
+      project: line.project || null,
+      sort_order: index,
+    }))
+
+    const { error: correctedLinesError } = await supabase
+      .from('journal_entry_lines')
+      .insert(correctedLineInserts)
+
+    if (correctedLinesError) {
+      await supabase.from('journal_entries').delete().eq('id', correctedEntry.id)
+      throw new Error(`Failed to create corrected lines: ${correctedLinesError.message}`)
+    }
+
+    // Post the corrected entry
+    const { error: postCorrectedError } = await supabase
+      .from('journal_entries')
+      .update({ status: 'posted' })
+      .eq('id', correctedEntry.id)
+
+    if (postCorrectedError) {
+      throw new Error(`Failed to post corrected entry: ${postCorrectedError.message}`)
+    }
+  } catch (err) {
+    // Roll back the reversal to restore ledger consistency
+    await rollbackReversal()
+    throw err
   }
 
   // ===== Step 3: Fetch complete entries =====

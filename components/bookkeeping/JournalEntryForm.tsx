@@ -12,29 +12,48 @@ import { JournalEntryReviewContent } from '@/components/bookkeeping/JournalEntry
 import DocumentUploadZone from '@/components/bookkeeping/DocumentUploadZone'
 import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
 import type { UploadedFile } from '@/components/bookkeeping/DocumentUploadZone'
-import type { CreateJournalEntryLineInput, FiscalPeriod, BASAccount } from '@/types'
+import type { CreateJournalEntryLineInput, FiscalPeriod, BASAccount, JournalEntrySourceType } from '@/types'
 
-interface Props {
-  onCreated?: () => void
-}
-
-interface FormLine {
+export interface FormLine {
   account_number: string
   debit_amount: string
   credit_amount: string
   line_description: string
 }
 
-export default function JournalEntryForm({ onCreated }: Props) {
+interface Props {
+  onCreated?: () => void
+  onEntryCreated?: (entryId: string) => void
+  initialLines?: FormLine[]
+  initialDate?: string
+  initialDescription?: string
+  sourceType?: JournalEntrySourceType
+  sourceId?: string
+  submitUrl?: string
+  embedded?: boolean
+}
+
+const BLANK_LINE: FormLine = { account_number: '', debit_amount: '', credit_amount: '', line_description: '' }
+
+export default function JournalEntryForm({
+  onCreated,
+  onEntryCreated,
+  initialLines,
+  initialDate,
+  initialDescription,
+  sourceType,
+  sourceId,
+  submitUrl,
+  embedded,
+}: Props) {
   const { toast } = useToast()
   const [periods, setPeriods] = useState<FiscalPeriod[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState('')
-  const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0])
-  const [description, setDescription] = useState('')
-  const [lines, setLines] = useState<FormLine[]>([
-    { account_number: '', debit_amount: '', credit_amount: '', line_description: '' },
-    { account_number: '', debit_amount: '', credit_amount: '', line_description: '' },
-  ])
+  const [entryDate, setEntryDate] = useState(initialDate ?? new Date().toISOString().split('T')[0])
+  const [description, setDescription] = useState(initialDescription ?? '')
+  const [lines, setLines] = useState<FormLine[]>(
+    initialLines ?? [{ ...BLANK_LINE }, { ...BLANK_LINE }]
+  )
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showReview, setShowReview] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
@@ -63,10 +82,7 @@ export default function JournalEntryForm({ onCreated }: Props) {
   }
 
   const addLine = () => {
-    setLines([
-      ...lines,
-      { account_number: '', debit_amount: '', credit_amount: '', line_description: '' },
-    ])
+    setLines([...lines, { ...BLANK_LINE }])
   }
 
   const removeLine = (index: number) => {
@@ -85,12 +101,20 @@ export default function JournalEntryForm({ onCreated }: Props) {
       updated[index].debit_amount = ''
     }
 
+    // Auto-fill line description from account name when selecting an account
+    if (field === 'account_number' && value && !updated[index].line_description) {
+      const account = accounts.find((a) => a.account_number === value)
+      if (account) {
+        updated[index].line_description = account.account_name
+      }
+    }
+
     setLines(updated)
   }
 
   const totalDebit = lines.reduce((sum, l) => sum + (parseFloat(l.debit_amount) || 0), 0)
   const totalCredit = lines.reduce((sum, l) => sum + (parseFloat(l.credit_amount) || 0), 0)
-  const isBalanced = Math.abs(totalDebit - totalCredit) < 0.01 && totalDebit > 0
+  const isBalanced = Math.round((totalDebit - totalCredit) * 100) === 0 && totalDebit > 0
 
   const handleReview = () => {
     if (!selectedPeriod || !description || !isBalanced) return
@@ -109,14 +133,17 @@ export default function JournalEntryForm({ onCreated }: Props) {
         line_description: l.line_description || undefined,
       }))
 
-    const res = await fetch('/api/bookkeeping/journal-entries', {
+    const url = submitUrl ?? '/api/bookkeeping/journal-entries'
+
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         fiscal_period_id: selectedPeriod,
         entry_date: entryDate,
         description,
-        source_type: 'manual',
+        source_type: sourceType ?? 'manual',
+        source_id: sourceId,
         lines: entryLines,
       }),
     })
@@ -131,8 +158,8 @@ export default function JournalEntryForm({ onCreated }: Props) {
       })
     } else {
       // Link uploaded documents to the new journal entry (non-blocking)
-      const journalEntryId = result.data?.id
-      if (journalEntryId) {
+      const journalEntryId = result.data?.id ?? result.journal_entry_id
+      if (journalEntryId && uploadedFiles.length > 0) {
         const filesToLink = uploadedFiles.filter((f) => f.status === 'uploaded' && f.id)
         for (const file of filesToLink) {
           try {
@@ -149,163 +176,160 @@ export default function JournalEntryForm({ onCreated }: Props) {
 
       toast({
         title: 'Verifikation skapad',
-        description: `Verifikation ${result.data?.voucher_series}${result.data?.voucher_number} har skapats.`,
+        description: `Verifikation ${result.data?.voucher_series ?? ''}${result.data?.voucher_number ?? ''} har skapats.`,
       })
       setShowReview(false)
       // Reset form
       setDescription('')
       setUploadedFiles([])
-      setLines([
-        { account_number: '', debit_amount: '', credit_amount: '', line_description: '' },
-        { account_number: '', debit_amount: '', credit_amount: '', line_description: '' },
-      ])
+      setLines([{ ...BLANK_LINE }, { ...BLANK_LINE }])
       onCreated?.()
+      if (journalEntryId) {
+        onEntryCreated?.(journalEntryId)
+      }
     }
 
     setIsSubmitting(false)
   }
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Ny verifikation</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <Label>Räkenskapsår</Label>
-            <select
-              value={selectedPeriod}
-              onChange={(e) => setSelectedPeriod(e.target.value)}
-              className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
-            >
-              {periods.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <Label>Datum</Label>
-            <Input
-              type="date"
-              value={entryDate}
-              onChange={(e) => setEntryDate(e.target.value)}
-            />
-          </div>
-          <div>
-            <Label>Beskrivning</Label>
-            <Input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Verifikationstext..."
-            />
-          </div>
-        </div>
-
-        {/* Entry lines */}
+  const formContent = (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-4">
         <div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-muted-foreground">
-                <th className="py-2 w-24">Konto</th>
-                <th className="py-2">Beskrivning</th>
-                <th className="py-2 w-32 text-right">Debet</th>
-                <th className="py-2 w-32 text-right">Kredit</th>
-                <th className="py-2 w-10"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((line, index) => (
-                <tr key={index} className="border-b">
-                  <td className="py-1">
-                    <AccountCombobox
-                      value={line.account_number}
-                      accounts={accounts}
-                      onChange={(num) => updateLine(index, 'account_number', num)}
-                    />
-                  </td>
-                  <td className="py-1 px-1">
-                    <Input
-                      value={line.line_description}
-                      onChange={(e) => updateLine(index, 'line_description', e.target.value)}
-                      placeholder="Radtext..."
-                      className="h-8"
-                    />
-                  </td>
-                  <td className="py-1">
-                    <Input
-                      type="number"
-                      value={line.debit_amount}
-                      onChange={(e) => updateLine(index, 'debit_amount', e.target.value)}
-                      placeholder="0,00"
-                      className="text-right h-8"
-                      min="0"
-                      step="0.01"
-                    />
-                  </td>
-                  <td className="py-1">
-                    <Input
-                      type="number"
-                      value={line.credit_amount}
-                      onChange={(e) => updateLine(index, 'credit_amount', e.target.value)}
-                      placeholder="0,00"
-                      className="text-right h-8"
-                      min="0"
-                      step="0.01"
-                    />
-                  </td>
-                  <td className="py-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeLine(index)}
-                      disabled={lines.length <= 2}
-                      className="h-8 w-8 p-0"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="font-semibold">
-                <td colSpan={2} className="py-2">
-                  Summa
-                </td>
-                <td
-                  className={`py-2 text-right ${
-                    isBalanced ? 'text-green-600' : 'text-red-600'
-                  }`}
-                >
-                  {totalDebit.toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
-                </td>
-                <td
-                  className={`py-2 text-right ${
-                    isBalanced ? 'text-green-600' : 'text-red-600'
-                  }`}
-                >
-                  {totalCredit.toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
-                </td>
-                <td></td>
-              </tr>
-            </tfoot>
-          </table>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={addLine}
-            className="mt-2"
+          <Label>Räkenskapsår</Label>
+          <select
+            value={selectedPeriod}
+            onChange={(e) => setSelectedPeriod(e.target.value)}
+            className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
           >
-            <Plus className="h-3 w-3 mr-1" />
-            Lägg till rad
-          </Button>
+            {periods.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
         </div>
+        <div>
+          <Label>Datum</Label>
+          <Input
+            type="date"
+            value={entryDate}
+            onChange={(e) => setEntryDate(e.target.value)}
+          />
+        </div>
+        <div>
+          <Label>Beskrivning</Label>
+          <Input
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Verifikationstext..."
+          />
+        </div>
+      </div>
 
-        {/* Document attachments */}
+      {/* Entry lines */}
+      <div>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left text-muted-foreground">
+              <th className="py-2 w-24">Konto</th>
+              <th className="py-2">Beskrivning</th>
+              <th className="py-2 w-32 text-right">Debet</th>
+              <th className="py-2 w-32 text-right">Kredit</th>
+              <th className="py-2 w-10"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {lines.map((line, index) => (
+              <tr key={index} className="border-b">
+                <td className="py-1">
+                  <AccountCombobox
+                    value={line.account_number}
+                    accounts={accounts}
+                    onChange={(num) => updateLine(index, 'account_number', num)}
+                  />
+                </td>
+                <td className="py-1 px-1">
+                  <Input
+                    value={line.line_description}
+                    onChange={(e) => updateLine(index, 'line_description', e.target.value)}
+                    placeholder="Radtext..."
+                    className="h-8"
+                  />
+                </td>
+                <td className="py-1">
+                  <Input
+                    type="number"
+                    value={line.debit_amount}
+                    onChange={(e) => updateLine(index, 'debit_amount', e.target.value)}
+                    placeholder="0,00"
+                    className="text-right h-8"
+                    min="0"
+                    step="0.01"
+                  />
+                </td>
+                <td className="py-1">
+                  <Input
+                    type="number"
+                    value={line.credit_amount}
+                    onChange={(e) => updateLine(index, 'credit_amount', e.target.value)}
+                    placeholder="0,00"
+                    className="text-right h-8"
+                    min="0"
+                    step="0.01"
+                  />
+                </td>
+                <td className="py-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeLine(index)}
+                    disabled={lines.length <= 2}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="font-semibold">
+              <td colSpan={2} className="py-2">
+                Summa
+              </td>
+              <td
+                className={`py-2 text-right ${
+                  isBalanced ? 'text-green-600' : 'text-red-600'
+                }`}
+              >
+                {totalDebit.toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
+              </td>
+              <td
+                className={`py-2 text-right ${
+                  isBalanced ? 'text-green-600' : 'text-red-600'
+                }`}
+              >
+                {totalCredit.toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
+              </td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={addLine}
+          className="mt-2"
+        >
+          <Plus className="h-3 w-3 mr-1" />
+          Lägg till rad
+        </Button>
+      </div>
+
+      {/* Document attachments */}
+      {!embedded && (
         <div>
           <Label className="mb-2 block">Underlag</Label>
           <DocumentUploadZone
@@ -313,47 +337,62 @@ export default function JournalEntryForm({ onCreated }: Props) {
             onFilesChange={setUploadedFiles}
           />
         </div>
+      )}
 
-        {!isBalanced && totalDebit > 0 && (
-          <p className="text-sm text-red-600">
-            Differens: {Math.abs(totalDebit - totalCredit).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} kr
-          </p>
-        )}
+      {!isBalanced && totalDebit > 0 && (
+        <p className="text-sm text-red-600">
+          Differens: {Math.abs(totalDebit - totalCredit).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} kr
+        </p>
+      )}
 
-        <div className="flex flex-col items-end gap-1">
-          <Button
-            onClick={handleReview}
-            disabled={!isBalanced || !description || !selectedPeriod || isSubmitting || isUploading}
-          >
-            Granska & skapa
-          </Button>
-          {(!description || !selectedPeriod || isUploading) && (
-            <div className="text-xs text-muted-foreground space-y-0.5 text-right">
-              {!description && <p>Ange en beskrivning</p>}
-              {!selectedPeriod && <p>Välj en räkenskapsperiod</p>}
-              {isUploading && <p>Vänta tills filerna laddats upp</p>}
-            </div>
-          )}
-        </div>
-
-        <ConfirmationDialog
-          open={showReview}
-          onOpenChange={setShowReview}
-          onConfirm={handleConfirm}
-          isSubmitting={isSubmitting}
-          title="Granska verifikation"
-          warningText="En verifikation skapas och kan inte ändras efteråt. Korrigeringar görs genom storno."
+      <div className="flex flex-col items-end gap-1">
+        <Button
+          onClick={handleReview}
+          disabled={!isBalanced || !description || !selectedPeriod || isSubmitting || isUploading}
         >
-          <JournalEntryReviewContent
-            periodName={periods.find((p) => p.id === selectedPeriod)?.name || ''}
-            entryDate={entryDate}
-            description={description}
-            lines={lines}
-            totalDebit={totalDebit}
-            totalCredit={totalCredit}
-            attachmentCount={uploadedFiles.filter((f) => f.status === 'uploaded').length}
-          />
-        </ConfirmationDialog>
+          Granska & skapa
+        </Button>
+        {(!description || !selectedPeriod || isUploading) && (
+          <div className="text-xs text-muted-foreground space-y-0.5 text-right">
+            {!description && <p>Ange en beskrivning</p>}
+            {!selectedPeriod && <p>Välj en räkenskapsperiod</p>}
+            {isUploading && <p>Vänta tills filerna laddats upp</p>}
+          </div>
+        )}
+      </div>
+
+      <ConfirmationDialog
+        open={showReview}
+        onOpenChange={setShowReview}
+        onConfirm={handleConfirm}
+        isSubmitting={isSubmitting}
+        title="Granska verifikation"
+        warningText="En verifikation skapas och kan inte ändras efteråt. Korrigeringar görs genom storno."
+      >
+        <JournalEntryReviewContent
+          periodName={periods.find((p) => p.id === selectedPeriod)?.name || ''}
+          entryDate={entryDate}
+          description={description}
+          lines={lines}
+          totalDebit={totalDebit}
+          totalCredit={totalCredit}
+          attachmentCount={uploadedFiles.filter((f) => f.status === 'uploaded').length}
+        />
+      </ConfirmationDialog>
+    </div>
+  )
+
+  if (embedded) {
+    return formContent
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Ny verifikation</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {formContent}
       </CardContent>
     </Card>
   )

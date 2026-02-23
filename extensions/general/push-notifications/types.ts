@@ -21,6 +21,11 @@ export interface NotificationSettings {
   quiet_end: string   // time format "HH:MM"
   email_enabled: boolean
   push_enabled: boolean
+  period_locked_enabled: boolean
+  period_year_closed_enabled: boolean
+  invoice_sent_enabled: boolean
+  receipt_extracted_enabled: boolean
+  receipt_matched_enabled: boolean
   created_at: string
   updated_at: string
 }

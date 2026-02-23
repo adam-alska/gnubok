@@ -14,14 +14,11 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: () => Promise.resolve(mockSupabase),
 }))
 
-const mockCreateJournalEntry = vi.fn()
-const mockFindFiscalPeriod = vi.fn()
-vi.mock('@/lib/bookkeeping/engine', () => ({
-  createJournalEntry: (...args: unknown[]) => mockCreateJournalEntry(...args),
-  findFiscalPeriod: (...args: unknown[]) => mockFindFiscalPeriod(...args),
-}))
-
+const mockCreateInvoicePaymentJournalEntry = vi.fn()
+const mockCreateInvoiceCashEntry = vi.fn()
 vi.mock('@/lib/bookkeeping/invoice-entries', () => ({
+  createInvoicePaymentJournalEntry: (...args: unknown[]) => mockCreateInvoicePaymentJournalEntry(...args),
+  createInvoiceCashEntry: (...args: unknown[]) => mockCreateInvoiceCashEntry(...args),
   getRevenueAccount: vi.fn().mockReturnValue('3001'),
   getOutputVatAccount: vi.fn().mockReturnValue('2611'),
 }))
@@ -35,7 +32,6 @@ describe('POST /api/transactions/[id]/match-invoice', () => {
     vi.clearAllMocks()
     reset()
     mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
-    mockFindFiscalPeriod.mockResolvedValue('period-1')
   })
 
   it('returns 401 when not authenticated', async () => {
@@ -161,7 +157,7 @@ describe('POST /api/transactions/[id]/match-invoice', () => {
     // Fetch company settings
     enqueue({ data: { accounting_method: 'accrual', entity_type: 'enskild_firma' }, error: null })
 
-    mockCreateJournalEntry.mockResolvedValue({ id: 'je-1' })
+    mockCreateInvoicePaymentJournalEntry.mockResolvedValue({ id: 'je-1' })
 
     // Update invoice to paid
     enqueue({ data: null, error: null })
@@ -186,16 +182,11 @@ describe('POST /api/transactions/[id]/match-invoice', () => {
     expect(body.paid_amount).toBe(12500)
     expect(body.journal_entry_id).toBe('je-1')
 
-    // Verify accrual journal entry: debit 1930, credit 1510
-    expect(mockCreateJournalEntry).toHaveBeenCalledWith(
+    // Verify accrual payment entry was called
+    expect(mockCreateInvoicePaymentJournalEntry).toHaveBeenCalledWith(
       'user-1',
-      expect.objectContaining({
-        source_type: 'invoice_paid',
-        lines: expect.arrayContaining([
-          expect.objectContaining({ account_number: '1930', debit_amount: 12500 }),
-          expect.objectContaining({ account_number: '1510', credit_amount: 12500 }),
-        ]),
-      })
+      expect.objectContaining({ id: 'inv-1' }),
+      '2024-06-15'
     )
   })
 
@@ -207,7 +198,7 @@ describe('POST /api/transactions/[id]/match-invoice', () => {
     enqueue({ data: invoice, error: null })
     enqueue({ data: { accounting_method: 'accrual', entity_type: 'enskild_firma' }, error: null })
 
-    mockCreateJournalEntry.mockRejectedValue(new Error('Period locked'))
+    mockCreateInvoicePaymentJournalEntry.mockRejectedValue(new Error('Period locked'))
 
     // Update invoice
     enqueue({ data: null, error: null })

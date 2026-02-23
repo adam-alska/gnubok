@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch'
 import { ChevronDown, ChevronRight, Paperclip, AlertTriangle } from 'lucide-react'
 import { AccountNumber } from '@/components/ui/account-number'
 import JournalEntryAttachments from '@/components/bookkeeping/JournalEntryAttachments'
+import CorrectionEntryDialog from '@/components/bookkeeping/CorrectionEntryDialog'
 import type { JournalEntry, JournalEntryLine } from '@/types'
 
 const NEEDS_ATTACHMENT = new Set([
@@ -32,6 +33,7 @@ export default function JournalEntryList({ periodId }: Props) {
   const [page, setPage] = useState(0)
   const [attachmentCounts, setAttachmentCounts] = useState<Record<string, number>>({})
   const [showMissingOnly, setShowMissingOnly] = useState(false)
+  const [correctionEntry, setCorrectionEntry] = useState<JournalEntry | null>(null)
   const pageSize = 20
 
   const fetchAttachmentCounts = useCallback(async (entryIds: string[]) => {
@@ -209,7 +211,7 @@ export default function JournalEntryList({ periodId }: Props) {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b text-left text-muted-foreground">
-                        <th className="py-2 w-24">Konto</th>
+                        <th className="py-2 w-48">Konto</th>
                         <th className="py-2">Beskrivning</th>
                         <th className="py-2 w-28 text-right">Debet</th>
                         <th className="py-2 w-28 text-right">Kredit</th>
@@ -220,7 +222,7 @@ export default function JournalEntryList({ periodId }: Props) {
                         .sort((a, b) => a.sort_order - b.sort_order)
                         .map((line) => (
                           <tr key={line.id} className="border-b last:border-0">
-                            <td className="py-2"><AccountNumber number={line.account_number} /></td>
+                            <td className="py-2"><AccountNumber number={line.account_number} showName /></td>
                             <td className="py-2 text-muted-foreground">
                               {line.line_description || ''}
                             </td>
@@ -264,12 +266,34 @@ export default function JournalEntryList({ periodId }: Props) {
                     journalEntryId={entry.id}
                     onCountChange={(c) => handleAttachmentCountChange(entry.id, c)}
                   />
+
+                  {entry.status === 'posted' && entry.source_type !== 'storno' && entry.source_type !== 'correction' && (
+                    <div className="mt-4 pt-3 border-t flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCorrectionEntry(entry)}
+                      >
+                        Skapa ändringsverifikation
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               )}
             </Card>
           )
         })}
       </div>
+
+      {/* Correction dialog */}
+      {correctionEntry && (
+        <CorrectionEntryDialog
+          entry={correctionEntry}
+          open={!!correctionEntry}
+          onOpenChange={(open) => { if (!open) setCorrectionEntry(null) }}
+          onCorrected={() => { setCorrectionEntry(null); fetchEntries() }}
+        />
+      )}
 
       {/* Pagination */}
       {count > pageSize && (

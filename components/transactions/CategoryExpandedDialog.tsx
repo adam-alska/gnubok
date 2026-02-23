@@ -1,18 +1,20 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react'
-import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from './transaction-types'
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, VAT_TREATMENT_OPTIONS } from './transaction-types'
 import type { TransactionWithInvoice } from './transaction-types'
-import type { TransactionCategory } from '@/types'
+import type { TransactionCategory, VatTreatment } from '@/types'
 
 interface CategoryExpandedDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   transaction: TransactionWithInvoice | null
-  onSelectCategory: (category: TransactionCategory) => void
+  onSelectCategory: (category: TransactionCategory, vatTreatment?: VatTreatment) => void
   isProcessing: boolean
 }
 
@@ -23,9 +25,22 @@ export default function CategoryExpandedDialog({
   onSelectCategory,
   isProcessing,
 }: CategoryExpandedDialogProps) {
+  const [vatTreatment, setVatTreatment] = useState<VatTreatment | 'none'>('standard_25')
+
+  useEffect(() => {
+    if (open) {
+      setVatTreatment('standard_25')
+    }
+  }, [open, transaction?.id])
+
   if (!transaction) return null
 
   const isIncome = transaction.amount > 0
+
+  const handleSelectCategory = (category: TransactionCategory) => {
+    const resolvedVat = vatTreatment === 'none' ? undefined : vatTreatment
+    onSelectCategory(category, resolvedVat)
+  }
 
   return (
     <Dialog open={open} onOpenChange={isProcessing ? undefined : onOpenChange}>
@@ -62,6 +77,26 @@ export default function CategoryExpandedDialog({
           </p>
         </div>
 
+        {/* VAT treatment selector */}
+        <div>
+          <h4 className="text-sm font-medium text-muted-foreground mb-2">Momsbehandling</h4>
+          <Select
+            value={vatTreatment}
+            onValueChange={(v) => setVatTreatment(v as VatTreatment | 'none')}
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {VAT_TREATMENT_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Category grid */}
         <div className="space-y-4 py-2">
           <div>
@@ -73,7 +108,7 @@ export default function CategoryExpandedDialog({
                   variant="outline"
                   size="sm"
                   className="justify-start text-xs"
-                  onClick={() => onSelectCategory(cat.value)}
+                  onClick={() => handleSelectCategory(cat.value)}
                   disabled={isProcessing}
                 >
                   {cat.label}
@@ -90,7 +125,7 @@ export default function CategoryExpandedDialog({
                   variant="outline"
                   size="sm"
                   className="justify-start text-xs"
-                  onClick={() => onSelectCategory(cat.value)}
+                  onClick={() => handleSelectCategory(cat.value)}
                   disabled={isProcessing}
                 >
                   {cat.label}

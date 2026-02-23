@@ -2,7 +2,10 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { syncAccountTransactions } from '@/extensions/general/enable-banking/lib/sync'
 import { isConsentExpiringSoon, getDaysUntilExpiry } from '@/extensions/general/enable-banking/lib/api-client'
+import { ensureInitialized } from '@/lib/init'
 import type { StoredAccount } from '@/extensions/general/enable-banking/types'
+
+ensureInitialized()
 
 /**
  * GET /api/extensions/enable-banking/sync/cron
