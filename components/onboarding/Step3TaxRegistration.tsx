@@ -11,8 +11,9 @@ import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { InfoTooltip } from '@/components/ui/info-tooltip'
-import { Loader2, ArrowRight, ArrowLeft, Check } from 'lucide-react'
+import { Loader2, ArrowRight, ArrowLeft, Check, CalendarDays, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { monthsBetween } from '@/lib/bookkeeping/validate-period-duration'
 import type { MomsPeriod, EntityType } from '@/types'
 
 const schema = z.object({
@@ -57,6 +58,14 @@ const monthNames = [
   'Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni',
   'Juli', 'Augusti', 'September', 'Oktober', 'November', 'December',
 ]
+
+function formatSwedishDate(dateStr: string): string {
+  const d = new Date(dateStr)
+  const day = d.getDate()
+  const month = monthNames[d.getMonth()].toLowerCase()
+  const year = d.getFullYear()
+  return `${day} ${month} ${year}`
+}
 
 /**
  * Get the last day of a given month (1-indexed).
@@ -163,6 +172,7 @@ export default function Step3TaxRegistration({
   const firstYearStart = watch('first_year_start')
   const firstYearEnd = watch('first_year_end')
   const fiscalYearEndMonth = watch('fiscal_year_end_month')
+  const accountingMethod = watch('accounting_method')
 
   // State for AB first-year end month selector
   const [abEndMonth, setAbEndMonth] = useState<number>(
@@ -424,6 +434,21 @@ export default function Step3TaxRegistration({
                       Ingen giltig slutperiod hittades. Kontrollera startdatumet.
                     </p>
                   )}
+
+                  {firstYearStart && firstYearEnd && (
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-1">
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <CalendarDays className="h-4 w-4 text-primary" />
+                        Ditt första räkenskapsår
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {formatSwedishDate(firstYearStart)} &ndash; {formatSwedishDate(firstYearEnd)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {monthsBetween(firstYearStart, firstYearEnd)} månader
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -464,6 +489,21 @@ export default function Step3TaxRegistration({
                       <p className="text-sm text-muted-foreground">
                         De flesta har kalenderår (december). Brutet räkenskapsår slutar annan månad.
                       </p>
+
+                      {fiscalYearEndMonth && (
+                        <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-1">
+                          <div className="flex items-center gap-2 text-sm font-medium">
+                            <CalendarDays className="h-4 w-4 text-primary" />
+                            Ditt räkenskapsår
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {fiscalYearEndMonth === 12
+                              ? `1 januari \u2013 31 december (kalenderår)`
+                              : `1 ${monthNames[fiscalYearEndMonth].toLowerCase()} \u2013 ${lastDayOfMonth(2025, fiscalYearEndMonth)} ${monthNames[fiscalYearEndMonth - 1].toLowerCase()}`}
+                          </p>
+                          <p className="text-xs text-muted-foreground">12 månader</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -594,11 +634,22 @@ export default function Step3TaxRegistration({
                     </Select>
                   )}
                 />
-                <p className="text-xs text-muted-foreground">
-                  {entityType === 'aktiebolag'
-                    ? 'Aktiebolag med omsättning över 3 MSEK måste använda faktureringsmetoden.'
-                    : 'Som enskild firma med omsättning under 3 MSEK kan du välja kontantmetoden.'}
-                </p>
+                <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                    {accountingMethod === 'accrual' ? 'Faktureringsmetoden' : 'Kontantmetoden'}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {accountingMethod === 'accrual'
+                      ? 'Intäkter och kostnader bokförs när fakturan skickas eller tas emot, oavsett när betalningen sker. Detta ger en mer rättvisande bild av verksamhetens ekonomi.'
+                      : 'Intäkter och kostnader bokförs först när betalningen faktiskt sker. Enklare att hantera men ger en mindre exakt bild av verksamhetens ekonomi vid varje given tidpunkt.'}
+                  </p>
+                  {entityType === 'aktiebolag' && (
+                    <p className="text-xs text-amber-700 bg-amber-50 rounded px-2 py-1">
+                      Aktiebolag med omsättning över 3 MSEK per år måste använda faktureringsmetoden.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 

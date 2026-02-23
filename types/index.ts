@@ -1220,6 +1220,7 @@ export type NotificationType =
   | 'receipt_extracted'
   | 'receipt_matched'
   | 'invoice_sent'
+  | 'missing_underlag'
 
 // Notification log entry
 export interface NotificationLog {

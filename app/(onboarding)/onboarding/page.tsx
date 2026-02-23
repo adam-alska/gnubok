@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Progress } from '@/components/ui/progress'
 import { useToast } from '@/components/ui/use-toast'
 import { Loader2 } from 'lucide-react'
+import { validatePeriodDuration } from '@/lib/bookkeeping/validate-period-duration'
 import type { CompanySettings, EntityType, MomsPeriod } from '@/types'
 
 import Step1EntityType from '@/components/onboarding/Step1EntityType'
@@ -25,6 +26,14 @@ const STEP_TITLES = [
   'Bransch',
   'Tillägg',
 ]
+
+function translatePeriodError(msg: string): string {
+  if (msg.includes('end must be after')) return 'Slutdatumet måste vara efter startdatumet.'
+  if (msg.includes('start must be the 1st')) return 'Startdatumet måste vara den 1:a i en månad.'
+  if (msg.includes('end must be the last day')) return 'Slutdatumet måste vara sista dagen i en månad.'
+  if (msg.includes('exceeds maximum 18 months')) return 'Räkenskapsåret får inte överstiga 18 månader (BFL 3 kap.).'
+  return 'Ogiltigt räkenskapsår. Kontrollera datumen och försök igen.'
+}
 
 export default function OnboardingPage() {
   return (
@@ -210,26 +219,33 @@ function OnboardingPageContent() {
                 : `Räkenskapsår ${currentYear}/${currentYear + 1}`
             }
 
-            // Validate period duration (max 18 months)
-            const startDate = new Date(startStr)
-            const endDate = new Date(endStr)
-            const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
-              (endDate.getMonth() - startDate.getMonth()) + 1
-            if (months > 18) {
-              console.error(`Period duration ${months} months exceeds 18-month maximum`)
-            } else {
-              await supabase.from('fiscal_periods').upsert({
-                user_id: user.id,
-                name: periodName,
-                period_start: startStr,
-                period_end: endStr,
-              }, {
-                onConflict: 'user_id,period_start,period_end',
+            // Validate period duration
+            const validationError = validatePeriodDuration(startStr, endStr)
+            if (validationError) {
+              toast({
+                title: 'Ogiltigt räkenskapsår',
+                description: translatePeriodError(validationError),
+                variant: 'destructive',
               })
+              setCurrentStep(3)
+              return
             }
+
+            await supabase.from('fiscal_periods').upsert({
+              user_id: user.id,
+              name: periodName,
+              period_start: startStr,
+              period_end: endStr,
+            }, {
+              onConflict: 'user_id,period_start,period_end',
+            })
           }
         } catch (err) {
-          console.error('Failed to create fiscal period:', err)
+          toast({
+            title: 'Kunde inte skapa räkenskapsår',
+            description: 'Ett fel uppstod när räkenskapsåret skulle skapas. Försök igen.',
+            variant: 'destructive',
+          })
         }
       }
 

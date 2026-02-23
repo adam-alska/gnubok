@@ -4,6 +4,7 @@ import { loadExtensions } from '@/lib/extensions/loader'
 import {
   sendTaxDeadlineNotifications,
   sendInvoiceNotifications,
+  sendMissingUnderlagNotifications,
 } from '@/extensions/general/push-notifications/notification-scheduler'
 
 /**
@@ -40,13 +41,14 @@ export async function GET(request: Request) {
 
   try {
     // Send all notification types in parallel
-    const [taxResult, invoiceResult] = await Promise.all([
+    const [taxResult, invoiceResult, underlagResult] = await Promise.all([
       sendTaxDeadlineNotifications(supabase),
       sendInvoiceNotifications(supabase),
+      sendMissingUnderlagNotifications(supabase),
     ])
 
-    const totalSent = taxResult.sent + invoiceResult.sent
-    const totalSkipped = taxResult.skipped + invoiceResult.skipped
+    const totalSent = taxResult.sent + invoiceResult.sent + underlagResult.sent
+    const totalSkipped = taxResult.skipped + invoiceResult.skipped + underlagResult.skipped
 
     console.log(
       `Push notification cron completed: ${totalSent} sent, ${totalSkipped} skipped`
@@ -57,6 +59,9 @@ export async function GET(request: Request) {
     console.log(
       `  Invoice: ${invoiceResult.sent} sent, ${invoiceResult.skipped} skipped`
     )
+    console.log(
+      `  Missing underlag: ${underlagResult.sent} sent, ${underlagResult.skipped} skipped`
+    )
 
     return NextResponse.json({
       success: true,
@@ -65,6 +70,7 @@ export async function GET(request: Request) {
       details: {
         taxDeadlines: taxResult,
         invoices: invoiceResult,
+        missingUnderlag: underlagResult,
       },
     })
   } catch (error) {
