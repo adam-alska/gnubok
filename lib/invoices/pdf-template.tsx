@@ -440,7 +440,7 @@ export function InvoicePDF({ invoice, customer, items, company, originalInvoiceN
                 ))
             ) : (
               <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Moms ({invoice.vat_rate ?? 25}%):</Text>
+                <Text style={styles.totalLabel}>Moms ({invoice.vat_rate ?? (vatByRate.size === 1 ? vatByRate.keys().next().value : 25)}%):</Text>
                 <Text style={styles.totalValue}>{formatCurrency(invoice.vat_amount, invoice.currency)}</Text>
               </View>
             )}

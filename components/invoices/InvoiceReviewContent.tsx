@@ -2,9 +2,9 @@
 
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { getVatTreatmentLabel } from '@/lib/invoices/vat-rules'
+import { getVatSummaryFromItems } from '@/lib/invoices/vat-rules'
 import { formatCurrency } from '@/lib/utils'
-import type { Customer, Currency, VatTreatment } from '@/types'
+import type { Customer, Currency } from '@/types'
 
 interface ReviewItem {
   description: string
@@ -21,10 +21,8 @@ interface InvoiceReviewContentProps {
   currency: Currency
   items: ReviewItem[]
   subtotal: number
-  vatRate: number
   vatAmount: number
   total: number
-  vatTreatment: VatTreatment
   yourReference?: string
   ourReference?: string
   notes?: string
@@ -37,10 +35,8 @@ export function InvoiceReviewContent({
   currency,
   items,
   subtotal,
-  vatRate,
   vatAmount,
   total,
-  vatTreatment,
   yourReference,
   ourReference,
   notes,
@@ -52,23 +48,19 @@ export function InvoiceReviewContent({
     non_eu_business: 'Utanför EU',
   }
 
-  // Check if items have mixed VAT rates
-  const hasPerLineVat = items.some((item) => item.vat_rate !== undefined)
-  const uniqueRates = hasPerLineVat
-    ? new Set(items.map((item) => item.vat_rate ?? vatRate))
-    : new Set([vatRate])
-  const showVatColumn = hasPerLineVat && uniqueRates.size > 1
+  // Derive VAT summary from items
+  const vatSummary = getVatSummaryFromItems(items)
 
   // Calculate per-rate VAT breakdown
   const vatByRate = new Map<number, number>()
-  if (hasPerLineVat) {
-    for (const item of items) {
-      const rate = item.vat_rate ?? vatRate
-      const lineTotal = item.quantity * item.unit_price
-      const lineVat = Math.round(lineTotal * rate / 100 * 100) / 100
-      vatByRate.set(rate, (vatByRate.get(rate) || 0) + lineVat)
-    }
+  for (const item of items) {
+    const rate = item.vat_rate ?? 25
+    const lineTotal = item.quantity * item.unit_price
+    const lineVat = Math.round(lineTotal * rate / 100 * 100) / 100
+    vatByRate.set(rate, (vatByRate.get(rate) || 0) + lineVat)
   }
+
+  const showVatColumn = vatByRate.size > 1
 
   return (
     <div className="space-y-4">
@@ -85,7 +77,7 @@ export function InvoiceReviewContent({
 
       {/* VAT treatment */}
       <Badge className="text-sm px-3 py-1">
-        {getVatTreatmentLabel(vatTreatment)}
+        {vatSummary.label}
       </Badge>
 
       {/* Dates */}
@@ -120,7 +112,7 @@ export function InvoiceReviewContent({
               <td className="py-2 text-center">{item.unit}</td>
               <td className="py-2 text-right">{formatCurrency(item.unit_price, currency)}</td>
               {showVatColumn && (
-                <td className="py-2 text-right">{item.vat_rate ?? vatRate}%</td>
+                <td className="py-2 text-right">{item.vat_rate ?? 25}%</td>
               )}
               <td className="py-2 text-right">
                 {formatCurrency(item.quantity * item.unit_price, currency)}
@@ -136,21 +128,19 @@ export function InvoiceReviewContent({
           <span className="text-muted-foreground">Delsumma</span>
           <span>{formatCurrency(subtotal, currency)}</span>
         </div>
-        {vatByRate.size > 1 ? (
-          // Per-rate breakdown
-          Array.from(vatByRate.entries())
-            .filter(([, vat]) => vat > 0)
-            .sort(([a], [b]) => b - a)
-            .map(([rate, vat]) => (
-              <div key={rate} className="flex justify-between">
-                <span className="text-muted-foreground">Moms {rate}%</span>
-                <span>{formatCurrency(vat, currency)}</span>
-              </div>
-            ))
-        ) : (
+        {Array.from(vatByRate.entries())
+          .filter(([, vat]) => vat > 0)
+          .sort(([a], [b]) => b - a)
+          .map(([rate, vat]) => (
+            <div key={rate} className="flex justify-between">
+              <span className="text-muted-foreground">Moms {rate}%</span>
+              <span>{formatCurrency(vat, currency)}</span>
+            </div>
+          ))}
+        {Array.from(vatByRate.values()).every((vat) => vat === 0) && (
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Moms ({vatRate}%)</span>
-            <span>{formatCurrency(vatAmount, currency)}</span>
+            <span className="text-muted-foreground">Moms</span>
+            <span>{formatCurrency(0, currency)}</span>
           </div>
         )}
         <Separator />
