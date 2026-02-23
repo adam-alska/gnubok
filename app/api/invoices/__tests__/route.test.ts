@@ -19,9 +19,11 @@ vi.mock('@/lib/init', () => ({
 
 const mockGetVatRules = vi.fn()
 const mockCalculateVat = vi.fn()
-vi.mock('@/lib/invoice/vat-rules', () => ({
+const mockGetAvailableVatRates = vi.fn()
+vi.mock('@/lib/invoices/vat-rules', () => ({
   getVatRules: (...args: unknown[]) => mockGetVatRules(...args),
   calculateVat: (...args: unknown[]) => mockCalculateVat(...args),
+  getAvailableVatRates: (...args: unknown[]) => mockGetAvailableVatRates(...args),
   calculateTotal: vi.fn(),
 }))
 
@@ -164,6 +166,12 @@ describe('POST /api/invoices (create invoice)', () => {
       reverseChargeText: null,
     })
     mockCalculateVat.mockReturnValue(2500)
+    mockGetAvailableVatRates.mockReturnValue([
+      { rate: 25, label: '25%', treatment: 'standard_25' },
+      { rate: 12, label: '12%', treatment: 'reduced_12' },
+      { rate: 6, label: '6%', treatment: 'reduced_6' },
+      { rate: 0, label: '0% (momsfri)', treatment: 'exempt' },
+    ])
 
     // Fetch customer
     enqueue({ data: customer, error: null })
@@ -209,6 +217,12 @@ describe('POST /api/invoices (create invoice)', () => {
       reverseChargeText: null,
     })
     mockCalculateVat.mockReturnValue(2500)
+    mockGetAvailableVatRates.mockReturnValue([
+      { rate: 25, label: '25%', treatment: 'standard_25' },
+      { rate: 12, label: '12%', treatment: 'reduced_12' },
+      { rate: 6, label: '6%', treatment: 'reduced_6' },
+      { rate: 0, label: '0% (momsfri)', treatment: 'exempt' },
+    ])
 
     enqueue({ data: customer, error: null })
     enqueue({ data: 'F-2024001' })

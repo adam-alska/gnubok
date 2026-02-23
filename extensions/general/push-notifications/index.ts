@@ -9,8 +9,7 @@
  *   check extension setting -> build payload -> send via unified pipeline
  */
 
-import { createClient } from '@/lib/supabase/server'
-import type { Extension } from '@/lib/extensions/types'
+import type { Extension, ExtensionContext } from '@/lib/extensions/types'
 import type { EventPayload } from '@/lib/events/types'
 import { sendNotificationToUser } from './notification-sender'
 import {
@@ -41,7 +40,15 @@ const DEFAULT_SETTINGS: PushNotificationSettings = {
   receiptMatchedEnabled: true,
 }
 
+/** Get settings via ExtensionContext (preferred in event handlers) */
+async function getSettingsViaCtx(ctx: ExtensionContext): Promise<PushNotificationSettings> {
+  const stored = await ctx.settings.get<Partial<PushNotificationSettings>>()
+  return { ...DEFAULT_SETTINGS, ...(stored || {}) }
+}
+
+/** Get settings for external callers (settings routes, cron jobs) */
 export async function getSettings(userId: string): Promise<PushNotificationSettings> {
+  const { createClient } = await import('@/lib/supabase/server')
   const supabase = await createClient()
 
   const { data } = await supabase
@@ -53,7 +60,6 @@ export async function getSettings(userId: string): Promise<PushNotificationSetti
     .single()
 
   if (!data?.value) return { ...DEFAULT_SETTINGS }
-
   return { ...DEFAULT_SETTINGS, ...(data.value as Partial<PushNotificationSettings>) }
 }
 
@@ -64,6 +70,7 @@ export async function saveSettings(
   const current = await getSettings(userId)
   const merged = { ...current, ...partial }
 
+  const { createClient } = await import('@/lib/supabase/server')
   const supabase = await createClient()
 
   await supabase
@@ -86,14 +93,15 @@ export async function saveSettings(
 // ============================================================
 
 async function handlePeriodLocked(
-  payload: EventPayload<'period.locked'>
+  payload: EventPayload<'period.locked'>,
+  ctx?: ExtensionContext
 ): Promise<void> {
   const { period, userId } = payload
 
-  const settings = await getSettings(userId)
+  const settings = ctx ? await getSettingsViaCtx(ctx) : await getSettings(userId)
   if (!settings.periodLockedEnabled) return
 
-  const supabase = await createClient()
+  const supabase = ctx?.supabase ?? await (await import('@/lib/supabase/server')).createClient()
   const notificationPayload = createPeriodLockedPayload(period.name, period.id)
 
   const result = await sendNotificationToUser(
@@ -105,19 +113,20 @@ async function handlePeriodLocked(
   )
 
   if (result.sent) {
-    console.log(`[push-notifications] Period locked notification sent for ${period.name}`)
+    (ctx?.log ?? console).info(`Period locked notification sent for ${period.name}`)
   }
 }
 
 async function handleYearClosed(
-  payload: EventPayload<'period.year_closed'>
+  payload: EventPayload<'period.year_closed'>,
+  ctx?: ExtensionContext
 ): Promise<void> {
   const { period, userId } = payload
 
-  const settings = await getSettings(userId)
+  const settings = ctx ? await getSettingsViaCtx(ctx) : await getSettings(userId)
   if (!settings.periodYearClosedEnabled) return
 
-  const supabase = await createClient()
+  const supabase = ctx?.supabase ?? await (await import('@/lib/supabase/server')).createClient()
   const notificationPayload = createYearClosedPayload(period.name, period.id)
 
   const result = await sendNotificationToUser(
@@ -129,19 +138,20 @@ async function handleYearClosed(
   )
 
   if (result.sent) {
-    console.log(`[push-notifications] Year closed notification sent for ${period.name}`)
+    (ctx?.log ?? console).info(`Year closed notification sent for ${period.name}`)
   }
 }
 
 async function handleInvoiceSent(
-  payload: EventPayload<'invoice.sent'>
+  payload: EventPayload<'invoice.sent'>,
+  ctx?: ExtensionContext
 ): Promise<void> {
   const { invoice, userId } = payload
 
-  const settings = await getSettings(userId)
+  const settings = ctx ? await getSettingsViaCtx(ctx) : await getSettings(userId)
   if (!settings.invoiceSentEnabled) return
 
-  const supabase = await createClient()
+  const supabase = ctx?.supabase ?? await (await import('@/lib/supabase/server')).createClient()
   const notificationPayload = createInvoiceSentPayload(
     invoice.invoice_number,
     invoice.id
@@ -156,19 +166,20 @@ async function handleInvoiceSent(
   )
 
   if (result.sent) {
-    console.log(`[push-notifications] Invoice sent notification for #${invoice.invoice_number}`)
+    (ctx?.log ?? console).info(`Invoice sent notification for #${invoice.invoice_number}`)
   }
 }
 
 async function handleReceiptExtracted(
-  payload: EventPayload<'receipt.extracted'>
+  payload: EventPayload<'receipt.extracted'>,
+  ctx?: ExtensionContext
 ): Promise<void> {
   const { receipt, userId } = payload
 
-  const settings = await getSettings(userId)
+  const settings = ctx ? await getSettingsViaCtx(ctx) : await getSettings(userId)
   if (!settings.receiptExtractedEnabled) return
 
-  const supabase = await createClient()
+  const supabase = ctx?.supabase ?? await (await import('@/lib/supabase/server')).createClient()
   const notificationPayload = createReceiptExtractedPayload(
     receipt.merchant_name,
     receipt.id
@@ -183,19 +194,20 @@ async function handleReceiptExtracted(
   )
 
   if (result.sent) {
-    console.log(`[push-notifications] Receipt extracted notification for ${receipt.id}`)
+    (ctx?.log ?? console).info(`Receipt extracted notification for ${receipt.id}`)
   }
 }
 
 async function handleReceiptMatched(
-  payload: EventPayload<'receipt.matched'>
+  payload: EventPayload<'receipt.matched'>,
+  ctx?: ExtensionContext
 ): Promise<void> {
   const { receipt, transaction, userId } = payload
 
-  const settings = await getSettings(userId)
+  const settings = ctx ? await getSettingsViaCtx(ctx) : await getSettings(userId)
   if (!settings.receiptMatchedEnabled) return
 
-  const supabase = await createClient()
+  const supabase = ctx?.supabase ?? await (await import('@/lib/supabase/server')).createClient()
   const notificationPayload = createReceiptMatchedPayload(receipt.id, transaction.id)
 
   const result = await sendNotificationToUser(
@@ -207,7 +219,7 @@ async function handleReceiptMatched(
   )
 
   if (result.sent) {
-    console.log(`[push-notifications] Receipt matched notification for ${receipt.id}`)
+    (ctx?.log ?? console).info(`Receipt matched notification for ${receipt.id}`)
   }
 }
 
@@ -231,6 +243,6 @@ export const pushNotificationsExtension: Extension = {
     path: '/settings/extensions/push-notifications',
   },
   async onInstall(ctx) {
-    await saveSettings(ctx.userId, DEFAULT_SETTINGS)
+    await ctx.settings.set('settings', DEFAULT_SETTINGS)
   },
 }

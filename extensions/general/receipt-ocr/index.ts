@@ -1,11 +1,9 @@
-import { createClient } from '@/lib/supabase/server'
-import { eventBus } from '@/lib/events/bus'
 import { analyzeReceipt } from './lib/receipt-analyzer'
 import { processLineItems } from './lib/receipt-categorizer'
 import { autoMatchReceipts } from './lib/receipt-matcher'
-import type { Extension } from '@/lib/extensions/types'
+import type { Extension, ExtensionContext } from '@/lib/extensions/types'
 import type { EventPayload } from '@/lib/events/types'
-import type { Receipt, Transaction } from '@/types'
+import type { Receipt } from '@/types'
 
 // ============================================================
 // Settings
@@ -25,7 +23,15 @@ const DEFAULT_SETTINGS: ReceiptOcrSettings = {
   ocrConfidenceThreshold: 0.6,
 }
 
+/** Get settings via ExtensionContext (preferred in event handlers) */
+async function getSettingsViaCtx(ctx: ExtensionContext): Promise<ReceiptOcrSettings> {
+  const stored = await ctx.settings.get<Partial<ReceiptOcrSettings>>()
+  return { ...DEFAULT_SETTINGS, ...(stored || {}) }
+}
+
+/** Get settings for external callers (settings routes, API routes) */
 export async function getSettings(userId: string): Promise<ReceiptOcrSettings> {
+  const { createClient } = await import('@/lib/supabase/server')
   const supabase = await createClient()
 
   const { data } = await supabase
@@ -49,6 +55,7 @@ export async function saveSettings(
   const current = await getSettings(userId)
   const merged = { ...current, ...partial }
 
+  const { createClient } = await import('@/lib/supabase/server')
   const supabase = await createClient()
 
   await supabase
@@ -76,9 +83,11 @@ const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
  * When an image is uploaded via the document archive, auto-trigger OCR.
  */
 async function handleDocumentUploaded(
-  payload: EventPayload<'document.uploaded'>
+  payload: EventPayload<'document.uploaded'>,
+  ctx?: ExtensionContext
 ): Promise<void> {
   const { document, userId } = payload
+  const log = ctx?.log ?? console
 
   // Gate: Is it an image?
   if (!document.mime_type || !IMAGE_MIME_TYPES.includes(document.mime_type)) {
@@ -86,15 +95,15 @@ async function handleDocumentUploaded(
   }
 
   // Gate: Is autoOcrEnabled?
-  const settings = await getSettings(userId)
+  const settings = ctx ? await getSettingsViaCtx(ctx) : await getSettings(userId)
   if (!settings.autoOcrEnabled) {
     return
   }
 
-  console.log(`[receipt-ocr] Auto-OCR triggered for document ${document.id}`)
+  log.info(`Auto-OCR triggered for document ${document.id}`)
 
   try {
-    const supabase = await createClient()
+    const supabase = ctx?.supabase ?? await (await import('@/lib/supabase/server')).createClient()
 
     // Download image from storage
     const { data: fileData, error: downloadError } = await supabase.storage
@@ -102,7 +111,7 @@ async function handleDocumentUploaded(
       .download(document.storage_path)
 
     if (downloadError || !fileData) {
-      console.error('[receipt-ocr] Failed to download document:', downloadError)
+      log.error('Failed to download document:', downloadError)
       return
     }
 
@@ -116,8 +125,8 @@ async function handleDocumentUploaded(
 
     // Gate: Is confidence high enough?
     if (extraction.confidence < settings.ocrConfidenceThreshold) {
-      console.log(
-        `[receipt-ocr] Confidence ${extraction.confidence} below threshold ${settings.ocrConfidenceThreshold}, skipping`
+      log.info(
+        `Confidence ${extraction.confidence} below threshold ${settings.ocrConfidenceThreshold}, skipping`
       )
       return
     }
@@ -155,7 +164,7 @@ async function handleDocumentUploaded(
       .single()
 
     if (insertError || !receipt) {
-      console.error('[receipt-ocr] Failed to create receipt:', insertError)
+      log.error('Failed to create receipt:', insertError)
       return
     }
 
@@ -188,7 +197,8 @@ async function handleDocumentUploaded(
       .single()
 
     // Emit receipt.extracted
-    await eventBus.emit({
+    const emit = ctx?.emit ?? (await import('@/lib/events/bus')).eventBus.emit.bind((await import('@/lib/events/bus')).eventBus)
+    await emit({
       type: 'receipt.extracted',
       payload: {
         receipt: (completeReceipt || receipt) as unknown as Receipt,
@@ -198,9 +208,9 @@ async function handleDocumentUploaded(
       },
     })
 
-    console.log(`[receipt-ocr] Receipt ${receipt.id} created from document ${document.id}`)
+    log.info(`Receipt ${receipt.id} created from document ${document.id}`)
   } catch (error) {
-    console.error('[receipt-ocr] handleDocumentUploaded failed:', error)
+    log.error('handleDocumentUploaded failed:', error)
   }
 }
 
@@ -208,12 +218,14 @@ async function handleDocumentUploaded(
  * When new transactions arrive from banking sync, auto-match unmatched receipts.
  */
 async function handleTransactionSynced(
-  payload: EventPayload<'transaction.synced'>
+  payload: EventPayload<'transaction.synced'>,
+  ctx?: ExtensionContext
 ): Promise<void> {
   const { transactions: syncedTransactions, userId } = payload
+  const log = ctx?.log ?? console
 
   // Gate: Is autoMatchEnabled?
-  const settings = await getSettings(userId)
+  const settings = ctx ? await getSettingsViaCtx(ctx) : await getSettings(userId)
   if (!settings.autoMatchEnabled) {
     return
   }
@@ -224,12 +236,10 @@ async function handleTransactionSynced(
     return
   }
 
-  console.log(
-    `[receipt-ocr] Auto-match triggered for ${expenseTransactions.length} expense transactions`
-  )
+  log.info(`Auto-match triggered for ${expenseTransactions.length} expense transactions`)
 
   try {
-    const supabase = await createClient()
+    const supabase = ctx?.supabase ?? await (await import('@/lib/supabase/server')).createClient()
 
     // Fetch unmatched receipts
     const { data: unmatchedReceipts, error: fetchError } = await supabase
@@ -250,6 +260,8 @@ async function handleTransactionSynced(
       settings.autoMatchThreshold
     )
 
+    const emit = ctx?.emit ?? (await import('@/lib/events/bus')).eventBus.emit.bind((await import('@/lib/events/bus')).eventBus)
+
     // Process each match
     for (const { receipt, match } of matches) {
       // Update receipt with match
@@ -268,7 +280,7 @@ async function handleTransactionSynced(
         .eq('id', match.transaction.id)
 
       // Emit receipt.matched
-      await eventBus.emit({
+      await emit({
         type: 'receipt.matched',
         payload: {
           receipt,
@@ -279,12 +291,12 @@ async function handleTransactionSynced(
         },
       })
 
-      console.log(
-        `[receipt-ocr] Auto-matched receipt ${receipt.id} to transaction ${match.transaction.id} (confidence: ${match.confidence})`
+      log.info(
+        `Auto-matched receipt ${receipt.id} to transaction ${match.transaction.id} (confidence: ${match.confidence})`
       )
     }
   } catch (error) {
-    console.error('[receipt-ocr] handleTransactionSynced failed:', error)
+    log.error('handleTransactionSynced failed:', error)
   }
 }
 
@@ -317,6 +329,6 @@ export const receiptOcrExtension: Extension = {
     path: '/settings/extensions/receipt-ocr',
   },
   async onInstall(ctx) {
-    await saveSettings(ctx.userId, DEFAULT_SETTINGS)
+    await ctx.settings.set('settings', DEFAULT_SETTINGS)
   },
 }

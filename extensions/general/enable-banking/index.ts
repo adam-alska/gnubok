@@ -1,16 +1,9 @@
-import type { Extension } from '@/lib/extensions/types'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import type { Extension, ExtensionContext } from '@/lib/extensions/types'
 import { NextResponse } from 'next/server'
-import { eventBus } from '@/lib/events'
 import {
   startAuthorization,
   getASPSPs,
-  createSession,
-  getAccountBalance,
-  isConsentExpiringSoon,
-  getDaysUntilExpiry,
   type ASPSP,
-  type AccountInfo,
 } from './lib/api-client'
 import { syncAccountTransactions } from './lib/sync'
 import type { StoredAccount } from './types'
@@ -41,7 +34,8 @@ export const enableBankingExtension: Extension = {
     {
       method: 'GET',
       path: '/banks',
-      handler: async () => {
+      handler: async (_request: Request, ctx?: ExtensionContext) => {
+        const log = ctx?.log ?? console
         try {
           const aspsps = await getASPSPs('SE')
           const banks = aspsps.map((aspsp: ASPSP) => ({
@@ -52,7 +46,7 @@ export const enableBankingExtension: Extension = {
           }))
           return NextResponse.json({ banks })
         } catch (error) {
-          console.error('Error fetching banks:', error)
+          log.error('Error fetching banks:', error)
           return NextResponse.json({
             banks: [
               { name: 'Nordea', country: 'SE', bic: 'NDEASESS' },
@@ -67,8 +61,9 @@ export const enableBankingExtension: Extension = {
     {
       method: 'POST',
       path: '/connect',
-      handler: async (request: Request) => {
-        const supabase = await createClient()
+      handler: async (request: Request, ctx?: ExtensionContext) => {
+        const log = ctx?.log ?? console
+        const supabase = ctx?.supabase ?? await (await import('@/lib/supabase/server')).createClient()
         const { data: { user } } = await supabase.auth.getUser()
 
         if (!user) {
@@ -108,7 +103,7 @@ export const enableBankingExtension: Extension = {
             .single()
 
           if (error) {
-            console.error('Database error:', error)
+            log.error('Database error:', error)
             throw new Error('Failed to store connection')
           }
 
@@ -117,7 +112,7 @@ export const enableBankingExtension: Extension = {
             authorization_url: url,
           })
         } catch (error) {
-          console.error('Bank connection error:', error)
+          log.error('Bank connection error:', error)
           return NextResponse.json(
             { error: error instanceof Error ? error.message : 'Connection failed' },
             { status: 500 }
@@ -128,8 +123,9 @@ export const enableBankingExtension: Extension = {
     {
       method: 'POST',
       path: '/sync',
-      handler: async (request: Request) => {
-        const supabase = await createClient()
+      handler: async (request: Request, ctx?: ExtensionContext) => {
+        const log = ctx?.log ?? console
+        const supabase = ctx?.supabase ?? await (await import('@/lib/supabase/server')).createClient()
         const { data: { user } } = await supabase.auth.getUser()
 
         if (!user) {
@@ -161,6 +157,9 @@ export const enableBankingExtension: Extension = {
             .toISOString()
             .split('T')[0]
 
+          // Use ctx.services.ingestTransactions when available
+          const ingestFn = ctx?.services.ingestTransactions
+
           let totalImported = 0
           let totalDuplicates = 0
 
@@ -171,7 +170,8 @@ export const enableBankingExtension: Extension = {
               connection.id,
               account,
               fromDate,
-              toDate
+              toDate,
+              ingestFn
             )
 
             totalImported += result.imported
@@ -198,7 +198,8 @@ export const enableBankingExtension: Extension = {
               .limit(totalImported)
 
             if (syncedTransactions && syncedTransactions.length > 0) {
-              await eventBus.emit({
+              const emit = ctx?.emit ?? (await import('@/lib/events/bus')).eventBus.emit.bind((await import('@/lib/events/bus')).eventBus)
+              await emit({
                 type: 'transaction.synced',
                 payload: { transactions: syncedTransactions as Transaction[], userId: user.id },
               })
@@ -211,7 +212,7 @@ export const enableBankingExtension: Extension = {
             last_synced_at: syncedAt,
           })
         } catch (error) {
-          console.error('Sync error:', error)
+          log.error('Sync error:', error)
           return NextResponse.json(
             { error: error instanceof Error ? error.message : 'Sync failed' },
             { status: 500 }

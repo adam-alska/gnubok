@@ -1,8 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
-import { eventBus } from '@/lib/events/bus'
 import { analyzeInvoice } from './lib/invoice-analyzer'
 import { matchSupplier } from './lib/supplier-matcher'
-import type { Extension } from '@/lib/extensions/types'
+import type { Extension, ExtensionContext } from '@/lib/extensions/types'
 import type { EventPayload } from '@/lib/events/types'
 import type { InvoiceInboxSettings } from './types'
 
@@ -17,7 +15,15 @@ const DEFAULT_SETTINGS: InvoiceInboxSettings = {
   inboxEmail: null,
 }
 
+/** Get settings via ExtensionContext (preferred in event handlers) */
+async function getSettingsViaCtx(ctx: ExtensionContext): Promise<InvoiceInboxSettings> {
+  const stored = await ctx.settings.get<Partial<InvoiceInboxSettings>>()
+  return { ...DEFAULT_SETTINGS, ...(stored || {}) }
+}
+
+/** Get settings for external callers (settings routes, API routes) */
 export async function getSettings(userId: string): Promise<InvoiceInboxSettings> {
+  const { createClient } = await import('@/lib/supabase/server')
   const supabase = await createClient()
 
   const { data } = await supabase
@@ -40,6 +46,7 @@ export async function saveSettings(
   const current = await getSettings(userId)
   const merged = { ...current, ...partial }
 
+  const { createClient } = await import('@/lib/supabase/server')
   const supabase = await createClient()
 
   await supabase
@@ -73,9 +80,11 @@ const INVOICE_MIME_TYPES = [
  * be auto-processed as a supplier invoice.
  */
 async function handleDocumentUploaded(
-  payload: EventPayload<'document.uploaded'>
+  payload: EventPayload<'document.uploaded'>,
+  ctx?: ExtensionContext
 ): Promise<void> {
   const { document, userId } = payload
+  const log = ctx?.log ?? console
 
   // Gate: Is it a supported file type?
   if (!document.mime_type || !INVOICE_MIME_TYPES.includes(document.mime_type)) {
@@ -83,13 +92,13 @@ async function handleDocumentUploaded(
   }
 
   // Gate: Is autoProcessEnabled?
-  const settings = await getSettings(userId)
+  const settings = ctx ? await getSettingsViaCtx(ctx) : await getSettings(userId)
   if (!settings.autoProcessEnabled) {
     return
   }
 
   // Gate: Was this document already processed as an inbox item?
-  const supabase = await createClient()
+  const supabase = ctx?.supabase ?? await (await import('@/lib/supabase/server')).createClient()
   const { data: existing } = await supabase
     .from('invoice_inbox_items')
     .select('id')
@@ -101,7 +110,7 @@ async function handleDocumentUploaded(
     return
   }
 
-  console.log(`[invoice-inbox] Auto-process triggered for document ${document.id}`)
+  log.info(`Auto-process triggered for document ${document.id}`)
 
   try {
     // Create inbox item
@@ -117,7 +126,7 @@ async function handleDocumentUploaded(
       .single()
 
     if (insertError || !inboxItem) {
-      console.error('[invoice-inbox] Failed to create inbox item:', insertError)
+      log.error('Failed to create inbox item:', insertError)
       return
     }
 
@@ -176,7 +185,8 @@ async function handleDocumentUploaded(
       .single()
 
     if (updatedItem) {
-      await eventBus.emit({
+      const emit = ctx?.emit ?? (await import('@/lib/events/bus')).eventBus.emit.bind((await import('@/lib/events/bus')).eventBus)
+      await emit({
         type: 'supplier_invoice.extracted',
         payload: {
           inboxItem: updatedItem,
@@ -186,9 +196,9 @@ async function handleDocumentUploaded(
       })
     }
 
-    console.log(`[invoice-inbox] Invoice ${inboxItem.id} processed (confidence: ${extraction.confidence})`)
+    log.info(`Invoice ${inboxItem.id} processed (confidence: ${extraction.confidence})`)
   } catch (error) {
-    console.error('[invoice-inbox] handleDocumentUploaded failed:', error)
+    log.error('handleDocumentUploaded failed:', error)
   }
 }
 
@@ -208,6 +218,6 @@ export const invoiceInboxExtension: Extension = {
     path: '/settings/extensions/invoice-inbox',
   },
   async onInstall(ctx) {
-    await saveSettings(ctx.userId, DEFAULT_SETTINGS)
+    await ctx.settings.set('settings', DEFAULT_SETTINGS)
   },
 }

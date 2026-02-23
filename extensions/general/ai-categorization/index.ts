@@ -1,5 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
-import type { Extension } from '@/lib/extensions/types'
+import type { Extension, ExtensionContext } from '@/lib/extensions/types'
 import type { EventPayload } from '@/lib/events/types'
 import type { Transaction, EntityType } from '@/types'
 import {
@@ -26,7 +25,15 @@ const DEFAULT_SETTINGS: AiCategorizationSettings = {
   providerModel: 'claude-haiku-4-5-20251001',
 }
 
+/** Get settings via ExtensionContext (preferred in event handlers) */
+async function getSettingsViaCtx(ctx: ExtensionContext): Promise<AiCategorizationSettings> {
+  const stored = await ctx.settings.get<Partial<AiCategorizationSettings>>()
+  return { ...DEFAULT_SETTINGS, ...(stored || {}) }
+}
+
+/** Get settings for external callers (settings routes, on-demand API) */
 export async function getSettings(userId: string): Promise<AiCategorizationSettings> {
+  const { createClient } = await import('@/lib/supabase/server')
   const supabase = await createClient()
 
   const { data } = await supabase
@@ -38,7 +45,6 @@ export async function getSettings(userId: string): Promise<AiCategorizationSetti
     .single()
 
   if (!data?.value) return { ...DEFAULT_SETTINGS }
-
   return { ...DEFAULT_SETTINGS, ...(data.value as Partial<AiCategorizationSettings>) }
 }
 
@@ -49,6 +55,7 @@ export async function saveSettings(
   const current = await getSettings(userId)
   const merged = { ...current, ...partial }
 
+  const { createClient } = await import('@/lib/supabase/server')
   const supabase = await createClient()
 
   await supabase
@@ -87,6 +94,7 @@ export async function categorizeTransactions(
   userId: string,
   transactionIds: string[]
 ): Promise<CategorizationSuggestion[]> {
+  const { createClient } = await import('@/lib/supabase/server')
   const supabase = await createClient()
   const settings = await getSettings(userId)
 
@@ -125,12 +133,14 @@ export async function categorizeTransactions(
 // ============================================================
 
 async function handleTransactionSynced(
-  payload: EventPayload<'transaction.synced'>
+  payload: EventPayload<'transaction.synced'>,
+  ctx?: ExtensionContext
 ): Promise<void> {
   const { transactions: syncedTransactions, userId } = payload
+  const log = ctx?.log ?? console
 
   // Gate: Is autoSuggestEnabled?
-  const settings = await getSettings(userId)
+  const settings = ctx ? await getSettingsViaCtx(ctx) : await getSettings(userId)
   if (!settings.autoSuggestEnabled) {
     return
   }
@@ -143,12 +153,10 @@ async function handleTransactionSynced(
     return
   }
 
-  console.log(
-    `[ai-categorization] Auto-suggest triggered for ${uncategorized.length} uncategorized transactions`
-  )
+  log.info(`Auto-suggest triggered for ${uncategorized.length} uncategorized transactions`)
 
   try {
-    const supabase = await createClient()
+    const supabase = ctx?.supabase ?? await (await import('@/lib/supabase/server')).createClient()
 
     const batch: TransactionForCategorization[] = uncategorized.map((t: Transaction) => ({
       id: t.id,
@@ -173,11 +181,11 @@ async function handleTransactionSynced(
       await storeSuggestions(userId, qualifiedSuggestions, supabase)
     }
 
-    console.log(
-      `[ai-categorization] Generated ${suggestions.length} suggestions, ${qualifiedSuggestions.length} above threshold (${settings.confidenceThreshold})`
+    log.info(
+      `Generated ${suggestions.length} suggestions, ${qualifiedSuggestions.length} above threshold (${settings.confidenceThreshold})`
     )
   } catch (error) {
-    console.error('[ai-categorization] handleTransactionSynced failed:', error)
+    log.error('handleTransactionSynced failed:', error)
   }
 }
 
@@ -251,6 +259,6 @@ export const aiCategorizationExtension: Extension = {
     path: '/settings/extensions/ai-categorization',
   },
   async onInstall(ctx) {
-    await saveSettings(ctx.userId, DEFAULT_SETTINGS)
+    await ctx.settings.set('settings', DEFAULT_SETTINGS)
   },
 }

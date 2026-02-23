@@ -1,5 +1,6 @@
-import type { CoreEventType } from '@/lib/events/types'
-import type { EntityType } from '@/types'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { CoreEvent, CoreEventType } from '@/lib/events/types'
+import type { EntityType, RawTransaction, IngestResult } from '@/types'
 
 // ============================================================
 // Extension Marketplace Types
@@ -63,7 +64,7 @@ export interface RouteDefinition {
 export interface ApiRouteDefinition {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
   path: string
-  handler: (request: Request) => Promise<Response>
+  handler: (request: Request, ctx?: ExtensionContext) => Promise<Response>
 }
 
 /** Sidebar navigation item added by an extension */
@@ -112,13 +113,44 @@ export interface MappingRuleTypeDefinition {
 export interface ExtensionEventHandler {
   eventType: CoreEventType
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  handler: (payload: any) => Promise<void> | void
+  handler: (payload: any, ctx?: ExtensionContext) => Promise<void> | void
 }
 
-/** Context passed to extension lifecycle hooks */
+/** Logger interface for extensions */
+export interface ExtensionLogger {
+  info(message: string, ...args: unknown[]): void
+  warn(message: string, ...args: unknown[]): void
+  error(message: string, ...args: unknown[]): void
+}
+
+/** Settings accessor for extension-scoped key-value data */
+export interface ExtensionSettings {
+  get<T>(key?: string): Promise<T | null>
+  set<T>(key: string, value: T): Promise<void>
+}
+
+/** Storage accessor wrapping Supabase storage */
+export interface ExtensionStorage {
+  download(bucket: string, path: string): Promise<{ data: Blob | null; error?: string }>
+  upload(bucket: string, path: string, data: ArrayBuffer, options?: { contentType?: string }): Promise<{ path: string; error?: string }>
+  getPublicUrl(bucket: string, path: string): string
+}
+
+/** Core services exposed to extensions */
+export interface ExtensionServices {
+  ingestTransactions(supabase: SupabaseClient, userId: string, raw: RawTransaction[]): Promise<IngestResult>
+}
+
+/** Context passed to extension lifecycle hooks and event handlers */
 export interface ExtensionContext {
   userId: string
   extensionId: string
+  supabase: SupabaseClient
+  emit(event: CoreEvent): Promise<void>
+  settings: ExtensionSettings
+  storage: ExtensionStorage
+  log: ExtensionLogger
+  services: ExtensionServices
 }
 
 /**

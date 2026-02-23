@@ -29,7 +29,7 @@ vi.mock('@react-pdf/renderer', () => ({
   StyleSheet: { create: (s: unknown) => s },
 }))
 
-vi.mock('@/lib/invoice/pdf-template', () => ({
+vi.mock('@/lib/invoices/pdf-template', () => ({
   InvoicePDF: vi.fn().mockReturnValue('mock-pdf-element'),
 }))
 

@@ -21,10 +21,6 @@ vi.mock('@/lib/events/bus', () => ({
   eventBus: { emit: vi.fn().mockResolvedValue(undefined), clear: vi.fn() },
 }))
 
-vi.mock('@/lib/bookkeeping/supplier-invoice-entries', () => ({
-  createSupplierInvoiceRegistrationEntry: vi.fn().mockResolvedValue({ id: 'je-1' }),
-}))
-
 import { createClient } from '@/lib/supabase/server'
 import { POST } from '../route'
 
@@ -160,11 +156,7 @@ describe('Invoice Inbox Confirm Route', () => {
       { data: { id: 'si-1', total: 625 }, error: null },
       // 6. Insert items
       { data: null, error: null },
-      // 7. Get company settings
-      { data: { accounting_method: 'accrual' }, error: null },
-      // 8. Update invoice with journal entry id
-      { data: null, error: null },
-      // 9. Update inbox item as confirmed
+      // 7. Update inbox item as confirmed
       { data: null, error: null },
     ])
     mockCreateClient.mockResolvedValue(supabase as never)
@@ -225,9 +217,7 @@ describe('Invoice Inbox Confirm Route', () => {
       { data: { id: 'si-2', total: 1250 }, error: null },
       // 5. Insert items
       { data: null, error: null },
-      // 6. Get company settings
-      { data: { accounting_method: 'cash' }, error: null },
-      // 7. Update inbox item as confirmed
+      // 6. Update inbox item as confirmed
       { data: null, error: null },
     ])
     mockCreateClient.mockResolvedValue(supabase as never)
