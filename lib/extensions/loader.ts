@@ -5,6 +5,7 @@ import { pushNotificationsExtension } from '@/extensions/general/push-notificati
 import { sruExportExtension } from '@/extensions/sru-export'
 import { neBilagaExtension } from '@/extensions/ne-bilaga'
 import { aiChatExtension } from '@/extensions/general/ai-chat'
+import { invoiceInboxExtension } from '@/extensions/general/invoice-inbox'
 import type { Extension } from './types'
 
 // ── Enable Banking (PSD2) — opt-in extension ───────────────────────────
@@ -26,6 +27,7 @@ const FIRST_PARTY_EXTENSIONS: Extension[] = [
   sruExportExtension,
   neBilagaExtension,
   aiChatExtension,
+  invoiceInboxExtension,
   // enableBankingExtension,  // Uncomment to activate PSD2 bank sync
 ]
 

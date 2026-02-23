@@ -1271,6 +1271,36 @@ export interface SIEAccountMapping {
 }
 
 // ============================================================
+// Invoice Inbox Types
+// ============================================================
+
+export type InboxItemStatus = 'pending' | 'processing' | 'ready' | 'confirmed' | 'rejected' | 'error'
+export type InboxItemSource = 'email' | 'upload'
+
+export interface InvoiceInboxItem {
+  id: string
+  user_id: string
+  status: InboxItemStatus
+  source: InboxItemSource
+  email_from: string | null
+  email_subject: string | null
+  email_received_at: string | null
+  document_id: string | null
+  extracted_data: Record<string, unknown> | null
+  confidence: number | null
+  matched_supplier_id: string | null
+  created_supplier_invoice_id: string | null
+  error_message: string | null
+  created_at: string
+  updated_at: string
+
+  // Relations (populated when fetched)
+  document?: DocumentAttachment
+  supplier?: Supplier
+  supplier_invoice?: SupplierInvoice
+}
+
+// ============================================================
 // Receipt Types (canonical source: extensions/receipt-ocr/types.ts)
 // ============================================================
 export type { ReceiptStatus, Receipt, ReceiptLineItem, ReceiptExtractionResult, ExtractedLineItem, ReceiptMatchCandidate, CreateReceiptInput, ConfirmReceiptInput, ConfirmLineItemInput, ReceiptQueueSummary, CameraQualityFeedback } from '@/extensions/general/receipt-ocr/types'
@@ -1628,4 +1658,33 @@ export const REMINDER_LEVEL_DESCRIPTIONS: Record<1 | 2 | 3, string> = {
   1: '15 dagar efter förfallodatum',
   2: '30 dagar efter förfallodatum',
   3: '45 dagar efter förfallodatum'
+}
+
+// ============================================================
+// Transaction Ingestion Types (re-exported for extension use)
+// ============================================================
+
+/** Normalized transaction input for the generic ingestion pipeline */
+export interface RawTransaction {
+  date: string
+  description: string
+  amount: number
+  currency: string
+  external_id: string
+  mcc_code?: number | null
+  merchant_name?: string | null
+  reference?: string | null
+  bank_connection_id?: string | null
+  import_source?: string
+}
+
+/** Result of the transaction ingestion pipeline */
+export interface IngestResult {
+  imported: number
+  duplicates: number
+  reconciled: number
+  auto_categorized: number
+  auto_matched_invoices: number
+  errors: number
+  transaction_ids: string[]
 }
