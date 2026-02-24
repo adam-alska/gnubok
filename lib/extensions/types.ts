@@ -10,7 +10,7 @@ import type { EntityType, RawTransaction, IngestResult } from '@/types'
 export type ExtensionCategory = 'accounting' | 'reports' | 'import' | 'operations'
 
 /** Sector slugs for extension organization */
-export type SectorSlug = 'general' | 'restaurant' | 'construction' | 'hotel' | 'tech' | 'ecommerce'
+export type SectorSlug = 'general' | 'restaurant' | 'construction' | 'hotel' | 'tech' | 'ecommerce' | 'export'
 
 /** How an extension gets its data */
 export type ExtensionDataPattern = 'core' | 'manual' | 'both'

@@ -23,6 +23,9 @@ import {
   BarChart3,
   Layers,
   Puzzle,
+  Ship,
+  FileText,
+  Shield,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -51,6 +54,9 @@ const ICON_MAP: Record<string, LucideIcon> = {
   BarChart3,
   Layers,
   Puzzle,
+  Ship,
+  FileText,
+  Shield,
 }
 
 export function resolveIcon(name: string): LucideIcon {

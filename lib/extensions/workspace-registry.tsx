@@ -32,6 +32,11 @@ const WORKSPACES: Record<WorkspaceKey, ComponentType<WorkspaceComponentProps>> =
   // E-commerce
   'ecommerce/shopify-import': dynamic(() => import('@/components/extensions/ecommerce/ShopifyImportWorkspace')),
   'ecommerce/multichannel-revenue': dynamic(() => import('@/components/extensions/ecommerce/MultichannelRevenueWorkspace')),
+  // Export
+  'export/eu-sales-list': dynamic(() => import('@/components/extensions/export/EuSalesListWorkspace')),
+  'export/vat-monitor': dynamic(() => import('@/components/extensions/export/VatMonitorWorkspace')),
+  'export/intrastat': dynamic(() => import('@/components/extensions/export/IntrastatWorkspace')),
+  'export/currency-receivables': dynamic(() => import('@/components/extensions/export/CurrencyReceivablesWorkspace')),
 }
 
 export function getWorkspaceComponent(

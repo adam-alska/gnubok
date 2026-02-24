@@ -292,6 +292,68 @@ export const SECTORS: Sector[] = [
       },
     ],
   },
+
+  // ── Export ──────────────────────────────────────────────
+  {
+    slug: 'export',
+    name: 'Export & Utrikeshandel',
+    icon: 'Ship',
+    description: 'Verktyg för svenska företag som exporterar varor till EU och övriga världen',
+    extensions: [
+      {
+        slug: 'eu-sales-list',
+        name: 'Periodisk sammanställning',
+        sector: 'export',
+        category: 'accounting',
+        icon: 'FileText',
+        dataPattern: 'core',
+        readsCoreTables: ['invoices', 'customers'],
+        hasOwnData: false,
+        description: 'Generera periodisk sammanställning (EC Sales List) för Skatteverket',
+        longDescription:
+          'Sammanställer automatiskt alla momsfria EU-försäljningar grupperat per kund och momsregistreringsnummer. Genererar nedladdningsbar fil (CSV/XML) för uppladdning till Skatteverket. Validerar kundernas VAT-nummer via VIES och flaggar saknade uppgifter. Korsvaliderar mot momsdeklarationens ruta 35 och 39.',
+      },
+      {
+        slug: 'vat-monitor',
+        name: 'Exportmoms-monitor',
+        sector: 'export',
+        category: 'reports',
+        icon: 'Shield',
+        dataPattern: 'core',
+        readsCoreTables: ['journal_entry_lines', 'journal_entries', 'invoices'],
+        hasOwnData: false,
+        description: 'Övervaka momsbehandling för export och EU-handel',
+        longDescription:
+          'Visar intäkter uppdelat på inhemsk försäljning, EU B2B (reverse charge) och export utanför EU. Mappar automatiskt till rätt rutor i momsdeklarationen (ruta 05, 35, 36, 39, 40). Flaggar potentiella fel som saknat momsregistreringsnummer på EU-kunder eller felaktig momsbehandling.',
+      },
+      {
+        slug: 'intrastat',
+        name: 'Intrastat-generator',
+        sector: 'export',
+        category: 'accounting',
+        icon: 'BarChart3',
+        dataPattern: 'both',
+        readsCoreTables: ['invoices', 'customers'],
+        hasOwnData: true,
+        description: 'Generera Intrastat-deklarationer för rapportering till SCB',
+        longDescription:
+          'Tagga produkter med CN-koder (Combined Nomenclature), vikt och ursprungsland. Genererar kompletta Intrastat-deklarationer i CSV-format för uppladdning till SCB:s IDEP.web. Övervakar tröskelvärdet på 12 MSEK för utförsel och varnar när rapporteringsskyldighet uppstår.',
+      },
+      {
+        slug: 'currency-receivables',
+        name: 'Valutafordringar',
+        sector: 'export',
+        category: 'reports',
+        icon: 'TrendingUp',
+        dataPattern: 'core',
+        readsCoreTables: ['invoices', 'journal_entry_lines', 'transactions'],
+        hasOwnData: false,
+        description: 'Övervaka valutaexponering och orealiserade kursvinster/-förluster',
+        longDescription:
+          'Visar öppna kundfordringar per valuta med aktuellt SEK-värde baserat på Riksbankens dagskurser. Beräknar orealiserade valutakursvinster och -förluster. Visar realiserade kursdifferenser per period (konto 3960/7960). Ger en samlad bild av företagets valutarisk.',
+      },
+    ],
+  },
 ]
 
 // ============================================================
