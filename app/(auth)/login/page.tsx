@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
 import { Loader2, Mail, Sparkles } from 'lucide-react'
+import { getErrorMessage } from '@/lib/errors/get-error-message'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -30,8 +31,8 @@ export default function LoginPage() {
 
       if (error) {
         toast({
-          title: 'Fel',
-          description: error.message,
+          title: 'Inloggning misslyckades',
+          description: getErrorMessage(error, { context: 'auth' }),
           variant: 'destructive',
         })
         return
@@ -42,10 +43,10 @@ export default function LoginPage() {
         title: 'E-post skickad!',
         description: 'Kolla din inkorg för att logga in.',
       })
-    } catch {
+    } catch (error) {
       toast({
-        title: 'Fel',
-        description: 'Något gick fel. Försök igen.',
+        title: 'Inloggning misslyckades',
+        description: getErrorMessage(error, { context: 'auth' }),
         variant: 'destructive',
       })
     } finally {

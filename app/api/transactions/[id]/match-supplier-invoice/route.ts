@@ -5,11 +5,9 @@ import {
   createSupplierInvoicePaymentEntry,
   createSupplierInvoiceCashEntry,
 } from '@/lib/bookkeeping/supplier-invoice-entries'
+import { validateBody } from '@/lib/api/validate'
+import { MatchSupplierInvoiceSchema } from '@/lib/api/schemas'
 import type { SupplierInvoice, SupplierInvoiceItem } from '@/types'
-
-interface MatchRequest {
-  supplier_invoice_id: string
-}
 
 /**
  * Ensure a fiscal period exists for the given date
@@ -64,12 +62,9 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body: MatchRequest = await request.json()
-  const { supplier_invoice_id } = body
-
-  if (!supplier_invoice_id) {
-    return NextResponse.json({ error: 'supplier_invoice_id is required' }, { status: 400 })
-  }
+  const validation = await validateBody(request, MatchSupplierInvoiceSchema)
+  if (!validation.success) return validation.response
+  const { supplier_invoice_id } = validation.data
 
   // Fetch the transaction
   const { data: transaction, error: fetchTxError } = await supabase

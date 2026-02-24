@@ -515,7 +515,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                   {(() => {
                     const vatByRate = new Map<number, number>()
                     for (const item of invoice.items) {
-                      const rate = item.vat_rate ?? 25
+                      const rate = item.vat_rate ?? 0
                       const lineVat = Math.round(item.line_total * (rate / 100) * 100) / 100
                       vatByRate.set(rate, (vatByRate.get(rate) || 0) + lineVat)
                     }

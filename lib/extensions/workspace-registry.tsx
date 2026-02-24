@@ -13,6 +13,7 @@ const WORKSPACES: Record<WorkspaceKey, ComponentType<WorkspaceComponentProps>> =
   'general/ai-categorization': dynamic(() => import('@/components/extensions/general/AiCategorizationWorkspace')),
   'general/ai-chat': dynamic(() => import('@/components/extensions/general/AiChatWorkspace')),
   'general/push-notifications': dynamic(() => import('@/components/extensions/general/PushNotificationsWorkspace')),
+  'general/invoice-inbox': dynamic(() => import('@/components/extensions/general/InvoiceInboxWorkspace')),
   'general/enable-banking': dynamic(() => import('@/components/extensions/general/EnableBankingWorkspace')),
   // Restaurant
   'restaurant/food-cost': dynamic(() => import('@/components/extensions/restaurant/FoodCostWorkspace')),

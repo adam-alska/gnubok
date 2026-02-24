@@ -30,6 +30,7 @@ export interface PushNotificationSettings {
   invoiceSentEnabled: boolean
   receiptExtractedEnabled: boolean
   receiptMatchedEnabled: boolean
+  missingUnderlagEnabled: boolean
 }
 
 const DEFAULT_SETTINGS: PushNotificationSettings = {
@@ -38,6 +39,7 @@ const DEFAULT_SETTINGS: PushNotificationSettings = {
   invoiceSentEnabled: false,
   receiptExtractedEnabled: true,
   receiptMatchedEnabled: true,
+  missingUnderlagEnabled: true,
 }
 
 /** Get settings via ExtensionContext (preferred in event handlers) */
@@ -54,7 +56,7 @@ export async function getSettings(userId: string): Promise<PushNotificationSetti
   const { data } = await supabase
     .from('notification_settings')
     .select(
-      'period_locked_enabled, period_year_closed_enabled, invoice_sent_enabled, receipt_extracted_enabled, receipt_matched_enabled'
+      'period_locked_enabled, period_year_closed_enabled, invoice_sent_enabled, receipt_extracted_enabled, receipt_matched_enabled, missing_underlag_enabled'
     )
     .eq('user_id', userId)
     .single()
@@ -66,6 +68,7 @@ export async function getSettings(userId: string): Promise<PushNotificationSetti
     invoiceSentEnabled: data.invoice_sent_enabled ?? DEFAULT_SETTINGS.invoiceSentEnabled,
     receiptExtractedEnabled: data.receipt_extracted_enabled ?? DEFAULT_SETTINGS.receiptExtractedEnabled,
     receiptMatchedEnabled: data.receipt_matched_enabled ?? DEFAULT_SETTINGS.receiptMatchedEnabled,
+    missingUnderlagEnabled: data.missing_underlag_enabled ?? DEFAULT_SETTINGS.missingUnderlagEnabled,
   }
 }
 
@@ -89,6 +92,7 @@ export async function saveSettings(
         invoice_sent_enabled: merged.invoiceSentEnabled,
         receipt_extracted_enabled: merged.receiptExtractedEnabled,
         receipt_matched_enabled: merged.receiptMatchedEnabled,
+        missing_underlag_enabled: merged.missingUnderlagEnabled,
       },
       { onConflict: 'user_id' }
     )

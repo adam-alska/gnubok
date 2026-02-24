@@ -11,6 +11,7 @@ import {
   generateInvoiceEmailSubject
 } from '@/lib/email/invoice-templates'
 import { createInvoiceJournalEntry } from '@/lib/bookkeeping/invoice-entries'
+import { uploadDocument } from '@/lib/core/documents/document-service'
 import type { Invoice, InvoiceItem, Customer, CompanySettings } from '@/types'
 
 ensureInitialized()
@@ -166,6 +167,7 @@ export async function POST(
 
     // Only create journal entries for real invoices (not proformas or delivery notes)
     const isRealInvoice = !invoice.document_type || invoice.document_type === 'invoice'
+    let createdJournalEntryId: string | undefined
     if (isRealInvoice && ((company as Record<string, unknown>).accounting_method === 'accrual' || !(company as Record<string, unknown>).accounting_method)) {
       try {
         const journalEntry = await createInvoiceJournalEntry(
@@ -174,6 +176,7 @@ export async function POST(
           (company as CompanySettings).entity_type
         )
         if (journalEntry) {
+          createdJournalEntryId = journalEntry.id
           await supabase
             .from('invoices')
             .update({ journal_entry_id: journalEntry.id })
@@ -181,6 +184,24 @@ export async function POST(
         }
       } catch (err) {
         console.error('Failed to create invoice journal entry on send:', err)
+        // Non-blocking — don't fail the send
+      }
+    }
+
+    // Auto-store invoice PDF as underlag and link to journal entry
+    if (isRealInvoice) {
+      try {
+        const pdfArrayBuffer = new Uint8Array(pdfBuffer).buffer as ArrayBuffer
+        await uploadDocument(user.id, {
+          name: filename,
+          buffer: pdfArrayBuffer,
+          type: 'application/pdf',
+        }, {
+          upload_source: 'system',
+          journal_entry_id: createdJournalEntryId,
+        })
+      } catch (err) {
+        console.error('Failed to store invoice PDF as underlag:', err)
         // Non-blocking — don't fail the send
       }
     }

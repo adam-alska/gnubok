@@ -27,6 +27,10 @@ const FORMAT_NAMES: Record<string, string> = {
   seb: 'SEB',
   swedbank: 'Swedbank',
   handelsbanken: 'Handelsbanken',
+  lansforsakringar: 'Länsförsäkringar',
+  ica_banken: 'ICA Banken',
+  skandia: 'Skandia',
+  lunar: 'Lunar',
   generic_csv: 'CSV (manuell mappning)',
   camt053: 'ISO 20022 camt.053',
 }
@@ -122,6 +126,10 @@ export default function BankFileUploadStep({
                 <SelectItem value="seb">SEB</SelectItem>
                 <SelectItem value="swedbank">Swedbank</SelectItem>
                 <SelectItem value="handelsbanken">Handelsbanken</SelectItem>
+                <SelectItem value="lansforsakringar">Länsförsäkringar</SelectItem>
+                <SelectItem value="ica_banken">ICA Banken</SelectItem>
+                <SelectItem value="skandia">Skandia</SelectItem>
+                <SelectItem value="lunar">Lunar</SelectItem>
                 <SelectItem value="camt053">ISO 20022 camt.053 (XML)</SelectItem>
                 <SelectItem value="generic_csv">Annan CSV (manuell mappning)</SelectItem>
               </SelectContent>
@@ -227,6 +235,30 @@ export default function BankFileUploadStep({
             <p className="font-medium">Handelsbanken</p>
             <p className="text-muted-foreground">
               Logga in → Konton → Transaktioner → Ladda ner (CSV)
+            </p>
+          </div>
+          <div>
+            <p className="font-medium">Länsförsäkringar</p>
+            <p className="text-muted-foreground">
+              Logga in → Konton → Kontoutdrag → Exportera (CSV)
+            </p>
+          </div>
+          <div>
+            <p className="font-medium">ICA Banken</p>
+            <p className="text-muted-foreground">
+              Logga in → Konton → Transaktioner → Exportera till fil (CSV)
+            </p>
+          </div>
+          <div>
+            <p className="font-medium">Skandia</p>
+            <p className="text-muted-foreground">
+              Logga in → Konton → Transaktioner → Exportera (CSV)
+            </p>
+          </div>
+          <div>
+            <p className="font-medium">Lunar</p>
+            <p className="text-muted-foreground">
+              Logga in → Konto → Transaktioner → Exportera (CSV)
             </p>
           </div>
         </CardContent>

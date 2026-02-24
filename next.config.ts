@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["nonpedagogically-sphinxlike-dalila.ngrok-free.dev"],
+  // Add your ngrok/tunnel domain here for local dev, e.g.:
+  // allowedDevOrigins: ["your-subdomain.ngrok-free.dev"],
 };
 
 export default nextConfig;

@@ -2,7 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { createJournalEntry } from '@/lib/bookkeeping/engine'
 import { ensureInitialized } from '@/lib/init'
-import type { CreateJournalEntryInput } from '@/types'
+import { validateBody } from '@/lib/api/validate'
+import { CreateJournalEntrySchema } from '@/lib/api/schemas'
 
 ensureInitialized()
 
@@ -63,7 +64,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json() as CreateJournalEntryInput
+  const validation = await validateBody(request, CreateJournalEntrySchema)
+  if (!validation.success) return validation.response
+  const body = validation.data
 
   try {
     const entry = await createJournalEntry(user.id, body)

@@ -16,6 +16,7 @@ import {
   createTaxDeadlinePayload,
   createInvoiceOverduePayload,
   createInvoiceDuePayload,
+  createMissingUnderlagPayload,
 } from './payload-builders'
 
 /**
@@ -203,6 +204,95 @@ export async function sendInvoiceNotifications(
       } else {
         skipped++
       }
+    }
+  }
+
+  return { sent, skipped }
+}
+
+/**
+ * Source types that require supporting documents (underlag).
+ */
+const NEEDS_ATTACHMENT_SOURCE_TYPES = [
+  'manual',
+  'bank_transaction',
+  'supplier_invoice_registered',
+  'supplier_invoice_paid',
+  'supplier_invoice_cash_payment',
+  'import',
+]
+
+/**
+ * Send missing underlag notifications.
+ * Checks all users for posted journal entries without attached documents.
+ * Deduplicates via the 'missing-underlag-weekly' tag on the notification payload.
+ */
+export async function sendMissingUnderlagNotifications(
+  supabase: SupabaseClient
+): Promise<{ sent: number; skipped: number }> {
+  let sent = 0
+  let skipped = 0
+
+  // Get all users who have posted entries with source types that need docs
+  const { data: entries } = await supabase
+    .from('journal_entries')
+    .select('id, user_id')
+    .eq('status', 'posted')
+    .in('source_type', NEEDS_ATTACHMENT_SOURCE_TYPES)
+
+  if (!entries || entries.length === 0) {
+    return { sent: 0, skipped: 0 }
+  }
+
+  // Get all document_attachments linked to journal entries
+  const { data: attachments } = await supabase
+    .from('document_attachments')
+    .select('journal_entry_id')
+    .eq('is_current_version', true)
+    .not('journal_entry_id', 'is', null)
+
+  const entriesWithDocs = new Set(
+    (attachments || []).map((a) => a.journal_entry_id)
+  )
+
+  // Group missing counts by user
+  const userMissingCounts = new Map<string, number>()
+  for (const entry of entries) {
+    if (!entriesWithDocs.has(entry.id)) {
+      userMissingCounts.set(
+        entry.user_id,
+        (userMissingCounts.get(entry.user_id) || 0) + 1
+      )
+    }
+  }
+
+  for (const [userId, count] of userMissingCounts) {
+    // Check user setting
+    const { data: settings } = await supabase
+      .from('notification_settings')
+      .select('missing_underlag_enabled')
+      .eq('user_id', userId)
+      .single()
+
+    if (settings && settings.missing_underlag_enabled === false) {
+      skipped++
+      continue
+    }
+
+    const payload = createMissingUnderlagPayload(count)
+
+    const result = await sendNotificationToUser(
+      supabase,
+      userId,
+      payload,
+      'missing_underlag',
+      'weekly-check'
+    )
+
+    if (result.sent) {
+      sent++
+    } else {
+      skipped++
     }
   }
 

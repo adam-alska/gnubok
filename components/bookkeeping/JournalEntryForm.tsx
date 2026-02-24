@@ -6,11 +6,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, AlertTriangle } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { JournalEntryReviewContent } from '@/components/bookkeeping/JournalEntryReviewContent'
 import DocumentUploadZone from '@/components/bookkeeping/DocumentUploadZone'
 import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
+import { getErrorMessage } from '@/lib/errors/get-error-message'
+import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import type { UploadedFile } from '@/components/bookkeeping/DocumentUploadZone'
 import type { CreateJournalEntryLineInput, FiscalPeriod, BASAccount, JournalEntrySourceType } from '@/types'
 
@@ -56,10 +58,16 @@ export default function JournalEntryForm({
   )
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showReview, setShowReview] = useState(false)
+  const [showNoDocWarning, setShowNoDocWarning] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [accounts, setAccounts] = useState<BASAccount[]>([])
 
   const isUploading = uploadedFiles.some((f) => f.status === 'uploading')
+
+  const hasContent = description !== '' ||
+    lines.some(l => l.account_number !== '' || l.debit_amount !== '' || l.credit_amount !== '') ||
+    uploadedFiles.length > 0
+  useUnsavedChanges(hasContent)
 
   useEffect(() => {
     fetchPeriods()
@@ -118,6 +126,11 @@ export default function JournalEntryForm({
 
   const handleReview = () => {
     if (!selectedPeriod || !description || !isBalanced) return
+    const hasDocuments = uploadedFiles.some((f) => f.status === 'uploaded')
+    if (!embedded && !hasDocuments) {
+      setShowNoDocWarning(true)
+      return
+    }
     setShowReview(true)
   }
 
@@ -152,8 +165,8 @@ export default function JournalEntryForm({
 
     if (result.error) {
       toast({
-        title: 'Fel',
-        description: result.error,
+        title: 'Kunde inte skapa verifikation',
+        description: getErrorMessage(result, { context: 'journal_entry', statusCode: res.status }),
         variant: 'destructive',
       })
     } else {
@@ -161,6 +174,7 @@ export default function JournalEntryForm({
       const journalEntryId = result.data?.id ?? result.journal_entry_id
       if (journalEntryId && uploadedFiles.length > 0) {
         const filesToLink = uploadedFiles.filter((f) => f.status === 'uploaded' && f.id)
+        let linkFailCount = 0
         for (const file of filesToLink) {
           try {
             await fetch(`/api/documents/${file.id}/link`, {
@@ -170,7 +184,15 @@ export default function JournalEntryForm({
             })
           } catch (linkErr) {
             console.error('[JournalEntryForm] Failed to link document:', linkErr)
+            linkFailCount++
           }
+        }
+        if (linkFailCount > 0) {
+          toast({
+            title: 'Underlag kunde inte bifogas',
+            description: `${linkFailCount} fil(er) kunde inte lankas till verifikationen. Forsok igen via bokforingssidan.`,
+            variant: 'destructive',
+          })
         }
       }
 
@@ -378,6 +400,31 @@ export default function JournalEntryForm({
           totalCredit={totalCredit}
           attachmentCount={uploadedFiles.filter((f) => f.status === 'uploaded').length}
         />
+      </ConfirmationDialog>
+
+      {/* Warning dialog when no documents attached */}
+      <ConfirmationDialog
+        open={showNoDocWarning}
+        onOpenChange={setShowNoDocWarning}
+        onConfirm={() => {
+          setShowNoDocWarning(false)
+          setShowReview(true)
+        }}
+        isSubmitting={false}
+        title="Underlag saknas"
+        warningText="Ingen verifikation har bifogats. Enligt bokforingslagen (BFL) kravs underlag for varje bokforingspost."
+        confirmLabel="Fortsatt anda"
+      >
+        <div className="flex items-start gap-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4">
+          <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+          <div className="text-sm text-amber-800 dark:text-amber-300">
+            <p className="font-medium mb-1">Inget underlag bifogat</p>
+            <p>
+              Enligt bokforingslagen (BFL 5 kap. 6-7 §§) ska varje bokforingspost ha en verifikation som
+              underlag. Du kan bifoga underlag nu eller fortsatta utan.
+            </p>
+          </div>
+        </div>
       </ConfirmationDialog>
     </div>
   )

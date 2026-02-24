@@ -4,14 +4,9 @@ import {
   createSupplierInvoicePaymentEntry,
   createSupplierInvoiceCashEntry,
 } from '@/lib/bookkeeping/supplier-invoice-entries'
+import { validateBody } from '@/lib/api/validate'
+import { MarkSupplierInvoicePaidSchema } from '@/lib/api/schemas'
 import type { SupplierInvoice, SupplierInvoiceItem } from '@/types'
-
-interface MarkPaidRequest {
-  amount?: number
-  payment_date?: string
-  exchange_rate_difference?: number
-  notes?: string
-}
 
 export async function POST(
   request: Request,
@@ -26,7 +21,9 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body: MarkPaidRequest = await request.json()
+  const validation = await validateBody(request, MarkSupplierInvoicePaidSchema)
+  if (!validation.success) return validation.response
+  const body = validation.data
 
   // Fetch invoice with supplier and items
   const { data: invoice, error: fetchError } = await supabase

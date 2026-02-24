@@ -1,13 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import type {
-  NEDeclaration,
-  NEDeclarationRutor,
-  NEAccountMapping,
   FiscalPeriod,
   JournalEntry,
   JournalEntryLine,
 } from '@/types'
+import type {
+  NEDeclaration,
+  NEDeclarationRutor,
+  NEAccountMapping,
+} from './types'
 
 /**
  * NE-bilaga (Enskild Firma / Sole Proprietorship Declaration)

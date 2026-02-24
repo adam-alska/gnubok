@@ -25,6 +25,9 @@ vi.mock('@/lib/bookkeeping/invoice-entries', () => ({
 
 import { POST } from '../route'
 
+const VALID_UUID = '550e8400-e29b-41d4-a716-446655440000'
+const VALID_UUID_2 = '550e8400-e29b-41d4-a716-446655440001'
+
 describe('POST /api/transactions/[id]/match-invoice', () => {
   const mockUser = { id: 'user-1', email: 'test@test.se' }
 
@@ -39,7 +42,7 @@ describe('POST /api/transactions/[id]/match-invoice', () => {
 
     const request = createMockRequest('/api/transactions/tx-1/match-invoice', {
       method: 'POST',
-      body: { invoice_id: 'inv-1' },
+      body: { invoice_id: VALID_UUID },
     })
     const response = await POST(request, createMockRouteParams({ id: 'tx-1' }))
     const { status, body } = await parseJsonResponse(response)
@@ -57,7 +60,7 @@ describe('POST /api/transactions/[id]/match-invoice', () => {
     const { status, body } = await parseJsonResponse<{ error: string }>(response)
 
     expect(status).toBe(400)
-    expect(body.error).toBe('invoice_id is required')
+    expect(body.error).toBe('Validation failed')
   })
 
   it('returns 404 when transaction not found', async () => {
@@ -65,7 +68,7 @@ describe('POST /api/transactions/[id]/match-invoice', () => {
 
     const request = createMockRequest('/api/transactions/tx-999/match-invoice', {
       method: 'POST',
-      body: { invoice_id: 'inv-1' },
+      body: { invoice_id: VALID_UUID },
     })
     const response = await POST(request, createMockRouteParams({ id: 'tx-999' }))
     const { status, body } = await parseJsonResponse<{ error: string }>(response)
@@ -80,7 +83,7 @@ describe('POST /api/transactions/[id]/match-invoice', () => {
 
     const request = createMockRequest('/api/transactions/tx-1/match-invoice', {
       method: 'POST',
-      body: { invoice_id: 'inv-1' },
+      body: { invoice_id: VALID_UUID },
     })
     const response = await POST(request, createMockRouteParams({ id: 'tx-1' }))
     const { status, body } = await parseJsonResponse<{ error: string }>(response)
@@ -95,7 +98,7 @@ describe('POST /api/transactions/[id]/match-invoice', () => {
 
     const request = createMockRequest('/api/transactions/tx-1/match-invoice', {
       method: 'POST',
-      body: { invoice_id: 'inv-1' },
+      body: { invoice_id: VALID_UUID },
     })
     const response = await POST(request, createMockRouteParams({ id: 'tx-1' }))
     const { status, body } = await parseJsonResponse<{ error: string }>(response)
@@ -111,7 +114,7 @@ describe('POST /api/transactions/[id]/match-invoice', () => {
 
     const request = createMockRequest('/api/transactions/tx-1/match-invoice', {
       method: 'POST',
-      body: { invoice_id: 'inv-999' },
+      body: { invoice_id: VALID_UUID_2 },
     })
     const response = await POST(request, createMockRouteParams({ id: 'tx-1' }))
     const { status, body } = await parseJsonResponse<{ error: string }>(response)
@@ -122,13 +125,13 @@ describe('POST /api/transactions/[id]/match-invoice', () => {
 
   it('returns 400 when invoice is not in unpaid state', async () => {
     const tx = makeTransaction({ id: 'tx-1', amount: 12500, invoice_id: null })
-    const invoice = makeInvoice({ id: 'inv-1', status: 'paid' })
+    const invoice = makeInvoice({ id: VALID_UUID, status: 'paid' })
     enqueue({ data: tx, error: null })
     enqueue({ data: invoice, error: null })
 
     const request = createMockRequest('/api/transactions/tx-1/match-invoice', {
       method: 'POST',
-      body: { invoice_id: 'inv-1' },
+      body: { invoice_id: VALID_UUID },
     })
     const response = await POST(request, createMockRouteParams({ id: 'tx-1' }))
     const { status, body } = await parseJsonResponse<{ error: string }>(response)
@@ -141,7 +144,7 @@ describe('POST /api/transactions/[id]/match-invoice', () => {
     const tx = makeTransaction({ id: 'tx-1', amount: 12500, invoice_id: null, date: '2024-06-15' })
     const customer = makeCustomer()
     const invoice = makeInvoice({
-      id: 'inv-1',
+      id: VALID_UUID,
       status: 'sent',
       total: 12500,
       subtotal: 10000,
@@ -166,7 +169,7 @@ describe('POST /api/transactions/[id]/match-invoice', () => {
 
     const request = createMockRequest('/api/transactions/tx-1/match-invoice', {
       method: 'POST',
-      body: { invoice_id: 'inv-1' },
+      body: { invoice_id: VALID_UUID },
     })
     const response = await POST(request, createMockRouteParams({ id: 'tx-1' }))
     const { status, body } = await parseJsonResponse<{
@@ -185,14 +188,14 @@ describe('POST /api/transactions/[id]/match-invoice', () => {
     // Verify accrual payment entry was called
     expect(mockCreateInvoicePaymentJournalEntry).toHaveBeenCalledWith(
       'user-1',
-      expect.objectContaining({ id: 'inv-1' }),
+      expect.objectContaining({ id: VALID_UUID }),
       '2024-06-15'
     )
   })
 
   it('returns success with journal_entry_error when journal entry fails (non-blocking)', async () => {
     const tx = makeTransaction({ id: 'tx-1', amount: 12500, invoice_id: null, date: '2024-06-15' })
-    const invoice = makeInvoice({ id: 'inv-1', status: 'sent', total: 12500 })
+    const invoice = makeInvoice({ id: VALID_UUID, status: 'sent', total: 12500 })
 
     enqueue({ data: tx, error: null })
     enqueue({ data: invoice, error: null })
@@ -207,7 +210,7 @@ describe('POST /api/transactions/[id]/match-invoice', () => {
 
     const request = createMockRequest('/api/transactions/tx-1/match-invoice', {
       method: 'POST',
-      body: { invoice_id: 'inv-1' },
+      body: { invoice_id: VALID_UUID },
     })
     const response = await POST(request, createMockRouteParams({ id: 'tx-1' }))
     const { status, body } = await parseJsonResponse<{

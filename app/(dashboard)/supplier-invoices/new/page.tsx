@@ -16,6 +16,8 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { SupplierInvoiceReviewContent } from '@/components/suppliers/SupplierInvoiceReviewContent'
 import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
 import { getAccountDescription } from '@/lib/bookkeeping/account-descriptions'
+import { getErrorMessage } from '@/lib/errors/get-error-message'
+import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import type { Supplier, BASAccount, VatTreatment } from '@/types'
 
 interface LineItem {
@@ -67,7 +69,7 @@ export default function NewSupplierInvoicePage() {
   const [showReview, setShowReview] = useState(false)
   const [pendingData, setPendingData] = useState<FormData | null>(null)
 
-  const { register, control, handleSubmit, watch, setValue } = useForm<FormData>({
+  const { register, control, handleSubmit, watch, setValue, formState: { isDirty } } = useForm<FormData>({
     defaultValues: {
       supplier_id: '',
       supplier_invoice_number: '',
@@ -89,6 +91,8 @@ export default function NewSupplierInvoicePage() {
       ],
     },
   })
+
+  useUnsavedChanges(isDirty)
 
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
   const watchedItems = watch('items')
@@ -208,7 +212,7 @@ export default function NewSupplierInvoicePage() {
     const result = await res.json()
 
     if (!res.ok) {
-      toast({ title: 'Fel', description: result.error || 'Kunde inte registrera faktura', variant: 'destructive' })
+      toast({ title: 'Kunde inte registrera faktura', description: getErrorMessage(result, { context: 'supplier_invoice', statusCode: res.status }), variant: 'destructive' })
     } else {
       toast({ title: 'Faktura registrerad', description: `Ankomstnummer: ${result.data.arrival_number}` })
       setShowReview(false)

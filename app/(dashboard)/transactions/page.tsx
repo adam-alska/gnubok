@@ -18,6 +18,9 @@ import TransactionHistoryList from '@/components/transactions/TransactionHistory
 import InboxZeroState from '@/components/transactions/InboxZeroState'
 import InvoiceMatchDialog from '@/components/transactions/InvoiceMatchDialog'
 import TransactionBookingDialog from '@/components/transactions/TransactionBookingDialog'
+import QuickReviewDialog from '@/components/transactions/QuickReviewDialog'
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/components/transactions/transaction-types'
+import { getDefaultAccountForCategory, getDefaultVatTreatmentForCategory } from '@/lib/bookkeeping/category-mapping'
 import type { TransactionWithInvoice, ViewMode, CategorizeHandler } from '@/components/transactions/transaction-types'
 import type { TransactionCategory, CreateTransactionInput, Invoice, Customer, VatTreatment } from '@/types'
 import type { SuggestedCategory } from '@/lib/transactions/category-suggestions'
@@ -47,6 +50,15 @@ export default function TransactionsPage() {
   // Booking dialog (journal entry form)
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false)
   const [bookingDialogTransaction, setBookingDialogTransaction] = useState<TransactionWithInvoice | null>(null)
+
+  // Quick review dialog (suggestion review before booking)
+  const [quickReviewOpen, setQuickReviewOpen] = useState(false)
+  const [quickReviewTransaction, setQuickReviewTransaction] = useState<TransactionWithInvoice | null>(null)
+  const [quickReviewCategory, setQuickReviewCategory] = useState<TransactionCategory | null>(null)
+  const [quickReviewLabel, setQuickReviewLabel] = useState('')
+
+  // Entity type for tooltip context
+  const [entityType, setEntityType] = useState<string>('enskild_firma')
 
   // Set of transaction IDs that are animating out (just categorized)
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set())
@@ -128,6 +140,22 @@ export default function TransactionsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchTransactions() }, [])
 
+  // Fetch entity type for tooltip context
+  useEffect(() => {
+    async function fetchEntityType() {
+      try {
+        const res = await fetch('/api/settings')
+        const data = await res.json()
+        if (data?.entity_type) {
+          setEntityType(data.entity_type)
+        }
+      } catch {
+        // Non-critical, defaults to enskild_firma
+      }
+    }
+    fetchEntityType()
+  }, [])
+
   // Auto-fetch suggestions when transactions load
   useEffect(() => {
     const uncatIds = transactions
@@ -157,7 +185,7 @@ export default function TransactionsPage() {
       if (!response.ok) {
         toast({ title: 'Fel', description: result.error || 'Kunde inte uppdatera transaktion', variant: 'destructive' })
         setProcessingId(null)
-        return false
+        return null
       }
 
       // Mark as exiting for animation, then update state
@@ -189,11 +217,11 @@ export default function TransactionsPage() {
         setProcessingId(null)
       }, 350)
 
-      return true
+      return result.journal_entry_id || null
     } catch {
       toast({ title: 'Fel', description: 'Något gick fel vid bokföring', variant: 'destructive' })
       setProcessingId(null)
-      return false
+      return null
     }
   }
 
@@ -416,6 +444,30 @@ export default function TransactionsPage() {
     setBookingDialogOpen(true)
   }
 
+  function handleOpenQuickReview(transaction: TransactionWithInvoice, suggestion: SuggestedCategory) {
+    const allCategories = [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES]
+    const label = allCategories.find((c) => c.value === suggestion.category)?.label || suggestion.label
+    setQuickReviewTransaction(transaction)
+    setQuickReviewCategory(suggestion.category)
+    setQuickReviewLabel(label)
+    setQuickReviewOpen(true)
+  }
+
+  async function handleQuickReviewConfirm(
+    id: string,
+    category: TransactionCategory,
+    vatTreatment: VatTreatment | undefined,
+    accountOverride: string | undefined
+  ): Promise<string | null> {
+    const journalEntryId = await handleCategorize(id, true, category, vatTreatment, accountOverride)
+    if (journalEntryId) {
+      setQuickReviewOpen(false)
+      setQuickReviewTransaction(null)
+      setQuickReviewCategory(null)
+    }
+    return journalEntryId
+  }
+
   // Swipe view
   if (showSwipeView && uncategorizedTransactions.length > 0) {
     return (
@@ -478,10 +530,12 @@ export default function TransactionsPage() {
                   processingId={processingId}
                   isBatchMode={isBatchMode}
                   isSelected={selectedIds.has(transaction.id)}
+                  entityType={entityType}
                   onCategorize={handleCategorize}
                   onMarkPrivate={handleMarkPrivate}
                   onOpenMatchDialog={openMatchDialog}
                   onOpenCategoryDialog={openCategoryDialog}
+                  onOpenQuickReview={handleOpenQuickReview}
                   onToggleSelect={toggleBatchSelect}
                 />
               ))}
@@ -535,6 +589,18 @@ export default function TransactionsPage() {
         onOpenChange={setBookingDialogOpen}
         transaction={bookingDialogTransaction}
         onBooked={handleTransactionBooked}
+      />
+
+      <QuickReviewDialog
+        key={quickReviewTransaction?.id ?? '' + String(quickReviewCategory)}
+        open={quickReviewOpen}
+        onOpenChange={setQuickReviewOpen}
+        transaction={quickReviewTransaction}
+        category={quickReviewCategory}
+        categoryLabel={quickReviewLabel}
+        defaultAccount={quickReviewCategory ? getDefaultAccountForCategory(quickReviewCategory) : ''}
+        defaultVat={quickReviewCategory ? (getDefaultVatTreatmentForCategory(quickReviewCategory) ?? 'none') : 'none'}
+        onConfirm={handleQuickReviewConfirm}
       />
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

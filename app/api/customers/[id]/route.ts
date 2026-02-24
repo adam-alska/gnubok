@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import type { CreateCustomerInput } from '@/types'
+import { validateBody } from '@/lib/api/validate'
+import { UpdateCustomerSchema } from '@/lib/api/schemas'
 
 export async function GET(
   request: Request,
@@ -62,7 +63,9 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body: Partial<CreateCustomerInput> = await request.json()
+  const result = await validateBody(request, UpdateCustomerSchema)
+  if (!result.success) return result.response
+  const body = result.data
 
   const updateData: Record<string, unknown> = {}
 

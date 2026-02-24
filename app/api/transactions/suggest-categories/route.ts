@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { getSuggestedCategories, mergeAiSuggestions, type SuggestedCategory } from '@/lib/transactions/category-suggestions'
-import type { Transaction, TransactionCategory } from '@/types'
+import { getSuggestedCategories, mergeAiSuggestions, getSuggestedTemplates, type SuggestedCategory, type SuggestedTemplate } from '@/lib/transactions/category-suggestions'
+import type { Transaction, TransactionCategory, EntityType } from '@/types'
 
 /**
  * POST /api/transactions/suggest-categories
@@ -78,8 +78,17 @@ export async function POST(request: Request) {
     }
   }
 
+  // Fetch entity type for template matching
+  const { data: settings } = await supabase
+    .from('company_settings')
+    .select('entity_type')
+    .eq('user_id', user.id)
+    .single()
+  const entityType = (settings?.entity_type as EntityType) || undefined
+
   // Generate suggestions for each transaction
   const suggestions: Record<string, SuggestedCategory[]> = {}
+  const template_suggestions: Record<string, SuggestedTemplate[]> = {}
 
   for (const tx of transactions) {
     let result = getSuggestedCategories(
@@ -95,7 +104,8 @@ export async function POST(request: Request) {
     }
 
     suggestions[tx.id] = result
+    template_suggestions[tx.id] = getSuggestedTemplates(tx as Transaction, entityType)
   }
 
-  return NextResponse.json({ suggestions })
+  return NextResponse.json({ suggestions, template_suggestions })
 }

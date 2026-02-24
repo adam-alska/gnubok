@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { ensureInitialized } from '@/lib/init'
 import { manualLink } from '@/lib/reconciliation/bank-reconciliation'
+import { validateBody } from '@/lib/api/validate'
+import { BankLinkSchema } from '@/lib/api/schemas'
 
 ensureInitialized()
 
@@ -13,15 +15,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json()
-  const { transaction_id, journal_entry_id } = body
-
-  if (!transaction_id || !journal_entry_id) {
-    return NextResponse.json(
-      { error: 'transaction_id and journal_entry_id are required' },
-      { status: 400 }
-    )
-  }
+  const validation = await validateBody(request, BankLinkSchema)
+  if (!validation.success) return validation.response
+  const { transaction_id, journal_entry_id } = validation.data
 
   const result = await manualLink(supabase, user.id, transaction_id, journal_entry_id)
 
