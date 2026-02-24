@@ -134,7 +134,7 @@ export async function POST(
       subject: generateInvoiceEmailSubject(emailData),
       html: generateInvoiceEmailHtml(emailData),
       text: generateInvoiceEmailText(emailData),
-      replyTo: (company as CompanySettings & { email?: string }).email || undefined,
+      replyTo: company.email || undefined,
       fromName: company.company_name,
       attachments: [
         {

@@ -27,8 +27,8 @@ function buildInitialLines(transaction: TransactionWithInvoice): FormLine[] {
 
   if (isExpense) {
     return [
-      { account_number: '', debit_amount: amountStr, credit_amount: '', line_description: '' },
       { account_number: '1930', debit_amount: '', credit_amount: amountStr, line_description: 'Företagskonto' },
+      { account_number: '', debit_amount: amountStr, credit_amount: '', line_description: '' },
     ]
   }
 
