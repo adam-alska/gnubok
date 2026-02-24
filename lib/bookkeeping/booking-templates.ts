@@ -617,7 +617,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     deductibility: 'full',
     special_rules_sv: 'Ofta utländsk leverantör (USA) med omvänd skattskyldighet',
     mcc_codes: [],
-    keywords: ['openai', 'chatgpt', 'anthropic', 'claude', 'ai', 'midjourney', 'copilot'],
+    keywords: ['openai', 'chatgpt', 'anthropic', 'claude', 'ai', 'midjourney', 'copilot', 'mistral', 'claude', 'gemini'],
     risk_level: 'NONE',
     requires_review: false,
     impact_score: 7,
@@ -663,7 +663,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     vat_rate: 0.25,
     deductibility: 'full',
     mcc_codes: [5111, 5112, 5943, 5944],
-    keywords: ['kontorsmaterial', 'pennor', 'papper', 'office supplies', 'staples', 'kontorsvaror'],
+    keywords: ['kontorsmaterial', 'pennor', 'papper', 'office supplies', 'staples', 'kontorsvaror', 'kontor'],
     risk_level: 'NONE',
     requires_review: false,
     impact_score: 7,
@@ -2534,7 +2534,7 @@ export function findMatchingTemplates(
 
   return results
     .sort((a, b) => b.confidence - a.confidence)
-    .slice(0, 5)
+    .slice(0, 20)
 }
 
 /**

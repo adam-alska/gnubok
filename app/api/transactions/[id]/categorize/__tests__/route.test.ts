@@ -160,7 +160,9 @@ describe('POST /api/transactions/[id]/categorize', () => {
       'GitHub',
       '6200',
       '1930',
-      false
+      false,
+      undefined,
+      undefined
     )
     expect(emitSpy).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'transaction.categorized' })

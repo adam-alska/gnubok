@@ -13,6 +13,10 @@ export type TransactionCategory =
   | 'expense_marketing'
   | 'expense_professional_services'
   | 'expense_education'
+  | 'expense_representation'
+  | 'expense_consumables'
+  | 'expense_vehicle'
+  | 'expense_telecom'
   | 'expense_bank_fees'
   | 'expense_card_fees'
   | 'expense_currency_exchange'
@@ -899,6 +903,10 @@ export interface MappingRule {
   // Capitalization
   capitalization_threshold: number | null
   capitalized_debit_account: string | null
+  // Source tracking
+  source: 'auto' | 'user_description' | 'system'
+  user_description: string | null
+  template_id: string | null
   // Meta
   is_active: boolean
   created_at: string

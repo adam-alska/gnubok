@@ -14,7 +14,9 @@ const WORKSPACES: Record<WorkspaceKey, ComponentType<WorkspaceComponentProps>> =
   'general/ai-chat': dynamic(() => import('@/components/extensions/general/AiChatWorkspace')),
   'general/push-notifications': dynamic(() => import('@/components/extensions/general/PushNotificationsWorkspace')),
   'general/invoice-inbox': dynamic(() => import('@/components/extensions/general/InvoiceInboxWorkspace')),
+  'general/calendar': dynamic(() => import('@/components/extensions/general/CalendarWorkspace')),
   'general/enable-banking': dynamic(() => import('@/components/extensions/general/EnableBankingWorkspace')),
+  'general/user-description-match': dynamic(() => import('@/components/extensions/general/UserDescriptionMatchWorkspace')),
   // Restaurant
   'restaurant/food-cost': dynamic(() => import('@/components/extensions/restaurant/FoodCostWorkspace')),
   'restaurant/earnings-per-liter': dynamic(() => import('@/components/extensions/restaurant/EarningsPerLiterWorkspace')),

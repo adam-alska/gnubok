@@ -71,6 +71,10 @@ export function getCategoryAccountMapping(
     expense_marketing: '5910', // Annonsering
     expense_professional_services: '6530', // Redovisningstjänster
     expense_education: educationAccount,
+    expense_representation: '6071', // Representation, avdragsgill
+    expense_consumables: '5460', // Förbrukningsvaror
+    expense_vehicle: '5611', // Drivmedel bil
+    expense_telecom: '6200', // Telefon och internet
     expense_bank_fees: '6570', // Bankavgifter
     expense_card_fees: '6570', // Kortavgifter
     expense_currency_exchange: '7960', // Valutakursförluster
@@ -224,6 +228,10 @@ export function buildMappingResultFromCategory(
     expense_marketing: 'Marknadsföring',
     expense_professional_services: 'Konsulttjänst',
     expense_education: 'Utbildning',
+    expense_representation: 'Representation',
+    expense_consumables: 'Förbrukningsvaror',
+    expense_vehicle: 'Bil & drivmedel',
+    expense_telecom: 'Telefon & internet',
     expense_bank_fees: 'Bankavgift',
     expense_card_fees: 'Kortavgift',
     expense_currency_exchange: 'Valutaväxling',
@@ -262,6 +270,10 @@ export function getExpenseAccountForCategory(category: TransactionCategory): str
     expense_marketing: '5910',
     expense_professional_services: '6530',
     expense_education: '6991',
+    expense_representation: '6071',
+    expense_consumables: '5460',
+    expense_vehicle: '5611',
+    expense_telecom: '6200',
     expense_bank_fees: '6570',
     expense_card_fees: '6570',
     expense_currency_exchange: '7960',
@@ -292,6 +304,10 @@ export function getDefaultAccountForCategory(
     expense_marketing: '5910',
     expense_professional_services: '6530',
     expense_education: entityType === 'aktiebolag' ? '7610' : '6991',
+    expense_representation: '6071',
+    expense_consumables: '5460',
+    expense_vehicle: '5611',
+    expense_telecom: '6200',
     expense_bank_fees: '6570',
     expense_card_fees: '6570',
     expense_currency_exchange: '7960',

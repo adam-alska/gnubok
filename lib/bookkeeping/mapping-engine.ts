@@ -227,35 +227,78 @@ function getDefaultResult(transaction: Transaction): MappingResult {
 }
 
 /**
- * Save a user-level mapping rule learned from categorization
+ * Save a user-level mapping rule learned from categorization.
+ *
+ * When userDescription is provided, the rule gets:
+ * - source: 'user_description' (instead of 'auto')
+ * - priority: 5 (beats auto-learned at 10)
+ * - confidence_score: 0.98
+ * - The original user text and template_id stored for UI display
+ *
+ * User-described rules for the same merchant replace prior user-described rules
+ * (latest description wins).
  */
 export async function saveUserMappingRule(
   userId: string,
   merchantName: string,
   debitAccount: string,
   creditAccount: string,
-  isPrivate: boolean
+  isPrivate: boolean,
+  userDescription?: string,
+  templateId?: string
 ): Promise<void> {
   const supabase = await createClient()
 
   // Escape special regex characters in merchant name
   const escapedMerchant = merchantName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-  const { error } = await supabase.from('mapping_rules').insert({
-    user_id: userId,
-    rule_name: `Learned: ${merchantName}`,
-    rule_type: 'merchant_name',
-    priority: 10, // User overrides have highest priority
-    merchant_pattern: escapedMerchant,
-    debit_account: debitAccount,
-    credit_account: creditAccount,
-    risk_level: 'NONE',
-    default_private: isPrivate,
-    requires_review: false,
-    confidence_score: 0.95,
-  })
+  if (userDescription) {
+    // Delete existing user_description rule for this merchant (latest wins)
+    await supabase
+      .from('mapping_rules')
+      .delete()
+      .eq('user_id', userId)
+      .eq('merchant_pattern', escapedMerchant)
+      .eq('source', 'user_description')
 
-  if (error) {
-    // Silently fail — saving learned rules is non-critical
+    const { error } = await supabase.from('mapping_rules').insert({
+      user_id: userId,
+      rule_name: `Described: ${merchantName}`,
+      rule_type: 'merchant_name',
+      priority: 5,
+      merchant_pattern: escapedMerchant,
+      debit_account: debitAccount,
+      credit_account: creditAccount,
+      risk_level: 'NONE',
+      default_private: isPrivate,
+      requires_review: false,
+      confidence_score: 0.98,
+      source: 'user_description',
+      user_description: userDescription,
+      template_id: templateId || null,
+    })
+
+    if (error) {
+      // Silently fail — saving learned rules is non-critical
+    }
+  } else {
+    const { error } = await supabase.from('mapping_rules').insert({
+      user_id: userId,
+      rule_name: `Learned: ${merchantName}`,
+      rule_type: 'merchant_name',
+      priority: 10,
+      merchant_pattern: escapedMerchant,
+      debit_account: debitAccount,
+      credit_account: creditAccount,
+      risk_level: 'NONE',
+      default_private: isPrivate,
+      requires_review: false,
+      confidence_score: 0.95,
+      source: 'auto',
+    })
+
+    if (error) {
+      // Silently fail — saving learned rules is non-critical
+    }
   }
 }

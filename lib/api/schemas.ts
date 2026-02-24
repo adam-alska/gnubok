@@ -72,6 +72,10 @@ export const TransactionCategorySchema = z.enum([
   'expense_marketing',
   'expense_professional_services',
   'expense_education',
+  'expense_representation',
+  'expense_consumables',
+  'expense_vehicle',
+  'expense_telecom',
   'expense_bank_fees',
   'expense_card_fees',
   'expense_currency_exchange',
@@ -306,6 +310,7 @@ export const CategorizeTransactionSchema = z.object({
   template_id: z.string().optional(),
   vat_treatment: VatTreatmentSchema.optional(),
   account_override: accountNumber.optional(),
+  user_description: z.string().max(500).optional(),
 })
 
 export const BookTransactionSchema = z.object({
@@ -321,6 +326,17 @@ export const MatchInvoiceSchema = z.object({
 
 export const MatchSupplierInvoiceSchema = z.object({
   supplier_invoice_id: uuid,
+})
+
+export const DescribeTransactionSchema = z.object({
+  description: z.string().min(3).max(500),
+})
+
+export const BatchDescribeSchema = z.object({
+  merchant_name: z.string().min(1),
+  template_id: z.string().min(1),
+  is_business: z.boolean(),
+  user_description: z.string().max(500).optional(),
 })
 
 // ============================================================

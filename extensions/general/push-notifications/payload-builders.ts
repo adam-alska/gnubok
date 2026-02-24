@@ -152,7 +152,7 @@ export function createTaxDeadlinePayload(
     badge: '/icons/badge-72.png',
     tag: `tax-deadline-${deadlineId}`,
     data: {
-      url: '/calendar',
+      url: '/deadlines',
       type: 'tax_deadline',
       id: deadlineId,
     },

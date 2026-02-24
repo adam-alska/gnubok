@@ -3,6 +3,24 @@ import { NextResponse } from 'next/server'
 import { getSuggestedCategories, mergeAiSuggestions, getSuggestedTemplates, type SuggestedCategory, type SuggestedTemplate } from '@/lib/transactions/category-suggestions'
 import type { Transaction, TransactionCategory, EntityType } from '@/types'
 
+// Minimum confidence threshold — below this, suggestions are considered weak
+// and we trigger on-demand AI categorization to get better results.
+const WEAK_SUGGESTION_THRESHOLD = 0.55
+
+/**
+ * Check if suggestions are "weak" — only history-based fallbacks
+ * with no strong rule/pattern/AI match.
+ */
+function hasWeakSuggestions(result: SuggestedCategory[]): boolean {
+  if (result.length === 0) return true
+  // Weak if the best suggestion is below threshold
+  const bestConfidence = Math.max(...result.map((s) => s.confidence))
+  if (bestConfidence < WEAK_SUGGESTION_THRESHOLD) return true
+  // Weak if all suggestions are from history only (no rule/pattern/ai match)
+  if (result.every((s) => s.source === 'history')) return true
+  return false
+}
+
 /**
  * POST /api/transactions/suggest-categories
  * Batch endpoint for getting category suggestions for multiple transactions
@@ -70,11 +88,18 @@ export async function POST(request: Request) {
     .eq('extension_id', 'ai-categorization')
     .in('key', aiKeys)
 
-  const aiSuggestionsMap: Record<string, { category: string; basAccount: string; confidence: number; reasoning: string }> = {}
+  type AiSuggestion = { category: string; basAccount: string; confidence: number; reasoning: string }
+  const aiSuggestionsMap: Record<string, AiSuggestion[]> = {}
   if (aiRecords) {
     for (const record of aiRecords) {
       const txId = record.key.replace('suggestion:', '')
-      aiSuggestionsMap[txId] = record.value as { category: string; basAccount: string; confidence: number; reasoning: string }
+      const value = record.value
+      // Handle both single object (old) and array (new) storage formats
+      if (Array.isArray(value)) {
+        aiSuggestionsMap[txId] = value as AiSuggestion[]
+      } else {
+        aiSuggestionsMap[txId] = [value as AiSuggestion]
+      }
     }
   }
 
@@ -86,9 +111,10 @@ export async function POST(request: Request) {
     .single()
   const entityType = (settings?.entity_type as EntityType) || undefined
 
-  // Generate suggestions for each transaction
+  // Generate initial suggestions for each transaction
   const suggestions: Record<string, SuggestedCategory[]> = {}
   const template_suggestions: Record<string, SuggestedTemplate[]> = {}
+  const needsAiIds: string[] = []
 
   for (const tx of transactions) {
     let result = getSuggestedCategories(
@@ -97,14 +123,74 @@ export async function POST(request: Request) {
       categoryHistory
     )
 
-    // Merge AI suggestions if available
-    const aiSuggestion = aiSuggestionsMap[tx.id]
-    if (aiSuggestion) {
-      result = mergeAiSuggestions(result, [aiSuggestion])
+    // Merge pre-computed AI suggestions if available
+    const aiSuggestions = aiSuggestionsMap[tx.id]
+    if (aiSuggestions && aiSuggestions.length > 0) {
+      result = mergeAiSuggestions(result, aiSuggestions, tx.amount)
+    } else if (hasWeakSuggestions(result)) {
+      // No pre-computed AI suggestion AND rule-based suggestions are weak —
+      // mark this transaction for on-demand AI categorization
+      needsAiIds.push(tx.id)
     }
 
     suggestions[tx.id] = result
-    template_suggestions[tx.id] = getSuggestedTemplates(tx as Transaction, entityType)
+    template_suggestions[tx.id] = await getSuggestedTemplates(tx as Transaction, entityType)
+  }
+
+  // Trigger on-demand AI categorization for transactions with weak suggestions
+  if (needsAiIds.length > 0) {
+    console.log(
+      `[suggest-categories] ${needsAiIds.length} transactions have weak suggestions, triggering on-demand AI:`,
+      needsAiIds.map((id) => {
+        const tx = transactions.find((t) => t.id === id)
+        return tx
+          ? { id, description: tx.description, merchant_name: tx.merchant_name, amount: tx.amount }
+          : { id }
+      })
+    )
+
+    try {
+      const { categorizeTransactions } = await import(
+        '@/extensions/general/ai-categorization'
+      )
+      const aiResults = await categorizeTransactions(user.id, needsAiIds)
+
+      console.log(
+        '[suggest-categories] AI categorization results:',
+        aiResults.map((r) => ({
+          id: r.transactionId,
+          category: r.category,
+          basAccount: r.basAccount,
+          confidence: r.confidence,
+          reasoning: r.reasoning,
+          isPrivate: r.isPrivate,
+          templateId: r.templateId,
+        }))
+      )
+
+      // Group AI results by transactionId (AI now returns 2 per transaction)
+      const groupedAi: Record<string, { category: string; basAccount: string; confidence: number; reasoning: string }[]> = {}
+      for (const aiResult of aiResults) {
+        if (!groupedAi[aiResult.transactionId]) {
+          groupedAi[aiResult.transactionId] = []
+        }
+        groupedAi[aiResult.transactionId].push({
+          category: aiResult.category,
+          basAccount: aiResult.basAccount,
+          confidence: aiResult.confidence,
+          reasoning: aiResult.reasoning,
+        })
+      }
+
+      for (const [txId, aiSuggestions] of Object.entries(groupedAi)) {
+        const existing = suggestions[txId] || []
+        const tx = transactions.find((t) => t.id === txId)
+        suggestions[txId] = mergeAiSuggestions(existing, aiSuggestions, tx?.amount)
+      }
+    } catch (err) {
+      // AI categorization is non-blocking — log and continue with existing suggestions
+      console.error('[suggest-categories] On-demand AI categorization failed:', err)
+    }
   }
 
   return NextResponse.json({ suggestions, template_suggestions })

@@ -5,7 +5,9 @@
  * in server components or API routes.
  *
  * Provider-abstracted AI categorization for Swedish BAS account mapping.
- * Default implementation uses Claude Haiku for cost efficiency.
+ * Uses Claude Haiku with structured tool outputs for reliable JSON.
+ * Accepts pre-filtered candidate templates from embedding search (Tier 2)
+ * instead of dumping all ~100 templates into the prompt.
  */
 
 import 'server-only'
@@ -27,9 +29,27 @@ export interface TransactionForCategorization {
   currency: string
 }
 
+export interface AccountUsageEntry {
+  account_number: string
+  count: number
+}
+
+export interface MerchantHistoryEntry {
+  merchant_name: string
+  category: string
+  template_id: string | null
+  count: number
+}
+
 export interface CategorizationContext {
   entityType: EntityType
   recentHistory: { description: string; category: string }[]
+}
+
+export interface EnrichedCategorizationContext extends CategorizationContext {
+  candidateTemplates: BookingTemplate[]
+  userAccountUsage: AccountUsageEntry[]
+  merchantHistory: MerchantHistoryEntry[]
 }
 
 export interface CategorizationSuggestion {
@@ -46,7 +66,7 @@ export interface CategorizationSuggestion {
 export interface CategorizationProvider {
   categorize(
     transactions: TransactionForCategorization[],
-    context: CategorizationContext
+    context: CategorizationContext | EnrichedCategorizationContext
   ): Promise<CategorizationSuggestion[]>
 }
 
@@ -67,35 +87,88 @@ function getCategoryAccountMap(entityType: EntityType): Record<string, { account
     expense_marketing: { account: '5910', label: 'Annonsering/marknadsföring' },
     expense_professional_services: { account: '6530', label: 'Redovisning/konsulttjänster' },
     expense_education: { account: educationAccount, label: 'Utbildning' },
+    expense_representation: { account: '6071', label: 'Representation (mat/möte)' },
+    expense_consumables: { account: '5460', label: 'Förbrukningsvaror' },
+    expense_vehicle: { account: '5611', label: 'Bil & drivmedel' },
+    expense_telecom: { account: '6200', label: 'Telefon & internet' },
     expense_bank_fees: { account: '6570', label: 'Bankavgifter' },
     expense_card_fees: { account: '6570', label: 'Kortavgifter' },
     expense_currency_exchange: { account: '7960', label: 'Valutakursförluster' },
     expense_other: { account: '6991', label: 'Övriga kostnader' },
-    private: { account: '2013', label: 'Privat uttag (EF) / Skuld till ägare (AB)' },
   }
 }
 
+/** Fallback template IDs when AI doesn't provide one */
+const CATEGORY_DEFAULT_TEMPLATES: Record<string, string> = {
+  expense_representation: 'representation_external',
+  expense_equipment: 'equipment_tools',
+  expense_software: 'software_subscription',
+  expense_travel: 'travel_domestic',
+  expense_office: 'office_supplies_general',
+  expense_consumables: 'office_supplies_general',
+  expense_vehicle: 'travel_fuel',
+  expense_telecom: 'telecom_mobile',
+  expense_marketing: 'marketing_advertising',
+  expense_education: 'education_course',
+  expense_professional_services: 'consulting_accounting',
+}
+
 /**
- * Build an abbreviated template reference for the AI prompt.
- * Filters by direction (expense/income) to keep prompt concise.
+ * Build template reference from candidate templates (pre-filtered by embeddings)
+ * or fall back to full template list if no candidates provided.
  */
-function getTemplateReference(direction: 'expense' | 'income'): string {
-  return BOOKING_TEMPLATES
+function getTemplateReference(
+  direction: 'expense' | 'income',
+  candidateTemplates?: BookingTemplate[]
+): string {
+  const templates = candidateTemplates && candidateTemplates.length > 0
+    ? candidateTemplates
+    : BOOKING_TEMPLATES
+
+  return templates
     .filter((t) => t.direction === direction || t.direction === 'transfer')
     .map((t) => `${t.id}: ${t.name_sv} → ${t.debit_account}/${t.credit_account}`)
     .join('\n')
 }
 
 const NON_DEDUCTIBLE_RULES = `
-ICKE-AVDRAGSGILLA KOSTNADER (svensk skatterätt):
-- Kläder: Normalt inte avdragsgilla (RÅ 1988 ref. 35)
-- Gym/träning: Inte avdragsgilla som personlig kostnad (IL 9 kap 2§)
-- Kosmetika/hudvård: Normalt inte avdragsgillt
-- Frisör: Normalt privat kostnad
-- Representation/måltider: Max 300 kr/person exkl. moms (IL 16 kap 2§)
+MOMSREGLER FÖR SPECIFIKA KATEGORIER:
+- Representation/måltider: Max 300 kr/person exkl. moms (IL 16 kap 2§), konto 6071/6072
 - Gåvor: Reklamgåvor max 300 kr/mottagare, representationsgåvor max 180 kr
 - Telefon/dator vid blandad användning: Bara yrkesmässig del avdragsgill
 `
+
+// ============================================================
+// Classify Transaction Tool Schema
+// ============================================================
+
+const CLASSIFY_TOOL: Anthropic.Tool = {
+  name: 'classify_transactions',
+  description: 'Classify a batch of bank transactions into Swedish BAS accounts and booking templates.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      suggestions: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            transactionId: { type: 'string', description: 'Transaction ID' },
+            templateId: { type: 'string', description: 'Booking template ID (REQUIRED — must be from the provided templates list)' },
+            category: { type: 'string', description: 'Transaction category (e.g. expense_representation, expense_equipment, expense_office)' },
+            basAccount: { type: 'string', description: 'BAS account number (4 digits)' },
+            taxCode: { type: ['string', 'null'], description: 'Tax code: MPI for deductible expenses with VAT, MP1 for income with VAT, null for VAT-exempt/private' },
+            confidence: { type: 'number', description: 'Confidence score 0.0-1.0' },
+            reasoning: { type: 'string', description: 'Short reasoning in Swedish' },
+            isPrivate: { type: 'boolean', description: 'Whether this is a private expense' },
+          },
+          required: ['transactionId', 'templateId', 'category', 'basAccount', 'confidence', 'reasoning', 'isPrivate'],
+        },
+      },
+    },
+    required: ['suggestions'],
+  },
+}
 
 // ============================================================
 // Anthropic Provider
@@ -116,22 +189,39 @@ export class AnthropicCategorizationProvider implements CategorizationProvider {
 
   async categorize(
     transactions: TransactionForCategorization[],
-    context: CategorizationContext
+    context: CategorizationContext | EnrichedCategorizationContext
   ): Promise<CategorizationSuggestion[]> {
     // Cap batch size
     const batch = transactions.slice(0, MAX_BATCH_SIZE)
     if (batch.length === 0) return []
 
+    const enriched = isEnrichedContext(context) ? context : null
     const privateAccount = context.entityType === 'aktiebolag' ? '2893' : '2013'
     const categoryAccountMap = getCategoryAccountMap(context.entityType)
 
-    // Build template references based on batch direction (most transactions will be same direction)
+    // Build template references — use candidate templates if available
     const hasExpenses = batch.some((t) => t.amount < 0)
     const hasIncome = batch.some((t) => t.amount > 0)
+    const candidates = enriched?.candidateTemplates
     const templateRef = [
-      hasExpenses ? `UTGIFTSMALLAR:\n${getTemplateReference('expense')}` : '',
-      hasIncome ? `INTÄKTSMALLAR:\n${getTemplateReference('income')}` : '',
+      hasExpenses ? `UTGIFTSMALLAR:\n${getTemplateReference('expense', candidates)}` : '',
+      hasIncome ? `INTÄKTSMALLAR:\n${getTemplateReference('income', candidates)}` : '',
     ].filter(Boolean).join('\n\n')
+
+    // Build account usage context
+    const accountUsageContext = enriched?.userAccountUsage && enriched.userAccountUsage.length > 0
+      ? `\nAnvändarens mest använda konton:\n${enriched.userAccountUsage
+          .slice(0, 15)
+          .map((a) => `- ${a.account_number} (${a.count} bokningar)`)
+          .join('\n')}`
+      : ''
+
+    // Build merchant history context
+    const merchantHistoryContext = enriched?.merchantHistory && enriched.merchantHistory.length > 0
+      ? `\nTidigare kategorisering av dessa handlare:\n${enriched.merchantHistory
+          .map((m) => `- "${m.merchant_name}" → ${m.category}${m.template_id ? ` (mall: ${m.template_id})` : ''} (${m.count}x)`)
+          .join('\n')}`
+      : ''
 
     const systemPrompt = `Du är expert på svensk bokföring och kategorisering av banktransaktioner enligt BAS-kontoplanen.
 Din uppgift är att kategorisera varje transaktion till rätt mall-ID (templateId) och BAS-konto.
@@ -156,12 +246,14 @@ ${NON_DEDUCTIBLE_RULES}
 
 REGLER:
 1. Negativa belopp = utgifter, positiva = intäkter
-2. Markera transaktioner som troligen är privata med isPrivate: true
-3. Ange confidence 0.0-1.0 baserat på hur säker du är
+2. VIKTIGT: Dessa transaktioner kommer från företagets bankkonto/kort. Anta ALLTID att de är affärsrelaterade. Klassificera ALDRIG som "private" — det beslutet tar användaren själv.
+3. Ange confidence 0.0-1.0 baserat på hur säker du är på rätt affärskategori
 4. Ange kort reasoning på svenska
-5. Om en transaktion liknar privat konsumtion (kläder, gym, etc.), sätt category: "private"
-6. taxCode: "MPI" för avdragsgilla affärskostnader med moms, "MP1" för intäkter med moms, null för momsfria/privata
-7. Ange templateId om en bokföringsmall matchar (föredra mallar framför generiska kategorier)`
+5. Restauranger/mat/café → expense_representation (6071). Bygghandel/järnhandel → expense_equipment eller expense_consumables. Heminredning/kontorsvaror → expense_office.
+6. taxCode: "MPI" för avdragsgilla affärskostnader med moms, "MP1" för intäkter med moms, null för momsfria
+7. templateId är OBLIGATORISKT — välj alltid den mest passande mallen från listan ovan, även för alternativa förslag
+8. isPrivate ska ALLTID vara false — användaren avgör själv vad som är privat
+9. Ange TVÅ förslag per transaktion: ett primärt (mest troligt) och ett alternativt (näst mest troligt, annan kategori, lägre confidence). Båda ska vara affärskategorier.`
 
     const historyContext =
       context.recentHistory.length > 0
@@ -181,29 +273,12 @@ REGLER:
       )
       .join('\n\n')
 
-    const userPrompt = `Kategorisera följande transaktioner:
-${historyContext}
+    const userPrompt = `Kategorisera följande transaktioner med classify_transactions-verktyget.
+Ange TVÅ förslag per transaktion (primärt + alternativ med lägre confidence):
+${historyContext}${accountUsageContext}${merchantHistoryContext}
 
 TRANSAKTIONER:
-${transactionList}
-
-Returnera ett JSON-objekt med följande struktur:
-{
-  "suggestions": [
-    {
-      "transactionId": "id",
-      "category": "expense_software",
-      "templateId": "it_saas_subscription",
-      "basAccount": "5420",
-      "taxCode": "MPI",
-      "confidence": 0.9,
-      "reasoning": "Spotify-prenumeration, typisk programvarukostnad",
-      "isPrivate": false
-    }
-  ]
-}
-
-Returnera ENDAST JSON-objektet, ingen annan text.`
+${transactionList}`
 
     let lastError: Error | null = null
 
@@ -212,7 +287,15 @@ Returnera ENDAST JSON-objektet, ingen annan text.`
         const message = await this.client.messages.create({
           model: this.model,
           max_tokens: 4096,
-          system: systemPrompt,
+          system: [
+            {
+              type: 'text',
+              text: systemPrompt,
+              cache_control: { type: 'ephemeral' },
+            },
+          ],
+          tools: [CLASSIFY_TOOL],
+          tool_choice: { type: 'tool', name: 'classify_transactions' },
           messages: [
             {
               role: 'user',
@@ -221,32 +304,19 @@ Returnera ENDAST JSON-objektet, ingen annan text.`
           ],
         })
 
-        const content = message.content[0]
-        if (content.type !== 'text') {
-          throw new Error('Unexpected response type from AI')
+        // Extract tool_use block from response
+        const toolUseBlock = message.content.find(
+          (block) => block.type === 'tool_use' && block.name === 'classify_transactions'
+        )
+
+        if (!toolUseBlock || toolUseBlock.type !== 'tool_use') {
+          throw new Error('No tool_use block in AI response')
         }
 
-        // Strip markdown code blocks if present
-        let jsonText = content.text.trim()
-        if (jsonText.startsWith('```json')) {
-          jsonText = jsonText.slice(7)
-        } else if (jsonText.startsWith('```')) {
-          jsonText = jsonText.slice(3)
-        }
-        if (jsonText.endsWith('```')) {
-          jsonText = jsonText.slice(0, -3)
-        }
-        jsonText = jsonText.trim()
-
-        const parsed = JSON.parse(jsonText)
-        return this.validateSuggestions(parsed.suggestions || [], batch, context.entityType)
+        const input = toolUseBlock.input as { suggestions?: unknown[] }
+        return this.validateSuggestions(input.suggestions || [], batch, context.entityType)
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error')
-
-        // Don't retry on parse errors
-        if (error instanceof SyntaxError) {
-          throw new Error(`Failed to parse AI response: ${lastError.message}`)
-        }
 
         if (attempt < MAX_RETRIES - 1) {
           await sleep(RETRY_DELAY_MS * (attempt + 1))
@@ -269,6 +339,7 @@ Returnera ENDAST JSON-objektet, ingen annan text.`
     const categoryAccountMap = getCategoryAccountMap(entityType)
     const validTransactionIds = new Set(transactions.map((t) => t.id))
     const validCategories = new Set(Object.keys(categoryAccountMap).concat(['uncategorized']))
+    const transactionMap = new Map(transactions.map((t) => [t.id, t]))
 
     return raw
       .filter(
@@ -277,9 +348,23 @@ Returnera ENDAST JSON-objektet, ingen annan text.`
       )
       .filter((s) => validTransactionIds.has(s.transactionId as string))
       .map((s) => {
-        const category = validCategories.has(s.category as string)
+        // Never let AI classify as private — remap to expense_other
+        let category = validCategories.has(s.category as string)
           ? (s.category as TransactionCategory)
           : 'expense_other'
+        if (category === 'private') {
+          category = 'expense_other'
+        }
+
+        // Enforce direction: positive amounts = income, negative = expense
+        const tx = transactionMap.get(s.transactionId as string)
+        if (tx) {
+          if (tx.amount > 0 && category.startsWith('expense_')) {
+            category = 'income_other' as TransactionCategory
+          } else if (tx.amount < 0 && category.startsWith('income_')) {
+            category = 'expense_other' as TransactionCategory
+          }
+        }
 
         const accountInfo = categoryAccountMap[category]
 
@@ -290,11 +375,17 @@ Returnera ENDAST JSON-objektet, ingen annan text.`
           taxCode: (s.taxCode as string) || null,
           confidence: Math.max(0, Math.min(1, Number(s.confidence) || 0.5)),
           reasoning: (s.reasoning as string) || '',
-          isPrivate: category === 'private' || Boolean(s.isPrivate),
-          templateId: (s.templateId as string) || undefined,
+          isPrivate: false,
+          templateId: (s.templateId as string) || CATEGORY_DEFAULT_TEMPLATES[category] || undefined,
         }
       })
   }
+}
+
+function isEnrichedContext(
+  ctx: CategorizationContext | EnrichedCategorizationContext
+): ctx is EnrichedCategorizationContext {
+  return 'candidateTemplates' in ctx
 }
 
 function sleep(ms: number): Promise<void> {
