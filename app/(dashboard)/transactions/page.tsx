@@ -19,11 +19,12 @@ import InboxZeroState from '@/components/transactions/InboxZeroState'
 import InvoiceMatchDialog from '@/components/transactions/InvoiceMatchDialog'
 import TransactionBookingDialog from '@/components/transactions/TransactionBookingDialog'
 import QuickReviewDialog from '@/components/transactions/QuickReviewDialog'
+import DescribeTransactionDialog from '@/components/transactions/DescribeTransactionDialog'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/components/transactions/transaction-types'
 import { getDefaultAccountForCategory, getDefaultVatTreatmentForCategory } from '@/lib/bookkeeping/category-mapping'
 import type { TransactionWithInvoice, ViewMode, CategorizeHandler } from '@/components/transactions/transaction-types'
 import type { TransactionCategory, CreateTransactionInput, Invoice, Customer, VatTreatment } from '@/types'
-import type { SuggestedCategory } from '@/lib/transactions/category-suggestions'
+import type { SuggestedCategory, SuggestedTemplate } from '@/lib/transactions/category-suggestions'
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<TransactionWithInvoice[]>([])
@@ -33,6 +34,7 @@ export default function TransactionsPage() {
   const [isCreating, setIsCreating] = useState(false)
   const [showSwipeView, setShowSwipeView] = useState(false)
   const [categorySuggestions, setCategorySuggestions] = useState<Record<string, SuggestedCategory[]>>({})
+  const [templateSuggestions, setTemplateSuggestions] = useState<Record<string, SuggestedTemplate[]>>({})
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
   const [processingId, setProcessingId] = useState<string | null>(null)
 
@@ -56,6 +58,10 @@ export default function TransactionsPage() {
   const [quickReviewTransaction, setQuickReviewTransaction] = useState<TransactionWithInvoice | null>(null)
   const [quickReviewCategory, setQuickReviewCategory] = useState<TransactionCategory | null>(null)
   const [quickReviewLabel, setQuickReviewLabel] = useState('')
+
+  // Describe dialog
+  const [describeDialogOpen, setDescribeDialogOpen] = useState(false)
+  const [describeDialogTransaction, setDescribeDialogTransaction] = useState<TransactionWithInvoice | null>(null)
 
   // Entity type for tooltip context
   const [entityType, setEntityType] = useState<string>('enskild_firma')
@@ -129,6 +135,9 @@ export default function TransactionsPage() {
       const data = await response.json()
       if (data.suggestions) {
         setCategorySuggestions(data.suggestions)
+      }
+      if (data.template_suggestions) {
+        setTemplateSuggestions(data.template_suggestions)
       }
     } catch {
       // Non-critical
@@ -409,13 +418,29 @@ export default function TransactionsPage() {
   async function handleBatchCategorize(category: TransactionCategory, vatTreatment?: VatTreatment) {
     const ids = Array.from(selectedIds)
     setBatchProgress({ done: 0, total: ids.length })
+    let successes = 0
+    const failures: string[] = []
     for (let i = 0; i < ids.length; i++) {
-      await handleCategorize(ids[i], true, category, vatTreatment)
+      const result = await handleCategorize(ids[i], true, category, vatTreatment)
+      if (result) {
+        successes++
+      } else {
+        const tx = transactions.find((t) => t.id === ids[i])
+        failures.push(tx?.description || ids[i])
+      }
       setBatchProgress({ done: i + 1, total: ids.length })
     }
     setBatchProgress(null)
     setShowBatchSelector(false)
-    toast({ title: 'Klart', description: `${ids.length} transaktioner bokförda` })
+    if (failures.length === 0) {
+      toast({ title: 'Klart', description: `${successes} transaktioner bokförda` })
+    } else {
+      toast({
+        title: 'Delvis klart',
+        description: `${successes} lyckades, ${failures.length} misslyckades: ${failures.slice(0, 3).join(', ')}${failures.length > 3 ? '...' : ''}`,
+        variant: 'destructive',
+      })
+    }
     exitBatchMode()
   }
 
@@ -468,12 +493,40 @@ export default function TransactionsPage() {
     return journalEntryId
   }
 
+  function openDescribeDialog(transaction: TransactionWithInvoice) {
+    setDescribeDialogTransaction(transaction)
+    setDescribeDialogOpen(true)
+  }
+
+  function handleDescribeCategorized(transactionId: string, journalEntryId: string | null) {
+    setExitingIds((prev) => new Set(prev).add(transactionId))
+    setTimeout(() => {
+      setTransactions((prev) =>
+        prev.map((t) =>
+          t.id === transactionId
+            ? { ...t, is_business: true, journal_entry_id: journalEntryId }
+            : t
+        )
+      )
+      setExitingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(transactionId)
+        return next
+      })
+    }, 350)
+  }
+
+  function handleBatchApplied() {
+    fetchTransactions()
+  }
+
   // Swipe view
   if (showSwipeView && uncategorizedTransactions.length > 0) {
     return (
       <SwipeCategorizationView
         transactions={uncategorizedTransactions}
         suggestions={categorySuggestions}
+        templateSuggestions={templateSuggestions}
         onCategorize={handleCategorize}
         onMatchInvoice={handleMatchInvoice}
         onClose={() => setShowSwipeView(false)}
@@ -527,6 +580,7 @@ export default function TransactionsPage() {
                   key={transaction.id}
                   transaction={transaction}
                   suggestions={categorySuggestions[transaction.id]}
+                  templateSuggestions={templateSuggestions[transaction.id]}
                   processingId={processingId}
                   isBatchMode={isBatchMode}
                   isSelected={selectedIds.has(transaction.id)}
@@ -535,6 +589,7 @@ export default function TransactionsPage() {
                   onMarkPrivate={handleMarkPrivate}
                   onOpenMatchDialog={openMatchDialog}
                   onOpenCategoryDialog={openCategoryDialog}
+                  onOpenDescribe={openDescribeDialog}
                   onOpenQuickReview={handleOpenQuickReview}
                   onToggleSelect={toggleBatchSelect}
                 />
@@ -601,6 +656,14 @@ export default function TransactionsPage() {
         defaultAccount={quickReviewCategory ? getDefaultAccountForCategory(quickReviewCategory) : ''}
         defaultVat={quickReviewCategory ? (getDefaultVatTreatmentForCategory(quickReviewCategory) ?? 'none') : 'none'}
         onConfirm={handleQuickReviewConfirm}
+      />
+
+      <DescribeTransactionDialog
+        open={describeDialogOpen}
+        onOpenChange={setDescribeDialogOpen}
+        transaction={describeDialogTransaction}
+        onCategorized={handleDescribeCategorized}
+        onBatchApplied={handleBatchApplied}
       />
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

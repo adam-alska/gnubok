@@ -82,9 +82,18 @@ export function buildEmbeddingText(template: BookingTemplate): string {
 
 /**
  * Build query text from a transaction for embedding search.
+ * When userDescription is provided, it is prepended so it dominates
+ * the semantic search (user intent > raw bank text).
  */
-export function buildTransactionQueryText(transaction: Transaction): string {
+export function buildTransactionQueryText(
+  transaction: Transaction,
+  userDescription?: string
+): string {
   const parts: string[] = []
+
+  if (userDescription) {
+    parts.push(userDescription)
+  }
 
   if (transaction.description) {
     parts.push(transaction.description)
@@ -180,7 +189,8 @@ let stalenessWarned = false
 export async function findSimilarTemplates(
   transaction: Transaction,
   entityType?: EntityType,
-  matchCount: number = MATCH_COUNT
+  matchCount: number = MATCH_COUNT,
+  userDescription?: string
 ): Promise<TemplateMatch[]> {
   try {
     const { createServiceClient } = await import('@/lib/supabase/server')
@@ -204,7 +214,7 @@ export async function findSimilarTemplates(
     }
 
     // Embed the transaction query text
-    const queryText = buildTransactionQueryText(transaction)
+    const queryText = buildTransactionQueryText(transaction, userDescription)
     const queryVector = await embeddings.embedQuery(queryText)
 
     // Request extra results to account for post-filtering

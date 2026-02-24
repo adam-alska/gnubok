@@ -95,6 +95,18 @@ export const SECTORS: Sector[] = [
           'Se alla fakturadatum och deadlines i en interaktiv kalender med manads-, vecko- och dagsvy.',
       },
       {
+        slug: 'user-description-match',
+        name: 'Beskrivningsmatchning',
+        sector: 'general',
+        category: 'operations',
+        icon: 'TextSearch',
+        dataPattern: 'core',
+        readsCoreTables: ['transactions', 'mapping_rules'],
+        description: 'Matcha transaktioner med egna beskrivningar',
+        longDescription:
+          'Beskriv vad en transaktion gäller med egna ord och få smarta bokföringsförslag. Systemet lär sig av dina beskrivningar och applicerar automatiskt på framtida transaktioner från samma leverantör.',
+      },
+      {
         slug: 'enable-banking',
         name: 'Bankintegration (PSD2)',
         sector: 'general',

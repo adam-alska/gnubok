@@ -10,6 +10,7 @@ export interface SuggestedCategory {
   account: string | null
   confidence: number
   source: 'mapping_rule' | 'pattern' | 'history' | 'ai'
+  match_reason?: string
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -23,6 +24,10 @@ const CATEGORY_LABELS: Record<string, string> = {
   expense_marketing: 'Marknadsföring',
   expense_professional_services: 'Konsulter',
   expense_education: 'Utbildning',
+  expense_representation: 'Representation',
+  expense_consumables: 'Material',
+  expense_vehicle: 'Bil & drivmedel',
+  expense_telecom: 'Telefon & internet',
   expense_bank_fees: 'Bankavgift',
   expense_card_fees: 'Kortavgift',
   expense_currency_exchange: 'Valutaväxling',
@@ -72,13 +77,17 @@ export function getSuggestedCategories(
       const category = accountToCategory(rule.debit_account, transaction.amount)
       if (category && !seen.has(category)) {
         seen.add(category)
-        suggestions.push({
+        const suggestion: SuggestedCategory = {
           category: category as TransactionCategory,
           label: CATEGORY_LABELS[category] || category,
           account: rule.debit_account,
           confidence: rule.confidence_score || 0.8,
           source: 'mapping_rule',
-        })
+        }
+        if (rule.source === 'user_description' && rule.user_description) {
+          suggestion.match_reason = `Matchad på din beskrivning: ${rule.user_description}`
+        }
+        suggestions.push(suggestion)
       }
     }
   }
@@ -140,9 +149,14 @@ function accountToCategory(account: string, amount: number): string | null {
   const expenseMap: Record<string, string> = {
     '5410': 'expense_equipment',
     '5420': 'expense_software',
+    '5460': 'expense_consumables',
+    '5611': 'expense_vehicle',
     '5800': 'expense_travel',
     '5010': 'expense_office',
     '5910': 'expense_marketing',
+    '6071': 'expense_representation',
+    '6072': 'expense_representation',
+    '6200': 'expense_telecom',
     '6530': 'expense_professional_services',
     '6570': 'expense_bank_fees',
     '6991': 'expense_other',
@@ -152,18 +166,39 @@ function accountToCategory(account: string, amount: number): string | null {
 }
 
 /**
+ * Source priority for sorting — higher-quality sources rank first.
+ * AI and mapping rules always beat history-based guesses.
+ */
+const SOURCE_PRIORITY: Record<SuggestedCategory['source'], number> = {
+  mapping_rule: 3,
+  ai: 2,
+  pattern: 1,
+  history: 0,
+}
+
+/**
  * Merge AI-generated suggestions into existing suggestion list.
+ * AI suggestions take priority over history-based ones.
  * Deduplicates by category, preserving the higher-confidence entry.
+ * When transactionAmount is provided, filters out wrong-direction suggestions.
  */
 export function mergeAiSuggestions(
   existing: SuggestedCategory[],
-  aiSuggestions: { category: string; basAccount: string; confidence: number; reasoning: string }[]
+  aiSuggestions: { category: string; basAccount: string; confidence: number; reasoning: string }[],
+  transactionAmount?: number
 ): SuggestedCategory[] {
   const seen = new Set<string>(existing.map((s) => s.category))
   const merged = [...existing]
 
   for (const ai of aiSuggestions) {
     if (seen.has(ai.category)) continue
+
+    // Skip suggestions that don't match transaction direction
+    if (transactionAmount !== undefined) {
+      if (transactionAmount > 0 && ai.category.startsWith('expense_')) continue
+      if (transactionAmount < 0 && ai.category.startsWith('income_')) continue
+    }
+
     seen.add(ai.category)
 
     merged.push({
@@ -175,8 +210,13 @@ export function mergeAiSuggestions(
     })
   }
 
+  // Sort by source priority first, then by confidence within the same tier
   return merged
-    .sort((a, b) => b.confidence - a.confidence)
+    .sort((a, b) => {
+      const priorityDiff = SOURCE_PRIORITY[b.source] - SOURCE_PRIORITY[a.source]
+      if (priorityDiff !== 0) return priorityDiff
+      return b.confidence - a.confidence
+    })
     .slice(0, 5)
 }
 

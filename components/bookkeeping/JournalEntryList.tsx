@@ -206,8 +206,11 @@ export default function JournalEntryList({ periodId }: Props) {
                 </div>
               </button>
 
-              {isExpanded && lines.length > 0 && (
+              {isExpanded && (
                 <CardContent className="pt-0 pb-4">
+                  {lines.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-2">Inga kontorader hittades för denna verifikation.</p>
+                  ) : (
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b text-left text-muted-foreground">
@@ -261,6 +264,7 @@ export default function JournalEntryList({ periodId }: Props) {
                       </tr>
                     </tfoot>
                   </table>
+                  )}
 
                   <JournalEntryAttachments
                     journalEntryId={entry.id}

@@ -323,16 +323,28 @@ async function storeSuggestions(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any
 ): Promise<void> {
+  // Group suggestions by transactionId (AI now returns multiple per transaction)
+  const grouped: Record<string, CategorizationSuggestion[]> = {}
   for (const suggestion of suggestions) {
-    await supabase.from('extension_data').upsert(
+    if (!grouped[suggestion.transactionId]) {
+      grouped[suggestion.transactionId] = []
+    }
+    grouped[suggestion.transactionId].push(suggestion)
+  }
+
+  for (const [txId, txSuggestions] of Object.entries(grouped)) {
+    const { error } = await supabase.from('extension_data').upsert(
       {
         user_id: userId,
         extension_id: 'ai-categorization',
-        key: `suggestion:${suggestion.transactionId}`,
-        value: suggestion,
+        key: `suggestion:${txId}`,
+        value: txSuggestions,
       },
       { onConflict: 'user_id,extension_id,key' }
     )
+    if (error) {
+      console.error(`[ai-categorization] Failed to store suggestion for ${txId}:`, error.message)
+    }
   }
 }
 

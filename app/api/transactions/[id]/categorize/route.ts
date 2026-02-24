@@ -256,7 +256,9 @@ export async function POST(
         transaction.merchant_name,
         mappingResult.debit_account,
         mappingResult.credit_account,
-        !is_business
+        !is_business,
+        body.user_description,
+        body.template_id
       )
     } catch (err) {
       console.error('Failed to save mapping rule:', err)
