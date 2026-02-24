@@ -93,6 +93,10 @@ export interface CompanySettings {
   city: string | null
   country: string
 
+  // Contact
+  phone: string | null
+  email: string | null
+
   // Tax registration
   f_skatt: boolean
   vat_registered: boolean

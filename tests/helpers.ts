@@ -423,6 +423,8 @@ export function makeCompanySettings(
     postal_code: '111 22',
     city: 'Stockholm',
     country: 'SE',
+    phone: null,
+    email: null,
     f_skatt: true,
     vat_registered: true,
     vat_number: null,

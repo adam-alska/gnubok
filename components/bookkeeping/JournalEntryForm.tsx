@@ -110,7 +110,7 @@ export default function JournalEntryForm({
     }
 
     // Auto-fill line description from account name when selecting an account
-    if (field === 'account_number' && value && !updated[index].line_description) {
+    if (field === 'account_number' && value) {
       const account = accounts.find((a) => a.account_number === value)
       if (account) {
         updated[index].line_description = account.account_name
