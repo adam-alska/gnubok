@@ -76,11 +76,14 @@ export default function DashboardNav({ companyName, entityType, enabledExtension
   const isOvrigtExpanded = isOnOvrigtPage || manualOvrigtExpanded
   // Auto-expand Tillägg when on an extension page, or when manually toggled (persisted)
   const isOnExtensionPage = pathname.startsWith('/e/')
-  const [manualTillaggExpanded, setManualTillaggExpanded] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return localStorage.getItem('tillagg-expanded') === 'true'
-  })
+  const [manualTillaggExpanded, setManualTillaggExpanded] = useState(false)
   const isTillaggExpanded = isOnExtensionPage || manualTillaggExpanded
+
+  // Restore persisted state after hydration to avoid SSR mismatch
+  useEffect(() => {
+    const stored = localStorage.getItem('tillagg-expanded') === 'true'
+    if (stored) setManualTillaggExpanded(true)
+  }, [])
   const [liveExtensions, setLiveExtensions] = useState(enabledExtensions ?? [])
 
   const fetchExtensions = useCallback(async () => {

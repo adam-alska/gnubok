@@ -34,38 +34,43 @@ app/
   (onboarding)/           6-step setup wizard
   (dashboard)/            Authenticated routes (invoices, customers, transactions,
                           bookkeeping, reports, suppliers, supplier-invoices,
-                          receipts, settings, calendar, help, import,
+                          receipts, deadlines, settings, help, import,
                           extensions, e/[sector]/[slug])
   (public)/               Public invoice action links (no auth)
   api/                    API routes organized by domain
 
 components/
   ui/                     shadcn/ui primitives (button, card, dialog, table, etc.)
-  bookkeeping/            Chart of accounts manager, account combobox, add/edit dialogs
-  calendar/               Calendar views, deadline cards, payment summary, todo widgets
+  bookkeeping/            Chart of accounts manager, account combobox, add/edit dialogs,
+                          journal entry form/list/review, document upload, correction dialog
   chat/                   ChatWidget, ChatPanel, ChatInput, ChatMessage
   customers/              CustomerForm
   dashboard/              DashboardContent, DashboardNav, FSkattWarningCard
+  deadlines/              DeadlineCard, DeadlineFilters, DeadlineForm, DeadlineList,
+                          TaxTodoWidget, UpcomingDeadlinesWidget
   extensions/             Extension marketplace UI (ExtensionCard, SectorCard,
                           ExtensionToggleButton, workspace components,
-                          per-sector subdirectories)
-  import/                 Bank file import workflow components
+                          per-sector subdirectories, shared reusable components)
+  import/                 Bank file import workflow components (SIE + bank file steps)
   invoices/               InvoiceReviewContent
   onboarding/             NewUserChecklist, setup step components
-  reports/                Report views (including BankReconciliationView)
+  reports/                Report views (BankReconciliationView, charts)
   settings/               CalendarFeedSettings
-  suppliers/              Supplier-related components
-  transactions/           Transaction list, categorization, booking components
+  suppliers/              SupplierForm, SupplierInvoiceReviewContent
+  transactions/           Transaction list, categorization, booking, swipe review,
+                          batch operations, invoice matching, VAT treatment
 
 extensions/               Sector-based extension hierarchy
   general/                General-purpose extensions (all businesses)
     ai-categorization/    AI-powered transaction categorization
     ai-chat/              Claude-based chat assistant (LangChain RAG)
+    calendar/             Payment calendar views, deadline cards, payment summary
     enable-banking/       PSD2 bank integration (opt-in, commented out in loader)
     example-logger/       Minimal reference extension (not loaded)
     invoice-inbox/        Supplier invoice intake via email/upload with AI extraction
     push-notifications/   Web push notification system
     receipt-ocr/          Receipt image OCR processing (includes components/pages)
+    user-description-match/ User description matching for transaction categorization
   restaurant/             Restaurant & cafe sector
     food-cost/            Food cost percentage calculator
     earnings-per-liter/   Revenue per liter of alcohol
@@ -100,6 +105,9 @@ lib/
     vat-entries.ts        VAT line generation
     bas-reference.ts      BAS account catalog (~180 accounts with metadata, SRU codes)
     account-descriptions.ts Human-readable account name lookup
+    booking-templates.ts  Booking template patterns for AI suggestions
+    template-embeddings.ts AI embeddings for booking template matching
+    client-account-names.ts Custom account name management
     validate-period-duration.ts Fiscal period duration validation (BFL 3 kap.)
     handlers/             Booking handler functions (supplier-invoice-handler.ts)
   core/
@@ -111,6 +119,7 @@ lib/
   currency/               Riksbanken exchange rates
   deadlines/              Tax deadline tracking, status engine
   email/                  Email service (Resend), invoice/reminder templates
+  errors/                 Error message utilities (get-error-message.ts)
   events/                 Event bus (bus.ts, types.ts)
   extensions/             Extension system
     loader.ts             FIRST_PARTY_EXTENSIONS array, static imports
@@ -125,9 +134,13 @@ lib/
     icon-resolver.tsx     Dynamic icon lookup for extensions
     use-account-totals.ts Hook for account balance queries
     use-extension-data.ts Hook for extension-specific data
+    invoice-inbox-utils.ts Utilities for supplier invoice inbox
+    use-mock-data.ts      Mock data utilities for development
+  hooks/                  React hooks (use-unsaved-changes.ts)
   import/                 SIE parser, SIE import orchestrator, bank file parser
     bank-file/            Bank file parser with format modules
-      formats/            camt053, generic-csv, handelsbanken, nordea, seb, swedbank
+      formats/            camt053, generic-csv, handelsbanken, nordea, seb, swedbank,
+                          ica-banken, lansforsakringar, lunar, skandia
   invoices/               VAT rules, invoice matching, PDF template, reminder processor
   reconciliation/         Bank reconciliation engine (4-pass matching algorithm)
   reports/                Financial reports (trial-balance, income-statement,
@@ -137,9 +150,12 @@ lib/
                           ar-ledger, ar-reconciliation, monthly-breakdown)
   supabase/               Client setup (client.ts = browser, server.ts = server/admin,
                           fetch-all.ts = pagination helper, middleware.ts)
-  tax/                    Tax calculations, deadlines, Swedish holidays, expense warnings
+  tax/                    Tax calculations, deadlines, deadline generator,
+                          Swedish holidays, expense warnings
   transactions/           Transaction processing, category suggestions
+  vat/                    VAT utilities (VIES client for EU VAT validation)
   init.ts                 Extension loader (idempotent, called by API routes)
+  logger.ts               Centralized logging utility
   utils.ts                Shared utility functions
 
 types/index.ts            Canonical type definitions (single source of truth)
@@ -270,14 +286,16 @@ Key types (from `lib/extensions/types.ts`):
 ### Currently Loaded Extensions (FIRST_PARTY_EXTENSIONS)
 
 ```
-receiptOcrExtension        @/extensions/general/receipt-ocr
-aiCategorizationExtension  @/extensions/general/ai-categorization
-pushNotificationsExtension @/extensions/general/push-notifications
-sruExportExtension         @/extensions/sru-export
-neBilagaExtension          @/extensions/ne-bilaga
-aiChatExtension            @/extensions/general/ai-chat
-invoiceInboxExtension      @/extensions/general/invoice-inbox
-# enableBankingExtension   @/extensions/general/enable-banking  (commented out, opt-in)
+receiptOcrExtension              @/extensions/general/receipt-ocr
+aiCategorizationExtension        @/extensions/general/ai-categorization
+pushNotificationsExtension       @/extensions/general/push-notifications
+sruExportExtension               @/extensions/sru-export
+neBilagaExtension                @/extensions/ne-bilaga
+aiChatExtension                  @/extensions/general/ai-chat
+invoiceInboxExtension            @/extensions/general/invoice-inbox
+calendarExtension                @/extensions/general/calendar
+userDescriptionMatchExtension    @/extensions/general/user-description-match
+# enableBankingExtension         @/extensions/general/enable-banking  (commented out, opt-in)
 ```
 
 ### Extension Interface
@@ -430,16 +448,35 @@ mockResult({ data: makeTransaction(), error: null })
 - `lib/api/__tests__/validate.test.ts` — Body/query validation helpers
 - `lib/bookkeeping/__tests__/engine.test.ts` — Balance validation
 - `lib/bookkeeping/__tests__/invoice-entries.test.ts` — Per-line VAT, mixed-rate invoices, credit notes
+- `lib/bookkeeping/__tests__/mapping-engine.test.ts` — Auto-categorization rule matching
+- `lib/bookkeeping/__tests__/category-mapping.test.ts` — Category-to-account mapping
+- `lib/bookkeeping/__tests__/booking-templates.test.ts` — Booking template patterns
+- `lib/bookkeeping/__tests__/template-embeddings.test.ts` — AI embedding matching
+- `lib/bookkeeping/__tests__/validate-period-duration.test.ts` — Fiscal period duration
+- `lib/bookkeeping/handlers/__tests__/supplier-invoice-handler.test.ts` — Supplier booking handler
 - `lib/core/bookkeeping/__tests__/storno-service.test.ts` — Complex mock queues
+- `lib/core/bookkeeping/__tests__/period-service.test.ts` — Fiscal period management
+- `lib/core/bookkeeping/__tests__/year-end-service.test.ts` — Year-end closing
 - `lib/core/documents/__tests__/document-service.test.ts` — Storage mocking
+- `lib/core/tax/__tests__/tax-code-service.test.ts` — Tax code management
+- `lib/currency/__tests__/riksbanken.test.ts` — Exchange rate fetching
 - `lib/events/__tests__/bus.test.ts` — Event bus behavior
 - `lib/extensions/__tests__/registry.test.ts` — Extension registration
+- `lib/extensions/__tests__/loader.test.ts` — Extension loader
+- `lib/extensions/__tests__/toggle-check.test.ts` — Extension toggle logic
+- `lib/extensions/__tests__/validation.test.ts` — Extension data validation
+- `lib/extensions/__tests__/sectors.test.ts` — Sector registry
+- `lib/extensions/__tests__/context-factory.test.ts` — Extension context builder
+- `lib/extensions/__tests__/invoice-inbox-utils.test.ts` — Invoice inbox utilities
 - `lib/import/__tests__/sie-parser.test.ts` — SIE file parsing
+- `lib/import/__tests__/sie-import.test.ts` — SIE import orchestration
+- `lib/import/__tests__/account-mapper.test.ts` — SIE account mapping
 - `lib/import/bank-file/__tests__/parser.test.ts` — Bank file format parsing
 - `lib/reconciliation/__tests__/bank-reconciliation.test.ts` — Reconciliation matching algorithm
 - `lib/reports/__tests__/vat-declaration.test.ts` — VAT declaration report
 - `lib/tax/__tests__/deadline-config.test.ts` — Tax deadline configuration
 - `lib/transactions/__tests__/ingest.test.ts` — Transaction ingestion and dedup
+- `lib/vat/__tests__/vies-client.test.ts` — VIES VAT number validation
 
 ---
 
@@ -447,11 +484,11 @@ mockResult({ data: makeTransaction(), error: null })
 
 ### Location
 
-`supabase/migrations/` — currently 39 files numbered `20240101000001` through `20240101000038` (note: two files share number `000033`).
+`supabase/migrations/` — currently 41 files numbered `20240101000001` through `20240101000041`.
 
 ### Naming Convention
 
-`YYYYMMDD00NNNN_descriptive_name.sql` — next migration: `20240101000039_*.sql`
+`YYYYMMDD00NNNN_descriptive_name.sql` — next migration: `20240101000042_*.sql`
 
 ### Migration Rules
 
@@ -491,12 +528,14 @@ mockResult({ data: makeTransaction(), error: null })
 - **Migration 031 (`invoice_document_type`)** — Adds `document_type` column to `invoices` (CHECK: invoice/proforma/delivery_note, default 'invoice') and `converted_from_id` FK for tracking proforma-to-invoice conversions.
 - **Migration 032 (`add_accounting_method`)** — Adds `accounting_method` column to `company_settings` (CHECK: accrual/cash, default 'accrual') to support kontantmetoden vs faktureringsmetoden.
 - **Migration 033 (`ai_chat_schema`)** — AI chat conversation and message storage.
-- **Migration 033 (`invoice_inbox`)** — Invoice inbox table for supplier invoice intake. (Note: shares number with ai_chat_schema.)
 - **Migration 034 (`fix_extension_data_trigger`)** — Fixes extension data trigger.
 - **Migration 035 (`fix_push_notifications`)** — Push notifications schema fix.
 - **Migration 036 (`fix_enable_banking`)** — Enable Banking schema fix.
 - **Migration 037 (`extension_toggles`)** — Extension toggle table for per-user enable/disable.
 - **Migration 038 (`fix_match_documents_search_path`)** — Fixes search path for document matching function.
+- **Migration 039 (`invoice_inbox`)** — Invoice inbox table for supplier invoice intake via email/upload.
+- **Migration 040 (`booking_template_embeddings`)** — Booking templates with AI embeddings for suggestion matching.
+- **Migration 041 (`user_description_matching`)** — User description matching for transaction categorization.
 
 ---
 
