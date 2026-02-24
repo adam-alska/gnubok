@@ -8,18 +8,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/components/ui/use-toast'
-import { formatDate } from '@/lib/utils'
 import {
   Loader2,
   Building,
   CreditCard,
   User,
-  AlertTriangle,
-  RefreshCw,
-  Trash2,
   LogOut,
   Bell,
   Calendar,
@@ -27,11 +22,14 @@ import {
   Moon,
   Monitor,
   Palette,
+  Landmark,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import type { CompanySettings, BankConnection } from '@/types'
 import { NotificationSettings } from '@/extensions/general/push-notifications/NotificationSettings'
 import { CalendarFeedSettings } from '@/components/settings/CalendarFeedSettings'
+import { BankSelector, type Bank } from '@/extensions/general/enable-banking/components/BankSelector'
+import { BankConnectionStatus } from '@/extensions/general/enable-banking/components/BankConnectionStatus'
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -46,8 +44,11 @@ export default function SettingsPage() {
   const [isSyncing, setIsSyncing] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
   const [hasBankingExtension, setHasBankingExtension] = useState(false)
+  const [selectedBank, setSelectedBank] = useState<Bank | null>(null)
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
+
+  const initialTab = searchParams.get('tab') || 'company'
 
   useEffect(() => {
     setMounted(true)
@@ -106,18 +107,16 @@ export default function SettingsPage() {
 
     setBankConnections(connections || [])
 
-    // Check if extension API is available (will return banks list if extension is loaded)
+    // Check if Enable Banking extension is enabled via toggle API
     try {
-      const bankingCheck = await fetch('/api/extensions/enable-banking/callback', {
-        method: 'HEAD',
-      })
-      // The extension route existing means it's deployed - but we also need
-      // to check if there are existing connections to show the tab
-      setHasBankingExtension(
-        (connections && connections.length > 0) || bankingCheck.status !== 404
-      )
+      const toggleRes = await fetch('/api/extensions/toggles/general/enable-banking')
+      if (toggleRes.ok) {
+        const { data } = await toggleRes.json()
+        setHasBankingExtension(data?.enabled || (connections && connections.length > 0) || false)
+      } else {
+        setHasBankingExtension((connections && connections.length > 0) || false)
+      }
     } catch {
-      // If the extension routes don't exist, only show tab if there are existing connections
       setHasBankingExtension((connections && connections.length > 0) || false)
     }
 
@@ -182,7 +181,7 @@ export default function SettingsPage() {
     setIsConnecting(true)
 
     try {
-      const response = await fetch('/api/extensions/enable-banking/callback', {
+      const response = await fetch('/api/extensions/ext/enable-banking/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ aspsp_name: bankName, aspsp_country: bankCountry }),
@@ -210,7 +209,7 @@ export default function SettingsPage() {
     setIsSyncing(true)
 
     try {
-      const response = await fetch('/api/extensions/enable-banking/sync/cron', {
+      const response = await fetch('/api/extensions/ext/enable-banking/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ connection_id: connectionId }),
@@ -275,24 +274,6 @@ export default function SettingsPage() {
 
   const activeConnections = bankConnections.filter((c) => c.status === 'active')
 
-  // Helper to calculate days until consent expires
-  function getDaysUntilExpiry(expiresAt: string | null): number | null {
-    if (!expiresAt) return null
-    const expiryDate = new Date(expiresAt)
-    const now = new Date()
-    const diffTime = expiryDate.getTime() - now.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return Math.max(0, diffDays)
-  }
-
-  function isConsentExpiringSoon(expiresAt: string | null): boolean {
-    if (!expiresAt) return false
-    const expiryDate = new Date(expiresAt)
-    const warningDate = new Date()
-    warningDate.setDate(warningDate.getDate() + 7)
-    return expiryDate <= warningDate
-  }
-
   return (
     <div className="space-y-6">
       <div>
@@ -302,7 +283,7 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="company" className="space-y-6">
+      <Tabs defaultValue={initialTab} className="space-y-6">
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="company">
             <Building className="mr-2 h-4 w-4" />
@@ -554,66 +535,63 @@ export default function SettingsPage() {
                   <CardTitle>Anslutna banker</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {activeConnections.map((connection) => {
-                    const daysUntilExpiry = getDaysUntilExpiry(connection.consent_expires)
-                    const isExpiring = isConsentExpiringSoon(connection.consent_expires)
-
-                    return (
-                      <div
-                        key={connection.id}
-                        className="flex items-center justify-between p-4 border rounded-lg"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                            <CreditCard className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                            <p className="font-medium">{connection.bank_name}</p>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <span>
-                                Senast synkad: {formatDate(connection.last_synced_at || connection.created_at)}
-                              </span>
-                              {isExpiring && (
-                                <Badge variant="warning" className="flex items-center gap-1">
-                                  <AlertTriangle className="h-3 w-3" />
-                                  {daysUntilExpiry} dagar kvar
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleSyncTransactions(connection.id)}
-                            disabled={isSyncing}
-                          >
-                            {isSyncing ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <RefreshCw className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDisconnectBank(connection.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </div>
-                    )
-                  })}
+                  {activeConnections.map((connection) => (
+                    <BankConnectionStatus
+                      key={connection.id}
+                      connection={connection}
+                      onSync={handleSyncTransactions}
+                      onDisconnect={handleDisconnectBank}
+                      isSyncing={isSyncing}
+                    />
+                  ))}
                 </CardContent>
               </Card>
             )}
 
+            {/* Connect new bank */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Anslut ny bank</CardTitle>
+                <CardDescription>
+                  Välj din bank nedan för att koppla ditt konto via PSD2.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <BankSelector
+                  onSelect={setSelectedBank}
+                  isLoading={isConnecting}
+                />
+                {selectedBank && (
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      <Landmark className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="text-sm font-medium">{selectedBank.name}</p>
+                        <p className="text-xs text-muted-foreground">{selectedBank.country}</p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => handleConnectBank(selectedBank.name, selectedBank.country)}
+                      disabled={isConnecting}
+                    >
+                      {isConnecting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Ansluter...
+                        </>
+                      ) : (
+                        'Anslut bank'
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Info about PSD2 */}
             <Card>
               <CardHeader>
-                <CardTitle>Bankintegration (PSD2)</CardTitle>
+                <CardTitle>Om bankintegration (PSD2)</CardTitle>
                 <CardDescription>
                   Automatisk import av transaktioner via PSD2 open banking.
                   Samtycket gäller i 90 dagar och behöver sedan förnyas.

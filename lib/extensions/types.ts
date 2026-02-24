@@ -39,6 +39,8 @@ export interface ExtensionDefinition {
   readsCoreTables?: string[]
   hasOwnData?: boolean
   quickAction?: QuickActionDefinition
+  /** Notice shown when enabling — e.g. external subscription requirement */
+  subscriptionNotice?: string
 }
 
 /** Sector definition with its extensions */

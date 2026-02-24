@@ -117,6 +117,8 @@ export const SECTORS: Sector[] = [
         description: 'Automatisk banktransaktionssynk via PSD2',
         longDescription:
           'Koppla ditt bankkonto direkt och synka transaktioner automatiskt via säker PSD2-bankintegration. Stöder de flesta svenska banker.',
+        subscriptionNotice:
+          'Denna integration kräver ett aktivt Enable Banking-abonnemang. Utan abonnemang kommer bankintegration inte att fungera.',
       },
     ],
   },

@@ -166,8 +166,8 @@ function accountToCategory(account: string, amount: number): string | null {
 }
 
 /**
- * Source priority for sorting — higher-quality sources rank first.
- * AI and mapping rules always beat history-based guesses.
+ * Source priority for tiebreaking — used when two suggestions
+ * have the same confidence score.
  */
 const SOURCE_PRIORITY: Record<SuggestedCategory['source'], number> = {
   mapping_rule: 3,
@@ -187,19 +187,28 @@ export function mergeAiSuggestions(
   aiSuggestions: { category: string; basAccount: string; confidence: number; reasoning: string }[],
   transactionAmount?: number
 ): SuggestedCategory[] {
-  const seen = new Set<string>(existing.map((s) => s.category))
   const merged = [...existing]
 
   for (const ai of aiSuggestions) {
-    if (seen.has(ai.category)) continue
-
     // Skip suggestions that don't match transaction direction
     if (transactionAmount !== undefined) {
       if (transactionAmount > 0 && ai.category.startsWith('expense_')) continue
       if (transactionAmount < 0 && ai.category.startsWith('income_')) continue
     }
 
-    seen.add(ai.category)
+    const existingIdx = merged.findIndex((s) => s.category === ai.category)
+    if (existingIdx !== -1) {
+      // Upgrade existing entry if the AI has higher confidence
+      if (ai.confidence > merged[existingIdx].confidence) {
+        merged[existingIdx] = {
+          ...merged[existingIdx],
+          account: ai.basAccount || merged[existingIdx].account,
+          confidence: ai.confidence,
+          source: 'ai',
+        }
+      }
+      continue
+    }
 
     merged.push({
       category: ai.category as TransactionCategory,
@@ -210,12 +219,12 @@ export function mergeAiSuggestions(
     })
   }
 
-  // Sort by source priority first, then by confidence within the same tier
+  // Sort by confidence first, then by source priority as tiebreaker
   return merged
     .sort((a, b) => {
-      const priorityDiff = SOURCE_PRIORITY[b.source] - SOURCE_PRIORITY[a.source]
-      if (priorityDiff !== 0) return priorityDiff
-      return b.confidence - a.confidence
+      const confidenceDiff = b.confidence - a.confidence
+      if (confidenceDiff !== 0) return confidenceDiff
+      return SOURCE_PRIORITY[b.source] - SOURCE_PRIORITY[a.source]
     })
     .slice(0, 5)
 }

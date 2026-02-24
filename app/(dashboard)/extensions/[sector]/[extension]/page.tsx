@@ -56,7 +56,11 @@ export default async function ExtensionDetailPage({
             </div>
           </div>
         </div>
-        <ExtensionToggleButton sectorSlug={sectorSlug} extensionSlug={extensionSlug} />
+        <ExtensionToggleButton
+          sectorSlug={sectorSlug}
+          extensionSlug={extensionSlug}
+          subscriptionNotice={definition.subscriptionNotice}
+        />
       </div>
 
       {/* Details */}
