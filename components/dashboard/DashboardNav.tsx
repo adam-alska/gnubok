@@ -46,7 +46,7 @@ interface NavItem {
 // All nav items for sidebar and mobile drawer
 const navItems: NavItem[] = [
   { href: '/', label: 'Översikt', icon: LayoutDashboard, group: 'main' },
-  { href: '/calendar', label: 'Kalender', icon: Calendar, group: 'main' },
+  { href: '/deadlines', label: 'Deadlines', icon: Calendar, group: 'main' },
   { href: '/invoices', label: 'Fakturor', icon: Receipt, group: 'finans' },
   { href: '/customers', label: 'Kunder', icon: Users, group: 'finans' },
   { href: '/suppliers', label: 'Leverantörer', icon: Building2, group: 'finans' },

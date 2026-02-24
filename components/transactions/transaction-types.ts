@@ -32,10 +32,14 @@ export interface CategoryOption {
 
 // Shared category arrays
 export const EXPENSE_CATEGORIES: CategoryOption[] = [
+  { value: 'expense_representation', label: 'Representation' },
   { value: 'expense_equipment', label: 'Utrustning' },
   { value: 'expense_software', label: 'Programvara' },
+  { value: 'expense_consumables', label: 'Material' },
   { value: 'expense_travel', label: 'Resor' },
   { value: 'expense_office', label: 'Kontor' },
+  { value: 'expense_vehicle', label: 'Bil & drivmedel' },
+  { value: 'expense_telecom', label: 'Telefon & internet' },
   { value: 'expense_marketing', label: 'Marknadsföring' },
   { value: 'expense_professional_services', label: 'Konsulter' },
   { value: 'expense_education', label: 'Utbildning' },

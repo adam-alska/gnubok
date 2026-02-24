@@ -51,6 +51,12 @@ export const SECTORS: Sector[] = [
         description: 'AI-assistent för skatte- och bokföringsfrågor',
         longDescription:
           'Ställ frågor om skatt, bokföring och företagande till en AI-assistent som förstår svensk redovisning. Svar baserade på aktuella regler och praxis.',
+        quickAction: {
+          label: 'AI-assistent',
+          description: 'Fråga om bokföring',
+          icon: 'MessageSquare',
+          event: 'open-ai-chat',
+        },
       },
       {
         slug: 'push-notifications',
@@ -75,6 +81,30 @@ export const SECTORS: Sector[] = [
         description: 'Ta emot leverantörsfakturor via e-post eller uppladdning',
         longDescription:
           'Skicka leverantörsfakturor till en dedikerad e-postadress eller ladda upp manuellt. AI extraherar automatiskt leverantörsdata, belopp och moms. Granska och bekräfta med ett klick för att skapa leverantörsfakturor.',
+      },
+      {
+        slug: 'calendar',
+        name: 'Kalender',
+        sector: 'general',
+        category: 'operations',
+        icon: 'Calendar',
+        dataPattern: 'core',
+        readsCoreTables: ['invoices', 'deadlines', 'customers'],
+        description: 'Fullstandig kalendervy med manads-, vecko- och dagsvisning',
+        longDescription:
+          'Se alla fakturadatum och deadlines i en interaktiv kalender med manads-, vecko- och dagsvy.',
+      },
+      {
+        slug: 'user-description-match',
+        name: 'Beskrivningsmatchning',
+        sector: 'general',
+        category: 'operations',
+        icon: 'TextSearch',
+        dataPattern: 'core',
+        readsCoreTables: ['transactions', 'mapping_rules'],
+        description: 'Matcha transaktioner med egna beskrivningar',
+        longDescription:
+          'Beskriv vad en transaktion gäller med egna ord och få smarta bokföringsförslag. Systemet lär sig av dina beskrivningar och applicerar automatiskt på framtida transaktioner från samma leverantör.',
       },
       {
         slug: 'enable-banking',

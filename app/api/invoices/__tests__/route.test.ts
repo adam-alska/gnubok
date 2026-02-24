@@ -318,6 +318,8 @@ describe('POST /api/invoices (create credit note)', () => {
         unit: 'tim',
         unit_price: 1000,
         line_total: 10000,
+        vat_rate: 25,
+        vat_amount: 2500,
         created_at: '2024-06-15T14:30:00Z',
       },
     ]
@@ -385,6 +387,8 @@ describe('POST /api/invoices (create credit note)', () => {
           unit: 'st',
           unit_price: 1000,
           line_total: 1000,
+          vat_rate: 25,
+          vat_amount: 250,
           created_at: '2024-06-15T14:30:00Z',
         },
       ],

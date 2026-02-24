@@ -8,10 +8,12 @@ import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { ArrowUpRight, ArrowDownRight, Check, Paperclip, ChevronDown, ChevronUp } from 'lucide-react'
 import { getDefaultAccountForCategory } from '@/lib/bookkeeping/category-mapping'
+import JournalEntryPreview from './JournalEntryPreview'
 import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
 import DocumentUploadZone from '@/components/bookkeeping/DocumentUploadZone'
 import type { UploadedFile } from '@/components/bookkeeping/DocumentUploadZone'
 import VatTreatmentSelect from './VatTreatmentSelect'
+import { VAT_TREATMENT_OPTIONS } from './transaction-types'
 import type { TransactionWithInvoice } from './transaction-types'
 import type { TransactionCategory, VatTreatment, BASAccount } from '@/types'
 
@@ -49,6 +51,7 @@ export default function QuickReviewDialog({
   const [error, setError] = useState<string | null>(null)
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [showUploadZone, setShowUploadZone] = useState(false)
+  const [showVatDropdown, setShowVatDropdown] = useState(false)
 
   // Handle account changes — clear VAT for liability/equity accounts (class 2)
   const handleAccountChange = useCallback((account: string) => {
@@ -174,6 +177,15 @@ export default function QuickReviewDialog({
           </div>
         </div>
 
+        {/* Journal entry preview */}
+        <JournalEntryPreview
+          amount={transaction.amount}
+          currency={transaction.currency}
+          category={category}
+          vatTreatment={isLiabilityAccount ? 'none' : vatTreatment}
+          accountOverride={accountOverride}
+        />
+
         {/* Account */}
         <div>
           <label className="text-sm font-medium text-muted-foreground">Konto</label>
@@ -190,14 +202,26 @@ export default function QuickReviewDialog({
         <div>
           <label className="text-sm font-medium text-muted-foreground">Momsbehandling</label>
           <div className="mt-1">
-            <VatTreatmentSelect
-              value={isLiabilityAccount ? 'none' : vatTreatment}
-              onValueChange={setVatTreatment}
-              disabled={isLiabilityAccount}
-            />
-            {isLiabilityAccount && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Ingen moms för skuld-/eget kapital-konton
+            {isLiabilityAccount ? (
+              <p className="text-sm text-muted-foreground">
+                Ingen moms for skuld-/eget kapital-konton
+              </p>
+            ) : showVatDropdown ? (
+              <VatTreatmentSelect
+                value={vatTreatment}
+                onValueChange={setVatTreatment}
+              />
+            ) : (
+              <p className="text-sm">
+                {VAT_TREATMENT_OPTIONS.find(o => o.value === vatTreatment)?.label || 'Ingen moms'}
+                {' '}
+                <button
+                  type="button"
+                  className="text-xs text-primary hover:underline"
+                  onClick={() => setShowVatDropdown(true)}
+                >
+                  Andra
+                </button>
               </p>
             )}
           </div>

@@ -10,18 +10,22 @@ import VatTreatmentSelect from './VatTreatmentSelect'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { checkExpenseWarnings } from '@/lib/tax/expense-warnings'
 import { getDefaultAccountForCategory, getDefaultVatTreatmentForCategory } from '@/lib/bookkeeping/category-mapping'
+import JournalEntryPreview from './JournalEntryPreview'
 import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
 import DocumentUploadZone from '@/components/bookkeeping/DocumentUploadZone'
 import type { UploadedFile } from '@/components/bookkeeping/DocumentUploadZone'
-import { X, ArrowLeft, ArrowRight, Building, AlertTriangle, Check, FileText, Link2, Receipt as ReceiptIcon, SkipForward, Paperclip, ChevronDown, ChevronUp } from 'lucide-react'
+import { X, ArrowLeft, ArrowRight, Building, AlertTriangle, Check, FileText, Link2, Receipt as ReceiptIcon, SkipForward, Paperclip, ChevronDown, ChevronUp, MessageSquareText } from 'lucide-react'
+import DescribeTransactionDialog from './DescribeTransactionDialog'
+import { formatAccountWithName } from '@/lib/bookkeeping/client-account-names'
 import type { TransactionCategory, VatTreatment, BASAccount } from '@/types'
-import type { SuggestedCategory } from '@/lib/transactions/category-suggestions'
+import type { SuggestedCategory, SuggestedTemplate } from '@/lib/transactions/category-suggestions'
 import type { TransactionWithInvoice, CategorizeHandler, MatchInvoiceHandler } from './transaction-types'
-import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from './transaction-types'
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, VAT_TREATMENT_OPTIONS } from './transaction-types'
 
 interface SwipeCategorizationViewProps {
   transactions: TransactionWithInvoice[]
   suggestions?: Record<string, SuggestedCategory[]>
+  templateSuggestions?: Record<string, SuggestedTemplate[]>
   onCategorize: CategorizeHandler
   onMatchInvoice?: MatchInvoiceHandler
   onClose: () => void
@@ -33,6 +37,7 @@ const incomeCategories = INCOME_CATEGORIES
 export default function SwipeCategorizationView({
   transactions,
   suggestions,
+  templateSuggestions,
   onCategorize,
   onMatchInvoice,
   onClose,
@@ -52,6 +57,8 @@ export default function SwipeCategorizationView({
   const [accounts, setAccounts] = useState<BASAccount[]>([])
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [showUploadZone, setShowUploadZone] = useState(false)
+  const [showDescribeDialog, setShowDescribeDialog] = useState(false)
+  const [showVatDropdown, setShowVatDropdown] = useState(false)
 
   // Clear VAT treatment when switching to a liability/equity account (class 2)
   useEffect(() => {
@@ -113,6 +120,7 @@ export default function SwipeCategorizationView({
     setPendingCategory(category)
     setAccountOverride(defaultAccount)
     setVatTreatment(defaultVat ?? 'none')
+    setShowVatDropdown(false)
     setShowCategorySelect(false)
     setShowReviewStep(true)
     setError(null)
@@ -366,6 +374,15 @@ export default function SwipeCategorizationView({
             </div>
           </div>
 
+          {/* Journal entry preview */}
+          <JournalEntryPreview
+            amount={currentTransaction.amount}
+            currency={currentTransaction.currency}
+            category={pendingCategory}
+            vatTreatment={isLiabilityAccount ? 'none' : vatTreatment}
+            accountOverride={accountOverride}
+          />
+
           {/* Account override */}
           <div>
             <label className="text-sm font-medium text-muted-foreground">Konto</label>
@@ -382,14 +399,26 @@ export default function SwipeCategorizationView({
           <div>
             <label className="text-sm font-medium text-muted-foreground">Momsbehandling</label>
             <div className="mt-1">
-              <VatTreatmentSelect
-                value={isLiabilityAccount ? 'none' : vatTreatment}
-                onValueChange={setVatTreatment}
-                disabled={isLiabilityAccount}
-              />
-              {isLiabilityAccount && (
-                <p className="text-xs text-muted-foreground mt-1">
+              {isLiabilityAccount ? (
+                <p className="text-sm text-muted-foreground">
                   Ingen moms for skuld-/eget kapital-konton
+                </p>
+              ) : showVatDropdown ? (
+                <VatTreatmentSelect
+                  value={vatTreatment}
+                  onValueChange={setVatTreatment}
+                />
+              ) : (
+                <p className="text-sm">
+                  {VAT_TREATMENT_OPTIONS.find(o => o.value === vatTreatment)?.label || 'Ingen moms'}
+                  {' '}
+                  <button
+                    type="button"
+                    className="text-xs text-primary hover:underline"
+                    onClick={() => setShowVatDropdown(true)}
+                  >
+                    Andra
+                  </button>
                 </p>
               )}
             </div>
@@ -641,7 +670,7 @@ export default function SwipeCategorizationView({
                     <div className="flex flex-col">
                       <span className="text-sm font-medium">{suggestion.label}</span>
                       {suggestion.account && (
-                        <span className="text-xs text-muted-foreground">{suggestion.account}</span>
+                        <span className="text-xs text-muted-foreground">{formatAccountWithName(suggestion.account)}</span>
                       )}
                     </div>
                   </Button>
@@ -649,6 +678,45 @@ export default function SwipeCategorizationView({
               </div>
             </div>
           )}
+
+          {/* Fallback templates when no strong suggestion */}
+          {(() => {
+            const txSuggestions = suggestions?.[currentTransaction.id]
+            const topConfidence = txSuggestions?.[0]?.confidence ?? 0
+            const templates = templateSuggestions?.[currentTransaction.id]
+            if (topConfidence < 0.55 && templates && templates.length > 0) {
+              return (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground text-center">Osaker? Prova dessa mallar:</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {templates.slice(0, 3).map((tmpl) => (
+                      <Button
+                        key={tmpl.template_id}
+                        variant="outline"
+                        className="h-auto py-2.5 px-3 text-left justify-start border-dashed"
+                        onClick={() => setShowDescribeDialog(true)}
+                        disabled={isProcessing}
+                      >
+                        <span className="text-sm">{tmpl.name_sv}</span>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )
+            }
+            return null
+          })()}
+
+          {/* Describe transaction button */}
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => setShowDescribeDialog(true)}
+            disabled={isProcessing}
+          >
+            <MessageSquareText className="mr-2 h-4 w-4" />
+            Beskriv transaktion...
+          </Button>
 
           {/* Categorization button */}
           <Button
@@ -678,6 +746,20 @@ export default function SwipeCategorizationView({
           </Button>
         </div>
       </div>
+
+      <DescribeTransactionDialog
+        open={showDescribeDialog}
+        onOpenChange={setShowDescribeDialog}
+        transaction={currentTransaction}
+        onCategorized={() => {
+          setShowDescribeDialog(false)
+          moveToNext()
+        }}
+        onBatchApplied={() => {
+          setShowDescribeDialog(false)
+          moveToNext()
+        }}
+      />
     </div>
   )
 }

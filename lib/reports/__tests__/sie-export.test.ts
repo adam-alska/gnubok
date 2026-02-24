@@ -91,7 +91,7 @@ describe('generateSIEExport', () => {
 
     const output = await generateSIEExport('user-1', {
       ...baseOptions,
-      org_number: undefined,
+      org_number: null,
     })
 
     expect(output).not.toContain('#ORGNR')

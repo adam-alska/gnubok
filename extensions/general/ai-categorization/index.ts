@@ -5,9 +5,13 @@ import {
   AnthropicCategorizationProvider,
   type CategorizationProvider,
   type TransactionForCategorization,
-  type CategorizationContext,
+  type EnrichedCategorizationContext,
   type CategorizationSuggestion,
+  type AccountUsageEntry,
+  type MerchantHistoryEntry,
 } from './categorizer'
+import { findSimilarTemplates } from '@/lib/bookkeeping/template-embeddings'
+import type { BookingTemplate } from '@/lib/bookkeeping/booking-templates'
 
 // ============================================================
 // Settings
@@ -117,7 +121,7 @@ export async function categorizeTransactions(
     currency: t.currency,
   }))
 
-  const context = await buildContext(userId, supabase)
+  const context = await buildEnrichedContext(userId, supabase, batch)
 
   const aiProvider = getProvider(settings.providerModel)
   const suggestions = await aiProvider.categorize(batch, context)
@@ -168,7 +172,7 @@ async function handleTransactionSynced(
       currency: t.currency,
     }))
 
-    const context = await buildContext(userId, supabase)
+    const context = await buildEnrichedContext(userId, supabase, batch)
     const aiProvider = getProvider(settings.providerModel)
     const suggestions = await aiProvider.categorize(batch, context)
 
@@ -194,7 +198,11 @@ async function handleTransactionSynced(
 // ============================================================
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function buildContext(userId: string, supabase: any): Promise<CategorizationContext> {
+async function buildEnrichedContext(
+  userId: string,
+  supabase: any,
+  transactions: TransactionForCategorization[]
+): Promise<EnrichedCategorizationContext> {
   // Fetch entity type
   const { data: companySettings } = await supabase
     .from('company_settings')
@@ -221,7 +229,92 @@ async function buildContext(userId: string, supabase: any): Promise<Categorizati
     })
   )
 
-  return { entityType, recentHistory }
+  // Fetch user's most-used accounts (top 30)
+  const { data: accountUsageRows } = await supabase
+    .from('journal_entry_lines')
+    .select('account_number')
+    .eq('user_id', userId)
+
+  const accountCounts = new Map<string, number>()
+  if (accountUsageRows) {
+    for (const row of accountUsageRows as { account_number: string }[]) {
+      accountCounts.set(row.account_number, (accountCounts.get(row.account_number) || 0) + 1)
+    }
+  }
+  const userAccountUsage: AccountUsageEntry[] = Array.from(accountCounts.entries())
+    .map(([account_number, count]) => ({ account_number, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 30)
+
+  // Fetch merchant history for this batch's merchants
+  const merchantNames = [...new Set(
+    transactions
+      .map((t) => t.merchant_name)
+      .filter((n): n is string => n !== null && n.length > 0)
+  )]
+
+  let merchantHistory: MerchantHistoryEntry[] = []
+  if (merchantNames.length > 0) {
+    const { data: merchantRows } = await supabase
+      .from('transactions')
+      .select('merchant_name, category, template_id')
+      .eq('user_id', userId)
+      .not('is_business', 'is', null)
+      .neq('category', 'uncategorized')
+      .in('merchant_name', merchantNames)
+      .limit(200)
+
+    if (merchantRows) {
+      const merchantMap = new Map<string, MerchantHistoryEntry>()
+      for (const row of merchantRows as { merchant_name: string; category: string; template_id: string | null }[]) {
+        const key = `${row.merchant_name}:${row.category}`
+        const existing = merchantMap.get(key)
+        if (existing) {
+          existing.count++
+        } else {
+          merchantMap.set(key, {
+            merchant_name: row.merchant_name,
+            category: row.category,
+            template_id: row.template_id,
+            count: 1,
+          })
+        }
+      }
+      merchantHistory = Array.from(merchantMap.values())
+        .sort((a, b) => b.count - a.count)
+    }
+  }
+
+  // Find candidate templates via embedding search
+  // Use a representative subset of transactions to find candidates
+  const representativeTransactions = transactions.slice(0, 5)
+  const candidateMap = new Map<string, BookingTemplate>()
+
+  for (const tx of representativeTransactions) {
+    try {
+      const matches = await findSimilarTemplates(
+        tx as unknown as Transaction,
+        entityType
+      )
+      for (const m of matches) {
+        if (!candidateMap.has(m.template.id)) {
+          candidateMap.set(m.template.id, m.template)
+        }
+      }
+    } catch {
+      // Embedding search failed — continue without candidates
+    }
+  }
+
+  const candidateTemplates = Array.from(candidateMap.values())
+
+  return {
+    entityType,
+    recentHistory,
+    candidateTemplates,
+    userAccountUsage,
+    merchantHistory,
+  }
 }
 
 async function storeSuggestions(
@@ -230,16 +323,28 @@ async function storeSuggestions(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any
 ): Promise<void> {
+  // Group suggestions by transactionId (AI now returns multiple per transaction)
+  const grouped: Record<string, CategorizationSuggestion[]> = {}
   for (const suggestion of suggestions) {
-    await supabase.from('extension_data').upsert(
+    if (!grouped[suggestion.transactionId]) {
+      grouped[suggestion.transactionId] = []
+    }
+    grouped[suggestion.transactionId].push(suggestion)
+  }
+
+  for (const [txId, txSuggestions] of Object.entries(grouped)) {
+    const { error } = await supabase.from('extension_data').upsert(
       {
         user_id: userId,
         extension_id: 'ai-categorization',
-        key: `suggestion:${suggestion.transactionId}`,
-        value: suggestion,
+        key: `suggestion:${txId}`,
+        value: txSuggestions,
       },
       { onConflict: 'user_id,extension_id,key' }
     )
+    if (error) {
+      console.error(`[ai-categorization] Failed to store suggestion for ${txId}:`, error.message)
+    }
   }
 }
 
