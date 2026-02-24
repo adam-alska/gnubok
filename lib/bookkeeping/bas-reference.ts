@@ -1015,6 +1015,38 @@ export const BAS_REFERENCE: BASReferenceAccount[] = [
     sru_code: '7311',
   },
 
+  // 31 - Forsaljning varor utanfor Sverige
+  {
+    account_number: '3105',
+    account_name: 'Forsaljning varor export utanfor EU',
+    account_class: 3,
+    account_group: '31',
+    account_type: 'revenue',
+    normal_balance: 'credit',
+    description: 'Intakter fran forsaljning av varor till kunder utanfor EU. Momsfritt (momsdeklaration ruta 36).',
+    sru_code: '7310',
+  },
+  {
+    account_number: '3108',
+    account_name: 'Forsaljning varor till annat EU-land',
+    account_class: 3,
+    account_group: '31',
+    account_type: 'revenue',
+    normal_balance: 'credit',
+    description: 'Intakter fran forsaljning av varor till momsregistrerade foretag i andra EU-lander. Omvand skattskyldighet (momsdeklaration ruta 35).',
+    sru_code: '7310',
+  },
+  {
+    account_number: '3109',
+    account_name: 'Forsaljning vid trepartshandel',
+    account_class: 3,
+    account_group: '31',
+    account_type: 'revenue',
+    normal_balance: 'credit',
+    description: 'Mellanmans forsaljning av varor vid trepartshandel inom EU (momsdeklaration ruta 38).',
+    sru_code: '7310',
+  },
+
   // 33 - Forsaljning tjanster utanfor Sverige
   {
     account_number: '3305',
@@ -1034,6 +1066,28 @@ export const BAS_REFERENCE: BASReferenceAccount[] = [
     account_type: 'revenue',
     normal_balance: 'credit',
     description: 'Intakter fran forsaljning av tjanster till foretag i andra EU-lander. Omvand skattskyldighet.',
+    sru_code: '7310',
+  },
+
+  // 35 - Fakturerade kostnader och frakter
+  {
+    account_number: '3521',
+    account_name: 'Fakturerade frakter, EU-land',
+    account_class: 3,
+    account_group: '35',
+    account_type: 'revenue',
+    normal_balance: 'credit',
+    description: 'Fraktkostnader som vidarefaktureras till kunder i andra EU-lander. Foljer varans momsbehandling.',
+    sru_code: '7310',
+  },
+  {
+    account_number: '3522',
+    account_name: 'Fakturerade frakter, export',
+    account_class: 3,
+    account_group: '35',
+    account_type: 'revenue',
+    normal_balance: 'credit',
+    description: 'Fraktkostnader som vidarefaktureras till kunder utanfor EU. Momsfritt (momsdeklaration ruta 36).',
     sru_code: '7310',
   },
 

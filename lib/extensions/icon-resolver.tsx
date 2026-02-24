@@ -25,6 +25,9 @@ import {
   Layers,
   Puzzle,
   TextSearch,
+  Ship,
+  FileText,
+  Shield,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -55,6 +58,9 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Layers,
   Puzzle,
   TextSearch,
+  Ship,
+  FileText,
+  Shield,
 }
 
 export function resolveIcon(name: string): LucideIcon {
