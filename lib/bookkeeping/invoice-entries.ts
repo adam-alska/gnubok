@@ -1,6 +1,7 @@
 import { createJournalEntry, findFiscalPeriod } from './engine'
 import { generateSalesVatLines, generateReverseChargeLines } from './vat-entries'
 import { getVatTreatmentForRate } from '@/lib/invoices/vat-rules'
+import { createLogger } from '@/lib/logger'
 import type {
   CreateJournalEntryInput,
   CreateJournalEntryLineInput,
@@ -10,6 +11,8 @@ import type {
   JournalEntry,
   VatTreatment,
 } from '@/types'
+
+const log = createLogger('invoice-entries')
 
 /**
  * Group invoice items by VAT rate and generate per-rate revenue + VAT lines.
@@ -115,7 +118,7 @@ export async function createInvoiceJournalEntry(
 ): Promise<JournalEntry | null> {
   const fiscalPeriodId = await findFiscalPeriod(userId, invoice.invoice_date)
   if (!fiscalPeriodId) {
-    console.warn('No open fiscal period found for invoice date:', invoice.invoice_date)
+    log.warn('No open fiscal period found for invoice date:', invoice.invoice_date)
     return null
   }
 
@@ -180,7 +183,7 @@ export async function createInvoicePaymentJournalEntry(
 ): Promise<JournalEntry | null> {
   const fiscalPeriodId = await findFiscalPeriod(userId, paymentDate)
   if (!fiscalPeriodId) {
-    console.warn('No open fiscal period found for payment date:', paymentDate)
+    log.warn('No open fiscal period found for payment date:', paymentDate)
     return null
   }
 
@@ -226,7 +229,7 @@ export async function createCreditNoteJournalEntry(
 ): Promise<JournalEntry | null> {
   const fiscalPeriodId = await findFiscalPeriod(userId, creditNote.invoice_date)
   if (!fiscalPeriodId) {
-    console.warn('No open fiscal period found for credit note date:', creditNote.invoice_date)
+    log.warn('No open fiscal period found for credit note date:', creditNote.invoice_date)
     return null
   }
 
@@ -305,7 +308,7 @@ export async function createInvoiceCashEntry(
 ): Promise<JournalEntry | null> {
   const fiscalPeriodId = await findFiscalPeriod(userId, paymentDate)
   if (!fiscalPeriodId) {
-    console.warn('No open fiscal period found for payment date:', paymentDate)
+    log.warn('No open fiscal period found for payment date:', paymentDate)
     return null
   }
 

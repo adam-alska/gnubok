@@ -1,5 +1,6 @@
 import { createJournalEntry, findFiscalPeriod } from './engine'
 import { generateInputVatLine, generateReverseChargeLines, extractNetAmount, extractVatAmount } from './vat-entries'
+import { createLogger } from '@/lib/logger'
 import type {
   CreateJournalEntryInput,
   CreateJournalEntryLineInput,
@@ -7,6 +8,8 @@ import type {
   MappingResult,
   Transaction,
 } from '@/types'
+
+const log = createLogger('transaction-entries')
 
 /**
  * Create a journal entry from a bank transaction using mapping engine result
@@ -47,7 +50,7 @@ export async function createTransactionJournalEntry(
 
   const fiscalPeriodId = await findFiscalPeriod(userId, transaction.date)
   if (!fiscalPeriodId) {
-    console.warn('No open fiscal period found for transaction date:', transaction.date)
+    log.warn('No open fiscal period found for transaction date:', transaction.date)
     return null
   }
 

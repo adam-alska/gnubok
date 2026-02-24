@@ -25,7 +25,8 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:support.fortnox.se)"
+      "WebFetch(domain:support.fortnox.se)",
+      "Bash(npx vitest run:*)"
     ]
   }
 }

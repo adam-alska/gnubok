@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { CoreEvent } from '@/lib/events/types'
 import { eventBus } from '@/lib/events/bus'
 import { ingestTransactions } from '@/lib/transactions/ingest'
+import { createLogger } from '@/lib/logger'
 import type {
   ExtensionContext,
   ExtensionLogger,
@@ -13,12 +14,12 @@ import type {
 /**
  * Create a prefixed logger for an extension.
  */
-function createLogger(extensionId: string): ExtensionLogger {
-  const prefix = `[${extensionId}]`
+function createExtLogger(extensionId: string): ExtensionLogger {
+  const logger = createLogger(`ext:${extensionId}`)
   return {
-    info: (message: string, ...args: unknown[]) => console.log(prefix, message, ...args),
-    warn: (message: string, ...args: unknown[]) => console.warn(prefix, message, ...args),
-    error: (message: string, ...args: unknown[]) => console.error(prefix, message, ...args),
+    info: (message: string, ...args: unknown[]) => logger.info(message, ...args),
+    warn: (message: string, ...args: unknown[]) => logger.warn(message, ...args),
+    error: (message: string, ...args: unknown[]) => logger.error(message, ...args),
   }
 }
 
@@ -116,7 +117,7 @@ export function createExtensionContext(
     emit: (event: CoreEvent) => eventBus.emit(event),
     settings: createSettings(supabase, userId, extensionId),
     storage: createStorage(supabase),
-    log: createLogger(extensionId),
+    log: createExtLogger(extensionId),
     services: createServices(),
   }
 }
