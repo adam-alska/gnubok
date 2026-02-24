@@ -198,6 +198,13 @@ export default async function RootPage() {
     streak_count: streakCount,
   }
 
+  // Fetch enabled extension toggles
+  const { data: enabledToggles } = await supabase
+    .from('extension_toggles')
+    .select('sector_slug, extension_slug')
+    .eq('user_id', user.id)
+    .eq('enabled', true)
+
   return (
     <div className="min-h-screen bg-background">
       <DashboardNav companyName={settings.company_name || 'Min verksamhet'} entityType={settings.entity_type || 'enskild_firma'} />
@@ -220,6 +227,7 @@ export default async function RootPage() {
               receiptQueue,
               missingUnderlagCount,
             }}
+            enabledExtensions={enabledToggles || []}
           />
         </div>
         <ChatWidget />

@@ -252,6 +252,13 @@ export default async function DashboardPage() {
     streak_count: streakCount,
   }
 
+  // Fetch enabled extension toggles
+  const { data: enabledToggles } = await supabase
+    .from('extension_toggles')
+    .select('sector_slug, extension_slug')
+    .eq('user_id', user.id)
+    .eq('enabled', true)
+
   return (
     <DashboardContent
       firstName={firstName}
@@ -272,6 +279,7 @@ export default async function DashboardPage() {
         missingUnderlagCount,
       }}
       onboardingProgress={onboardingProgress}
+      enabledExtensions={enabledToggles || []}
     />
   )
 }

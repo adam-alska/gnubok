@@ -104,7 +104,7 @@ export async function POST(request: Request) {
     }
 
     suggestions[tx.id] = result
-    template_suggestions[tx.id] = getSuggestedTemplates(tx as Transaction, entityType)
+    template_suggestions[tx.id] = await getSuggestedTemplates(tx as Transaction, entityType)
   }
 
   return NextResponse.json({ suggestions, template_suggestions })

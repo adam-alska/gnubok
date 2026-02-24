@@ -1,6 +1,7 @@
 import { suggestCategory } from '@/lib/tax/expense-warnings'
 import { getExpenseAccountForCategory } from '@/lib/bookkeeping/category-mapping'
 import { findMatchingTemplates, type TemplateMatch } from '@/lib/bookkeeping/booking-templates'
+import { findSimilarTemplates } from '@/lib/bookkeeping/template-embeddings'
 import type { Transaction, TransactionCategory, EntityType, MappingRule } from '@/types'
 
 export interface SuggestedCategory {
@@ -198,13 +199,25 @@ export interface SuggestedTemplate {
 
 /**
  * Get suggested booking templates for a transaction.
- * Uses multi-signal matching (MCC, keywords, description patterns).
+ * Tries embedding-based semantic search first, falls back to keyword matching.
  */
-export function getSuggestedTemplates(
+export async function getSuggestedTemplates(
   transaction: Transaction,
   entityType?: EntityType
-): SuggestedTemplate[] {
-  const matches = findMatchingTemplates(transaction, entityType)
+): Promise<SuggestedTemplate[]> {
+  let matches: TemplateMatch[]
+
+  try {
+    matches = await findSimilarTemplates(transaction, entityType)
+  } catch {
+    matches = []
+  }
+
+  // Fall back to keyword matching if embedding search returns nothing
+  if (matches.length === 0) {
+    matches = findMatchingTemplates(transaction, entityType)
+  }
+
   return matches.map((m: TemplateMatch) => ({
     template_id: m.template.id,
     name_sv: m.template.name_sv,

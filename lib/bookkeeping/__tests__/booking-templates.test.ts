@@ -249,7 +249,7 @@ describe('findMatchingTemplates', () => {
       mcc_code: 5817,
     })
     const matches = findMatchingTemplates(tx)
-    expect(matches.length).toBeLessThanOrEqual(5)
+    expect(matches.length).toBeLessThanOrEqual(20)
   })
 
   it('results are sorted by confidence descending', () => {

@@ -3,10 +3,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/use-toast'
-import { PaymentCalendar } from '@/components/calendar/PaymentCalendar'
+import { PaymentCalendar } from '@/extensions/general/calendar/components/PaymentCalendar'
+import type { WorkspaceComponentProps } from '@/lib/extensions/workspace-registry'
 import type { Invoice, Deadline } from '@/types'
 
-export default function CalendarPage() {
+export default function CalendarWorkspace({ userId }: WorkspaceComponentProps) {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [deadlines, setDeadlines] = useState<Deadline[]>([])
   const [customers, setCustomers] = useState<{ id: string; name: string }[]>([])
@@ -18,7 +19,6 @@ export default function CalendarPage() {
     setIsLoading(true)
 
     try {
-      // Fetch invoices with customer names
       const { data: invoicesData, error: invoicesError } = await supabase
         .from('invoices')
         .select('*, customer:customers(name)')
@@ -26,7 +26,6 @@ export default function CalendarPage() {
 
       if (invoicesError) throw invoicesError
 
-      // Fetch deadlines with customer names
       const { data: deadlinesData, error: deadlinesError } = await supabase
         .from('deadlines')
         .select('*, customer:customers(name)')
@@ -34,7 +33,6 @@ export default function CalendarPage() {
 
       if (deadlinesError) throw deadlinesError
 
-      // Fetch customers for the form
       const { data: customersData, error: customersError } = await supabase
         .from('customers')
         .select('id, name')
@@ -45,10 +43,10 @@ export default function CalendarPage() {
       setInvoices(invoicesData || [])
       setDeadlines(deadlinesData || [])
       setCustomers(customersData || [])
-    } catch (error) {
+    } catch {
       toast({
         title: 'Fel',
-        description: 'Kunde inte hämta data',
+        description: 'Kunde inte hamta data',
         variant: 'destructive',
       })
     } finally {
@@ -101,7 +99,7 @@ export default function CalendarPage() {
       })
 
       fetchData()
-    } catch (error) {
+    } catch {
       toast({
         title: 'Fel',
         description: 'Kunde inte uppdatera deadline',
@@ -112,31 +110,20 @@ export default function CalendarPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Kalender</h1>
-        </div>
-        <div className="animate-pulse">
-          <div className="h-10 bg-muted rounded w-48 mb-4" />
-          <div className="h-96 bg-muted rounded" />
-        </div>
+      <div className="animate-pulse">
+        <div className="h-10 bg-muted rounded w-48 mb-4" />
+        <div className="h-96 bg-muted rounded" />
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Kalender</h1>
-      </div>
-
-      <PaymentCalendar
-        invoices={invoices}
-        deadlines={deadlines}
-        customers={customers}
-        onDeadlineCreate={handleDeadlineCreate}
-        onDeadlineToggle={handleDeadlineToggle}
-      />
-    </div>
+    <PaymentCalendar
+      invoices={invoices}
+      deadlines={deadlines}
+      customers={customers}
+      onDeadlineCreate={handleDeadlineCreate}
+      onDeadlineToggle={handleDeadlineToggle}
+    />
   )
 }

@@ -15,6 +15,16 @@ export type SectorSlug = 'general' | 'restaurant' | 'construction' | 'hotel' | '
 /** How an extension gets its data */
 export type ExtensionDataPattern = 'core' | 'manual' | 'both'
 
+/** Dashboard quick action declared by an extension */
+export interface QuickActionDefinition {
+  label: string
+  description: string
+  icon: string
+  href?: string
+  event?: string
+  order?: number
+}
+
 /** Extension metadata for the marketplace and workspace routing */
 export interface ExtensionDefinition {
   slug: string
@@ -28,6 +38,7 @@ export interface ExtensionDefinition {
   dataPattern: ExtensionDataPattern
   readsCoreTables?: string[]
   hasOwnData?: boolean
+  quickAction?: QuickActionDefinition
 }
 
 /** Sector definition with its extensions */

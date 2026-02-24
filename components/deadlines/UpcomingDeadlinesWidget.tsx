@@ -201,9 +201,9 @@ export function UpcomingDeadlinesWidget({ deadlines, maxItems = 5, onStatusChang
           )
         })}
 
-        <Link href="/calendar" className="block">
+        <Link href="/deadlines" className="block">
           <Button variant="ghost" className="w-full justify-between mt-2">
-            Visa kalender
+            Visa alla deadlines
             <ChevronRight className="h-4 w-4" />
           </Button>
         </Link>

@@ -12,7 +12,8 @@ import {
   getEnhancedTaxWarningStatus
 } from '@/lib/tax/calculator'
 import FSkattWarningCard from '@/components/dashboard/FSkattWarningCard'
-import { UpcomingDeadlinesWidget } from '@/components/calendar/UpcomingDeadlinesWidget'
+import { UpcomingDeadlinesWidget } from '@/components/deadlines/UpcomingDeadlinesWidget'
+import { TaxTodoWidget } from '@/components/deadlines/TaxTodoWidget'
 import NewUserChecklist from '@/components/onboarding/NewUserChecklist'
 import {
   TrendingUp,
@@ -27,9 +28,11 @@ import {
   Landmark,
   CheckCircle2,
   ClipboardList,
-  MessageCircle,
   FileWarning,
 } from 'lucide-react'
+import { getExtensionDefinition } from '@/lib/extensions/sectors'
+import { resolveIcon } from '@/lib/extensions/icon-resolver'
+import type { QuickActionDefinition } from '@/lib/extensions/types'
 import type { CompanySettings, EntityType, Deadline, ReceiptQueueSummary, OnboardingProgress } from '@/types'
 
 interface DashboardContentProps {
@@ -51,11 +54,31 @@ interface DashboardContentProps {
     missingUnderlagCount: number
   }
   onboardingProgress?: OnboardingProgress
+  enabledExtensions?: { sector_slug: string; extension_slug: string }[]
 }
 
-export default function DashboardContent({ firstName, settings, summary, onboardingProgress }: DashboardContentProps) {
+export default function DashboardContent({ firstName, settings, summary, onboardingProgress, enabledExtensions }: DashboardContentProps) {
   const [showAllAlerts, setShowAllAlerts] = useState(false)
   const [showMore, setShowMore] = useState(false)
+  const [liveExtensions, setLiveExtensions] = useState(enabledExtensions ?? [])
+
+  useEffect(() => {
+    setLiveExtensions(enabledExtensions ?? [])
+  }, [enabledExtensions])
+
+  useEffect(() => {
+    const handler = ((e: CustomEvent<{ sector_slug: string; extension_slug: string; enabled: boolean }>) => {
+      setLiveExtensions(prev => {
+        if (e.detail.enabled) {
+          if (prev.some(x => x.sector_slug === e.detail.sector_slug && x.extension_slug === e.detail.extension_slug)) return prev
+          return [...prev, { sector_slug: e.detail.sector_slug, extension_slug: e.detail.extension_slug }]
+        }
+        return prev.filter(x => !(x.sector_slug === e.detail.sector_slug && x.extension_slug === e.detail.extension_slug))
+      })
+    }) as EventListener
+    window.addEventListener('extension-toggle-changed', handler)
+    return () => window.removeEventListener('extension-toggle-changed', handler)
+  }, [])
 
   const entityType = (settings?.entity_type as EntityType) || 'enskild_firma'
   const preliminaryTaxMonthly = settings?.preliminary_tax_monthly || 0
@@ -205,7 +228,15 @@ export default function DashboardContent({ firstName, settings, summary, onboard
   const visibleAlerts = showAllAlerts ? alertItems : alertItems.slice(0, MAX_VISIBLE_ALERTS)
   const hasMoreAlerts = alertItems.length > MAX_VISIBLE_ALERTS
 
-  const openAiChat = () => window.dispatchEvent(new Event('open-ai-chat'))
+  // Build extension quick actions from enabled extensions
+  const extensionQuickActions: (QuickActionDefinition & { key: string })[] = liveExtensions
+    .map(toggle => {
+      const def = getExtensionDefinition(toggle.sector_slug, toggle.extension_slug)
+      if (!def?.quickAction) return null
+      return { ...def.quickAction, key: `${toggle.sector_slug}/${toggle.extension_slug}` }
+    })
+    .filter((a): a is QuickActionDefinition & { key: string } => a !== null)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
 
   // Quick action items
   const quickActions = [
@@ -242,7 +273,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
         const todoItems: { label: string; href: string; count: number; variant: 'destructive' | 'warning' | 'default' }[] = []
 
         if (passedDeadlines.length > 0) {
-          todoItems.push({ label: 'passerade deadlines', href: '/calendar', count: passedDeadlines.length, variant: 'destructive' })
+          todoItems.push({ label: 'passerade deadlines', href: '/deadlines', count: passedDeadlines.length, variant: 'destructive' })
         }
         if (summary.overdueInvoicesCount > 0) {
           todoItems.push({ label: 'förfallna fakturor', href: '/invoices?status=unpaid', count: summary.overdueInvoicesCount, variant: 'destructive' })
@@ -431,18 +462,42 @@ export default function DashboardContent({ firstName, settings, summary, onboard
               </Link>
             )
           })}
-          {/* AI assistant quick action */}
-          <button onClick={openAiChat} className="group text-left">
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/40 hover:bg-muted/30 transition-colors duration-150">
-              <div className="p-2 rounded-lg bg-muted/50">
-                <MessageCircle className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium truncate">AI-assistent</p>
-                <p className="text-xs text-muted-foreground truncate hidden md:block">Fråga om bokföring</p>
-              </div>
-            </div>
-          </button>
+          {/* Extension quick actions */}
+          {extensionQuickActions.map((action) => {
+            const Icon = resolveIcon(action.icon)
+            if (action.href) {
+              return (
+                <Link key={action.key} href={action.href} className="group">
+                  <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/40 hover:bg-muted/30 transition-colors duration-150">
+                    <div className="p-2 rounded-lg bg-muted/50">
+                      <Icon className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{action.label}</p>
+                      <p className="text-xs text-muted-foreground truncate hidden md:block">{action.description}</p>
+                    </div>
+                  </div>
+                </Link>
+              )
+            }
+            return (
+              <button
+                key={action.key}
+                onClick={() => window.dispatchEvent(new Event(action.event!))}
+                className="group text-left"
+              >
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/40 hover:bg-muted/30 transition-colors duration-150">
+                  <div className="p-2 rounded-lg bg-muted/50">
+                    <Icon className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{action.label}</p>
+                    <p className="text-xs text-muted-foreground truncate hidden md:block">{action.description}</p>
+                  </div>
+                </div>
+              </button>
+            )
+          })}
         </div>
       </section>
 
@@ -450,6 +505,13 @@ export default function DashboardContent({ firstName, settings, summary, onboard
       {summary.deadlines && summary.deadlines.length > 0 && (
         <section className="mb-10">
           <UpcomingDeadlinesWidget deadlines={summary.deadlines} maxItems={8} />
+        </section>
+      )}
+
+      {/* Tax todo widget — visible when there are incomplete tax deadlines */}
+      {summary.deadlines?.some(d => d.deadline_type === 'tax' && !d.is_completed) && (
+        <section className="mb-10">
+          <TaxTodoWidget deadlines={summary.deadlines} />
         </section>
       )}
 
