@@ -139,7 +139,7 @@ export async function findMatchingInvoices(
     .order('due_date', { ascending: true })
 
   if (error || !invoices) {
-    console.error('Failed to fetch invoices for matching:', error)
+    // Failed to fetch invoices — return empty matches
     return []
   }
 

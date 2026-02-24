@@ -2,7 +2,10 @@ import { eventBus } from '@/lib/events/bus'
 import type { EventPayload } from '@/lib/events/types'
 import { createClient } from '@/lib/supabase/server'
 import { createSupplierInvoiceRegistrationEntry } from '@/lib/bookkeeping/supplier-invoice-entries'
+import { createLogger } from '@/lib/logger'
 import type { SupplierInvoiceItem } from '@/types'
+
+const log = createLogger('supplier-invoice-handler')
 
 /**
  * Core event handler: creates a registration journal entry when a supplier
@@ -36,7 +39,7 @@ async function handleSupplierInvoiceConfirmed(
     .order('sort_order')
 
   if (itemsError || !items || items.length === 0) {
-    console.error('[supplier-invoice-handler] Failed to fetch invoice items:', itemsError)
+    log.error('Failed to fetch invoice items:', itemsError)
     return
   }
 
@@ -64,7 +67,7 @@ async function handleSupplierInvoiceConfirmed(
         .eq('id', supplierInvoice.id)
     }
   } catch (err) {
-    console.error('[supplier-invoice-handler] Failed to create registration journal entry:', err)
+    log.error('Failed to create registration journal entry:', err)
   }
 }
 

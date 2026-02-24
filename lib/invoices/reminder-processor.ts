@@ -6,7 +6,10 @@ import {
   generateReminderEmailSubject,
   getReminderDaysConfig
 } from '@/lib/email/reminder-templates'
+import { createLogger } from '@/lib/logger'
 import type { Invoice, Customer, CompanySettings } from '@/types'
+
+const log = createLogger('reminder-processor')
 
 // Create a service client for cron jobs (no cookie access needed)
 function createServiceClient() {
@@ -144,16 +147,16 @@ export async function processOverdueReminders(): Promise<ProcessRemindersResult>
     .order('due_date', { ascending: true })
 
   if (invoiceError) {
-    console.error('Error fetching overdue invoices:', invoiceError)
+    log.error('Error fetching overdue invoices:', invoiceError)
     return { processed: 0, sent: 0, failed: 0, results: [] }
   }
 
   if (!overdueInvoices || overdueInvoices.length === 0) {
-    console.log('No overdue invoices found')
+    log.info('No overdue invoices found')
     return { processed: 0, sent: 0, failed: 0, results: [] }
   }
 
-  console.log(`Found ${overdueInvoices.length} overdue invoices to process`)
+  log.info(`Found ${overdueInvoices.length} overdue invoices to process`)
 
   // Process each invoice
   for (const invoice of overdueInvoices) {
@@ -161,7 +164,7 @@ export async function processOverdueReminders(): Promise<ProcessRemindersResult>
 
     // Skip if customer has no email
     if (!customer?.email) {
-      console.log(`Skipping invoice ${invoice.invoice_number}: customer has no email`)
+      log.info(`Skipping invoice ${invoice.invoice_number}: customer has no email`)
       continue
     }
 
@@ -177,7 +180,7 @@ export async function processOverdueReminders(): Promise<ProcessRemindersResult>
 
     // Skip if no reminder needed
     if (!reminderLevel) {
-      console.log(`Skipping invoice ${invoice.invoice_number}: no reminder needed (${daysOverdue} days overdue, existing levels: ${existingLevels.join(', ')})`)
+      log.info(`Skipping invoice ${invoice.invoice_number}: no reminder needed (${daysOverdue} days overdue, existing levels: ${existingLevels.join(', ')})`)
       continue
     }
 
@@ -189,7 +192,7 @@ export async function processOverdueReminders(): Promise<ProcessRemindersResult>
       .single()
 
     if (companyError || !company) {
-      console.error(`Skipping invoice ${invoice.invoice_number}: company settings not found`)
+      log.error(`Skipping invoice ${invoice.invoice_number}: company settings not found`)
       results.push({
         invoiceId: invoice.id,
         invoiceNumber: invoice.invoice_number,
@@ -214,7 +217,7 @@ export async function processOverdueReminders(): Promise<ProcessRemindersResult>
       .single()
 
     if (reminderError || !reminderRecord) {
-      console.error(`Failed to create reminder record for invoice ${invoice.invoice_number}:`, reminderError)
+      log.error(`Failed to create reminder record for invoice ${invoice.invoice_number}:`, reminderError)
       results.push({
         invoiceId: invoice.id,
         invoiceNumber: invoice.invoice_number,
@@ -235,7 +238,7 @@ export async function processOverdueReminders(): Promise<ProcessRemindersResult>
     )
 
     if (sendResult.success) {
-      console.log(`Sent level ${reminderLevel} reminder for invoice ${invoice.invoice_number} to ${customer.email}`)
+      log.info(`Sent level ${reminderLevel} reminder for invoice ${invoice.invoice_number} to ${customer.email}`)
 
       // Update invoice status to overdue if not already
       if (invoice.status === 'sent') {
@@ -245,7 +248,7 @@ export async function processOverdueReminders(): Promise<ProcessRemindersResult>
           .eq('id', invoice.id)
       }
     } else {
-      console.error(`Failed to send reminder for invoice ${invoice.invoice_number}:`, sendResult.error)
+      log.error(`Failed to send reminder for invoice ${invoice.invoice_number}:`, sendResult.error)
     }
 
     results.push({
