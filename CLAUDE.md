@@ -613,4 +613,4 @@ VAPID_SUBJECT                     # VAPID subject (mailto: URI) for web push
 ```
 
 ## Other
-We should never create a nul file
+Never create a NUL/nul file: C:\Users\emilm\projects\erp-base\NUL
