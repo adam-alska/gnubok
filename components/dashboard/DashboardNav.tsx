@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -74,7 +74,13 @@ export default function DashboardNav({ companyName, entityType, enabledExtension
   const isOnOvrigtPage = ['/import', '/help', '/settings'].some(p => pathname.startsWith(p))
   const [manualOvrigtExpanded, setManualOvrigtExpanded] = useState(false)
   const isOvrigtExpanded = isOnOvrigtPage || manualOvrigtExpanded
-  const [isTillaggExpanded, setIsTillaggExpanded] = useState(false)
+  // Auto-expand Tillägg when on an extension page, or when manually toggled (persisted)
+  const isOnExtensionPage = pathname.startsWith('/e/')
+  const [manualTillaggExpanded, setManualTillaggExpanded] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem('tillagg-expanded') === 'true'
+  })
+  const isTillaggExpanded = isOnExtensionPage || manualTillaggExpanded
   const [liveExtensions, setLiveExtensions] = useState(enabledExtensions ?? [])
 
   const fetchExtensions = useCallback(async () => {
@@ -89,9 +95,16 @@ export default function DashboardNav({ companyName, entityType, enabledExtension
     }
   }, [])
 
+  // Fetch extensions on mount if Tillägg starts expanded
+  useEffect(() => {
+    if (isTillaggExpanded) fetchExtensions()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const toggleTillagg = () => {
     const next = !isTillaggExpanded
-    setIsTillaggExpanded(next)
+    setManualTillaggExpanded(next)
+    localStorage.setItem('tillagg-expanded', String(next))
     if (next) fetchExtensions()
   }
 
