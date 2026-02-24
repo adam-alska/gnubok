@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { ArrowLeft, Edit, Trash2, FileText } from 'lucide-react'
 import SupplierForm from '@/components/suppliers/SupplierForm'
 import Link from 'next/link'
+import { DestructiveConfirmDialog, useDestructiveConfirm } from '@/components/ui/destructive-confirm-dialog'
 import type { Supplier, SupplierType, CreateSupplierInput, SupplierInvoice } from '@/types'
 
 const supplierTypeLabels: Record<SupplierType, string> = {
@@ -31,6 +32,7 @@ export default function SupplierDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const { dialogProps: confirmDialogProps, confirm: confirmAction } = useDestructiveConfirm()
 
   useEffect(() => {
     fetchSupplier()
@@ -76,7 +78,13 @@ export default function SupplierDetailPage() {
   }
 
   async function handleDelete() {
-    if (!confirm('Är du säker på att du vill ta bort denna leverantör?')) return
+    const ok = await confirmAction({
+      title: 'Ta bort leverantör',
+      description: `"${supplier?.name}" och tillhörande data tas bort permanent. Denna åtgärd kan inte ångras.`,
+      confirmLabel: 'Ta bort',
+      variant: 'destructive',
+    })
+    if (!ok) return
 
     const res = await fetch(`/api/suppliers/${params.id}`, { method: 'DELETE' })
     const result = await res.json()
@@ -266,6 +274,8 @@ export default function SupplierDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <DestructiveConfirmDialog {...confirmDialogProps} />
 
       {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>

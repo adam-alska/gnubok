@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { evaluateMappingRules } from '@/lib/bookkeeping/mapping-engine'
+import { validateBody } from '@/lib/api/validate'
+import { EvaluateMappingRulesSchema } from '@/lib/api/schemas'
 import type { Transaction } from '@/types'
 
 export async function POST(request: Request) {
@@ -11,12 +13,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json()
+  const validation = await validateBody(request, EvaluateMappingRulesSchema)
+  if (!validation.success) return validation.response
+  const body = validation.data
 
   // Accept either a transaction ID or raw transaction data
   let transaction: Transaction
 
-  if (body.transaction_id) {
+  if ('transaction_id' in body) {
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
@@ -30,7 +34,7 @@ export async function POST(request: Request) {
 
     transaction = data as Transaction
   } else {
-    transaction = body as Transaction
+    transaction = body as unknown as Transaction
   }
 
   try {

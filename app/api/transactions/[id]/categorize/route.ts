@@ -3,18 +3,14 @@ import { NextResponse } from 'next/server'
 import { eventBus } from '@/lib/events'
 import { ensureInitialized } from '@/lib/init'
 import { buildMappingResultFromCategory } from '@/lib/bookkeeping/category-mapping'
+import { getTemplateById, buildMappingResultFromTemplate } from '@/lib/bookkeeping/booking-templates'
 import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-entries'
 import { saveUserMappingRule } from '@/lib/bookkeeping/mapping-engine'
-import type { Transaction, TransactionCategory, EntityType, VatTreatment } from '@/types'
+import { validateBody } from '@/lib/api/validate'
+import { CategorizeTransactionSchema } from '@/lib/api/schemas'
+import type { Transaction, TransactionCategory, EntityType } from '@/types'
 
 ensureInitialized()
-
-interface CategorizeRequest {
-  is_business: boolean
-  category?: TransactionCategory
-  vat_treatment?: VatTreatment
-  account_override?: string
-}
 
 /**
  * Ensure a fiscal period exists for the given date, create one if needed
@@ -98,8 +94,10 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Parse request body
-  const body: CategorizeRequest = await request.json()
+  // Parse and validate request body
+  const validation = await validateBody(request, CategorizeTransactionSchema)
+  if (!validation.success) return validation.response
+  const body = validation.data
   const { is_business, category } = body
 
   // Fetch the transaction (validates ownership)
@@ -156,18 +154,36 @@ export async function POST(
   const fiscalYearStartMonth: number = settings?.fiscal_year_start_month ?? 1
 
   // Determine the category to use
-  const finalCategory: TransactionCategory = is_business
-    ? (category || 'uncategorized')
-    : 'private'
+  let finalCategory: TransactionCategory
+  if (body.template_id) {
+    const template = getTemplateById(body.template_id)
+    if (template) {
+      finalCategory = is_business ? template.fallback_category : 'private'
+    } else {
+      return NextResponse.json({ error: 'Invalid template_id' }, { status: 400 })
+    }
+  } else {
+    finalCategory = is_business ? (category || 'uncategorized') : 'private'
+  }
 
-  // Build mapping result from category
-  const mappingResult = buildMappingResultFromCategory(
-    finalCategory,
-    transaction as Transaction,
-    is_business,
-    entityType,
-    body.vat_treatment
-  )
+  // Build mapping result from template or category
+  let mappingResult
+  if (body.template_id) {
+    const template = getTemplateById(body.template_id)!
+    mappingResult = buildMappingResultFromTemplate(
+      template,
+      transaction as Transaction,
+      entityType
+    )
+  } else {
+    mappingResult = buildMappingResultFromCategory(
+      finalCategory,
+      transaction as Transaction,
+      is_business,
+      entityType,
+      body.vat_treatment
+    )
+  }
 
   // Apply account override if provided (only for business transactions)
   if (is_business && body.account_override) {

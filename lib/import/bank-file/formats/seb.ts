@@ -25,12 +25,14 @@ export const sebFormat: BankFileFormat = {
   detect(content: string, _filename: string): boolean {
     const prepared = prepareContent(content)
     const firstLine = prepared.split('\n')[0]?.toLowerCase() || ''
-    // SEB headers contain "bokföringsdag" or "bokforingsdatum" and use semicolons
+    // SEB headers contain "bokföringsdag"/"bokforingsdatum" AND "valutadag"/"verifikationsnummer"
+    // The secondary check distinguishes SEB from Länsförsäkringar (which also has "bokföringsdag")
     return (
       firstLine.includes(';') &&
       (firstLine.includes('bokföringsdag') ||
         firstLine.includes('bokforingsdatum') ||
-        firstLine.includes('bokföringsdag'))
+        firstLine.includes('bokföringsdag')) &&
+      (firstLine.includes('valutadag') || firstLine.includes('verifikationsnummer'))
     )
   },
 

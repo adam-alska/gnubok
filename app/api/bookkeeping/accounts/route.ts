@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import { NextResponse } from 'next/server'
+import { validateBody } from '@/lib/api/validate'
+import { CreateAccountSchema } from '@/lib/api/schemas'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -47,7 +49,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json()
+  const validation = await validateBody(request, CreateAccountSchema)
+  if (!validation.success) return validation.response
+  const body = validation.data
 
   const { data, error } = await supabase
     .from('chart_of_accounts')

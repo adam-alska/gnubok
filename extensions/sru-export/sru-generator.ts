@@ -1,4 +1,4 @@
-import type { SRUFile, SRURecord } from '@/types'
+import type { SRUFile, SRURecord } from '@/extensions/ne-bilaga/types'
 import { sruFileToString, validateSRUFile } from './lib/sru-generator'
 import type { SRUBalance } from './sru-engine'
 

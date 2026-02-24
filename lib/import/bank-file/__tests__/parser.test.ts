@@ -116,6 +116,51 @@ const CAMT053_XML_WITH_STRUCTURED_REF = `<?xml version="1.0" encoding="UTF-8"?>
 </BkToCstmrStmt>
 </Document>`
 
+const LANSFORSAKRINGAR_CSV = [
+  '"Datum";"Bokföringsdag";"Typ";"Text";"Belopp";"Saldo"',
+  '"2024-01-15";"2024-01-15";"Kortköp";"SPOTIFY AB";"-99,00";"12 345,67"',
+  '"2024-01-14";"2024-01-14";"Kortköp";"ICA MAXI";"-432,50";"12 444,67"',
+  '"2024-01-13";"2024-01-13";"Insättning";"LÖNEUTBETALNING";"25 000,00";"12 877,17"',
+].join('\n')
+
+const LANSFORSAKRINGAR_CSV_NO_HEADER = [
+  '"2024-01-15";"2024-01-15";"Kortköp";"SPOTIFY AB";"-99,00";"12 345,67"',
+  '"2024-01-14";"2024-01-14";"Kortköp";"ICA MAXI";"-432,50";"12 444,67"',
+].join('\n')
+
+const ICA_BANKEN_CSV = [
+  'Kontonamn: Lönekonto',
+  'Kontonummer: 1234 567 890',
+  'Saldo: 12 877,17',
+  'Tillgängligt belopp: 12 877,17',
+  'Period: 2024-01-01 - 2024-01-31',
+  'Exporterad: 2024-02-01',
+  'Datum;Text;Belopp;Saldo',
+  '2024-01-15;SPOTIFY AB;-99,00;12345,67',
+  '2024-01-14;ICA MAXI LINDHAGEN;-432,50;12444,67',
+  '2024-01-13;LÖNEUTBETALNING;25000,00;12877,17',
+].join('\n')
+
+const SKANDIA_CSV = [
+  'Datum;Beskrivning;Belopp;Saldo',
+  '2024-01-15;SPOTIFY AB;-99,00;12345,67',
+  '2024-01-14;HEMKÖP FRIDHEMSPLAN;-432,50;12444,67',
+  '2024-01-13;LÖNEUTBETALNING;25000,00;12877,17',
+].join('\n')
+
+const SKANDIA_CSV_WITH_BANKKATEGORI = [
+  'Datum;Beskrivning;Belopp;Saldo;Bankkategori',
+  '2024-01-15;SPOTIFY AB;-99,00;12345,67;Underhållning',
+  '2024-01-14;ICA MAXI;-432,50;12444,67;Livsmedel',
+].join('\n')
+
+const LUNAR_CSV = [
+  'Date,Text,Amount,Balance',
+  '2024-01-15,SPOTIFY AB,"-99,00","12.345,67"',
+  '2024-01-14,ICA MAXI LINDHAGEN,"-432,50","12.444,67"',
+  '2024-01-13,LÖNEUTBETALNING,"25.000,00","12.877,17"',
+].join('\n')
+
 const UNKNOWN_CSV = [
   'id,name,value,timestamp',
   '1,Widget A,100,2024-01-15T10:00:00',
@@ -183,6 +228,42 @@ describe('detectFileFormat', () => {
     if (format) {
       expect(format.id).not.toBe('camt053')
     }
+  })
+
+  it('detects Länsförsäkringar CSV from header with "typ" keyword', () => {
+    const format = detectFileFormat(LANSFORSAKRINGAR_CSV, 'lansforsakringar.csv')
+    expect(format).not.toBeNull()
+    expect(format!.id).toBe('lansforsakringar')
+  })
+
+  it('detects Länsförsäkringar CSV from two adjacent date fields (no header)', () => {
+    const format = detectFileFormat(LANSFORSAKRINGAR_CSV_NO_HEADER, 'export.csv')
+    expect(format).not.toBeNull()
+    expect(format!.id).toBe('lansforsakringar')
+  })
+
+  it('detects ICA Banken CSV from metadata rows before header', () => {
+    const format = detectFileFormat(ICA_BANKEN_CSV, 'ica.csv')
+    expect(format).not.toBeNull()
+    expect(format!.id).toBe('ica_banken')
+  })
+
+  it('detects Skandia CSV from "beskrivning" header keyword', () => {
+    const format = detectFileFormat(SKANDIA_CSV, 'skandia.csv')
+    expect(format).not.toBeNull()
+    expect(format!.id).toBe('skandia')
+  })
+
+  it('detects Skandia CSV from "bankkategori" header keyword', () => {
+    const format = detectFileFormat(SKANDIA_CSV_WITH_BANKKATEGORI, 'skandia.csv')
+    expect(format).not.toBeNull()
+    expect(format!.id).toBe('skandia')
+  })
+
+  it('detects Lunar CSV from English headers (date, text, amount, balance)', () => {
+    const format = detectFileFormat(LUNAR_CSV, 'lunar.csv')
+    expect(format).not.toBeNull()
+    expect(format!.id).toBe('lunar')
   })
 
   it('returns null for unrecognized CSV content', () => {
@@ -423,6 +504,216 @@ describe('parseBankFile — Handelsbanken format', () => {
 
     const result = parseBankFile(diffDates, 'shb.csv')
     expect(result.transactions[0].date).toBe('2024-01-15')
+  })
+})
+
+describe('parseBankFile — Länsförsäkringar format', () => {
+  it('parses semicolon-delimited CSV with quoted fields and comma decimal separator', () => {
+    const result = parseBankFile(LANSFORSAKRINGAR_CSV, 'lf.csv')
+
+    expect(result.format).toBe('lansforsakringar')
+    expect(result.format_name).toBe('Länsförsäkringar')
+    expect(result.transactions).toHaveLength(3)
+    expect(result.issues).toHaveLength(0)
+  })
+
+  it('correctly parses amounts with comma decimal and space thousands', () => {
+    const result = parseBankFile(LANSFORSAKRINGAR_CSV, 'lf.csv')
+
+    expect(result.transactions[0].amount).toBe(-99)
+    expect(result.transactions[0].description).toBe('SPOTIFY AB')
+    expect(result.transactions[0].date).toBe('2024-01-15')
+
+    expect(result.transactions[1].amount).toBe(-432.5)
+    expect(result.transactions[2].amount).toBe(25000)
+  })
+
+  it('parses balance field', () => {
+    const result = parseBankFile(LANSFORSAKRINGAR_CSV, 'lf.csv')
+
+    expect(result.transactions[0].balance).toBe(12345.67)
+  })
+
+  it('handles files without a header row (data-only)', () => {
+    const result = parseBankFile(LANSFORSAKRINGAR_CSV_NO_HEADER, 'lf.csv')
+
+    expect(result.format).toBe('lansforsakringar')
+    expect(result.transactions).toHaveLength(2)
+    expect(result.transactions[0].amount).toBe(-99)
+    expect(result.transactions[1].amount).toBe(-432.5)
+  })
+
+  it('calculates stats correctly', () => {
+    const result = parseBankFile(LANSFORSAKRINGAR_CSV, 'lf.csv')
+
+    expect(result.stats.total_income).toBe(25000)
+    expect(result.stats.total_expenses).toBe(-531.5)
+    expect(result.stats.parsed_rows).toBe(3)
+  })
+
+  it('extracts correct date range', () => {
+    const result = parseBankFile(LANSFORSAKRINGAR_CSV, 'lf.csv')
+
+    expect(result.date_from).toBe('2024-01-13')
+    expect(result.date_to).toBe('2024-01-15')
+  })
+})
+
+describe('parseBankFile — ICA Banken format', () => {
+  it('parses semicolon-delimited CSV with metadata rows before header', () => {
+    const result = parseBankFile(ICA_BANKEN_CSV, 'ica.csv')
+
+    expect(result.format).toBe('ica_banken')
+    expect(result.format_name).toBe('ICA Banken')
+    expect(result.transactions).toHaveLength(3)
+    expect(result.issues).toHaveLength(0)
+  })
+
+  it('skips metadata rows and finds the correct header', () => {
+    const result = parseBankFile(ICA_BANKEN_CSV, 'ica.csv')
+
+    // No transaction should contain metadata text
+    const descriptions = result.transactions.map((t) => t.description)
+    expect(descriptions).not.toContain(expect.stringContaining('Kontonamn'))
+    expect(descriptions).not.toContain(expect.stringContaining('Exporterad'))
+  })
+
+  it('correctly parses amounts with comma decimal separator', () => {
+    const result = parseBankFile(ICA_BANKEN_CSV, 'ica.csv')
+
+    expect(result.transactions[0].amount).toBe(-99)
+    expect(result.transactions[0].description).toBe('SPOTIFY AB')
+    expect(result.transactions[0].date).toBe('2024-01-15')
+
+    expect(result.transactions[1].amount).toBe(-432.5)
+    expect(result.transactions[2].amount).toBe(25000)
+  })
+
+  it('parses balance field', () => {
+    const result = parseBankFile(ICA_BANKEN_CSV, 'ica.csv')
+
+    expect(result.transactions[0].balance).toBe(12345.67)
+  })
+
+  it('calculates stats correctly', () => {
+    const result = parseBankFile(ICA_BANKEN_CSV, 'ica.csv')
+
+    expect(result.stats.total_income).toBe(25000)
+    expect(result.stats.total_expenses).toBe(-531.5)
+    expect(result.stats.parsed_rows).toBe(3)
+  })
+
+  it('extracts correct date range', () => {
+    const result = parseBankFile(ICA_BANKEN_CSV, 'ica.csv')
+
+    expect(result.date_from).toBe('2024-01-13')
+    expect(result.date_to).toBe('2024-01-15')
+  })
+})
+
+describe('parseBankFile — Skandia format', () => {
+  it('parses semicolon-delimited CSV with comma decimal separator', () => {
+    const result = parseBankFile(SKANDIA_CSV, 'skandia.csv')
+
+    expect(result.format).toBe('skandia')
+    expect(result.format_name).toBe('Skandia')
+    expect(result.transactions).toHaveLength(3)
+    expect(result.issues).toHaveLength(0)
+  })
+
+  it('correctly parses amounts and descriptions', () => {
+    const result = parseBankFile(SKANDIA_CSV, 'skandia.csv')
+
+    expect(result.transactions[0].amount).toBe(-99)
+    expect(result.transactions[0].description).toBe('SPOTIFY AB')
+    expect(result.transactions[0].date).toBe('2024-01-15')
+
+    expect(result.transactions[1].amount).toBe(-432.5)
+    expect(result.transactions[1].description).toBe('HEMKÖP FRIDHEMSPLAN')
+    expect(result.transactions[2].amount).toBe(25000)
+  })
+
+  it('parses balance field', () => {
+    const result = parseBankFile(SKANDIA_CSV, 'skandia.csv')
+
+    expect(result.transactions[0].balance).toBe(12345.67)
+  })
+
+  it('handles files with bankkategori column', () => {
+    const result = parseBankFile(SKANDIA_CSV_WITH_BANKKATEGORI, 'skandia.csv')
+
+    expect(result.format).toBe('skandia')
+    expect(result.transactions).toHaveLength(2)
+    expect(result.transactions[0].amount).toBe(-99)
+    expect(result.transactions[1].amount).toBe(-432.5)
+  })
+
+  it('calculates stats correctly', () => {
+    const result = parseBankFile(SKANDIA_CSV, 'skandia.csv')
+
+    expect(result.stats.total_income).toBe(25000)
+    expect(result.stats.total_expenses).toBe(-531.5)
+    expect(result.stats.parsed_rows).toBe(3)
+  })
+
+  it('extracts correct date range', () => {
+    const result = parseBankFile(SKANDIA_CSV, 'skandia.csv')
+
+    expect(result.date_from).toBe('2024-01-13')
+    expect(result.date_to).toBe('2024-01-15')
+  })
+})
+
+describe('parseBankFile — Lunar format', () => {
+  it('parses comma-delimited CSV with English headers', () => {
+    const result = parseBankFile(LUNAR_CSV, 'lunar.csv')
+
+    expect(result.format).toBe('lunar')
+    expect(result.format_name).toBe('Lunar')
+    expect(result.transactions).toHaveLength(3)
+    expect(result.issues).toHaveLength(0)
+  })
+
+  it('correctly parses amounts with comma decimal and period thousand separator', () => {
+    const result = parseBankFile(LUNAR_CSV, 'lunar.csv')
+
+    expect(result.transactions[0].amount).toBe(-99)
+    expect(result.transactions[0].description).toBe('SPOTIFY AB')
+    expect(result.transactions[0].date).toBe('2024-01-15')
+
+    expect(result.transactions[1].amount).toBe(-432.5)
+    expect(result.transactions[2].amount).toBe(25000)
+  })
+
+  it('parses balance field with period thousand separator', () => {
+    const result = parseBankFile(LUNAR_CSV, 'lunar.csv')
+
+    expect(result.transactions[0].balance).toBe(12345.67)
+    expect(result.transactions[2].balance).toBe(12877.17)
+  })
+
+  it('calculates stats correctly', () => {
+    const result = parseBankFile(LUNAR_CSV, 'lunar.csv')
+
+    expect(result.stats.total_income).toBe(25000)
+    expect(result.stats.total_expenses).toBe(-531.5)
+    expect(result.stats.parsed_rows).toBe(3)
+  })
+
+  it('extracts correct date range', () => {
+    const result = parseBankFile(LUNAR_CSV, 'lunar.csv')
+
+    expect(result.date_from).toBe('2024-01-13')
+    expect(result.date_to).toBe('2024-01-15')
+  })
+
+  it('does not confuse Lunar (English) with Nordea (Swedish) headers', () => {
+    // Nordea has Swedish headers, Lunar has English
+    const nordeaResult = detectFileFormat(NORDEA_CSV, 'test.csv')
+    const lunarResult = detectFileFormat(LUNAR_CSV, 'test.csv')
+
+    expect(nordeaResult!.id).toBe('nordea')
+    expect(lunarResult!.id).toBe('lunar')
   })
 })
 
@@ -850,13 +1141,17 @@ describe('getFormat and getAllFormats', () => {
   it('getAllFormats returns all registered formats', () => {
     const formats = getAllFormats()
 
-    expect(formats.length).toBeGreaterThanOrEqual(6)
+    expect(formats.length).toBeGreaterThanOrEqual(10)
 
     const ids = formats.map((f) => f.id)
     expect(ids).toContain('nordea')
     expect(ids).toContain('seb')
     expect(ids).toContain('swedbank')
     expect(ids).toContain('handelsbanken')
+    expect(ids).toContain('lansforsakringar')
+    expect(ids).toContain('ica_banken')
+    expect(ids).toContain('skandia')
+    expect(ids).toContain('lunar')
     expect(ids).toContain('camt053')
     expect(ids).toContain('generic_csv')
   })

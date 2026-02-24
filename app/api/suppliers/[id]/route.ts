@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import type { CreateSupplierInput } from '@/types'
+import { validateBody } from '@/lib/api/validate'
+import { UpdateSupplierSchema } from '@/lib/api/schemas'
 
 export async function GET(
   _request: Request,
@@ -66,7 +67,9 @@ export async function PUT(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body: Partial<CreateSupplierInput> = await request.json()
+  const result = await validateBody(request, UpdateSupplierSchema)
+  if (!result.success) return result.response
+  const body = result.data
 
   const { data, error } = await supabase
     .from('suppliers')

@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { ensureInitialized } from '@/lib/init'
 import { runReconciliation } from '@/lib/reconciliation/bank-reconciliation'
+import { validateBody } from '@/lib/api/validate'
+import { RunReconciliationSchema } from '@/lib/api/schemas'
 
 ensureInitialized()
 
@@ -13,8 +15,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json()
-  const { date_from, date_to, dry_run } = body
+  const validation = await validateBody(request, RunReconciliationSchema)
+  if (!validation.success) return validation.response
+  const { date_from, date_to, dry_run } = validation.data
 
   const result = await runReconciliation(supabase, user.id, {
     dateFrom: date_from,

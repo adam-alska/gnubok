@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
 import CustomerForm from '@/components/customers/CustomerForm'
+import { DestructiveConfirmDialog, useDestructiveConfirm } from '@/components/ui/destructive-confirm-dialog'
 import {
   ArrowLeft,
   Building,
@@ -66,6 +67,7 @@ export default function CustomerDetailPage({
   const [isLoading, setIsLoading] = useState(true)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
+  const { dialogProps: confirmDialogProps, confirm: confirmAction } = useDestructiveConfirm()
 
   useEffect(() => {
     fetchCustomer()
@@ -124,7 +126,13 @@ export default function CustomerDetailPage({
 
   async function handleDelete() {
     if (!customer) return
-    if (!confirm(`Ta bort "${customer.name}"? Detta kan inte angras.`)) return
+    const ok = await confirmAction({
+      title: `Ta bort ${customer.name}`,
+      description: 'Kunden och tillhörande data tas bort permanent. Denna åtgärd kan inte ångras.',
+      confirmLabel: 'Ta bort',
+      variant: 'destructive',
+    })
+    if (!ok) return
 
     try {
       const response = await fetch(`/api/customers/${id}`, {
@@ -351,6 +359,8 @@ export default function CustomerDetailPage({
           )}
         </CardContent>
       </Card>
+
+      <DestructiveConfirmDialog {...confirmDialogProps} />
 
       {/* Edit dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>

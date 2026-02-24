@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Download, AlertCircle } from 'lucide-react'
 import { AccountNumber } from '@/components/ui/account-number'
-import type { SRUExportResult, SRUCoverageStats } from '@/types'
+import type { SRUExportResult, SRUCoverageStats } from '@/extensions/sru-export/types'
 
 function formatAmount(amount: number): string {
   return amount.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

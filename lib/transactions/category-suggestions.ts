@@ -1,6 +1,7 @@
 import { suggestCategory } from '@/lib/tax/expense-warnings'
 import { getExpenseAccountForCategory } from '@/lib/bookkeeping/category-mapping'
-import type { Transaction, TransactionCategory, MappingRule } from '@/types'
+import { findMatchingTemplates, type TemplateMatch } from '@/lib/bookkeeping/booking-templates'
+import type { Transaction, TransactionCategory, EntityType, MappingRule } from '@/types'
 
 export interface SuggestedCategory {
   category: TransactionCategory
@@ -176,4 +177,44 @@ export function mergeAiSuggestions(
   return merged
     .sort((a, b) => b.confidence - a.confidence)
     .slice(0, 5)
+}
+
+// ============================================================
+// Template Suggestions
+// ============================================================
+
+export interface SuggestedTemplate {
+  template_id: string
+  name_sv: string
+  name_en: string
+  group: string
+  debit_account: string
+  credit_account: string
+  confidence: number
+  description_sv: string
+  risk_level: string
+  requires_review: boolean
+}
+
+/**
+ * Get suggested booking templates for a transaction.
+ * Uses multi-signal matching (MCC, keywords, description patterns).
+ */
+export function getSuggestedTemplates(
+  transaction: Transaction,
+  entityType?: EntityType
+): SuggestedTemplate[] {
+  const matches = findMatchingTemplates(transaction, entityType)
+  return matches.map((m: TemplateMatch) => ({
+    template_id: m.template.id,
+    name_sv: m.template.name_sv,
+    name_en: m.template.name_en,
+    group: m.template.group,
+    debit_account: m.template.debit_account,
+    credit_account: m.template.credit_account,
+    confidence: m.confidence,
+    description_sv: m.template.description_sv,
+    risk_level: m.template.risk_level,
+    requires_review: m.template.requires_review,
+  }))
 }

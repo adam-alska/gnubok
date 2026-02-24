@@ -136,6 +136,36 @@ export default async function RootPage() {
     .lt('amount', 0)
     .is('receipt_id', null)
 
+  // Count journal entries missing underlag (documents)
+  const needsDocSourceTypes = [
+    'manual',
+    'bank_transaction',
+    'supplier_invoice_registered',
+    'supplier_invoice_paid',
+    'supplier_invoice_cash_payment',
+    'import',
+  ]
+
+  const { count: postedEntriesCount } = await supabase
+    .from('journal_entries')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .eq('status', 'posted')
+    .in('source_type', needsDocSourceTypes)
+
+  const { data: entriesWithDocs } = await supabase
+    .from('document_attachments')
+    .select('journal_entry_id')
+    .eq('user_id', user.id)
+    .eq('is_current_version', true)
+    .not('journal_entry_id', 'is', null)
+
+  const uniqueEntriesWithDocs = new Set(
+    (entriesWithDocs || []).map((d) => d.journal_entry_id)
+  ).size
+
+  const missingUnderlagCount = Math.max(0, (postedEntriesCount || 0) - uniqueEntriesWithDocs)
+
   // Calculate receipt streak
   const { data: recentReceiptActivity } = await supabase
     .from('receipts')
@@ -188,6 +218,7 @@ export default async function RootPage() {
               bankBalance,
               deadlines: (deadlines || []) as Deadline[],
               receiptQueue,
+              missingUnderlagCount,
             }}
           />
         </div>

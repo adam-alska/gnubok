@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/use-toast'
 import { Badge } from '@/components/ui/badge'
 import { Calendar, Copy, RefreshCw, Loader2, ExternalLink, Check } from 'lucide-react'
+import { DestructiveConfirmDialog, useDestructiveConfirm } from '@/components/ui/destructive-confirm-dialog'
 import type { CalendarFeed } from '@/types'
 
 interface CalendarFeedWithUrls extends CalendarFeed {
@@ -24,6 +25,7 @@ export function CalendarFeedSettings() {
   const [isRegenerating, setIsRegenerating] = useState(false)
   const [feed, setFeed] = useState<CalendarFeedWithUrls | null>(null)
   const [copied, setCopied] = useState(false)
+  const { dialogProps: confirmDialogProps, confirm: confirmAction } = useDestructiveConfirm()
 
   useEffect(() => {
     fetchFeed()
@@ -99,9 +101,13 @@ export function CalendarFeedSettings() {
   }
 
   const regenerateToken = async () => {
-    if (!confirm('Är du säker? Den gamla länken kommer sluta fungera.')) {
-      return
-    }
+    const ok = await confirmAction({
+      title: 'Skapa ny kalender-länk',
+      description: 'Den gamla länken slutar fungera omedelbart. Du behöver uppdatera länken i alla kalenderappar som använder den.',
+      confirmLabel: 'Skapa ny länk',
+      variant: 'warning',
+    })
+    if (!ok) return
 
     setIsRegenerating(true)
 
@@ -334,6 +340,8 @@ export function CalendarFeedSettings() {
 
         </CardContent>
       </Card>
+
+      <DestructiveConfirmDialog {...confirmDialogProps} />
     </div>
   )
 }

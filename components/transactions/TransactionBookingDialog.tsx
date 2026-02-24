@@ -1,9 +1,15 @@
 'use client'
 
+import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { ArrowUpRight, ArrowDownRight, ChevronDown, ChevronUp, Paperclip } from 'lucide-react'
 import JournalEntryForm from '@/components/bookkeeping/JournalEntryForm'
+import DocumentUploadZone from '@/components/bookkeeping/DocumentUploadZone'
+import type { UploadedFile } from '@/components/bookkeeping/DocumentUploadZone'
 import type { FormLine } from '@/components/bookkeeping/JournalEntryForm'
 import type { TransactionWithInvoice } from './transaction-types'
 
@@ -38,17 +44,58 @@ export default function TransactionBookingDialog({
   transaction,
   onBooked,
 }: TransactionBookingDialogProps) {
+  const { toast } = useToast()
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
+  const [showUploadZone, setShowUploadZone] = useState(false)
+
   if (!transaction) return null
 
   const isIncome = transaction.amount > 0
 
+  const handleBooked = async (transactionId: string, journalEntryId: string) => {
+    // Link any uploaded documents to the new journal entry
+    const filesToLink = uploadedFiles.filter((f) => f.status === 'uploaded' && f.id)
+    if (filesToLink.length > 0) {
+      let linkFailCount = 0
+      for (const file of filesToLink) {
+        try {
+          await fetch(`/api/documents/${file.id}/link`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ journal_entry_id: journalEntryId }),
+          })
+        } catch (linkErr) {
+          console.error('[TransactionBookingDialog] Failed to link document:', linkErr)
+          linkFailCount++
+        }
+      }
+      if (linkFailCount > 0) {
+        toast({
+          title: 'Underlag kunde inte bifogas',
+          description: `${linkFailCount} fil(er) kunde inte lankas till verifikationen. Forsok igen via bokforingssidan.`,
+          variant: 'destructive',
+        })
+      }
+    }
+
+    setUploadedFiles([])
+    setShowUploadZone(false)
+    onBooked(transactionId, journalEntryId)
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => {
+      if (!o) {
+        setUploadedFiles([])
+        setShowUploadZone(false)
+      }
+      onOpenChange(o)
+    }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Bokför transaktion</DialogTitle>
+          <DialogTitle>Bokfor transaktion</DialogTitle>
           <DialogDescription>
-            Skapa en verifikation för transaktionen
+            Skapa en verifikation for transaktionen
           </DialogDescription>
         </DialogHeader>
 
@@ -77,6 +124,39 @@ export default function TransactionBookingDialog({
           </p>
         </div>
 
+        {/* Document upload section */}
+        <div className="rounded-lg border">
+          <button
+            type="button"
+            onClick={() => setShowUploadZone(!showUploadZone)}
+            className="flex items-center justify-between w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Paperclip className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">Underlag (valfritt)</span>
+              {uploadedFiles.filter((f) => f.status === 'uploaded').length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {uploadedFiles.filter((f) => f.status === 'uploaded').length} bifogade
+                </span>
+              )}
+            </div>
+            {showUploadZone ? (
+              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            )}
+          </button>
+          {showUploadZone && (
+            <div className="px-3 pb-3">
+              <DocumentUploadZone
+                files={uploadedFiles}
+                onFilesChange={setUploadedFiles}
+                compact
+              />
+            </div>
+          )}
+        </div>
+
         <JournalEntryForm
           key={transaction.id}
           embedded
@@ -86,7 +166,7 @@ export default function TransactionBookingDialog({
           submitUrl={`/api/transactions/${transaction.id}/book`}
           sourceType="bank_transaction"
           sourceId={transaction.id}
-          onEntryCreated={(entryId) => onBooked(transaction.id, entryId)}
+          onEntryCreated={(entryId) => handleBooked(transaction.id, entryId)}
         />
       </DialogContent>
     </Dialog>

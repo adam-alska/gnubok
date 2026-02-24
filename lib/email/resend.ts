@@ -5,9 +5,10 @@ const log = createLogger('email')
 
 // Default sender configuration
 // Using a fixed From address with dynamic Reply-To
-// From: "Företagsnamn via ERP Base" <fakturor@erp-base.se>
+// From: "Företagsnamn via ERP Base" <your-from@example.com>
 // Reply-To: user's company email from company_settings
-const DEFAULT_FROM_EMAIL = 'fakturor@arcim.io'
+// Set RESEND_FROM_EMAIL in .env.local to your verified Resend domain
+const DEFAULT_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@localhost'
 
 // Lazy initialization to avoid errors at build time
 let resendClient: Resend | null = null

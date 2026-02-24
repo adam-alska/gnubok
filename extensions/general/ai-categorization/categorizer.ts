@@ -10,6 +10,7 @@
 
 import 'server-only'
 import Anthropic from '@anthropic-ai/sdk'
+import { BOOKING_TEMPLATES, type BookingTemplate } from '@/lib/bookkeeping/booking-templates'
 import type { TransactionCategory, EntityType } from '@/types'
 
 // ============================================================
@@ -39,6 +40,7 @@ export interface CategorizationSuggestion {
   confidence: number
   reasoning: string
   isPrivate: boolean
+  templateId?: string
 }
 
 export interface CategorizationProvider {
@@ -71,6 +73,17 @@ function getCategoryAccountMap(entityType: EntityType): Record<string, { account
     expense_other: { account: '6991', label: 'Övriga kostnader' },
     private: { account: '2013', label: 'Privat uttag (EF) / Skuld till ägare (AB)' },
   }
+}
+
+/**
+ * Build an abbreviated template reference for the AI prompt.
+ * Filters by direction (expense/income) to keep prompt concise.
+ */
+function getTemplateReference(direction: 'expense' | 'income'): string {
+  return BOOKING_TEMPLATES
+    .filter((t) => t.direction === direction || t.direction === 'transfer')
+    .map((t) => `${t.id}: ${t.name_sv} → ${t.debit_account}/${t.credit_account}`)
+    .join('\n')
 }
 
 const NON_DEDUCTIBLE_RULES = `
@@ -112,10 +125,21 @@ export class AnthropicCategorizationProvider implements CategorizationProvider {
     const privateAccount = context.entityType === 'aktiebolag' ? '2893' : '2013'
     const categoryAccountMap = getCategoryAccountMap(context.entityType)
 
-    const systemPrompt = `Du är expert på svensk bokföring och kategorisering av banktransaktioner enligt BAS-kontoplanen.
-Din uppgift är att kategorisera varje transaktion till rätt kategori och BAS-konto.
+    // Build template references based on batch direction (most transactions will be same direction)
+    const hasExpenses = batch.some((t) => t.amount < 0)
+    const hasIncome = batch.some((t) => t.amount > 0)
+    const templateRef = [
+      hasExpenses ? `UTGIFTSMALLAR:\n${getTemplateReference('expense')}` : '',
+      hasIncome ? `INTÄKTSMALLAR:\n${getTemplateReference('income')}` : '',
+    ].filter(Boolean).join('\n\n')
 
-KATEGORIER OCH BAS-KONTON:
+    const systemPrompt = `Du är expert på svensk bokföring och kategorisering av banktransaktioner enligt BAS-kontoplanen.
+Din uppgift är att kategorisera varje transaktion till rätt mall-ID (templateId) och BAS-konto.
+
+BOKFÖRINGSMALLAR (id: namn → debitkonto/kreditkonto):
+${templateRef}
+
+KATEGORIER (fallback om ingen mall matchar):
 ${Object.entries(categoryAccountMap)
   .map(([cat, info]) => `- ${cat}: ${info.account} (${info.label})`)
   .join('\n')}
@@ -136,7 +160,8 @@ REGLER:
 3. Ange confidence 0.0-1.0 baserat på hur säker du är
 4. Ange kort reasoning på svenska
 5. Om en transaktion liknar privat konsumtion (kläder, gym, etc.), sätt category: "private"
-6. taxCode: "MPI" för avdragsgilla affärskostnader med moms, "MP1" för intäkter med moms, null för momsfria/privata`
+6. taxCode: "MPI" för avdragsgilla affärskostnader med moms, "MP1" för intäkter med moms, null för momsfria/privata
+7. Ange templateId om en bokföringsmall matchar (föredra mallar framför generiska kategorier)`
 
     const historyContext =
       context.recentHistory.length > 0
@@ -168,6 +193,7 @@ Returnera ett JSON-objekt med följande struktur:
     {
       "transactionId": "id",
       "category": "expense_software",
+      "templateId": "it_saas_subscription",
       "basAccount": "5420",
       "taxCode": "MPI",
       "confidence": 0.9,
@@ -265,6 +291,7 @@ Returnera ENDAST JSON-objektet, ingen annan text.`
           confidence: Math.max(0, Math.min(1, Number(s.confidence) || 0.5)),
           reasoning: (s.reasoning as string) || '',
           isPrivate: category === 'private' || Boolean(s.isPrivate),
+          templateId: (s.templateId as string) || undefined,
         }
       })
   }

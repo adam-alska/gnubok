@@ -28,6 +28,7 @@ import {
   CheckCircle2,
   ClipboardList,
   MessageCircle,
+  FileWarning,
 } from 'lucide-react'
 import type { CompanySettings, EntityType, Deadline, ReceiptQueueSummary, OnboardingProgress } from '@/types'
 
@@ -47,6 +48,7 @@ interface DashboardContentProps {
     bankBalance: number | null
     deadlines: Deadline[]
     receiptQueue: ReceiptQueueSummary | null
+    missingUnderlagCount: number
   }
   onboardingProgress?: OnboardingProgress
 }
@@ -176,6 +178,29 @@ export default function DashboardContent({ firstName, settings, summary, onboard
     )
   }
 
+  if (summary.missingUnderlagCount > 0) {
+    alertItems.push(
+      <Link key="missing-underlag" href="/bookkeeping?missingUnderlag=true" className="group">
+        <Card className="h-full border-l-2 border-l-warning hover:bg-muted/20 transition-colors">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <FileWarning className="h-4 w-4 text-warning-foreground flex-shrink-0" />
+                <div>
+                  <p className="font-medium text-sm">Saknade underlag</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {summary.missingUnderlagCount} verifikationer utan underlag
+                  </p>
+                </div>
+              </div>
+              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground group-hover:translate-x-0.5 transition-all" />
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
+    )
+  }
+
   const MAX_VISIBLE_ALERTS = 3
   const visibleAlerts = showAllAlerts ? alertItems : alertItems.slice(0, MAX_VISIBLE_ALERTS)
   const hasMoreAlerts = alertItems.length > MAX_VISIBLE_ALERTS
@@ -227,6 +252,9 @@ export default function DashboardContent({ firstName, settings, summary, onboard
         }
         if (summary.receiptQueue && summary.receiptQueue.pending_review_count > 0) {
           todoItems.push({ label: 'kvitton att granska', href: '/receipts', count: summary.receiptQueue.pending_review_count, variant: 'default' })
+        }
+        if (summary.missingUnderlagCount > 0) {
+          todoItems.push({ label: 'saknade underlag', href: '/bookkeeping?missingUnderlag=true', count: summary.missingUnderlagCount, variant: 'warning' })
         }
 
         if (todoItems.length === 0) return null
