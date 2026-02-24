@@ -58,22 +58,56 @@ export const EU_COUNTRY_CODES_EXCL_SE = EU_COUNTRIES
 /** All EU country codes including Sweden */
 export const EU_COUNTRY_CODES = EU_COUNTRIES.map(c => c.code)
 
-/** Check if a country code is an EU member state (excluding Sweden) */
-export function isEUCountry(countryCode: string): boolean {
-  return EU_COUNTRY_CODES_EXCL_SE.includes(countryCode.toUpperCase())
+/**
+ * Build a lookup set of all known names/codes for EU countries (excluding Sweden).
+ * Handles ISO codes, English names, and Swedish names — all uppercased for matching.
+ */
+const EU_LOOKUP_EXCL_SE = new Set(
+  EU_COUNTRIES
+    .filter(c => c.code !== 'SE')
+    .flatMap(c => [c.code, c.name, c.nameEn].map(s => s.toUpperCase()))
+)
+
+const EU_LOOKUP_INCL_SE = new Set(
+  EU_COUNTRIES
+    .flatMap(c => [c.code, c.name, c.nameEn].map(s => s.toUpperCase()))
+)
+
+/**
+ * Check if a country value is an EU member state (excluding Sweden).
+ * Accepts ISO codes ("DE"), English names ("Germany"), or Swedish names ("Tyskland").
+ */
+export function isEUCountry(country: string): boolean {
+  return EU_LOOKUP_EXCL_SE.has(country.trim().toUpperCase())
 }
 
-/** Check if a country code is an EU member state (including Sweden) */
-export function isEUCountryIncludingSE(countryCode: string): boolean {
-  return EU_COUNTRY_CODES.includes(countryCode.toUpperCase())
+/**
+ * Check if a country value is an EU member state (including Sweden).
+ * Accepts ISO codes, English names, or Swedish names.
+ */
+export function isEUCountryIncludingSE(country: string): boolean {
+  return EU_LOOKUP_INCL_SE.has(country.trim().toUpperCase())
 }
 
-/** Get EU country data by ISO code */
-export function getEUCountry(countryCode: string): EUCountry | undefined {
-  return EU_COUNTRIES.find(c => c.code === countryCode.toUpperCase())
+/** Get EU country data by ISO code, English name, or Swedish name */
+export function getEUCountry(country: string): EUCountry | undefined {
+  const upper = country.trim().toUpperCase()
+  return EU_COUNTRIES.find(
+    c => c.code === upper || c.name.toUpperCase() === upper || c.nameEn.toUpperCase() === upper
+  )
 }
 
 /** Get the VIES VAT prefix for a country (note: Greece uses 'EL' not 'GR') */
 export function getVatPrefix(countryCode: string): string | undefined {
   return getEUCountry(countryCode)?.vatPrefix
+}
+
+/**
+ * Normalize a country value to its ISO 3166-1 alpha-2 code.
+ * Accepts ISO codes, English names, or Swedish names.
+ * Returns the input uppercased if no match is found.
+ */
+export function toCountryCode(country: string): string {
+  const found = getEUCountry(country)
+  return found ? found.code : country.trim().toUpperCase()
 }

@@ -491,6 +491,15 @@ export const ReportPeriodQuerySchema = z.object({
 })
 
 // ============================================================
+// VAT validation schemas
+// ============================================================
+
+export const ValidateVatNumberSchema = z.object({
+  vat_number: z.string().min(4, 'VAT number must be at least 4 characters'),
+  customer_id: uuid.optional(),
+})
+
+// ============================================================
 // Pagination schemas
 // ============================================================
 

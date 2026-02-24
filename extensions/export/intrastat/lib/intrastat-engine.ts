@@ -15,7 +15,7 @@
  * Reference: SCB Intrastat guidelines, Combined Nomenclature (CN)
  */
 
-import { isEUCountry } from '@/extensions/export/shared/eu-countries'
+import { isEUCountry, toCountryCode } from '@/extensions/export/shared/eu-countries'
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -192,6 +192,7 @@ export function generateIntrastatReport(options: IntrastatOptions): IntrastatRep
 
   for (const invoice of relevantInvoices) {
     const customer = customerMap.get(invoice.customer_id)!
+    const partnerCountryCode = toCountryCode(customer.country)
     const isCreditNote = invoice.credited_invoice_id !== null
     const items = itemsByInvoice.get(invoice.id) ?? []
 
@@ -208,10 +209,10 @@ export function generateIntrastatReport(options: IntrastatOptions): IntrastatRep
         message: `Faktura ${invoice.invoice_number} saknar fakturarader — kan inte tilldela CN-kod.`,
       })
 
-      const key = buildAggKey('00000000', customer.country, 'SE', defaultTransactionNature, defaultDeliveryTerms)
+      const key = buildAggKey('00000000', partnerCountryCode, 'SE', defaultTransactionNature, defaultDeliveryTerms)
       addToAggregation(aggregation, key, {
         cnCode: '00000000',
-        partnerCountry: customer.country,
+        partnerCountry: partnerCountryCode,
         countryOfOrigin: 'SE',
         transactionNature: defaultTransactionNature,
         deliveryTerms: defaultDeliveryTerms,
@@ -240,10 +241,10 @@ export function generateIntrastatReport(options: IntrastatOptions): IntrastatRep
           message: `Faktura ${invoice.invoice_number}, rad "${item.description}" — ingen matchande produkt med CN-kod hittad.`,
         })
 
-        const key = buildAggKey('00000000', customer.country, 'SE', defaultTransactionNature, defaultDeliveryTerms)
+        const key = buildAggKey('00000000', partnerCountryCode, 'SE', defaultTransactionNature, defaultDeliveryTerms)
         addToAggregation(aggregation, key, {
           cnCode: '00000000',
-          partnerCountry: customer.country,
+          partnerCountry: partnerCountryCode,
           countryOfOrigin: 'SE',
           transactionNature: defaultTransactionNature,
           deliveryTerms: defaultDeliveryTerms,
@@ -286,10 +287,10 @@ export function generateIntrastatReport(options: IntrastatOptions): IntrastatRep
         ? product.supplementaryUnit * item.quantity
         : null
 
-      const key = buildAggKey(cnCode, customer.country, origin, defaultTransactionNature, defaultDeliveryTerms)
+      const key = buildAggKey(cnCode, partnerCountryCode, origin, defaultTransactionNature, defaultDeliveryTerms)
       addToAggregation(aggregation, key, {
         cnCode,
-        partnerCountry: customer.country,
+        partnerCountry: partnerCountryCode,
         countryOfOrigin: origin,
         transactionNature: defaultTransactionNature,
         deliveryTerms: defaultDeliveryTerms,

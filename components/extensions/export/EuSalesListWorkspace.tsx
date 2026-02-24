@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import type { WorkspaceComponentProps } from '@/lib/extensions/workspace-registry'
+import { useMockData } from '@/lib/extensions/use-mock-data'
 import ExtensionLoadingSkeleton from '@/components/extensions/shared/ExtensionLoadingSkeleton'
+import MockDataBanner from '@/components/extensions/shared/MockDataBanner'
+import MockDataImportDialog from '@/components/extensions/shared/MockDataImportDialog'
+import type { CsvFieldDef } from '@/components/extensions/shared/MockDataImportDialog'
 import KPICard from '@/components/extensions/shared/KPICard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -16,6 +20,7 @@ import {
 import {
   AlertTriangle, CheckCircle2, FileSpreadsheet, FileCode,
   Clock, ChevronDown, ChevronUp, Users, Package, Briefcase,
+  FlaskConical,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -99,10 +104,72 @@ function currentQuarter(): number {
   return Math.ceil(currentMonth() / 3)
 }
 
+// ── Mock Data Config ──────────────────────────────────────────
+
+const MOCK_CSV_FIELDS: CsvFieldDef[] = [
+  { key: 'customerVatNumber', label: 'VAT-nummer', required: true },
+  { key: 'customerName', label: 'Kundnamn', required: true },
+  { key: 'customerCountry', label: 'Land', required: true },
+  { key: 'goodsAmount', label: 'Varor (SEK)' },
+  { key: 'servicesAmount', label: 'Tjänster (SEK)' },
+  { key: 'triangulationAmount', label: 'Trepartshandel (SEK)' },
+  { key: 'invoiceCount', label: 'Antal fakturor' },
+]
+
+const MOCK_CSV_TEMPLATE = `customerVatNumber;customerName;customerCountry;goodsAmount;servicesAmount;triangulationAmount;invoiceCount
+DE123456789;Beispiel GmbH;DE;150000;25000;0;3
+FR987654321;Exemple SARL;FR;0;80000;0;2
+NL456789012;Voorbeeld BV;NL;45000;0;12000;1`
+
+function parseMockCsvRows(rows: Record<string, string>[]): ReportData {
+  const lines: ECSalesListLine[] = rows.map(r => ({
+    customerVatNumber: r.customerVatNumber || '',
+    customerName: r.customerName || '',
+    customerCountry: r.customerCountry || '',
+    customerId: r.customerVatNumber || '',
+    goodsAmount: parseFloat(r.goodsAmount || '0') || 0,
+    servicesAmount: parseFloat(r.servicesAmount || '0') || 0,
+    triangulationAmount: parseFloat(r.triangulationAmount || '0') || 0,
+    invoiceCount: parseInt(r.invoiceCount || '1', 10) || 1,
+  }))
+
+  const goods = lines.reduce((s, l) => s + l.goodsAmount, 0)
+  const services = lines.reduce((s, l) => s + l.servicesAmount, 0)
+  const triangulation = lines.reduce((s, l) => s + l.triangulationAmount, 0)
+  const invoiceCount = lines.reduce((s, l) => s + l.invoiceCount, 0)
+
+  return {
+    period: { year: new Date().getFullYear(), quarter: Math.ceil((new Date().getMonth() + 1) / 3) },
+    filingType: 'quarterly',
+    reporterVatNumber: 'SE000000000001',
+    reporterName: 'Testdata',
+    lines,
+    totals: { goods, services, triangulation, total: goods + services + triangulation },
+    warnings: [],
+    crossCheck: null,
+    invoiceCount,
+    customerCount: lines.length,
+    deadline: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+    daysUntilDeadline: 30,
+  }
+}
+
+function validateMockReport(data: unknown): { valid: boolean; error?: string } {
+  if (!data || typeof data !== 'object') return { valid: false, error: 'Data måste vara ett objekt' }
+  const obj = data as Record<string, unknown>
+  if (!Array.isArray(obj.lines)) return { valid: false, error: 'Fältet "lines" saknas eller är inte en array' }
+  if (!obj.totals || typeof obj.totals !== 'object') return { valid: false, error: 'Fältet "totals" saknas' }
+  return { valid: true }
+}
+
 // ── Component ─────────────────────────────────────────────────
 
 export default function EuSalesListWorkspace({ userId }: WorkspaceComponentProps) {
   void userId
+
+  // Mock data
+  const { mockReport, isMockActive, isLoading: mockLoading, importedAt, saveMockData, clearMockData } = useMockData<ReportData>('export', 'eu-sales-list')
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
 
   // Period selection state
   const [year, setYear] = useState(currentYear())
@@ -133,6 +200,12 @@ export default function EuSalesListWorkspace({ userId }: WorkspaceComponentProps
 
   // Fetch report
   const fetchReport = useCallback(async () => {
+    if (isMockActive && mockReport) {
+      setReport(mockReport)
+      setIsLoading(false)
+      return
+    }
+
     setIsLoading(true)
     setError(null)
 
@@ -159,11 +232,38 @@ export default function EuSalesListWorkspace({ userId }: WorkspaceComponentProps
     } finally {
       setIsLoading(false)
     }
-  }, [year, month, quarter, periodType])
+  }, [year, month, quarter, periodType, isMockActive, mockReport])
 
   useEffect(() => {
     fetchReport()
   }, [fetchReport])
+
+  const handleMockImport = useCallback(async (data: ReportData, meta: { source: 'csv' | 'json'; fileName: string; rowCount: number }) => {
+    await saveMockData(data, meta)
+    setReport(data)
+  }, [saveMockData])
+
+  const handleMockClear = useCallback(async () => {
+    await clearMockData()
+    setReport(null)
+    // Re-fetch from API
+    setIsLoading(true)
+    setError(null)
+    const params = new URLSearchParams({ year: String(year) })
+    if (periodType === 'monthly') {
+      params.set('month', String(month))
+    } else {
+      params.set('quarter', String(quarter))
+    }
+    try {
+      const res = await fetch(`/api/extensions/export/eu-sales-list/report?${params}`)
+      if (res.ok) {
+        const json = await res.json()
+        setReport(json.data)
+      }
+    } catch { /* ignore */ }
+    setIsLoading(false)
+  }, [clearMockData, year, month, quarter, periodType])
 
   // Sort lines
   const sortedLines = useMemo(() => {
@@ -245,7 +345,7 @@ export default function EuSalesListWorkspace({ userId }: WorkspaceComponentProps
   const errorCount = report?.warnings.filter(w => w.severity === 'error').length ?? 0
   const warningCount = report?.warnings.filter(w => w.severity === 'warning').length ?? 0
 
-  if (isLoading && !report) {
+  if ((isLoading || mockLoading) && !report) {
     return <ExtensionLoadingSkeleton />
   }
 
@@ -309,8 +409,16 @@ export default function EuSalesListWorkspace({ userId }: WorkspaceComponentProps
           )}
         </div>
 
-        {/* Download buttons */}
+        {/* Download + Import buttons */}
         <div className="flex gap-2 ml-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setImportDialogOpen(true)}
+          >
+            <FlaskConical className="h-4 w-4 mr-1.5" />
+            Importera testdata
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -331,6 +439,15 @@ export default function EuSalesListWorkspace({ userId }: WorkspaceComponentProps
           </Button>
         </div>
       </div>
+
+      {/* ── Mock Data Banner ──────────────────────────────── */}
+      {isMockActive && (
+        <MockDataBanner
+          importedAt={importedAt}
+          onClear={handleMockClear}
+          onReplace={() => setImportDialogOpen(true)}
+        />
+      )}
 
       {/* ── Error state ────────────────────────────────────── */}
       {error && (
@@ -578,6 +695,18 @@ export default function EuSalesListWorkspace({ userId }: WorkspaceComponentProps
           </div>
         </>
       )}
+
+      {/* ── Mock Data Import Dialog ───────────────────────── */}
+      <MockDataImportDialog<ReportData>
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        csvFields={MOCK_CSV_FIELDS}
+        parseCsvRows={parseMockCsvRows}
+        validateReport={validateMockReport}
+        templateCsvContent={MOCK_CSV_TEMPLATE}
+        templateFileName="eu-sales-list-template.csv"
+        onImport={handleMockImport}
+      />
     </div>
   )
 }
