@@ -59,34 +59,53 @@ export default async function DashboardPage() {
     hasBankConnected: (transactionCount || 0) > 0,
   }
 
-  // Fetch current year transactions summary
-  const startOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString()
-  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
+  // Fetch current year date boundaries
+  const startOfYearStr = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]
+  const startOfMonthStr = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
 
-  const { data: transactions } = await supabase
-    .from('transactions')
-    .select('amount, amount_sek, is_business, category, date')
-    .eq('user_id', user.id)
-    .gte('date', startOfYear.split('T')[0])
+  // Fetch posted journal entry lines for revenue/expense accounts (classes 3-7)
+  const { data: journalLines } = await supabase
+    .from('journal_entry_lines')
+    .select('account_number, debit_amount, credit_amount, journal_entry:journal_entries!inner(entry_date, status)')
+    .eq('journal_entry.status', 'posted')
+    .gte('journal_entry.entry_date', startOfYearStr)
 
-  // Calculate summaries
-  const ytdTransactions = transactions || []
-  const mtdTransactions = ytdTransactions.filter(
-    (t) => t.date >= startOfMonth.split('T')[0]
-  )
+  // Calculate totals from journal entry lines using account classes
+  const calculateTotals = (lines: typeof journalLines, fromDate: string) => {
+    const filtered = (lines || []).filter((l) => {
+      const entry = l.journal_entry as unknown as { entry_date: string; status: string }
+      return entry.entry_date >= fromDate
+    })
 
-  const calculateTotals = (txns: typeof ytdTransactions) => {
-    const income = txns
-      .filter((t) => t.is_business && t.amount > 0)
-      .reduce((sum, t) => sum + Number(t.amount_sek || t.amount), 0)
-    const expenses = txns
-      .filter((t) => t.is_business && t.amount < 0)
-      .reduce((sum, t) => sum + Math.abs(Number(t.amount_sek || t.amount)), 0)
-    return { income, expenses, net: income - expenses }
+    let revenue = 0
+    let expenses = 0
+
+    for (const line of filtered) {
+      const acct = line.account_number
+      if (acct.startsWith('3')) {
+        // Revenue: class 3 — credit-normal accounts
+        revenue += Math.round(((line.credit_amount || 0) - (line.debit_amount || 0)) * 100) / 100
+      } else if (acct.startsWith('4') || acct.startsWith('5') || acct.startsWith('6') || acct.startsWith('7')) {
+        // Expenses: classes 4-7 — debit-normal accounts
+        expenses += Math.round(((line.debit_amount || 0) - (line.credit_amount || 0)) * 100) / 100
+      }
+    }
+
+    revenue = Math.round(revenue * 100) / 100
+    expenses = Math.round(expenses * 100) / 100
+
+    return { income: revenue, expenses, net: Math.round((revenue - expenses) * 100) / 100 }
   }
 
-  const ytdTotals = calculateTotals(ytdTransactions)
-  const mtdTotals = calculateTotals(mtdTransactions)
+  const ytdTotals = calculateTotals(journalLines, startOfYearStr)
+  const mtdTotals = calculateTotals(journalLines, startOfMonthStr)
+
+  // Fetch uncategorized transaction counts (still useful for the alert)
+  const { data: transactions } = await supabase
+    .from('transactions')
+    .select('amount, amount_sek, is_business')
+    .eq('user_id', user.id)
+    .gte('date', startOfYearStr)
 
   const uncategorizedTxns = (transactions || []).filter(
     (t) => t.is_business === null
