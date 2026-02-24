@@ -114,7 +114,8 @@ describe('Supplier Invoice Core Handler', () => {
     })
 
     expect(consoleSpy).toHaveBeenCalledWith(
-      '[supplier-invoice-handler] Failed to create registration journal entry:',
+      '[supplier-invoice-handler]',
+      'Failed to create registration journal entry:',
       expect.any(Error)
     )
 

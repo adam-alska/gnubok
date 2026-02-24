@@ -3,7 +3,10 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js'
+import { createLogger } from '@/lib/logger'
 import type { TaxDeadlineType, DeadlineStatus, CreateDeadlineInput } from '@/types'
+
+const log = createLogger('deadline-generator')
 import {
   TAX_DEADLINE_CONFIGS,
   getApplicableDeadlineConfigs,
@@ -81,7 +84,7 @@ export async function generateTaxDeadlinesForUser(
     .select('id')
 
   if (deleteError) {
-    console.error('Error deleting existing deadlines:', deleteError)
+    log.error('Error deleting existing deadlines:', deleteError)
     throw deleteError
   }
 
@@ -161,7 +164,7 @@ export async function generateTaxDeadlinesForUser(
       .insert(deadlines)
 
     if (insertError) {
-      console.error('Error inserting deadlines:', insertError)
+      log.error('Error inserting deadlines:', insertError)
       throw insertError
     }
   }
@@ -234,7 +237,7 @@ export async function generateNewYearDeadlines(
     .select('user_id, entity_type, moms_period, f_skatt, vat_registered, pays_salaries, fiscal_year_start_month')
 
   if (error) {
-    console.error('Error fetching company settings:', error)
+    log.error('Error fetching company settings:', error)
     throw error
   }
 
@@ -259,7 +262,7 @@ export async function generateNewYearDeadlines(
       usersProcessed++
       totalCreated += result.created
     } catch (err) {
-      console.error(`Error generating deadlines for user ${settings.user_id}:`, err)
+      log.error(`Error generating deadlines for user ${settings.user_id}:`, err)
     }
   }
 

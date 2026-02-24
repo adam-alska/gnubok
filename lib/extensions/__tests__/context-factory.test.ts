@@ -59,9 +59,9 @@ describe('createExtensionContext', () => {
     ctx.log.warn('caution')
     ctx.log.error('oops')
 
-    expect(logSpy).toHaveBeenCalledWith('[my-ext]', 'hello', 42)
-    expect(warnSpy).toHaveBeenCalledWith('[my-ext]', 'caution')
-    expect(errorSpy).toHaveBeenCalledWith('[my-ext]', 'oops')
+    expect(logSpy).toHaveBeenCalledWith('[ext:my-ext]', 'hello', 42)
+    expect(warnSpy).toHaveBeenCalledWith('[ext:my-ext]', 'caution')
+    expect(errorSpy).toHaveBeenCalledWith('[ext:my-ext]', 'oops')
 
     logSpy.mockRestore()
     warnSpy.mockRestore()

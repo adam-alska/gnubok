@@ -41,7 +41,7 @@ class ExtensionRegistry {
    */
   register(extension: Extension): void {
     if (this.extensions.has(extension.id)) {
-      console.warn(`[ExtensionRegistry] Extension "${extension.id}" already registered, skipping`)
+      // Extension already registered — skip silently (expected during hot reloads)
       return
     }
 

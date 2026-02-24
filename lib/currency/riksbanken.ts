@@ -1,4 +1,7 @@
+import { createLogger } from '@/lib/logger'
 import type { Currency, ExchangeRate } from '@/types'
+
+const log = createLogger('riksbanken')
 
 /**
  * Fetch exchange rates from Riksbanken API
@@ -31,7 +34,7 @@ export async function fetchExchangeRate(
 
   const seriesId = seriesIds[currency]
   if (!seriesId) {
-    console.error(`Unknown currency: ${currency}`)
+    log.error(`Unknown currency: ${currency}`)
     return null
   }
 
@@ -84,7 +87,7 @@ export async function fetchExchangeRate(
 
     return null
   } catch (error) {
-    console.error('Error fetching exchange rate:', error)
+    log.error('Error fetching exchange rate:', error)
     // Return fallback rates for development/testing
     return getFallbackRate(currency)
   }
