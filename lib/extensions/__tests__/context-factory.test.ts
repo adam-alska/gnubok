@@ -11,6 +11,17 @@ vi.mock('@/lib/transactions/ingest', () => ({
   }),
 }))
 
+vi.mock('@/lib/logger', () => ({
+  createLogger: (module: string) => {
+    const prefix = `[${module}]`
+    return {
+      info: (message: string, ...args: unknown[]) => console.log(prefix, message, ...args),
+      warn: (message: string, ...args: unknown[]) => console.warn(prefix, message, ...args),
+      error: (message: string, ...args: unknown[]) => console.error(prefix, message, ...args),
+    }
+  },
+}))
+
 beforeEach(() => {
   eventBus.clear()
   vi.clearAllMocks()
