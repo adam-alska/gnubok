@@ -328,7 +328,7 @@ export const SECTORS: Sector[] = [
     slug: 'export',
     name: 'Export & Utrikeshandel',
     icon: 'Ship',
-    description: 'Verktyg för svenska företag som exporterar varor till EU och övriga världen',
+    description: 'Branschverktyg för export och utrikeshandel',
     extensions: [
       {
         slug: 'eu-sales-list',
