@@ -7,12 +7,12 @@ import {
 } from '../sectors'
 
 describe('sectors registry', () => {
-  it('should have 6 sectors', () => {
-    expect(SECTORS.length).toBe(6)
+  it('should have 7 sectors', () => {
+    expect(SECTORS.length).toBe(7)
   })
 
-  it('should have 18 total extensions', () => {
-    expect(getAllExtensions().length).toBe(18)
+  it('should have 22 total extensions', () => {
+    expect(getAllExtensions().length).toBe(22)
   })
 
   it('should have unique slugs within each sector', () => {
