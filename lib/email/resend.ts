@@ -116,5 +116,5 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
  * Check if Resend is properly configured
  */
 export function isResendConfigured(): boolean {
-  return !!process.env.RESEND_API_KEY
+  return !!process.env.RESEND_API_KEY && !!process.env.RESEND_FROM_EMAIL && process.env.RESEND_FROM_EMAIL !== 'noreply@localhost'
 }
