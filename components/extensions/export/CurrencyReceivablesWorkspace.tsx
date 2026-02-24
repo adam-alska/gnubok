@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { WorkspaceComponentProps } from '@/lib/extensions/workspace-registry'
+import { useMockData } from '@/lib/extensions/use-mock-data'
 import ExtensionLoadingSkeleton from '@/components/extensions/shared/ExtensionLoadingSkeleton'
+import MockDataBanner from '@/components/extensions/shared/MockDataBanner'
+import MockDataImportDialog from '@/components/extensions/shared/MockDataImportDialog'
+import type { CsvFieldDef } from '@/components/extensions/shared/MockDataImportDialog'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -12,7 +16,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import {
-  TrendingUp, TrendingDown, RefreshCw, Info, ArrowUpDown,
+  TrendingUp, TrendingDown, RefreshCw, Info, ArrowUpDown, FlaskConical,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -124,10 +128,125 @@ function currentYear(): number { return new Date().getFullYear() }
 type SortField = 'unrealizedGainLoss' | 'foreignAmount' | 'daysOutstanding' | 'customerName'
 type SortDir = 'asc' | 'desc'
 
+// ── Mock Data Config ──────────────────────────────────────────
+
+const MOCK_CSV_FIELDS: CsvFieldDef[] = [
+  { key: 'invoiceNumber', label: 'Fakturanummer', required: true },
+  { key: 'customerName', label: 'Kund', required: true },
+  { key: 'currency', label: 'Valuta', required: true },
+  { key: 'foreignAmount', label: 'Belopp (utl. valuta)', required: true },
+  { key: 'bookedSekAmount', label: 'Bokfört (SEK)' },
+  { key: 'bookedRate', label: 'Bokförd kurs' },
+  { key: 'currentSekAmount', label: 'Aktuellt (SEK)' },
+  { key: 'currentRate', label: 'Aktuell kurs' },
+  { key: 'invoiceDate', label: 'Fakturadatum' },
+  { key: 'dueDate', label: 'Förfallodatum' },
+]
+
+const MOCK_CSV_TEMPLATE = `invoiceNumber;customerName;currency;foreignAmount;bookedSekAmount;bookedRate;currentSekAmount;currentRate;invoiceDate;dueDate
+1001;Beispiel GmbH;EUR;10000;112500;11.25;114200;11.42;2025-01-15;2025-02-15
+1002;Example Corp;USD;25000;262500;10.50;260000;10.40;2025-01-20;2025-02-20
+1003;London Ltd;GBP;8000;106400;13.30;108000;13.50;2025-02-01;2025-03-01`
+
+function parseMockCsvRows(rows: Record<string, string>[]): ReportData {
+  const today = new Date().toISOString().slice(0, 10)
+  const receivables: ForeignReceivable[] = rows.map(r => {
+    const foreignAmount = parseFloat(r.foreignAmount || '0') || 0
+    const bookedRate = parseFloat(r.bookedRate || '0') || 0
+    const currentRate = parseFloat(r.currentRate || '0') || bookedRate
+    const bookedSek = parseFloat(r.bookedSekAmount || '0') || Math.round(foreignAmount * bookedRate * 100) / 100
+    const currentSek = parseFloat(r.currentSekAmount || '0') || Math.round(foreignAmount * currentRate * 100) / 100
+    const invoiceDate = r.invoiceDate || today
+    const dueDate = r.dueDate || today
+    const daysOutstanding = Math.max(0, Math.floor((Date.now() - new Date(invoiceDate).getTime()) / 86400000))
+
+    return {
+      invoiceId: r.invoiceNumber || '',
+      invoiceNumber: r.invoiceNumber || '',
+      customerName: r.customerName || '',
+      customerCountry: '',
+      currency: r.currency || 'EUR',
+      foreignAmount,
+      bookedSekAmount: bookedSek,
+      bookedRate,
+      currentSekAmount: currentSek,
+      currentRate,
+      unrealizedGainLoss: Math.round((currentSek - bookedSek) * 100) / 100,
+      invoiceDate,
+      dueDate,
+      daysOutstanding,
+    }
+  })
+
+  // Group by currency for exposure
+  const currencyMap = new Map<string, CurrencyExposure>()
+  for (const r of receivables) {
+    const existing = currencyMap.get(r.currency)
+    if (existing) {
+      existing.totalForeignAmount += r.foreignAmount
+      existing.bookedSekValue += r.bookedSekAmount
+      existing.currentSekValue += r.currentSekAmount
+      existing.unrealizedGainLoss += r.unrealizedGainLoss
+      existing.invoiceCount++
+    } else {
+      currencyMap.set(r.currency, {
+        currency: r.currency,
+        totalForeignAmount: r.foreignAmount,
+        bookedSekValue: r.bookedSekAmount,
+        currentSekValue: r.currentSekAmount,
+        unrealizedGainLoss: r.unrealizedGainLoss,
+        invoiceCount: 1,
+        averageBookedRate: r.bookedRate,
+        currentRate: r.currentRate,
+      })
+    }
+  }
+
+  const exposureByCurrency = Array.from(currencyMap.values())
+  const totalBookedSek = receivables.reduce((s, r) => s + r.bookedSekAmount, 0)
+  const totalCurrentSek = receivables.reduce((s, r) => s + r.currentSekAmount, 0)
+  const totalUnrealized = Math.round((totalCurrentSek - totalBookedSek) * 100) / 100
+
+  return {
+    referenceDate: today,
+    exchangeRates: exposureByCurrency.map(e => ({ currency: e.currency, rate: e.currentRate, date: today })),
+    exposureByCurrency,
+    receivables,
+    realizedGainLoss: { year: new Date().getFullYear(), gains: 0, losses: 0, net: 0 },
+    monthlyTrend: [],
+    revalPreview: {
+      totalUnrealizedGainLoss: totalUnrealized,
+      gains: Math.max(0, totalUnrealized),
+      losses: Math.abs(Math.min(0, totalUnrealized)),
+    },
+    totals: {
+      bookedSekValue: totalBookedSek,
+      currentSekValue: totalCurrentSek,
+      totalUnrealizedGainLoss: totalUnrealized,
+      receivableCount: receivables.length,
+      currencyCount: exposureByCurrency.length,
+    },
+  }
+}
+
+function validateMockReport(data: unknown): { valid: boolean; error?: string } {
+  if (!data || typeof data !== 'object') return { valid: false, error: 'Data måste vara ett objekt' }
+  const obj = data as Record<string, unknown>
+  if (!Array.isArray(obj.receivables) && !Array.isArray(obj.exposureByCurrency)) {
+    return { valid: false, error: 'Fältet "receivables" eller "exposureByCurrency" saknas' }
+  }
+  if (!obj.totals || typeof obj.totals !== 'object') return { valid: false, error: 'Fältet "totals" saknas' }
+  return { valid: true }
+}
+
 // ── Component ─────────────────────────────────────────────────
 
 export default function CurrencyReceivablesWorkspace({ userId }: WorkspaceComponentProps) {
   void userId
+
+  // Mock data
+  const { mockReport, isMockActive, isLoading: mockLoading, importedAt, saveMockData, clearMockData } = useMockData<ReportData>('export', 'currency-receivables')
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
 
   const [year, setYear] = useState(currentYear())
   const [report, setReport] = useState<ReportData | null>(null)
@@ -141,6 +260,13 @@ export default function CurrencyReceivablesWorkspace({ userId }: WorkspaceCompon
   const years = [currentYear(), currentYear() - 1, currentYear() - 2]
 
   const fetchReport = useCallback(async () => {
+    if (isMockActive && mockReport) {
+      setReport(mockReport)
+      setIsLoading(false)
+      setRefreshing(false)
+      return
+    }
+
     setIsLoading(true)
     setError(null)
     try {
@@ -161,11 +287,31 @@ export default function CurrencyReceivablesWorkspace({ userId }: WorkspaceCompon
       setIsLoading(false)
       setRefreshing(false)
     }
-  }, [year])
+  }, [year, isMockActive, mockReport])
 
   useEffect(() => {
     fetchReport()
   }, [fetchReport])
+
+  const handleMockImport = useCallback(async (data: ReportData, meta: { source: 'csv' | 'json'; fileName: string; rowCount: number }) => {
+    await saveMockData(data, meta)
+    setReport(data)
+  }, [saveMockData])
+
+  const handleMockClear = useCallback(async () => {
+    await clearMockData()
+    setReport(null)
+    setIsLoading(true)
+    try {
+      const params = new URLSearchParams({ year: String(year) })
+      const res = await fetch(`/api/extensions/export/currency-receivables/report?${params}`)
+      if (res.ok) {
+        const json = await res.json()
+        setReport(json.data)
+      }
+    } catch { /* ignore */ }
+    setIsLoading(false)
+  }, [clearMockData, year])
 
   const handleRefresh = () => {
     setRefreshing(true)
@@ -200,7 +346,7 @@ export default function CurrencyReceivablesWorkspace({ userId }: WorkspaceCompon
     return m <= new Date().getMonth() + 1
   }) || []
 
-  if (isLoading && !report) {
+  if ((isLoading || mockLoading) && !report) {
     return <ExtensionLoadingSkeleton />
   }
 
@@ -217,11 +363,26 @@ export default function CurrencyReceivablesWorkspace({ userId }: WorkspaceCompon
             </SelectContent>
           </Select>
         </div>
-        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="ml-auto">
-          <RefreshCw className={cn('h-4 w-4 mr-1.5', refreshing && 'animate-spin')} />
-          {refreshing ? 'Uppdaterar...' : 'Uppdatera kurser'}
-        </Button>
+        <div className="flex gap-2 ml-auto">
+          <Button variant="outline" size="sm" onClick={() => setImportDialogOpen(true)}>
+            <FlaskConical className="h-4 w-4 mr-1.5" />
+            Importera testdata
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw className={cn('h-4 w-4 mr-1.5', refreshing && 'animate-spin')} />
+            {refreshing ? 'Uppdaterar...' : 'Uppdatera kurser'}
+          </Button>
+        </div>
       </div>
+
+      {/* ── Mock Data Banner ──────────────────────────────── */}
+      {isMockActive && (
+        <MockDataBanner
+          importedAt={importedAt}
+          onClear={handleMockClear}
+          onReplace={() => setImportDialogOpen(true)}
+        />
+      )}
 
       {error && (
         <Card className="border-destructive/50 bg-destructive/5">
@@ -454,6 +615,18 @@ export default function CurrencyReceivablesWorkspace({ userId }: WorkspaceCompon
           )}
         </>
       )}
+
+      {/* ── Mock Data Import Dialog ───────────────────────── */}
+      <MockDataImportDialog<ReportData>
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        csvFields={MOCK_CSV_FIELDS}
+        parseCsvRows={parseMockCsvRows}
+        validateReport={validateMockReport}
+        templateCsvContent={MOCK_CSV_TEMPLATE}
+        templateFileName="currency-receivables-template.csv"
+        onImport={handleMockImport}
+      />
     </div>
   )
 }

@@ -3,7 +3,11 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import type { WorkspaceComponentProps } from '@/lib/extensions/workspace-registry'
 import { useExtensionData } from '@/lib/extensions/use-extension-data'
+import { useMockData } from '@/lib/extensions/use-mock-data'
 import ExtensionLoadingSkeleton from '@/components/extensions/shared/ExtensionLoadingSkeleton'
+import MockDataBanner from '@/components/extensions/shared/MockDataBanner'
+import MockDataImportDialog from '@/components/extensions/shared/MockDataImportDialog'
+import type { CsvFieldDef } from '@/components/extensions/shared/MockDataImportDialog'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -21,7 +25,7 @@ import {
 } from '@/components/ui/dialog'
 import {
   AlertTriangle, Plus, Pencil, Trash2, FileSpreadsheet, Clock,
-  ChevronDown, ChevronUp, Package,
+  ChevronDown, ChevronUp, Package, FlaskConical,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -102,10 +106,74 @@ const EMPTY_PRODUCT: ProductForm = {
   productId: '', description: '', cnCode: '', netWeightKg: '', countryOfOrigin: 'SE',
 }
 
+// ── Mock Data Config ──────────────────────────────────────────
+
+const MOCK_CSV_FIELDS: CsvFieldDef[] = [
+  { key: 'cnCode', label: 'CN-kod', required: true },
+  { key: 'partnerCountry', label: 'Partnerland', required: true },
+  { key: 'countryOfOrigin', label: 'Ursprungsland' },
+  { key: 'transactionNature', label: 'Transaktionstyp' },
+  { key: 'deliveryTerms', label: 'Leveransvillkor' },
+  { key: 'invoicedValue', label: 'Fakturerat värde (SEK)', required: true },
+  { key: 'netMass', label: 'Nettovikt (kg)' },
+  { key: 'partnerVatId', label: 'Partner VAT-ID' },
+]
+
+const MOCK_CSV_TEMPLATE = `cnCode;partnerCountry;countryOfOrigin;transactionNature;deliveryTerms;invoicedValue;netMass;partnerVatId
+72163100;DE;SE;11;DAP;245000;4500;DE123456789
+84713000;FR;CN;11;EXW;128000;85;FR987654321
+39269090;NL;SE;11;FCA;67000;320;NL456789012`
+
+function parseMockCsvRows(rows: Record<string, string>[]): ReportData {
+  const lines: IntrastatLine[] = rows.map(r => ({
+    cnCode: r.cnCode || '00000000',
+    partnerCountry: r.partnerCountry || '',
+    countryOfOrigin: r.countryOfOrigin || 'SE',
+    transactionNature: r.transactionNature || '11',
+    deliveryTerms: r.deliveryTerms || 'DAP',
+    invoicedValue: parseFloat(r.invoicedValue || '0') || 0,
+    netMass: parseFloat(r.netMass || '0') || 0,
+    supplementaryUnit: null,
+    supplementaryUnitType: null,
+    partnerVatId: r.partnerVatId || '',
+  }))
+
+  const invoicedValue = lines.reduce((s, l) => s + l.invoicedValue, 0)
+  const netMass = lines.reduce((s, l) => s + l.netMass, 0)
+
+  return {
+    period: { year: new Date().getFullYear(), month: new Date().getMonth() + 1 },
+    reporterVatNumber: 'SE000000000001',
+    reporterName: 'Testdata',
+    lines,
+    totals: { invoicedValue, netMass, lineCount: lines.length },
+    thresholdStatus: {
+      cumulativeValue: invoicedValue,
+      threshold: 9000000,
+      isObligated: invoicedValue >= 9000000,
+      percentageUsed: Math.round(invoicedValue / 9000000 * 100),
+    },
+    warnings: [],
+    invoiceCount: lines.length,
+  }
+}
+
+function validateMockReport(data: unknown): { valid: boolean; error?: string } {
+  if (!data || typeof data !== 'object') return { valid: false, error: 'Data måste vara ett objekt' }
+  const obj = data as Record<string, unknown>
+  if (!Array.isArray(obj.lines)) return { valid: false, error: 'Fältet "lines" saknas eller är inte en array' }
+  if (!obj.totals || typeof obj.totals !== 'object') return { valid: false, error: 'Fältet "totals" saknas' }
+  return { valid: true }
+}
+
 // ── Component ─────────────────────────────────────────────────
 
 export default function IntrastatWorkspace({ userId }: WorkspaceComponentProps) {
   void userId
+
+  // Mock data
+  const { mockReport, isMockActive, isLoading: mockLoading, importedAt, saveMockData, clearMockData } = useMockData<ReportData>('export', 'intrastat')
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
 
   const [year, setYear] = useState(currentYear())
   const [month, setMonth] = useState(currentMonth())
@@ -146,6 +214,12 @@ export default function IntrastatWorkspace({ userId }: WorkspaceComponentProps) 
 
   // Fetch report
   const fetchReport = useCallback(async () => {
+    if (isMockActive && mockReport) {
+      setReport(mockReport)
+      setIsLoading(false)
+      return
+    }
+
     setIsLoading(true)
     setError(null)
 
@@ -166,11 +240,31 @@ export default function IntrastatWorkspace({ userId }: WorkspaceComponentProps) 
     } finally {
       setIsLoading(false)
     }
-  }, [year, month])
+  }, [year, month, isMockActive, mockReport])
 
   useEffect(() => {
     fetchReport()
   }, [fetchReport])
+
+  const handleMockImport = useCallback(async (data: ReportData, meta: { source: 'csv' | 'json'; fileName: string; rowCount: number }) => {
+    await saveMockData(data, meta)
+    setReport(data)
+  }, [saveMockData])
+
+  const handleMockClear = useCallback(async () => {
+    await clearMockData()
+    setReport(null)
+    setIsLoading(true)
+    try {
+      const params = new URLSearchParams({ year: String(year), month: String(month) })
+      const res = await fetch(`/api/extensions/export/intrastat/report?${params}`)
+      if (res.ok) {
+        const json = await res.json()
+        setReport(json.data)
+      }
+    } catch { /* ignore */ }
+    setIsLoading(false)
+  }, [clearMockData, year, month])
 
   // Product CRUD handlers
   const openNewProduct = () => {
@@ -248,7 +342,7 @@ export default function IntrastatWorkspace({ userId }: WorkspaceComponentProps) 
   const errorCount = report?.warnings.filter(w => w.severity === 'error').length ?? 0
   const warningCount = report?.warnings.filter(w => w.severity === 'warning').length ?? 0
 
-  if ((isLoading || productsLoading) && !report) {
+  if ((isLoading || productsLoading || mockLoading) && !report) {
     return <ExtensionLoadingSkeleton />
   }
 
@@ -277,6 +371,13 @@ export default function IntrastatWorkspace({ userId }: WorkspaceComponentProps) 
         <div className="flex gap-2 ml-auto">
           <Button
             variant="outline" size="sm"
+            onClick={() => setImportDialogOpen(true)}
+          >
+            <FlaskConical className="h-4 w-4 mr-1.5" />
+            Importera testdata
+          </Button>
+          <Button
+            variant="outline" size="sm"
             onClick={handleDownload}
             disabled={downloading || !report || report.lines.length === 0}
           >
@@ -285,6 +386,15 @@ export default function IntrastatWorkspace({ userId }: WorkspaceComponentProps) 
           </Button>
         </div>
       </div>
+
+      {/* ── Mock Data Banner ──────────────────────────────── */}
+      {isMockActive && (
+        <MockDataBanner
+          importedAt={importedAt}
+          onClear={handleMockClear}
+          onReplace={() => setImportDialogOpen(true)}
+        />
+      )}
 
       {error && (
         <Card className="border-destructive/50 bg-destructive/5">
@@ -528,6 +638,18 @@ export default function IntrastatWorkspace({ userId }: WorkspaceComponentProps) 
           </div>
         </>
       )}
+
+      {/* ── Mock Data Import Dialog ───────────────────────── */}
+      <MockDataImportDialog<ReportData>
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        csvFields={MOCK_CSV_FIELDS}
+        parseCsvRows={parseMockCsvRows}
+        validateReport={validateMockReport}
+        templateCsvContent={MOCK_CSV_TEMPLATE}
+        templateFileName="intrastat-template.csv"
+        onImport={handleMockImport}
+      />
 
       {/* ── Product Dialog ────────────────────────────────────── */}
       <Dialog open={productDialogOpen} onOpenChange={setProductDialogOpen}>

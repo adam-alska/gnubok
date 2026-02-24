@@ -12,7 +12,7 @@
  * Deadline: 25th of the month following the reporting period
  */
 
-import { isEUCountry } from '@/extensions/export/shared/eu-countries'
+import { isEUCountry, toCountryCode } from '@/extensions/export/shared/eu-countries'
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -231,6 +231,9 @@ export function generateECSalesListReport(options: GenerateReportOptions): ECSal
     // Classify: goods (box 35) or services (box 39)
     const classification = classifyInvoice(invoice)
 
+    // Normalize country to ISO code for consistent output
+    const countryCode = toCountryCode(customer.country)
+
     // Get or create aggregation line
     const vatNumber = customer.vat_number
     const key = vatNumber
@@ -238,7 +241,7 @@ export function generateECSalesListReport(options: GenerateReportOptions): ECSal
       aggregation.set(key, {
         customerVatNumber: vatNumber,
         customerName: customer.name,
-        customerCountry: customer.country,
+        customerCountry: countryCode,
         customerId: customer.id,
         goodsAmount: 0,
         servicesAmount: 0,

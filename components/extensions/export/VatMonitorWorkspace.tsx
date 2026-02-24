@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import type { WorkspaceComponentProps } from '@/lib/extensions/workspace-registry'
+import { useMockData } from '@/lib/extensions/use-mock-data'
 import ExtensionLoadingSkeleton from '@/components/extensions/shared/ExtensionLoadingSkeleton'
+import MockDataBanner from '@/components/extensions/shared/MockDataBanner'
+import MockDataImportDialog from '@/components/extensions/shared/MockDataImportDialog'
+import type { CsvFieldDef } from '@/components/extensions/shared/MockDataImportDialog'
 import KPICard from '@/components/extensions/shared/KPICard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -15,7 +19,7 @@ import {
 } from '@/components/ui/table'
 import {
   AlertTriangle, CheckCircle2, ChevronDown, ChevronUp,
-  ArrowUp, ArrowDown, Minus, BarChart3,
+  ArrowUp, ArrowDown, Minus, BarChart3, FlaskConical,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -120,10 +124,101 @@ const REVENUE_CARDS: { key: keyof Omit<RevenueBreakdown, 'totalRevenue'>; label:
 // Box display order (only show relevant ones)
 const DISPLAY_BOX_ORDER = ['05', '10', '11', '12', '35', '36', '38', '39', '40', '48', '49']
 
+// ── Mock Data Config ──────────────────────────────────────────
+
+const MOCK_CSV_FIELDS: CsvFieldDef[] = [
+  { key: 'boxNumber', label: 'Ruta', required: true },
+  { key: 'label', label: 'Beskrivning', required: true },
+  { key: 'amount', label: 'Belopp (SEK)', required: true },
+  { key: 'accounts', label: 'Konton (kommaseparerade)' },
+]
+
+const MOCK_CSV_TEMPLATE = `boxNumber;label;amount;accounts
+05;Momspliktiga intäkter;500000;3001,3002,3003
+10;Utgående moms 25%;100000;2611
+11;Utgående moms 12%;6000;2621
+12;Utgående moms 6%;3000;2631
+35;Varuförsäljning EU;75000;3305
+36;Tjänsteförsäljning EU;45000;3308
+38;Exportförsäljning;30000;3305
+39;Omvänd skattskyldighet;20000;
+40;Inköp varor EU;60000;
+48;Ingående moms;65000;2641
+49;Moms att betala;44000;`
+
+function parseMockCsvRows(rows: Record<string, string>[]): ReportData {
+  const boxes: VatBoxData[] = rows.map(r => ({
+    boxNumber: r.boxNumber || '',
+    label: r.label || '',
+    amount: parseFloat(r.amount || '0') || 0,
+    accounts: r.accounts ? r.accounts.split(',').map(a => a.trim()) : [],
+  }))
+
+  // Derive revenue breakdown from box values
+  const getBox = (num: string) => boxes.find(b => b.boxNumber === num)?.amount || 0
+  const domestic = getBox('05')
+  const euGoods = getBox('35')
+  const euServices = getBox('36')
+  const exportGoods = getBox('38')
+  const exportServices = 0
+  const triangular = getBox('39')
+  const totalRevenue = domestic + euGoods + euServices + exportGoods + exportServices + triangular
+
+  const revenueBreakdown: RevenueBreakdown = {
+    domestic: { amount: domestic, percentage: totalRevenue > 0 ? Math.round(domestic / totalRevenue * 100) : 0 },
+    euGoods: { amount: euGoods, percentage: totalRevenue > 0 ? Math.round(euGoods / totalRevenue * 100) : 0 },
+    euServices: { amount: euServices, percentage: totalRevenue > 0 ? Math.round(euServices / totalRevenue * 100) : 0 },
+    exportGoods: { amount: exportGoods, percentage: totalRevenue > 0 ? Math.round(exportGoods / totalRevenue * 100) : 0 },
+    exportServices: { amount: exportServices, percentage: 0 },
+    triangular: { amount: triangular, percentage: totalRevenue > 0 ? Math.round(triangular / totalRevenue * 100) : 0 },
+    totalRevenue,
+  }
+
+  const outputVat25 = getBox('10')
+  const outputVat12 = getBox('11')
+  const outputVat6 = getBox('12')
+  const inputVat = getBox('48')
+  const netVat = getBox('49')
+
+  return {
+    period: { year: new Date().getFullYear(), month: new Date().getMonth() + 1 },
+    boxes,
+    revenueBreakdown,
+    vatSummary: {
+      outputVat25,
+      outputVat12,
+      outputVat6,
+      totalOutputVat: outputVat25 + outputVat12 + outputVat6,
+      inputVat,
+      netVat,
+      isRefund: netVat < 0,
+    },
+    warnings: [],
+    comparison: null,
+  }
+}
+
+function validateMockReport(data: unknown): { valid: boolean; error?: string } {
+  if (!data || typeof data !== 'object') return { valid: false, error: 'Data måste vara ett objekt' }
+  const obj = data as Record<string, unknown>
+  if (!Array.isArray(obj.boxes)) return { valid: false, error: 'Fältet "boxes" saknas eller är inte en array' }
+  if (!obj.revenueBreakdown || typeof obj.revenueBreakdown !== 'object') {
+    return { valid: false, error: 'Fältet "revenueBreakdown" saknas' }
+  }
+  if (!obj.vatSummary || typeof obj.vatSummary !== 'object') {
+    return { valid: false, error: 'Fältet "vatSummary" saknas' }
+  }
+  return { valid: true }
+}
+
 // ── Component ─────────────────────────────────────────────────
 
 export default function VatMonitorWorkspace({ userId }: WorkspaceComponentProps) {
   void userId
+
+  // Mock data
+  const { mockReport, isMockActive, isLoading: mockLoading, importedAt, saveMockData, clearMockData } = useMockData<ReportData>('export', 'vat-monitor')
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
 
   const [year, setYear] = useState(currentYear())
   const [periodType, setPeriodType] = useState<'monthly' | 'quarterly'>('monthly')
@@ -143,6 +238,12 @@ export default function VatMonitorWorkspace({ userId }: WorkspaceComponentProps)
   }, [])
 
   const fetchReport = useCallback(async () => {
+    if (isMockActive && mockReport) {
+      setReport(mockReport)
+      setIsLoading(false)
+      return
+    }
+
     setIsLoading(true)
     setError(null)
 
@@ -172,11 +273,40 @@ export default function VatMonitorWorkspace({ userId }: WorkspaceComponentProps)
     } finally {
       setIsLoading(false)
     }
-  }, [year, month, quarter, periodType, compareEnabled])
+  }, [year, month, quarter, periodType, compareEnabled, isMockActive, mockReport])
 
   useEffect(() => {
     fetchReport()
   }, [fetchReport])
+
+  const handleMockImport = useCallback(async (data: ReportData, meta: { source: 'csv' | 'json'; fileName: string; rowCount: number }) => {
+    await saveMockData(data, meta)
+    setReport(data)
+  }, [saveMockData])
+
+  const handleMockClear = useCallback(async () => {
+    await clearMockData()
+    setReport(null)
+    setIsLoading(true)
+    setError(null)
+    const params = new URLSearchParams({ year: String(year) })
+    if (periodType === 'monthly') {
+      params.set('month', String(month))
+    } else {
+      params.set('quarter', String(quarter))
+    }
+    if (compareEnabled) {
+      params.set('compare', 'previous')
+    }
+    try {
+      const res = await fetch(`/api/extensions/export/vat-monitor/report?${params}`)
+      if (res.ok) {
+        const json = await res.json()
+        setReport(json.data)
+      }
+    } catch { /* ignore */ }
+    setIsLoading(false)
+  }, [clearMockData, year, month, quarter, periodType, compareEnabled])
 
   const errorCount = report?.warnings.filter(w => w.severity === 'error').length ?? 0
   const warningCount = report?.warnings.filter(w => w.severity === 'warning').length ?? 0
@@ -190,7 +320,7 @@ export default function VatMonitorWorkspace({ userId }: WorkspaceComponentProps)
       .filter((b): b is VatBoxData => b !== undefined)
   }, [report])
 
-  if (isLoading && !report) {
+  if ((isLoading || mockLoading) && !report) {
     return <ExtensionLoadingSkeleton />
   }
 
@@ -254,7 +384,15 @@ export default function VatMonitorWorkspace({ userId }: WorkspaceComponentProps)
           )}
         </div>
 
-        <div className="ml-auto">
+        <div className="flex gap-2 ml-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setImportDialogOpen(true)}
+          >
+            <FlaskConical className="h-4 w-4 mr-1.5" />
+            Importera testdata
+          </Button>
           <Button
             variant={compareEnabled ? 'default' : 'outline'}
             size="sm"
@@ -265,6 +403,15 @@ export default function VatMonitorWorkspace({ userId }: WorkspaceComponentProps)
           </Button>
         </div>
       </div>
+
+      {/* ── Mock Data Banner ──────────────────────────────── */}
+      {isMockActive && (
+        <MockDataBanner
+          importedAt={importedAt}
+          onClear={handleMockClear}
+          onReplace={() => setImportDialogOpen(true)}
+        />
+      )}
 
       {/* ── Error state ────────────────────────────────────── */}
       {error && (
@@ -462,6 +609,18 @@ export default function VatMonitorWorkspace({ userId }: WorkspaceComponentProps)
           </div>
         </>
       )}
+
+      {/* ── Mock Data Import Dialog ───────────────────────── */}
+      <MockDataImportDialog<ReportData>
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        csvFields={MOCK_CSV_FIELDS}
+        parseCsvRows={parseMockCsvRows}
+        validateReport={validateMockReport}
+        templateCsvContent={MOCK_CSV_TEMPLATE}
+        templateFileName="vat-monitor-template.csv"
+        onImport={handleMockImport}
+      />
     </div>
   )
 }

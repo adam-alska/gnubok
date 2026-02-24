@@ -8,7 +8,7 @@ import {
   type GLLine,
   type ExchangeRateInfo,
 } from '@/extensions/export/currency-receivables/lib/receivables-engine'
-import { fetchExchangeRate } from '@/lib/currency/riksbanken'
+import { fetchMultipleRates } from '@/lib/currency/riksbanken'
 import type { Currency } from '@/types'
 
 const SUPPORTED_CURRENCIES: Currency[] = ['EUR', 'USD', 'GBP', 'NOK', 'DKK']
@@ -67,18 +67,17 @@ export async function GET(request: Request) {
     }
 
     // Fetch current Riksbanken rates for all supported currencies
+    const rateMap = await fetchMultipleRates(SUPPORTED_CURRENCIES)
     const currentRates: ExchangeRateInfo[] = []
-    const ratePromises = SUPPORTED_CURRENCIES.map(async (currency) => {
-      const rate = await fetchExchangeRate(currency)
-      if (rate) {
+    for (const [, rate] of rateMap) {
+      if (rate.currency !== 'SEK') {
         currentRates.push({
           currency: rate.currency,
           rate: rate.rate,
           date: rate.date,
         })
       }
-    })
-    await Promise.all(ratePromises)
+    }
 
     // Fetch realized FX GL lines for the year
     const realizedFXLines = await fetchFXLines(supabase, user.id, year)

@@ -1,0 +1,116 @@
+{
+  "period": { "year": 2025, "month": 12 },
+  "reporterVatNumber": "SE556677889901",
+  "reporterName": "Testbolaget AB",
+  "lines": [
+    {
+      "cnCode": "72163100",
+      "partnerCountry": "DE",
+      "countryOfOrigin": "SE",
+      "transactionNature": "11",
+      "deliveryTerms": "DAP",
+      "invoicedValue": 245000,
+      "netMass": 4500,
+      "supplementaryUnit": null,
+      "supplementaryUnitType": null,
+      "partnerVatId": "DE123456789"
+    },
+    {
+      "cnCode": "84713000",
+      "partnerCountry": "FR",
+      "countryOfOrigin": "CN",
+      "transactionNature": "11",
+      "deliveryTerms": "EXW",
+      "invoicedValue": 128000,
+      "netMass": 85,
+      "supplementaryUnit": 40,
+      "supplementaryUnitType": "st",
+      "partnerVatId": "FR98765432101"
+    },
+    {
+      "cnCode": "39269090",
+      "partnerCountry": "NL",
+      "countryOfOrigin": "SE",
+      "transactionNature": "11",
+      "deliveryTerms": "FCA",
+      "invoicedValue": 78000,
+      "netMass": 620,
+      "supplementaryUnit": null,
+      "supplementaryUnitType": null,
+      "partnerVatId": "NL456789012B01"
+    },
+    {
+      "cnCode": "85176200",
+      "partnerCountry": "FI",
+      "countryOfOrigin": "SE",
+      "transactionNature": "11",
+      "deliveryTerms": "DAP",
+      "invoicedValue": 56000,
+      "netMass": 12,
+      "supplementaryUnit": 200,
+      "supplementaryUnitType": "st",
+      "partnerVatId": "FI12345678"
+    },
+    {
+      "cnCode": "72163100",
+      "partnerCountry": "ES",
+      "countryOfOrigin": "SE",
+      "transactionNature": "11",
+      "deliveryTerms": "CIF",
+      "invoicedValue": 132000,
+      "netMass": 2800,
+      "supplementaryUnit": null,
+      "supplementaryUnitType": null,
+      "partnerVatId": "ES87654321A"
+    },
+    {
+      "cnCode": "73064090",
+      "partnerCountry": "IT",
+      "countryOfOrigin": "SE",
+      "transactionNature": "11",
+      "deliveryTerms": "DAP",
+      "invoicedValue": 67500,
+      "netMass": 1450,
+      "supplementaryUnit": null,
+      "supplementaryUnitType": null,
+      "partnerVatId": "IT01234567890"
+    },
+    {
+      "cnCode": "44079910",
+      "partnerCountry": "PL",
+      "countryOfOrigin": "SE",
+      "transactionNature": "11",
+      "deliveryTerms": "FCA",
+      "invoicedValue": 189000,
+      "netMass": 18600,
+      "supplementaryUnit": null,
+      "supplementaryUnitType": null,
+      "partnerVatId": "PL5678901234"
+    },
+    {
+      "cnCode": "84713000",
+      "partnerCountry": "DE",
+      "countryOfOrigin": "TW",
+      "transactionNature": "11",
+      "deliveryTerms": "DAP",
+      "invoicedValue": 94000,
+      "netMass": 62,
+      "supplementaryUnit": 30,
+      "supplementaryUnitType": "st",
+      "partnerVatId": "DE123456789"
+    }
+  ],
+  "totals": {
+    "invoicedValue": 989500,
+    "netMass": 28129,
+    "lineCount": 8
+  },
+  "thresholdStatus": {
+    "cumulativeValue": 7850000,
+    "threshold": 9000000,
+    "isObligated": false,
+    "percentageUsed": 87
+  },
+  "warnings": [],
+  "invoiceCount": 14
+}
