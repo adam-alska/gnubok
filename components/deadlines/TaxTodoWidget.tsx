@@ -231,9 +231,9 @@ export function TaxTodoWidget({ deadlines, onStatusChange }: TaxTodoWidgetProps)
           </p>
         )}
 
-        <Link href="/calendar" className="block">
+        <Link href="/deadlines" className="block">
           <Button variant="ghost" className="w-full justify-between">
-            Visa alla skattedeadlines
+            Visa alla deadlines
             <ChevronRight className="h-4 w-4" />
           </Button>
         </Link>

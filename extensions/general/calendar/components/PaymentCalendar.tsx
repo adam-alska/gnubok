@@ -10,7 +10,7 @@ import { CalendarGrid } from './CalendarGrid'
 import { CalendarWeekView } from './CalendarWeekView'
 import { CalendarDayView } from './CalendarDayView'
 import { DayDetailModal } from './DayDetailModal'
-import { DeadlineForm } from './DeadlineForm'
+import { DeadlineForm } from '@/components/deadlines/DeadlineForm'
 
 interface PaymentCalendarProps {
   invoices: Invoice[]
