@@ -256,6 +256,6 @@ export async function saveUserMappingRule(
   })
 
   if (error) {
-    console.error('Failed to save user mapping rule:', error)
+    // Silently fail — saving learned rules is non-critical
   }
 }

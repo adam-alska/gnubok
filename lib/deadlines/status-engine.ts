@@ -13,7 +13,10 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js'
+import { createLogger } from '@/lib/logger'
 import type { DeadlineStatus } from '@/types'
+
+const log = createLogger('deadline-status')
 
 /**
  * Number of days before deadline when status changes to action_needed
@@ -116,7 +119,7 @@ export async function updateDeadlineStatuses(
     .select('id')
 
   if (overdueError) {
-    console.error('Error updating overdue deadlines:', overdueError)
+    log.error('Error updating overdue deadlines:', overdueError)
   } else {
     newlyOverdue = overdueDeadlines?.length || 0
     updated += newlyOverdue
@@ -136,7 +139,7 @@ export async function updateDeadlineStatuses(
     .select('id')
 
   if (actionNeededError) {
-    console.error('Error updating action_needed deadlines:', actionNeededError)
+    log.error('Error updating action_needed deadlines:', actionNeededError)
   } else {
     newlyActionNeeded = actionNeededDeadlines?.length || 0
     updated += newlyActionNeeded
@@ -218,7 +221,7 @@ export async function getDeadlinesNeedingAttention(
     .order('due_date', { ascending: true })
 
   if (error) {
-    console.error('Error fetching deadlines needing attention:', error)
+    log.error('Error fetching deadlines needing attention:', error)
     return { actionNeeded: [], overdue: [] }
   }
 

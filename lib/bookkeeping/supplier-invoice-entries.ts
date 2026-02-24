@@ -1,5 +1,6 @@
 import { createJournalEntry, findFiscalPeriod } from './engine'
 import { generateReverseChargeLines } from './vat-entries'
+import { createLogger } from '@/lib/logger'
 import type {
   CreateJournalEntryInput,
   CreateJournalEntryLineInput,
@@ -7,6 +8,8 @@ import type {
   SupplierInvoice,
   SupplierInvoiceItem,
 } from '@/types'
+
+const log = createLogger('supplier-invoice-entries')
 
 /**
  * Create journal entry when a supplier invoice is registered (accrual method)
@@ -30,7 +33,7 @@ export async function createSupplierInvoiceRegistrationEntry(
 ): Promise<JournalEntry | null> {
   const fiscalPeriodId = await findFiscalPeriod(userId, invoice.invoice_date)
   if (!fiscalPeriodId) {
-    console.warn('No open fiscal period found for invoice date:', invoice.invoice_date)
+    log.warn('No open fiscal period found for invoice date:', invoice.invoice_date)
     return null
   }
 
@@ -112,7 +115,7 @@ export async function createSupplierInvoicePaymentEntry(
 ): Promise<JournalEntry | null> {
   const fiscalPeriodId = await findFiscalPeriod(userId, paymentDate)
   if (!fiscalPeriodId) {
-    console.warn('No open fiscal period found for payment date:', paymentDate)
+    log.warn('No open fiscal period found for payment date:', paymentDate)
     return null
   }
 
@@ -204,7 +207,7 @@ export async function createSupplierInvoiceCashEntry(
 ): Promise<JournalEntry | null> {
   const fiscalPeriodId = await findFiscalPeriod(userId, paymentDate)
   if (!fiscalPeriodId) {
-    console.warn('No open fiscal period found for payment date:', paymentDate)
+    log.warn('No open fiscal period found for payment date:', paymentDate)
     return null
   }
 
@@ -278,7 +281,7 @@ export async function createSupplierCreditNoteEntry(
 ): Promise<JournalEntry | null> {
   const fiscalPeriodId = await findFiscalPeriod(userId, creditNote.invoice_date)
   if (!fiscalPeriodId) {
-    console.warn('No open fiscal period found for credit note date:', creditNote.invoice_date)
+    log.warn('No open fiscal period found for credit note date:', creditNote.invoice_date)
     return null
   }
 

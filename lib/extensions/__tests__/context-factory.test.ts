@@ -11,6 +11,17 @@ vi.mock('@/lib/transactions/ingest', () => ({
   }),
 }))
 
+vi.mock('@/lib/logger', () => ({
+  createLogger: (module: string) => {
+    const prefix = `[${module}]`
+    return {
+      info: (message: string, ...args: unknown[]) => console.log(prefix, message, ...args),
+      warn: (message: string, ...args: unknown[]) => console.warn(prefix, message, ...args),
+      error: (message: string, ...args: unknown[]) => console.error(prefix, message, ...args),
+    }
+  },
+}))
+
 beforeEach(() => {
   eventBus.clear()
   vi.clearAllMocks()
@@ -59,9 +70,9 @@ describe('createExtensionContext', () => {
     ctx.log.warn('caution')
     ctx.log.error('oops')
 
-    expect(logSpy).toHaveBeenCalledWith('[my-ext]', 'hello', 42)
-    expect(warnSpy).toHaveBeenCalledWith('[my-ext]', 'caution')
-    expect(errorSpy).toHaveBeenCalledWith('[my-ext]', 'oops')
+    expect(logSpy).toHaveBeenCalledWith('[ext:my-ext]', 'hello', 42)
+    expect(warnSpy).toHaveBeenCalledWith('[ext:my-ext]', 'caution')
+    expect(errorSpy).toHaveBeenCalledWith('[ext:my-ext]', 'oops')
 
     logSpy.mockRestore()
     warnSpy.mockRestore()

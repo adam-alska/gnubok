@@ -1,4 +1,7 @@
 import { Resend } from 'resend'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('email')
 
 // Default sender configuration
 // Using a fixed From address with dynamic Reply-To
@@ -89,7 +92,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
     })
 
     if (response.error) {
-      console.error('Resend error:', response.error)
+      log.error('Resend error:', response.error)
       return {
         success: false,
         error: response.error.message
@@ -101,7 +104,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
       messageId: response.data?.id
     }
   } catch (error) {
-    console.error('Failed to send email:', error)
+    log.error('Failed to send email:', error)
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
