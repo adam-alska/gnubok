@@ -72,6 +72,8 @@ describe('POST /api/invoices/[id]/send', () => {
         unit: 'tim',
         unit_price: 1000,
         line_total: 10000,
+        vat_rate: 25,
+        vat_amount: 2500,
         created_at: '2024-06-15T14:30:00Z',
       },
     ],

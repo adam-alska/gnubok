@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { CheckCircle2, AlertTriangle } from 'lucide-react'
 import type { TransactionWithInvoice } from './transaction-types'
 
 interface InvoiceMatchDialogProps {
@@ -65,6 +66,37 @@ export default function InvoiceMatchDialog({
                 </span>
               </div>
             </div>
+
+            {/* Amount comparison */}
+            {(() => {
+              const txAmount = transaction.amount
+              const invAmount = transaction.potential_invoice!.total
+              const sameCurrency = transaction.currency === transaction.potential_invoice!.currency
+              const amountsMatch = sameCurrency && Math.abs(txAmount - invAmount) < 0.01
+
+              if (amountsMatch) {
+                return (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-success/10 text-success">
+                    <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+                    <p className="text-sm font-medium">Beloppen stammer</p>
+                  </div>
+                )
+              }
+
+              const diff = Math.abs(txAmount - invAmount)
+              return (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium">Beloppen skiljer sig</p>
+                    <p>
+                      Differens: {formatCurrency(diff, transaction.currency)}
+                      {!sameCurrency && ' (olika valutor)'}
+                    </p>
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* What will happen */}
             <div className="rounded-lg bg-muted/50 p-4 space-y-2">

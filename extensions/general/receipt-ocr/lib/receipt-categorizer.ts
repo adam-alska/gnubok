@@ -28,6 +28,10 @@ const BAS_ACCOUNT_MAPPING: Record<TransactionCategory, string> = {
   expense_marketing: '5910', // Annonsering
   expense_professional_services: '6530', // Redovisningstjänster
   expense_education: '6991', // Övriga avdragsgilla kostnader
+  expense_representation: '6071', // Representation
+  expense_consumables: '5460', // Förbrukningsvaror
+  expense_vehicle: '5611', // Drivmedel bil
+  expense_telecom: '6200', // Telefon och internet
   expense_bank_fees: '6570', // Bankavgifter
   expense_card_fees: '6570', // Kortavgifter
   expense_currency_exchange: '7960', // Valutakursförluster
@@ -273,6 +277,10 @@ export const CATEGORY_LABELS: Record<TransactionCategory, string> = {
   expense_marketing: 'Marknadsföring',
   expense_professional_services: 'Konsulttjänster',
   expense_education: 'Utbildning',
+  expense_representation: 'Representation',
+  expense_consumables: 'Material',
+  expense_vehicle: 'Bil & drivmedel',
+  expense_telecom: 'Telefon & internet',
   expense_bank_fees: 'Bankavgift',
   expense_card_fees: 'Kortavgift',
   expense_currency_exchange: 'Valutaväxling',

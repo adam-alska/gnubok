@@ -6,14 +6,16 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { ArrowUpRight, ArrowDownRight, FileText, Loader2 } from 'lucide-react'
+import { ArrowUpRight, ArrowDownRight, FileText, Loader2, MessageSquareText } from 'lucide-react'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/info-tooltip'
+import { formatAccountWithName } from '@/lib/bookkeeping/client-account-names'
 import type { TransactionWithInvoice, CategorizeHandler } from './transaction-types'
-import type { SuggestedCategory } from '@/lib/transactions/category-suggestions'
+import type { SuggestedCategory, SuggestedTemplate } from '@/lib/transactions/category-suggestions'
 
 interface TransactionInboxCardProps {
   transaction: TransactionWithInvoice
   suggestions?: SuggestedCategory[]
+  templateSuggestions?: SuggestedTemplate[]
   processingId: string | null
   isBatchMode: boolean
   isSelected: boolean
@@ -22,6 +24,7 @@ interface TransactionInboxCardProps {
   onMarkPrivate: (id: string) => void
   onOpenMatchDialog: (transaction: TransactionWithInvoice) => void
   onOpenCategoryDialog: (transaction: TransactionWithInvoice) => void
+  onOpenDescribe?: (transaction: TransactionWithInvoice) => void
   onOpenQuickReview?: (transaction: TransactionWithInvoice, suggestion: SuggestedCategory) => void
   onToggleSelect: (id: string) => void
   onAnimationComplete?: (id: string) => void
@@ -30,6 +33,7 @@ interface TransactionInboxCardProps {
 export default function TransactionInboxCard({
   transaction,
   suggestions,
+  templateSuggestions,
   processingId,
   isBatchMode,
   isSelected,
@@ -38,6 +42,7 @@ export default function TransactionInboxCard({
   onMarkPrivate,
   onOpenMatchDialog,
   onOpenCategoryDialog,
+  onOpenDescribe,
   onOpenQuickReview,
   onToggleSelect,
   onAnimationComplete,
@@ -49,6 +54,8 @@ export default function TransactionInboxCard({
   const topSuggestion = suggestions?.[0]
   const isUncategorized = transaction.is_business === null && !transaction.journal_entry_id
   const showCheckbox = isBatchMode && isUncategorized
+  const hasWeakSuggestions = !topSuggestion || topSuggestion.confidence < 0.55
+  const showTemplateFallback = hasWeakSuggestions && templateSuggestions && templateSuggestions.length > 0
 
   function handleSuggestionClick(suggestion: SuggestedCategory) {
     if (onOpenQuickReview) {
@@ -155,6 +162,11 @@ export default function TransactionInboxCard({
                     <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
                   ) : null}
                   {topSuggestion.label}
+                  {topSuggestion.account && (
+                    <span className="ml-1 text-muted-foreground font-normal">
+                      ({formatAccountWithName(topSuggestion.account)})
+                    </span>
+                  )}
                   {topSuggestion.confidence >= 0.8 && (
                     <Badge variant="secondary" className="ml-1.5 text-[10px] px-1 py-0">
                       {Math.round(topSuggestion.confidence * 100)}%
@@ -173,7 +185,31 @@ export default function TransactionInboxCard({
                   disabled={isProcessing || isDisabled}
                 >
                   {suggestions[1].label}
+                  {suggestions[1].account && (
+                    <span className="ml-1 text-muted-foreground font-normal">
+                      ({formatAccountWithName(suggestions[1].account)})
+                    </span>
+                  )}
                 </Button>
+              )}
+
+              {/* Fallback templates when no strong suggestion */}
+              {showTemplateFallback && !hasInvoiceMatch && (
+                <>
+                  <span className="text-[10px] text-muted-foreground">Osaker? Prova:</span>
+                  {templateSuggestions!.slice(0, 3).map((tmpl) => (
+                    <Button
+                      key={tmpl.template_id}
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs border-dashed"
+                      onClick={() => onOpenDescribe?.(transaction)}
+                      disabled={isProcessing || isDisabled}
+                    >
+                      {tmpl.name_sv}
+                    </Button>
+                  ))}
+                </>
               )}
 
               {/* Private button */}
@@ -199,6 +235,20 @@ export default function TransactionInboxCard({
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
+
+              {/* Describe transaction */}
+              {onOpenDescribe && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs"
+                  onClick={() => onOpenDescribe(transaction)}
+                  disabled={isProcessing || isDisabled}
+                >
+                  <MessageSquareText className="mr-1.5 h-3 w-3" />
+                  Beskriv...
+                </Button>
+              )}
 
               {/* Open category dialog */}
               <Button

@@ -149,6 +149,40 @@ describe('template-embeddings', () => {
       expect(text).toContain('utgift')
       expect(text).not.toContain('MCC')
     })
+
+    it('prepends user description when provided', async () => {
+      const { buildTransactionQueryText } = await import('../template-embeddings')
+
+      const tx = makeTransaction({
+        description: 'SWE REST 4521 STHLM',
+        merchant_name: 'Unknown',
+        amount: -450,
+      })
+
+      const text = buildTransactionQueryText(tx, 'business lunch with client')
+
+      // User description should appear first
+      expect(text.indexOf('business lunch with client')).toBe(0)
+      // Transaction data should still be present
+      expect(text).toContain('SWE REST 4521 STHLM')
+      expect(text).toContain('Unknown')
+      expect(text).toContain('utgift')
+    })
+
+    it('behaves identically when userDescription is undefined', async () => {
+      const { buildTransactionQueryText } = await import('../template-embeddings')
+
+      const tx = makeTransaction({
+        description: 'SPOTIFY PREMIUM',
+        merchant_name: 'Spotify',
+        amount: -109,
+      })
+
+      const withoutDesc = buildTransactionQueryText(tx)
+      const withUndefined = buildTransactionQueryText(tx, undefined)
+
+      expect(withoutDesc).toBe(withUndefined)
+    })
   })
 
   describe('getSchemaVersion', () => {

@@ -7,6 +7,7 @@ import { neBilagaExtension } from '@/extensions/ne-bilaga'
 import { aiChatExtension } from '@/extensions/general/ai-chat'
 import { invoiceInboxExtension } from '@/extensions/general/invoice-inbox'
 import { calendarExtension } from '@/extensions/general/calendar'
+import { userDescriptionMatchExtension } from '@/extensions/general/user-description-match'
 import type { Extension } from './types'
 
 // ── Enable Banking (PSD2) — opt-in extension ───────────────────────────
@@ -30,6 +31,7 @@ const FIRST_PARTY_EXTENSIONS: Extension[] = [
   aiChatExtension,
   invoiceInboxExtension,
   calendarExtension,
+  userDescriptionMatchExtension,
   // enableBankingExtension,  // Uncomment to activate PSD2 bank sync
 ]
 
