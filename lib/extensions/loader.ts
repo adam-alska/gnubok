@@ -8,6 +8,10 @@ import { aiChatExtension } from '@/extensions/general/ai-chat'
 import { invoiceInboxExtension } from '@/extensions/general/invoice-inbox'
 import { calendarExtension } from '@/extensions/general/calendar'
 import { userDescriptionMatchExtension } from '@/extensions/general/user-description-match'
+import { euSalesListExtension } from '@/extensions/export/eu-sales-list'
+import { vatMonitorExtension } from '@/extensions/export/vat-monitor'
+import { intrastatExtension } from '@/extensions/export/intrastat'
+import { currencyReceivablesExtension } from '@/extensions/export/currency-receivables'
 import type { Extension } from './types'
 
 // ── Enable Banking (PSD2) — opt-in extension ───────────────────────────
@@ -33,6 +37,12 @@ const FIRST_PARTY_EXTENSIONS: Extension[] = [
   calendarExtension,
   userDescriptionMatchExtension,
   // enableBankingExtension,  // Uncomment to activate PSD2 bank sync
+
+  // ── Export sector ──────────────────────────────────────────
+  euSalesListExtension,
+  vatMonitorExtension,
+  intrastatExtension,
+  currencyReceivablesExtension,
 ]
 
 let loaded = false

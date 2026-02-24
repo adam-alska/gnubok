@@ -26,7 +26,18 @@
       "Bash(git commit:*)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:support.fortnox.se)",
-      "Bash(npx vitest run:*)"
+      "Bash(npx vitest run:*)",
+      "WebFetch(domain:www.bjornlunden.se)",
+      "WebFetch(domain:www.scb.se)",
+      "WebFetch(domain:stripe.com)",
+      "WebFetch(domain:tullify.se)",
+      "WebFetch(domain:www.momsens.se)",
+      "WebFetch(domain:www.bokforingstips.se)",
+      "WebFetch(domain:rattsakuten.se)",
+      "WebFetch(domain:www.faronline.se)",
+      "WebFetch(domain:www.worldstopexports.com)",
+      "WebFetch(domain:www.riksbank.se)",
+      "WebFetch(domain:www.avalara.com)"
     ]
   }
 }

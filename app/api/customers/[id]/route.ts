@@ -2,6 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { validateBody } from '@/lib/api/validate'
 import { UpdateCustomerSchema } from '@/lib/api/schemas'
+import { validateVatNumber } from '@/lib/vat/vies-client'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('api/customers/[id]')
 
 export async function GET(
   request: Request,
@@ -93,6 +97,56 @@ export async function PATCH(
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // Auto-validate VAT number when it changes on an EU business customer (non-blocking)
+  const isEuBusiness = (body.customer_type || data.customer_type) === 'eu_business'
+  if (body.vat_number !== undefined && isEuBusiness) {
+    try {
+      if (body.vat_number) {
+        const vatResult = await validateVatNumber(body.vat_number)
+        if (vatResult.valid) {
+          await supabase
+            .from('customers')
+            .update({
+              vat_number_validated: true,
+              vat_number_validated_at: new Date().toISOString(),
+            })
+            .eq('id', id)
+            .eq('user_id', user.id)
+
+          data.vat_number_validated = true
+          data.vat_number_validated_at = new Date().toISOString()
+        } else {
+          await supabase
+            .from('customers')
+            .update({
+              vat_number_validated: false,
+              vat_number_validated_at: null,
+            })
+            .eq('id', id)
+            .eq('user_id', user.id)
+
+          data.vat_number_validated = false
+          data.vat_number_validated_at = null
+        }
+      } else {
+        // VAT number cleared
+        await supabase
+          .from('customers')
+          .update({
+            vat_number_validated: false,
+            vat_number_validated_at: null,
+          })
+          .eq('id', id)
+          .eq('user_id', user.id)
+
+        data.vat_number_validated = false
+        data.vat_number_validated_at = null
+      }
+    } catch (err) {
+      log.warn('Auto-VIES validation failed on customer update:', err)
+    }
   }
 
   return NextResponse.json({ data })
