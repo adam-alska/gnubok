@@ -23,7 +23,8 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { InvoiceReviewContent } from '@/components/invoices/InvoiceReviewContent'
 import { getErrorMessage } from '@/lib/errors/get-error-message'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
-import type { Customer, Currency, CreateInvoiceInput, InvoiceDocumentType } from '@/types'
+import CustomerForm from '@/components/customers/CustomerForm'
+import type { Customer, Currency, CreateInvoiceInput, CreateCustomerInput, InvoiceDocumentType } from '@/types'
 
 const itemSchema = z.object({
   description: z.string().min(1, 'Beskrivning krävs'),
@@ -68,6 +69,8 @@ export default function NewInvoicePage() {
   const [isSending, setIsSending] = useState(false)
   const [isPreviewing, setIsPreviewing] = useState(false)
   const [defaultNotes, setDefaultNotes] = useState<string | null>(null)
+  const [isCreateCustomerOpen, setIsCreateCustomerOpen] = useState(false)
+  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false)
 
   const {
     register,
@@ -164,6 +167,36 @@ export default function NewInvoicePage() {
       setCustomers(data || [])
     }
     setIsLoading(false)
+  }
+
+  async function handleCreateCustomer(data: CreateCustomerInput) {
+    setIsCreatingCustomer(true)
+
+    const response = await fetch('/api/customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      toast({
+        title: 'Fel',
+        description: result.error || 'Kunde inte skapa kund',
+        variant: 'destructive',
+      })
+    } else {
+      toast({
+        title: 'Kund skapad',
+        description: `${data.name} har lagts till`,
+      })
+      setCustomers([...customers, result.data])
+      setValue('customer_id', result.data.id)
+      setIsCreateCustomerOpen(false)
+    }
+
+    setIsCreatingCustomer(false)
   }
 
   const subtotal = watchItems.reduce((sum, item) => {
@@ -366,6 +399,16 @@ export default function NewInvoicePage() {
                     </Select>
                   )}
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => setIsCreateCustomerOpen(true)}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Skapa kund
+                </Button>
                 {errors.customer_id && (
                   <p className="text-sm text-destructive mt-2">{errors.customer_id.message}</p>
                 )}
@@ -676,6 +719,19 @@ export default function NewInvoicePage() {
           />
         </ConfirmationDialog>
       )}
+
+      {/* Create customer dialog */}
+      <Dialog open={isCreateCustomerOpen} onOpenChange={setIsCreateCustomerOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Lägg till kund</DialogTitle>
+          </DialogHeader>
+          <CustomerForm
+            onSubmit={handleCreateCustomer}
+            isLoading={isCreatingCustomer}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Send now prompt dialog */}
       <Dialog open={showSendPrompt} onOpenChange={(open) => {

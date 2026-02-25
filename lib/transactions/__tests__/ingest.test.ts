@@ -132,6 +132,8 @@ describe('ingestTransactions', () => {
     const raw = makeRaw({ amount: -100 })
     const inserted = makeTransaction({ id: 'tx-1', external_id: raw.external_id })
 
+    // Booked transaction map query (no booked transactions)
+    enqueue({ data: [], error: null })
     // Dedup check returns null (no existing row)
     enqueue({ data: null, error: null })
     // Insert returns the new transaction
@@ -154,6 +156,8 @@ describe('ingestTransactions', () => {
     const { supabase, enqueue } = createQueueMockSupabase()
     const raw = makeRaw()
 
+    // Booked transaction map query
+    enqueue({ data: [], error: null })
     // Dedup check returns an existing record
     enqueue({ data: { id: 'existing-tx-1' }, error: null })
 
@@ -171,6 +175,8 @@ describe('ingestTransactions', () => {
     const { supabase, enqueue } = createQueueMockSupabase()
     const raw = makeRaw()
 
+    // Booked transaction map query
+    enqueue({ data: [], error: null })
     // Dedup check: no duplicate
     enqueue({ data: null, error: null })
     // Insert fails
@@ -195,6 +201,8 @@ describe('ingestTransactions', () => {
       external_id: raw.external_id,
     })
 
+    // Booked transaction map query
+    enqueue({ data: [], error: null })
     // Dedup: no duplicate
     enqueue({ data: null, error: null })
     // Insert returns the new transaction
@@ -233,6 +241,8 @@ describe('ingestTransactions', () => {
       external_id: raw.external_id,
     })
 
+    // Booked transaction map query
+    enqueue({ data: [], error: null })
     // Dedup: no duplicate
     enqueue({ data: null, error: null })
     // Insert
@@ -260,6 +270,8 @@ describe('ingestTransactions', () => {
     })
     const journalEntry = makeJournalEntry({ id: 'je-1' })
 
+    // Booked transaction map query
+    enqueue({ data: [], error: null })
     // Dedup: no duplicate
     enqueue({ data: null, error: null })
     // Insert
@@ -294,6 +306,8 @@ describe('ingestTransactions', () => {
       external_id: raw.external_id,
     })
 
+    // Booked transaction map query
+    enqueue({ data: [], error: null })
     // Dedup: no duplicate
     enqueue({ data: null, error: null })
     // Insert
@@ -321,6 +335,8 @@ describe('ingestTransactions', () => {
       external_id: raw.external_id,
     })
 
+    // Booked transaction map query
+    enqueue({ data: [], error: null })
     // Dedup: no duplicate
     enqueue({ data: null, error: null })
     // Insert
@@ -347,6 +363,8 @@ describe('ingestTransactions', () => {
     const inserted1 = makeTransaction({ id: 'tx-a', amount: -100 })
     const inserted2 = makeTransaction({ id: 'tx-b', amount: -200 })
 
+    // Booked transaction map query
+    enqueue({ data: [], error: null })
     // Transaction 1: dedup (no match), insert OK
     enqueue({ data: null, error: null })
     enqueue({ data: inserted1, error: null })
@@ -382,6 +400,8 @@ describe('ingestTransactions', () => {
       external_id: 'ext-new',
     })
 
+    // Booked transaction map query
+    enqueue({ data: [], error: null })
     // Transaction rawNew: dedup (no match), insert OK
     enqueue({ data: null, error: null })
     enqueue({ data: insertedNew, error: null })
@@ -452,6 +472,8 @@ describe('ingestTransactions', () => {
     const raw = makeRaw({ amount: 1000 })
     const inserted = makeTransaction({ id: 'tx-inv-err', amount: 1000 })
 
+    // Booked transaction map query
+    enqueue({ data: [], error: null })
     enqueue({ data: null, error: null })
     enqueue({ data: inserted, error: null })
 
@@ -474,6 +496,8 @@ describe('ingestTransactions', () => {
     const raw = makeRaw({ amount: -400 })
     const inserted = makeTransaction({ id: 'tx-cat-err', amount: -400 })
 
+    // Booked transaction map query
+    enqueue({ data: [], error: null })
     enqueue({ data: null, error: null })
     enqueue({ data: inserted, error: null })
 
@@ -522,6 +546,8 @@ describe('ingestTransactions', () => {
       confidence: 0.95,
     })
 
+    // Booked transaction map query
+    enqueue({ data: [], error: null })
     // Dedup: no duplicate
     enqueue({ data: null, error: null })
     // Insert
@@ -562,6 +588,8 @@ describe('ingestTransactions', () => {
     ])
     mockTryReconcileTransaction.mockReturnValue(null)
 
+    // Booked transaction map query
+    enqueue({ data: [], error: null })
     // Dedup: no duplicate
     enqueue({ data: null, error: null })
     // Insert
@@ -587,6 +615,8 @@ describe('ingestTransactions', () => {
 
     mockFetchUnlinkedGLLines.mockRejectedValue(new Error('RPC error'))
 
+    // Booked transaction map query
+    enqueue({ data: [], error: null })
     // Dedup: no duplicate
     enqueue({ data: null, error: null })
     // Insert
@@ -599,5 +629,113 @@ describe('ingestTransactions', () => {
     expect(result.imported).toBe(1)
     expect(result.reconciled).toBe(0)
     expect(result.errors).toBe(0)
+  })
+
+  // -----------------------------------------------------------------------
+  // Content-based dedup: cross-source duplicate detection
+  // -----------------------------------------------------------------------
+  it('skips transactions that match already-booked ones by date+amount', async () => {
+    const { supabase, enqueue } = createQueueMockSupabase()
+    const raw = makeRaw({
+      external_id: 'psd2_conn123_tx456',
+      date: '2024-06-15',
+      amount: -250,
+    })
+
+    // Booked transaction map returns a booked tx with same date+amount
+    enqueue({
+      data: [{ date: '2024-06-15', amount: -250 }],
+      error: null,
+    })
+    // external_id dedup: no match (different source)
+    enqueue({ data: null, error: null })
+
+    const result = await ingestTransactions(supabase as never, USER_ID, [raw])
+
+    expect(result.duplicates).toBe(1)
+    expect(result.imported).toBe(0)
+  })
+
+  it('imports transactions when booked ones have different amounts', async () => {
+    const { supabase, enqueue } = createQueueMockSupabase()
+    const raw = makeRaw({
+      external_id: 'psd2_conn123_tx789',
+      date: '2024-06-15',
+      amount: -300,
+    })
+    const inserted = makeTransaction({ id: 'tx-new', amount: -300 })
+
+    // Booked transaction map: same date but different amount
+    enqueue({
+      data: [{ date: '2024-06-15', amount: -250 }],
+      error: null,
+    })
+    // external_id dedup: no match
+    enqueue({ data: null, error: null })
+    // Insert
+    enqueue({ data: inserted, error: null })
+
+    mockEvaluateMappingRules.mockResolvedValue(makeMappingResult({ confidence: 0.5 }))
+
+    const result = await ingestTransactions(supabase as never, USER_ID, [raw])
+
+    expect(result.imported).toBe(1)
+    expect(result.duplicates).toBe(0)
+  })
+
+  it('handles multiple booked transactions with same date+amount correctly', async () => {
+    const { supabase, enqueue } = createQueueMockSupabase()
+
+    // Three incoming transactions with the same date+amount
+    const raw1 = makeRaw({ external_id: 'psd2_a', date: '2024-06-15', amount: -100 })
+    const raw2 = makeRaw({ external_id: 'psd2_b', date: '2024-06-15', amount: -100 })
+    const raw3 = makeRaw({ external_id: 'psd2_c', date: '2024-06-15', amount: -100 })
+
+    const inserted = makeTransaction({ id: 'tx-new', amount: -100 })
+
+    // Booked map: 2 existing booked transactions with same date+amount
+    // So 2 of the 3 incoming should be skipped, 1 should be imported
+    enqueue({
+      data: [
+        { date: '2024-06-15', amount: -100 },
+        { date: '2024-06-15', amount: -100 },
+      ],
+      error: null,
+    })
+
+    // raw1: external_id dedup (no match) -> content dedup matches (bookedCount=2 -> 1)
+    enqueue({ data: null, error: null })
+    // raw2: external_id dedup (no match) -> content dedup matches (bookedCount=1 -> 0)
+    enqueue({ data: null, error: null })
+    // raw3: external_id dedup (no match) -> content dedup exhausted -> insert
+    enqueue({ data: null, error: null })
+    enqueue({ data: inserted, error: null })
+
+    mockEvaluateMappingRules.mockResolvedValue(makeMappingResult({ confidence: 0.5 }))
+
+    const result = await ingestTransactions(supabase as never, USER_ID, [raw1, raw2, raw3])
+
+    expect(result.duplicates).toBe(2)
+    expect(result.imported).toBe(1)
+  })
+
+  it('continues normally when booked transaction map query fails', async () => {
+    const { supabase, enqueue } = createQueueMockSupabase()
+    const raw = makeRaw({ amount: -200 })
+    const inserted = makeTransaction({ id: 'tx-mapfail', amount: -200 })
+
+    // Booked map query throws (caught by try/catch in buildBookedTransactionMap)
+    enqueue({ error: { message: 'Query failed' } })
+    // external_id dedup: no match
+    enqueue({ data: null, error: null })
+    // Insert
+    enqueue({ data: inserted, error: null })
+
+    mockEvaluateMappingRules.mockResolvedValue(makeMappingResult({ confidence: 0.5 }))
+
+    const result = await ingestTransactions(supabase as never, USER_ID, [raw])
+
+    expect(result.imported).toBe(1)
+    expect(result.duplicates).toBe(0)
   })
 })

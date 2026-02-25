@@ -25,7 +25,7 @@ import { createHash } from 'crypto'
 
 export const EMBEDDING_MODEL = 'text-embedding-3-small'
 const EMBEDDING_LOGIC_VERSION = '1'
-const MATCH_COUNT = 20
+const MATCH_COUNT = 5
 const MATCH_THRESHOLD = 0.5
 
 /**

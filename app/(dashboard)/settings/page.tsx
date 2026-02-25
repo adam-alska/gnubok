@@ -22,14 +22,14 @@ import {
   Moon,
   Monitor,
   Palette,
-  Landmark,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
-import type { CompanySettings, BankConnection } from '@/types'
-import { NotificationSettings } from '@/extensions/general/push-notifications/NotificationSettings'
+import type { CompanySettings } from '@/types'
 import { CalendarFeedSettings } from '@/components/settings/CalendarFeedSettings'
-import { BankSelector, type Bank } from '@/extensions/general/enable-banking/components/BankSelector'
-import { BankConnectionStatus } from '@/extensions/general/enable-banking/components/BankConnectionStatus'
+import { getSettingsPanel } from '@/lib/extensions/settings-panel-registry'
+
+const NotificationPanel = getSettingsPanel('push-notifications')
+const BankingPanel = getSettingsPanel('enable-banking')
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -40,11 +40,7 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [settings, setSettings] = useState<CompanySettings | null>(null)
-  const [bankConnections, setBankConnections] = useState<BankConnection[]>([])
-  const [isSyncing, setIsSyncing] = useState(false)
-  const [isConnecting, setIsConnecting] = useState(false)
   const [hasBankingExtension, setHasBankingExtension] = useState(false)
-  const [selectedBank, setSelectedBank] = useState<Bank | null>(null)
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
@@ -97,26 +93,22 @@ export default function SettingsPage() {
 
     setSettings(settingsData)
 
-    // Check if Enable Banking extension is active by testing for bank connections
-    // If there are active connections, show the banking tab
-    const { data: connections } = await supabase
-      .from('bank_connections')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-
-    setBankConnections(connections || [])
-
-    // Check if Enable Banking extension is enabled via toggle API
+    // Check if Enable Banking extension is enabled
     try {
       const toggleRes = await fetch('/api/extensions/toggles/general/enable-banking')
       if (toggleRes.ok) {
         const { data } = await toggleRes.json()
-        setHasBankingExtension(data?.enabled || (connections && connections.length > 0) || false)
-      } else {
-        setHasBankingExtension((connections && connections.length > 0) || false)
+        setHasBankingExtension(data?.enabled || false)
       }
     } catch {
+      // If toggle check fails, also check for existing connections
+      const { data: connections } = await supabase
+        .from('bank_connections')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .limit(1)
+
       setHasBankingExtension((connections && connections.length > 0) || false)
     }
 
@@ -177,88 +169,6 @@ export default function SettingsPage() {
     setIsSaving(false)
   }
 
-  async function handleConnectBank(bankName: string, bankCountry: string) {
-    setIsConnecting(true)
-
-    try {
-      const response = await fetch('/api/extensions/ext/enable-banking/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ aspsp_name: bankName, aspsp_country: bankCountry }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error)
-      }
-
-      // Redirect to bank authorization
-      window.location.href = data.authorization_url
-    } catch (error) {
-      toast({
-        title: 'Fel',
-        description: error instanceof Error ? error.message : 'Kunde inte ansluta bank',
-        variant: 'destructive',
-      })
-      setIsConnecting(false)
-    }
-  }
-
-  async function handleSyncTransactions(connectionId: string) {
-    setIsSyncing(true)
-
-    try {
-      const response = await fetch('/api/extensions/ext/enable-banking/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ connection_id: connectionId }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error)
-      }
-
-      toast({
-        title: 'Synkronisering klar',
-        description: `${data.imported} nya transaktioner importerade`,
-      })
-
-      fetchData()
-    } catch (error) {
-      toast({
-        title: 'Fel',
-        description: error instanceof Error ? error.message : 'Synkronisering misslyckades',
-        variant: 'destructive',
-      })
-    }
-
-    setIsSyncing(false)
-  }
-
-  async function handleDisconnectBank(connectionId: string) {
-    const { error } = await supabase
-      .from('bank_connections')
-      .update({ status: 'revoked' })
-      .eq('id', connectionId)
-
-    if (error) {
-      toast({
-        title: 'Fel',
-        description: 'Kunde inte koppla bort bank',
-        variant: 'destructive',
-      })
-    } else {
-      toast({
-        title: 'Bank bortkopplad',
-        description: 'Bankanslutningen har tagits bort',
-      })
-      fetchData()
-    }
-  }
-
   async function handleLogout() {
     await supabase.auth.signOut()
     router.push('/login')
@@ -271,8 +181,6 @@ export default function SettingsPage() {
       </div>
     )
   }
-
-  const activeConnections = bankConnections.filter((c) => c.status === 'active')
 
   return (
     <div className="space-y-6">
@@ -289,16 +197,18 @@ export default function SettingsPage() {
             <Building className="mr-2 h-4 w-4" />
             Företag
           </TabsTrigger>
-          {hasBankingExtension && (
+          {hasBankingExtension && BankingPanel && (
             <TabsTrigger value="banking">
               <CreditCard className="mr-2 h-4 w-4" />
               Bank (PSD2)
             </TabsTrigger>
           )}
-          <TabsTrigger value="notifications">
-            <Bell className="mr-2 h-4 w-4" />
-            Aviseringar
-          </TabsTrigger>
+          {NotificationPanel && (
+            <TabsTrigger value="notifications">
+              <Bell className="mr-2 h-4 w-4" />
+              Aviseringar
+            </TabsTrigger>
+          )}
           <TabsTrigger value="calendar">
             <Calendar className="mr-2 h-4 w-4" />
             Kalender
@@ -525,93 +435,19 @@ export default function SettingsPage() {
           </form>
         </TabsContent>
 
-        {/* Banking settings (only shown when extension is active or connections exist) */}
-        {hasBankingExtension && (
+        {/* Banking settings — loaded dynamically from extension */}
+        {hasBankingExtension && BankingPanel && (
           <TabsContent value="banking" className="space-y-6">
-            {/* Connected banks */}
-            {activeConnections.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Anslutna banker</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {activeConnections.map((connection) => (
-                    <BankConnectionStatus
-                      key={connection.id}
-                      connection={connection}
-                      onSync={handleSyncTransactions}
-                      onDisconnect={handleDisconnectBank}
-                      isSyncing={isSyncing}
-                    />
-                  ))}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Connect new bank */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Anslut ny bank</CardTitle>
-                <CardDescription>
-                  Välj din bank nedan för att koppla ditt konto via PSD2.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <BankSelector
-                  onSelect={setSelectedBank}
-                  isLoading={isConnecting}
-                />
-                {selectedBank && (
-                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
-                    <div className="flex items-center gap-3">
-                      <Landmark className="h-5 w-5 text-primary" />
-                      <div>
-                        <p className="text-sm font-medium">{selectedBank.name}</p>
-                        <p className="text-xs text-muted-foreground">{selectedBank.country}</p>
-                      </div>
-                    </div>
-                    <Button
-                      onClick={() => handleConnectBank(selectedBank.name, selectedBank.country)}
-                      disabled={isConnecting}
-                    >
-                      {isConnecting ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Ansluter...
-                        </>
-                      ) : (
-                        'Anslut bank'
-                      )}
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Info about PSD2 */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Om bankintegration (PSD2)</CardTitle>
-                <CardDescription>
-                  Automatisk import av transaktioner via PSD2 open banking.
-                  Samtycket gäller i 90 dagar och behöver sedan förnyas.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Vi använder säker bankintegration (PSD2). Vi kan endast läsa transaktioner,
-                  aldrig flytta pengar. Du kan också importera transaktioner manuellt via
-                  bankfiler på importsidan.
-                </p>
-              </CardContent>
-            </Card>
+            <BankingPanel />
           </TabsContent>
         )}
 
-        {/* Notification settings */}
-        <TabsContent value="notifications">
-          <NotificationSettings />
-        </TabsContent>
+        {/* Notification settings — loaded dynamically from extension */}
+        {NotificationPanel && (
+          <TabsContent value="notifications">
+            <NotificationPanel />
+          </TabsContent>
+        )}
 
         {/* Calendar feed settings */}
         <TabsContent value="calendar">

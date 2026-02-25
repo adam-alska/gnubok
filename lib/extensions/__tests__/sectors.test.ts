@@ -11,8 +11,8 @@ describe('sectors registry', () => {
     expect(SECTORS.length).toBe(7)
   })
 
-  it('should have 22 total extensions', () => {
-    expect(getAllExtensions().length).toBe(22)
+  it('should have 24 total extensions', () => {
+    expect(getAllExtensions().length).toBe(24)
   })
 
   it('should have unique slugs within each sector', () => {

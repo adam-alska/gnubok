@@ -128,20 +128,9 @@ export async function createNextPeriod(
     throw new Error('Current fiscal period not found')
   }
 
-  // Check if next period already exists
+  // Compute next period start (day after current end)
   const nextStart = new Date(current.period_end)
   nextStart.setDate(nextStart.getDate() + 1)
-
-  const { data: existing } = await supabase
-    .from('fiscal_periods')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('period_start', nextStart.toISOString().split('T')[0])
-    .maybeSingle()
-
-  if (existing) {
-    throw new Error('Next fiscal period already exists')
-  }
 
   // Compute period length from current period to handle broken fiscal years
   const currentStart = new Date(current.period_start)
@@ -166,6 +155,19 @@ export async function createNextPeriod(
   const durationError = validatePeriodDuration(nextStartStr, nextEndStr)
   if (durationError) {
     throw new Error(durationError)
+  }
+
+  // Check for overlapping periods
+  const { data: overlapping } = await supabase
+    .from('fiscal_periods')
+    .select('id')
+    .eq('user_id', userId)
+    .lte('period_start', nextEndStr)
+    .gte('period_end', nextStartStr)
+    .limit(1)
+
+  if (overlapping && overlapping.length > 0) {
+    throw new Error('Next fiscal period already exists or overlaps with an existing period')
   }
 
   // Generate name: e.g. "FY 2025" or "FY 2025/2026"

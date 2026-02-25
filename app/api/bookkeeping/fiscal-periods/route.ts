@@ -43,6 +43,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: durationError }, { status: 400 })
   }
 
+  // Check for overlapping periods
+  const { data: overlapping } = await supabase
+    .from('fiscal_periods')
+    .select('id, name')
+    .eq('user_id', user.id)
+    .lte('period_start', body.period_end)
+    .gte('period_end', body.period_start)
+    .limit(1)
+
+  if (overlapping && overlapping.length > 0) {
+    return NextResponse.json(
+      { error: `Overlaps with existing period: ${overlapping[0].name}` },
+      { status: 409 }
+    )
+  }
+
   const { data, error } = await supabase
     .from('fiscal_periods')
     .insert({

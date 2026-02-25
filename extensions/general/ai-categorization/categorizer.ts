@@ -101,16 +101,16 @@ function getCategoryAccountMap(entityType: EntityType): Record<string, { account
 /** Fallback template IDs when AI doesn't provide one */
 const CATEGORY_DEFAULT_TEMPLATES: Record<string, string> = {
   expense_representation: 'representation_external',
-  expense_equipment: 'equipment_tools',
-  expense_software: 'software_subscription',
-  expense_travel: 'travel_domestic',
+  expense_equipment: 'equipment_small',
+  expense_software: 'it_saas_subscription',
+  expense_travel: 'travel_transport',
   expense_office: 'office_supplies_general',
   expense_consumables: 'office_supplies_general',
-  expense_vehicle: 'travel_fuel',
+  expense_vehicle: 'vehicle_fuel',
   expense_telecom: 'telecom_mobile',
-  expense_marketing: 'marketing_advertising',
+  expense_marketing: 'marketing_online_ads',
   expense_education: 'education_course',
-  expense_professional_services: 'consulting_accounting',
+  expense_professional_services: 'prof_accounting',
 }
 
 /**

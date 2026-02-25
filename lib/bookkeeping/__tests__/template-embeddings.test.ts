@@ -93,7 +93,7 @@ describe('template-embeddings', () => {
       expect(text).toContain('non_deductible')
     })
 
-    it('generates text for all 100 templates without error', async () => {
+    it('generates text for all 45 templates without error', async () => {
       const { buildEmbeddingText } = await import('../template-embeddings')
 
       for (const template of BOOKING_TEMPLATES) {

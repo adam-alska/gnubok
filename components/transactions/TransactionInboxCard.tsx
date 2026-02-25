@@ -163,7 +163,7 @@ export default function TransactionInboxCard({
                   ) : null}
                   {topSuggestion.label}
                   {topSuggestion.account && (
-                    <span className="ml-1 text-muted-foreground font-normal">
+                    <span className="ml-1 opacity-70 font-normal">
                       ({formatAccountWithName(topSuggestion.account)})
                     </span>
                   )}
@@ -211,30 +211,6 @@ export default function TransactionInboxCard({
                   ))}
                 </>
               )}
-
-              {/* Private button */}
-              <TooltipProvider delayDuration={300}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 text-xs text-muted-foreground"
-                      onClick={() => onMarkPrivate(transaction.id)}
-                      disabled={isProcessing || isDisabled}
-                    >
-                      Privat
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-[260px]">
-                    <p className="text-sm leading-relaxed">
-                      {entityType === 'aktiebolag'
-                        ? 'Privat utgift med företagets kort \u2014 bokförs som skuld till ägaren (konto 2893)'
-                        : 'Privat uttag \u2014 bokförs mot konto 2013 (Övriga egna uttag)'}
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
 
               {/* Describe transaction */}
               {onOpenDescribe && (

@@ -10,10 +10,52 @@ import type { Transaction, RawTransaction, IngestResult } from '@/types'
 export type { RawTransaction, IngestResult } from '@/types'
 
 /**
+ * Build a lookup map of already-booked transactions keyed by "date|amount".
+ * Each key maps to the number of booked transactions with that date+amount
+ * combination, allowing correct dedup when multiple transactions share
+ * the same date and amount.
+ */
+async function buildBookedTransactionMap(
+  supabase: SupabaseClient,
+  userId: string,
+  rawTransactions: RawTransaction[]
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>()
+  if (rawTransactions.length === 0) return map
+
+  const dates = rawTransactions.map((t) => t.date).sort()
+  const dateFrom = dates[0]
+  const dateTo = dates[dates.length - 1]
+
+  try {
+    const { data: booked } = await supabase
+      .from('transactions')
+      .select('date, amount')
+      .eq('user_id', userId)
+      .not('journal_entry_id', 'is', null)
+      .gte('date', dateFrom)
+      .lte('date', dateTo)
+
+    if (booked) {
+      for (const tx of booked) {
+        const key = `${tx.date}|${tx.amount}`
+        map.set(key, (map.get(key) || 0) + 1)
+      }
+    }
+  } catch {
+    // Non-critical — content-based dedup will be skipped
+  }
+
+  return map
+}
+
+/**
  * Generic transaction ingestion pipeline.
  *
  * Handles:
  * 1. Deduplication via external_id
+ * 1b. Content-based dedup via date+amount against already-booked transactions
+ *     (catches cross-source duplicates, e.g. CSV import then PSD2 sync)
  * 2. Insert into transactions table
  * 3. OCR/reference-based invoice matching (highest confidence)
  * 4. Amount+customer fallback invoice matching
@@ -37,6 +79,11 @@ export async function ingestTransactions(
     transaction_ids: [],
   }
 
+  // Pre-fetch booked transactions for content-based dedup (date+amount)
+  // This catches cross-source duplicates (e.g. same transaction imported
+  // via CSV and then again via PSD2 with different external_id)
+  const bookedMap = await buildBookedTransactionMap(supabase, userId, rawTransactions)
+
   // Pre-fetch unlinked GL lines for reconciliation (non-critical)
   let glLinePool: UnlinkedGLLine[] = []
   try {
@@ -55,6 +102,16 @@ export async function ingestTransactions(
       .single()
 
     if (existing) {
+      result.duplicates++
+      continue
+    }
+
+    // 1b. Content-based dedup: skip if an already-booked transaction
+    // exists with the same date and amount (cross-source duplicate)
+    const contentKey = `${raw.date}|${raw.amount}`
+    const bookedCount = bookedMap.get(contentKey) || 0
+    if (bookedCount > 0) {
+      bookedMap.set(contentKey, bookedCount - 1)
       result.duplicates++
       continue
     }
