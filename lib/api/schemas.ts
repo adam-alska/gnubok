@@ -311,6 +311,7 @@ export const CategorizeTransactionSchema = z.object({
   vat_treatment: VatTreatmentSchema.optional(),
   account_override: accountNumber.optional(),
   user_description: z.string().max(500).optional(),
+  inbox_item_id: z.string().uuid().optional(),
 })
 
 export const BookTransactionSchema = z.object({

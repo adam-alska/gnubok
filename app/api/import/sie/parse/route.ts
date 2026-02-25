@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import { NextResponse } from 'next/server'
 import {
   parseSIEFile,
@@ -10,7 +9,8 @@ import {
 } from '@/lib/import/sie-parser'
 import { suggestMappings, getMappingStats } from '@/lib/import/account-mapper'
 import { generateImportPreview, checkDuplicateImport } from '@/lib/import/sie-import'
-import type { SIEAccountMappingRecord, SIEAccount } from '@/lib/import/types'
+import { BAS_REFERENCE } from '@/lib/bookkeeping/bas-data'
+import type { SIEAccountMappingRecord } from '@/lib/import/types'
 
 /**
  * POST /api/import/sie/parse
@@ -78,33 +78,18 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
-    // Fetch user's full chart of accounts (paginated to avoid 1000-row limit)
-    const basAccounts = await fetchAllRows(({ from, to }) =>
-      supabase
-        .from('chart_of_accounts')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .order('account_number')
-        .range(from, to)
-    )
-
-    if (basAccounts.length === 0) {
-      return NextResponse.json({
-        error: 'No chart of accounts found. Please complete onboarding first.',
-      }, { status: 400 })
-    }
-
     // Fetch stored mappings from database
     const { data: storedMappings } = await supabase
       .from('sie_account_mappings')
       .select('*')
       .eq('user_id', user.id)
 
-    // Suggest account mappings
+    // Match against the full BAS reference (1,276 accounts) instead of only
+    // the user's active chart (~40 accounts). Accounts that match will be
+    // auto-activated during the execute step.
     const mappings = suggestMappings(
       parsed.accounts,
-      basAccounts,
+      BAS_REFERENCE,
       (storedMappings as SIEAccountMappingRecord[]) || undefined
     )
 

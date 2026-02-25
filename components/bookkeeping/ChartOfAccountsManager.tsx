@@ -56,6 +56,7 @@ const TYPE_LABELS: Record<string, string> = {
   equity: 'EK',
   revenue: 'Intakt',
   expense: 'Kostnad',
+  untaxed_reserves: 'Ob. reserver',
 }
 
 // ---------------------------------------------------------------------------
@@ -69,6 +70,7 @@ export default function ChartOfAccountsManager() {
   const [view, setView] = useState<'my-accounts' | 'bas-catalog'>('my-accounts')
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedClasses, setExpandedClasses] = useState<Set<number>>(new Set())
+  const [hideK2Excluded, setHideK2Excluded] = useState<boolean | null>(null)
 
   // Data state
   const [accounts, setAccounts] = useState<BASAccount[]>([])
@@ -104,10 +106,25 @@ export default function ChartOfAccountsManager() {
     async function load() {
       setLoading(true)
       await Promise.all([fetchAccounts(), fetchReference()])
+      // Set K2 filter default based on company settings (plan_type)
+      if (hideK2Excluded === null) {
+        try {
+          const res = await fetch('/api/settings')
+          if (res.ok) {
+            const { data } = await res.json()
+            // Default to hiding K2-excluded accounts if the company uses K2 (plan_type === 'k1')
+            setHideK2Excluded(data?.plan_type === 'k1')
+          } else {
+            setHideK2Excluded(false)
+          }
+        } catch {
+          setHideK2Excluded(false)
+        }
+      }
       setLoading(false)
     }
     load()
-  }, [fetchAccounts, fetchReference])
+  }, [fetchAccounts, fetchReference, hideK2Excluded])
 
   const refreshAll = useCallback(async () => {
     await Promise.all([fetchAccounts(), fetchReference()])
@@ -221,12 +238,18 @@ export default function ChartOfAccountsManager() {
   }, [filteredAccounts])
 
   const filteredReference = useMemo(() => {
-    if (!searchQuery) return referenceAccounts
-    const q = searchQuery.toLowerCase()
-    return referenceAccounts.filter(
-      (a) => a.account_number.includes(q) || a.account_name.toLowerCase().includes(q)
-    )
-  }, [referenceAccounts, searchQuery])
+    let filtered = referenceAccounts
+    if (hideK2Excluded) {
+      filtered = filtered.filter((a) => !a.k2_excluded)
+    }
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      filtered = filtered.filter(
+        (a) => a.account_number.includes(q) || a.account_name.toLowerCase().includes(q)
+      )
+    }
+    return filtered
+  }, [referenceAccounts, searchQuery, hideK2Excluded])
 
   const groupedReference = useMemo(() => {
     const grouped: Record<number, ReferenceAccount[]> = {}
@@ -283,6 +306,17 @@ export default function ChartOfAccountsManager() {
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             Eget konto
           </Button>
+        )}
+
+        {view === 'bas-catalog' && (
+          <label className="flex items-center gap-2 text-sm">
+            <Switch
+              checked={hideK2Excluded ?? false}
+              onCheckedChange={setHideK2Excluded}
+              className="scale-75"
+            />
+            <span className="text-muted-foreground">Dolj K2-undantagna</span>
+          </label>
         )}
       </div>
 

@@ -134,6 +134,8 @@ describe('ingestTransactions', () => {
 
     // Booked transaction map query (no booked transactions)
     enqueue({ data: [], error: null })
+    // Supplier invoices fetch (no unpaid invoices)
+    enqueue({ data: [], error: null })
     // Dedup check returns null (no existing row)
     enqueue({ data: null, error: null })
     // Insert returns the new transaction
@@ -158,6 +160,8 @@ describe('ingestTransactions', () => {
 
     // Booked transaction map query
     enqueue({ data: [], error: null })
+    // Supplier invoices fetch
+    enqueue({ data: [], error: null })
     // Dedup check returns an existing record
     enqueue({ data: { id: 'existing-tx-1' }, error: null })
 
@@ -176,6 +180,8 @@ describe('ingestTransactions', () => {
     const raw = makeRaw()
 
     // Booked transaction map query
+    enqueue({ data: [], error: null })
+    // Supplier invoices fetch
     enqueue({ data: [], error: null })
     // Dedup check: no duplicate
     enqueue({ data: null, error: null })
@@ -202,6 +208,8 @@ describe('ingestTransactions', () => {
     })
 
     // Booked transaction map query
+    enqueue({ data: [], error: null })
+    // Supplier invoices fetch
     enqueue({ data: [], error: null })
     // Dedup: no duplicate
     enqueue({ data: null, error: null })
@@ -243,6 +251,8 @@ describe('ingestTransactions', () => {
 
     // Booked transaction map query
     enqueue({ data: [], error: null })
+    // Supplier invoices fetch
+    enqueue({ data: [], error: null })
     // Dedup: no duplicate
     enqueue({ data: null, error: null })
     // Insert
@@ -271,6 +281,8 @@ describe('ingestTransactions', () => {
     const journalEntry = makeJournalEntry({ id: 'je-1' })
 
     // Booked transaction map query
+    enqueue({ data: [], error: null })
+    // Supplier invoices fetch
     enqueue({ data: [], error: null })
     // Dedup: no duplicate
     enqueue({ data: null, error: null })
@@ -308,6 +320,8 @@ describe('ingestTransactions', () => {
 
     // Booked transaction map query
     enqueue({ data: [], error: null })
+    // Supplier invoices fetch
+    enqueue({ data: [], error: null })
     // Dedup: no duplicate
     enqueue({ data: null, error: null })
     // Insert
@@ -337,6 +351,8 @@ describe('ingestTransactions', () => {
 
     // Booked transaction map query
     enqueue({ data: [], error: null })
+    // Supplier invoices fetch
+    enqueue({ data: [], error: null })
     // Dedup: no duplicate
     enqueue({ data: null, error: null })
     // Insert
@@ -364,6 +380,8 @@ describe('ingestTransactions', () => {
     const inserted2 = makeTransaction({ id: 'tx-b', amount: -200 })
 
     // Booked transaction map query
+    enqueue({ data: [], error: null })
+    // Supplier invoices fetch
     enqueue({ data: [], error: null })
     // Transaction 1: dedup (no match), insert OK
     enqueue({ data: null, error: null })
@@ -401,6 +419,8 @@ describe('ingestTransactions', () => {
     })
 
     // Booked transaction map query
+    enqueue({ data: [], error: null })
+    // Supplier invoices fetch
     enqueue({ data: [], error: null })
     // Transaction rawNew: dedup (no match), insert OK
     enqueue({ data: null, error: null })
@@ -474,6 +494,8 @@ describe('ingestTransactions', () => {
 
     // Booked transaction map query
     enqueue({ data: [], error: null })
+    // Supplier invoices fetch
+    enqueue({ data: [], error: null })
     enqueue({ data: null, error: null })
     enqueue({ data: inserted, error: null })
 
@@ -497,6 +519,8 @@ describe('ingestTransactions', () => {
     const inserted = makeTransaction({ id: 'tx-cat-err', amount: -400 })
 
     // Booked transaction map query
+    enqueue({ data: [], error: null })
+    // Supplier invoices fetch
     enqueue({ data: [], error: null })
     enqueue({ data: null, error: null })
     enqueue({ data: inserted, error: null })
@@ -548,6 +572,8 @@ describe('ingestTransactions', () => {
 
     // Booked transaction map query
     enqueue({ data: [], error: null })
+    // Supplier invoices fetch
+    enqueue({ data: [], error: null })
     // Dedup: no duplicate
     enqueue({ data: null, error: null })
     // Insert
@@ -590,6 +616,8 @@ describe('ingestTransactions', () => {
 
     // Booked transaction map query
     enqueue({ data: [], error: null })
+    // Supplier invoices fetch
+    enqueue({ data: [], error: null })
     // Dedup: no duplicate
     enqueue({ data: null, error: null })
     // Insert
@@ -616,6 +644,8 @@ describe('ingestTransactions', () => {
     mockFetchUnlinkedGLLines.mockRejectedValue(new Error('RPC error'))
 
     // Booked transaction map query
+    enqueue({ data: [], error: null })
+    // Supplier invoices fetch
     enqueue({ data: [], error: null })
     // Dedup: no duplicate
     enqueue({ data: null, error: null })
@@ -647,6 +677,8 @@ describe('ingestTransactions', () => {
       data: [{ date: '2024-06-15', amount: -250 }],
       error: null,
     })
+    // Supplier invoices fetch
+    enqueue({ data: [], error: null })
     // external_id dedup: no match (different source)
     enqueue({ data: null, error: null })
 
@@ -670,6 +702,8 @@ describe('ingestTransactions', () => {
       data: [{ date: '2024-06-15', amount: -250 }],
       error: null,
     })
+    // Supplier invoices fetch
+    enqueue({ data: [], error: null })
     // external_id dedup: no match
     enqueue({ data: null, error: null })
     // Insert
@@ -702,6 +736,8 @@ describe('ingestTransactions', () => {
       ],
       error: null,
     })
+    // Supplier invoices fetch
+    enqueue({ data: [], error: null })
 
     // raw1: external_id dedup (no match) -> content dedup matches (bookedCount=2 -> 1)
     enqueue({ data: null, error: null })
@@ -726,6 +762,8 @@ describe('ingestTransactions', () => {
 
     // Booked map query throws (caught by try/catch in buildBookedTransactionMap)
     enqueue({ error: { message: 'Query failed' } })
+    // Supplier invoices fetch
+    enqueue({ data: [], error: null })
     // external_id dedup: no match
     enqueue({ data: null, error: null })
     // Insert

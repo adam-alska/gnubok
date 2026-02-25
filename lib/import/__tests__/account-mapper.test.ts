@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { BASAccount } from '@/types'
+import type { BASReferenceAccount } from '@/lib/bookkeeping/bas-reference'
 import type { SIEAccount, SIEAccountMappingRecord } from '../types'
 import {
   suggestMappings,
@@ -36,6 +37,7 @@ function makeBASAccount(number: string, name: string): BASAccount {
     default_vat_code: null,
     description: null,
     sru_code: null,
+    k2_excluded: false,
     sort_order: parseInt(number, 10),
     created_at: '2024-01-01',
     updated_at: '2024-01-01',
@@ -73,7 +75,7 @@ describe('suggestMappings', () => {
     expect(result[0].isOverride).toBe(false)
   })
 
-  it('returns unmapped entry when no match exists', () => {
+  it('returns unmapped entry for out-of-range accounts', () => {
     const source = [makeSIEAccount('9999', 'Okänt konto')]
     const result = suggestMappings(source, basAccounts)
 
@@ -84,9 +86,31 @@ describe('suggestMappings', () => {
     expect(result[0].matchType).toBe('manual')
   })
 
-  it('does not fuzzy match accounts with similar names', () => {
-    // 3400 should NOT match 3001 or 3002 despite being in same class
+  it('self-maps valid BAS-range accounts not in reference via bas_range fallback', () => {
+    // 3400 is a valid BAS-range account (1000-8999) but not in the fixture list
     const source = [makeSIEAccount('3400', 'Försäljning tjänster')]
+    const result = suggestMappings(source, basAccounts)
+
+    expect(result).toHaveLength(1)
+    expect(result[0].targetAccount).toBe('3400')
+    expect(result[0].targetName).toBe('Försäljning tjänster')
+    expect(result[0].confidence).toBe(0.9)
+    expect(result[0].matchType).toBe('bas_range')
+  })
+
+  it('self-maps sub-accounts not in reference (e.g. 1241 Personbilar)', () => {
+    const source = [makeSIEAccount('1241', 'Personbilar')]
+    const result = suggestMappings(source, basAccounts)
+
+    expect(result).toHaveLength(1)
+    expect(result[0].targetAccount).toBe('1241')
+    expect(result[0].targetName).toBe('Personbilar')
+    expect(result[0].confidence).toBe(0.9)
+    expect(result[0].matchType).toBe('bas_range')
+  })
+
+  it('does not self-map accounts outside BAS range (9000+)', () => {
+    const source = [makeSIEAccount('9100', 'Internt konto')]
     const result = suggestMappings(source, basAccounts)
 
     expect(result).toHaveLength(1)
@@ -94,9 +118,8 @@ describe('suggestMappings', () => {
     expect(result[0].confidence).toBe(0)
   })
 
-  it('does not fuzzy match accounts with similar numbers', () => {
-    // 2510 should NOT match 2440 despite being in same class
-    const source = [makeSIEAccount('2510', 'Skatteskulder')]
+  it('does not self-map non-4-digit account numbers', () => {
+    const source = [makeSIEAccount('12345', 'Felaktigt kontonummer')]
     const result = suggestMappings(source, basAccounts)
 
     expect(result).toHaveLength(1)
@@ -128,21 +151,25 @@ describe('suggestMappings', () => {
     expect(result[0].matchType).toBe('manual')
   })
 
-  it('sorts unmapped accounts first (lowest confidence)', () => {
+  it('sorts by confidence (lowest first)', () => {
     const source = [
       makeSIEAccount('1510', 'Kundfordringar'),
       makeSIEAccount('9999', 'Okänt konto'),
+      makeSIEAccount('3400', 'Försäljning tjänster'),
       makeSIEAccount('1930', 'Företagskonto'),
     ]
     const result = suggestMappings(source, basAccounts)
 
-    expect(result).toHaveLength(3)
+    expect(result).toHaveLength(4)
     // Unmapped (confidence 0) should come first
     expect(result[0].sourceAccount).toBe('9999')
     expect(result[0].confidence).toBe(0)
-    // Exact matches (confidence 1.0) come after
-    expect(result[1].confidence).toBe(1.0)
+    // bas_range (confidence 0.9) next
+    expect(result[1].sourceAccount).toBe('3400')
+    expect(result[1].confidence).toBe(0.9)
+    // Exact matches (confidence 1.0) come last
     expect(result[2].confidence).toBe(1.0)
+    expect(result[3].confidence).toBe(1.0)
   })
 
   it('handles multiple accounts with mixed results', () => {
@@ -155,10 +182,10 @@ describe('suggestMappings', () => {
 
     expect(result).toHaveLength(3)
 
+    // All 3 should be mapped: 1510 and 5010 exact, 3400 bas_range
     const mapped = result.filter((m) => m.targetAccount)
-    const unmapped = result.filter((m) => !m.targetAccount)
-    expect(mapped).toHaveLength(2)
-    expect(unmapped).toHaveLength(1)
+    expect(mapped).toHaveLength(3)
+    expect(mapped.find((m) => m.sourceAccount === '3400')?.matchType).toBe('bas_range')
   })
 
   it('handles empty source accounts', () => {
@@ -174,6 +201,48 @@ describe('suggestMappings', () => {
     expect(result[0].targetAccount).toBe('')
     expect(result[0].confidence).toBe(0)
   })
+
+  it('accepts BASReferenceAccount objects (full BAS reference)', () => {
+    const refAccounts: BASReferenceAccount[] = [
+      {
+        account_number: '1510',
+        account_name: 'Kundfordringar',
+        account_class: 1,
+        account_group: '15',
+        account_type: 'asset',
+        normal_balance: 'debit',
+        description: 'Kundfordringar',
+        sru_code: null,
+        k2_excluded: false,
+      },
+      {
+        account_number: '2440',
+        account_name: 'Leverantörsskulder',
+        account_class: 2,
+        account_group: '24',
+        account_type: 'liability',
+        normal_balance: 'credit',
+        description: 'Leverantörsskulder',
+        sru_code: null,
+        k2_excluded: false,
+      },
+    ]
+
+    const source = [
+      makeSIEAccount('1510', 'Kundfordringar'),
+      makeSIEAccount('2440', 'Leverantörsskulder'),
+      makeSIEAccount('9999', 'Okänt konto'),
+    ]
+
+    const result = suggestMappings(source, refAccounts)
+
+    expect(result).toHaveLength(3)
+    const mapped = result.filter((m) => m.targetAccount)
+    const unmapped = result.filter((m) => !m.targetAccount)
+    expect(mapped).toHaveLength(2)
+    expect(unmapped).toHaveLength(1)
+    expect(mapped.find((m) => m.sourceAccount === '1510')?.confidence).toBe(1.0)
+  })
 })
 
 describe('validateMappings', () => {
@@ -188,7 +257,7 @@ describe('validateMappings', () => {
     expect(validation.unmappedAccounts).toHaveLength(0)
   })
 
-  it('returns invalid when accounts are unmapped', () => {
+  it('returns invalid when out-of-range accounts are unmapped', () => {
     const mappings = suggestMappings(
       [makeSIEAccount('1510', 'Kundfordringar'), makeSIEAccount('9999', 'Okänt konto')],
       basAccounts
@@ -198,6 +267,17 @@ describe('validateMappings', () => {
     expect(validation.valid).toBe(false)
     expect(validation.unmappedAccounts).toContain('9999')
     expect(validation.unmappedAccounts).toHaveLength(1)
+  })
+
+  it('returns valid when all accounts mapped via exact + bas_range', () => {
+    const mappings = suggestMappings(
+      [makeSIEAccount('1510', 'Kundfordringar'), makeSIEAccount('1241', 'Personbilar')],
+      basAccounts
+    )
+    const validation = validateMappings(mappings)
+
+    expect(validation.valid).toBe(true)
+    expect(validation.unmappedAccounts).toHaveLength(0)
   })
 
   it('detects low confidence accounts', () => {
@@ -236,18 +316,20 @@ describe('getMappingStats', () => {
     expect(stats.unmapped).toBe(1)
   })
 
-  it('counts match types correctly', () => {
+  it('counts match types correctly including bas_range', () => {
     const mappings = suggestMappings(
       [
-        makeSIEAccount('1510', 'Kundfordringar'),
-        makeSIEAccount('9999', 'Okänt konto'),
+        makeSIEAccount('1510', 'Kundfordringar'),   // exact
+        makeSIEAccount('1241', 'Personbilar'),       // bas_range
+        makeSIEAccount('9999', 'Okänt konto'),       // manual (unmapped)
       ],
       basAccounts
     )
     const stats = getMappingStats(mappings)
 
     expect(stats.exact).toBe(1)
-    expect(stats.manual).toBe(1) // unmapped gets matchType 'manual'
+    expect(stats.basRange).toBe(1)
+    expect(stats.manual).toBe(1)
     expect(stats.name).toBe(0)
     expect(stats.class).toBe(0)
   })
@@ -265,6 +347,20 @@ describe('getMappingStats', () => {
 
     // Average of mapped only: (1.0 + 1.0) / 2 = 1.0
     expect(stats.averageConfidence).toBe(1.0)
+  })
+
+  it('includes bas_range in average confidence calculation', () => {
+    const mappings = suggestMappings(
+      [
+        makeSIEAccount('1510', 'Kundfordringar'), // exact, confidence 1.0
+        makeSIEAccount('1241', 'Personbilar'),     // bas_range, confidence 0.9
+      ],
+      basAccounts
+    )
+    const stats = getMappingStats(mappings)
+
+    // Average of (1.0 + 0.9) / 2 = 0.95
+    expect(stats.averageConfidence).toBe(0.95)
   })
 
   it('returns 0 average confidence when nothing is mapped', () => {

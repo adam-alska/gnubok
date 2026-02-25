@@ -15,6 +15,7 @@ const TYPE_COLORS: Record<AccountType, string> = {
   equity: 'bg-blue-500',
   revenue: 'bg-purple-500',
   expense: 'bg-red-500',
+  untaxed_reserves: 'bg-amber-500',
 }
 
 const TYPE_LABELS: Record<AccountType, string> = {
@@ -23,6 +24,7 @@ const TYPE_LABELS: Record<AccountType, string> = {
   equity: 'Eget kapital',
   revenue: 'Intäkt',
   expense: 'Kostnad',
+  untaxed_reserves: 'Obeskattade reserver',
 }
 
 interface AccountNumberProps {

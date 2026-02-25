@@ -1,4 +1,4 @@
-export type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense'
+export type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense' | 'untaxed_reserves'
 
 export interface AccountDescription {
   name: string

@@ -1,8 +1,10 @@
-import type { Transaction, TransactionCategory, Invoice, Customer, VatTreatment } from '@/types'
+import type { Transaction, TransactionCategory, Invoice, Customer, SupplierInvoice, VatTreatment, InvoiceInboxItem } from '@/types'
 
 // Shared transaction type with potential invoice data
 export interface TransactionWithInvoice extends Transaction {
   potential_invoice?: Invoice & { customer?: Customer }
+  potential_supplier_invoice?: SupplierInvoice
+  matched_inbox_item?: InvoiceInboxItem
 }
 
 // Page view modes
@@ -16,7 +18,9 @@ export type CategorizeHandler = (
   isBusiness: boolean,
   category?: TransactionCategory,
   vatTreatment?: VatTreatment,
-  accountOverride?: string
+  accountOverride?: string,
+  templateId?: string,
+  inboxItemId?: string
 ) => Promise<string | null>
 
 export type MatchInvoiceHandler = (

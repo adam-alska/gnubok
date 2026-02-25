@@ -14,6 +14,7 @@ import { ChatAnthropic } from '@langchain/anthropic'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { z } from 'zod'
 import type { ReceiptExtractionResult, ExtractedLineItem } from '@/types'
+import { buildTemplatePromptSection } from '@/lib/bookkeeping/template-prompt'
 import {
   SYSTEMBOLAGET_PATTERNS,
   RESTAURANT_PATTERNS,
@@ -54,6 +55,8 @@ VIKTIGT:
 - Belopp ska vara numeriska värden utan valutasymboler
 - Ange konfidenstal (0.0-1.0) för hela extraheringen baserat på bildkvalitet`
 
+  const templateSection = buildTemplatePromptSection()
+
   const userPrompt = `Analysera detta kvitto och extrahera strukturerad data.
 
 Returnera ett JSON-objekt med följande struktur:
@@ -77,7 +80,8 @@ Returnera ett JSON-objekt med följande struktur:
       "unitPrice": 100.00,
       "lineTotal": 100.00,
       "vatRate": 25,
-      "suggestedCategory": "equipment|software|travel|office|marketing|professional_services|education|other"
+      "suggestedCategory": "equipment|software|travel|office|marketing|professional_services|education|other",
+      "suggestedTemplateId": "mall-id eller null"
     }
   ],
   "totals": {
@@ -90,10 +94,13 @@ Returnera ett JSON-objekt med följande struktur:
     "isSystembolaget": false,
     "isForeignMerchant": false
   },
-  "confidence": 0.95
+  "confidence": 0.95,
+  "suggestedTemplateId": "mall-id för hela kvittot eller null"
 }
 
-KATEGORIER för suggestedCategory:
+${templateSection}
+
+KATEGORIER för suggestedCategory (backup om ingen mall matchar):
 - equipment: Datorer, telefoner, kameror, teknikprylar
 - software: Program, appar, molntjänster, prenumerationer
 - travel: Flyg, tåg, hotell, taxi
@@ -224,6 +231,7 @@ function validateAndEnhanceResult(raw: unknown): ReceiptExtractionResult {
       isForeignMerchant: isForeign,
     },
     confidence: validateNumber(data.confidence) || 0.5,
+    suggestedTemplateId: validateString(data.suggestedTemplateId) || undefined,
   }
 
   return result
@@ -245,6 +253,7 @@ function validateLineItems(data: any): ExtractedLineItem[] {
       lineTotal: validateNumber(item.lineTotal) || 0,
       vatRate: validateNumber(item.vatRate),
       suggestedCategory: validateCategory(item.suggestedCategory),
+      suggestedTemplateId: validateString(item.suggestedTemplateId) || undefined,
       confidence: validateNumber(item.confidence) || undefined,
     }))
     .filter((item) => item.lineTotal > 0 || item.description.length > 0)

@@ -46,10 +46,19 @@ export interface CategorizationContext {
   recentHistory: { description: string; category: string }[]
 }
 
+export interface DocumentEnrichment {
+  type: 'receipt' | 'supplier_invoice'
+  merchantName?: string
+  lineItems?: Array<{ description: string; amount: number; category?: string; accountSuggestion?: string }>
+  vatBreakdown?: Array<{ rate: number; amount: number }>
+  isReverseCharge?: boolean
+}
+
 export interface EnrichedCategorizationContext extends CategorizationContext {
   candidateTemplates: BookingTemplate[]
   userAccountUsage: AccountUsageEntry[]
   merchantHistory: MerchantHistoryEntry[]
+  documentData?: DocumentEnrichment
 }
 
 export interface CategorizationSuggestion {
@@ -223,6 +232,11 @@ export class AnthropicCategorizationProvider implements CategorizationProvider {
           .join('\n')}`
       : ''
 
+    // Build document enrichment context (from linked receipt or supplier invoice)
+    const documentContext = enriched?.documentData
+      ? buildDocumentContext(enriched.documentData)
+      : ''
+
     const systemPrompt = `Du är expert på svensk bokföring och kategorisering av banktransaktioner enligt BAS-kontoplanen.
 Din uppgift är att kategorisera varje transaktion till rätt mall-ID (templateId) och BAS-konto.
 
@@ -243,7 +257,7 @@ MOMSHANTERING:
 - Intäkter: Normalt 25% moms (utgående moms, MP1)
 
 ${NON_DEDUCTIBLE_RULES}
-
+${documentContext}
 REGLER:
 1. Negativa belopp = utgifter, positiva = intäkter
 2. VIKTIGT: Dessa transaktioner kommer från företagets bankkonto/kort. Anta ALLTID att de är affärsrelaterade. Klassificera ALDRIG som "private" — det beslutet tar användaren själv.
@@ -380,6 +394,42 @@ ${transactionList}`
         }
       })
   }
+}
+
+function buildDocumentContext(doc: DocumentEnrichment): string {
+  const parts: string[] = []
+
+  const typeLabel = doc.type === 'receipt' ? 'KVITTO' : 'LEVERANTÖRSFAKTURA'
+  parts.push(`LÄNKAT DOKUMENT (${typeLabel}):`)
+
+  if (doc.merchantName) {
+    parts.push(`Handlare/leverantör: ${doc.merchantName}`)
+  }
+
+  if (doc.lineItems && doc.lineItems.length > 0) {
+    parts.push('Rader:')
+    for (const item of doc.lineItems) {
+      let line = `- ${item.description}: ${item.amount} kr`
+      if (item.accountSuggestion) line += ` (föreslaget konto: ${item.accountSuggestion})`
+      if (item.category) line += ` [${item.category}]`
+      parts.push(line)
+    }
+  }
+
+  if (doc.vatBreakdown && doc.vatBreakdown.length > 0) {
+    parts.push('Momsfördelning:')
+    for (const vat of doc.vatBreakdown) {
+      parts.push(`- ${vat.rate}%: ${vat.amount} kr`)
+    }
+  }
+
+  if (doc.isReverseCharge) {
+    parts.push(`VIKTIGT: Omvänd skattskyldighet (reverse charge). Använd dubbelkontering:
+- Debitera 2645 (beräknad ingående moms) OCH kreditera 2614 (utgående moms, omvänd skattskyldighet)
+- Mallen "purchase_eu_service_reverse_charge" ska användas om tillgänglig`)
+  }
+
+  return parts.join('\n') + '\n'
 }
 
 function isEnrichedContext(

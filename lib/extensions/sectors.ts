@@ -72,15 +72,15 @@ export const SECTORS: Sector[] = [
       },
       {
         slug: 'invoice-inbox',
-        name: 'Leverantörsfaktura-inbox',
+        name: 'Dokumentinkorg',
         sector: 'general',
         category: 'import',
         icon: 'Inbox',
         dataPattern: 'manual',
         hasOwnData: true,
-        description: 'Ta emot leverantörsfakturor via e-post eller uppladdning',
+        description: 'Ta emot alla dokument via e-post — fakturor, kvitton och myndighetspost',
         longDescription:
-          'Skicka leverantörsfakturor till en dedikerad e-postadress eller ladda upp manuellt. AI extraherar automatiskt leverantörsdata, belopp och moms. Granska och bekräfta med ett klick för att skapa leverantörsfakturor.',
+          'Skicka alla affärsdokument till en dedikerad e-postadress. AI klassificerar automatiskt dokumenttyp (faktura, kvitto, myndighetspost), extraherar data och matchar mot transaktioner. En inkorg för alla dokument.',
       },
       {
         slug: 'calendar',

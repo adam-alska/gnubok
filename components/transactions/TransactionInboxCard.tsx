@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { ArrowUpRight, ArrowDownRight, FileText, Loader2, MessageSquareText } from 'lucide-react'
+import { ArrowUpRight, ArrowDownRight, FileText, Loader2, MessageSquareText, Paperclip } from 'lucide-react'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/info-tooltip'
 import { formatAccountWithName } from '@/lib/bookkeeping/client-account-names'
 import type { TransactionWithInvoice, CategorizeHandler } from './transaction-types'
@@ -51,11 +51,13 @@ export default function TransactionInboxCard({
   const isDisabled = processingId !== null && processingId !== transaction.id
   const isIncome = transaction.amount > 0
   const hasInvoiceMatch = !!transaction.potential_invoice && !transaction.invoice_id
+  const hasSupplierInvoiceMatch = !!transaction.potential_supplier_invoice && !transaction.supplier_invoice_id
   const topSuggestion = suggestions?.[0]
   const isUncategorized = transaction.is_business === null && !transaction.journal_entry_id
   const showCheckbox = isBatchMode && isUncategorized
   const hasWeakSuggestions = !topSuggestion || topSuggestion.confidence < 0.55
   const showTemplateFallback = hasWeakSuggestions && templateSuggestions && templateSuggestions.length > 0
+  const hasDocumentMatch = !!transaction.matched_inbox_item
 
   function handleSuggestionClick(suggestion: SuggestedCategory) {
     if (onOpenQuickReview) {
@@ -80,7 +82,7 @@ export default function TransactionInboxCard({
     >
       <Card
         className={`transition-colors ${
-          hasInvoiceMatch ? 'border-blue-500/50' : 'border-warning/50'
+          hasInvoiceMatch || hasSupplierInvoiceMatch ? 'border-blue-500/50' : 'border-warning/50'
         } ${isSelected ? 'border-primary bg-primary/[0.02]' : ''} ${
           isDisabled ? 'opacity-50' : ''
         }`}
@@ -113,7 +115,16 @@ export default function TransactionInboxCard({
               </div>
               <div className="min-w-0">
                 <p className="font-medium truncate">{transaction.description}</p>
-                <p className="text-sm text-muted-foreground">{formatDate(transaction.date)}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground">{formatDate(transaction.date)}</p>
+                  {hasDocumentMatch && (
+                    <Badge variant="secondary" className="text-xs gap-1">
+                      <Paperclip className="h-3 w-3" />
+                      {transaction.matched_inbox_item!.document_type === 'receipt' ? 'Kvitto' :
+                       transaction.matched_inbox_item!.document_type === 'supplier_invoice' ? 'Faktura' : 'Dokument'}
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -149,6 +160,21 @@ export default function TransactionInboxCard({
                     <FileText className="mr-1.5 h-3 w-3" />
                   )}
                   Matcha Faktura {transaction.potential_invoice!.invoice_number}
+                </Button>
+              ) : hasSupplierInvoiceMatch ? (
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="h-8 text-xs"
+                  onClick={() => onOpenMatchDialog(transaction)}
+                  disabled={isProcessing || isDisabled}
+                >
+                  {isProcessing ? (
+                    <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                  ) : (
+                    <FileText className="mr-1.5 h-3 w-3" />
+                  )}
+                  Matcha Leverantörsfaktura {transaction.potential_supplier_invoice!.supplier_invoice_number}
                 </Button>
               ) : topSuggestion ? (
                 <Button

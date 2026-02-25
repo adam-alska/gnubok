@@ -10,6 +10,7 @@ import VatTreatmentSelect from './VatTreatmentSelect'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { checkExpenseWarnings } from '@/lib/tax/expense-warnings'
 import { getDefaultAccountForCategory, getDefaultVatTreatmentForCategory } from '@/lib/bookkeeping/category-mapping'
+import { getTemplateById } from '@/lib/bookkeeping/booking-templates'
 import JournalEntryPreview from './JournalEntryPreview'
 import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
 import DocumentUploadZone from '@/components/bookkeeping/DocumentUploadZone'
@@ -59,6 +60,8 @@ export default function SwipeCategorizationView({
   const [showUploadZone, setShowUploadZone] = useState(false)
   const [showDescribeDialog, setShowDescribeDialog] = useState(false)
   const [showVatDropdown, setShowVatDropdown] = useState(false)
+  const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null)
+  const [pendingInboxItemId, setPendingInboxItemId] = useState<string | null>(null)
 
   // Clear VAT treatment when switching to a liability/equity account (class 2)
   useEffect(() => {
@@ -120,6 +123,23 @@ export default function SwipeCategorizationView({
     setPendingCategory(category)
     setAccountOverride(defaultAccount)
     setVatTreatment(defaultVat ?? 'none')
+    setPendingTemplateId(null)
+    setPendingInboxItemId(null)
+    setShowVatDropdown(false)
+    setShowCategorySelect(false)
+    setShowReviewStep(true)
+    setError(null)
+  }, [])
+
+  const handleTemplateSelect = useCallback((templateId: string, inboxItemId?: string) => {
+    const template = getTemplateById(templateId)
+    if (!template) return
+
+    setPendingCategory(template.fallback_category)
+    setAccountOverride(template.debit_account)
+    setVatTreatment(template.vat_treatment ?? 'none')
+    setPendingTemplateId(templateId)
+    setPendingInboxItemId(inboxItemId ?? null)
     setShowVatDropdown(false)
     setShowCategorySelect(false)
     setShowReviewStep(true)
@@ -180,7 +200,9 @@ export default function SwipeCategorizationView({
         true,
         pendingCategory,
         resolvedVat,
-        override
+        override,
+        pendingTemplateId ?? undefined,
+        pendingInboxItemId ?? undefined
       )
       if (journalEntryId) {
         // Link uploaded documents to the journal entry
@@ -210,6 +232,8 @@ export default function SwipeCategorizationView({
         resetUploadState()
         setShowReviewStep(false)
         setPendingCategory(null)
+        setPendingTemplateId(null)
+        setPendingInboxItemId(null)
         moveToNext()
       } else {
         setError('Kunde inte bokföra. Tryck "Hoppa över" för att gå vidare.')
@@ -248,6 +272,8 @@ export default function SwipeCategorizationView({
     setShowCategorySelect(false)
     setShowReviewStep(false)
     setPendingCategory(null)
+    setPendingTemplateId(null)
+    setPendingInboxItemId(null)
     resetUploadState()
     moveToNext()
   }, [moveToNext, resetUploadState])
@@ -424,38 +450,51 @@ export default function SwipeCategorizationView({
             </div>
           </div>
 
-          {/* Document upload */}
-          <div className="rounded-lg border">
-            <button
-              type="button"
-              onClick={() => setShowUploadZone(!showUploadZone)}
-              className="flex items-center justify-between w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors"
-            >
+          {/* Document upload / pre-attached document */}
+          {pendingInboxItemId && currentTransaction.matched_inbox_item?.document_id ? (
+            <div className="rounded-lg border bg-blue-500/5 border-blue-500/30 px-3 py-2.5">
               <div className="flex items-center gap-2">
-                <Paperclip className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">Underlag</span>
-                {uploadedFiles.filter((f) => f.status === 'uploaded').length > 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    {uploadedFiles.filter((f) => f.status === 'uploaded').length} bifogade
-                  </span>
+                <Paperclip className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium">Underlag bifogat</span>
+                <Check className="h-4 w-4 text-blue-600" />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Dokumentet från inkorgen länkas automatiskt till verifikationen.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-lg border">
+              <button
+                type="button"
+                onClick={() => setShowUploadZone(!showUploadZone)}
+                className="flex items-center justify-between w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Paperclip className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">Underlag</span>
+                  {uploadedFiles.filter((f) => f.status === 'uploaded').length > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      {uploadedFiles.filter((f) => f.status === 'uploaded').length} bifogade
+                    </span>
+                  )}
+                </div>
+                {showUploadZone ? (
+                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 )}
-              </div>
-              {showUploadZone ? (
-                <ChevronUp className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </button>
+              {showUploadZone && (
+                <div className="px-3 pb-3">
+                  <DocumentUploadZone
+                    files={uploadedFiles}
+                    onFilesChange={setUploadedFiles}
+                    compact
+                  />
+                </div>
               )}
-            </button>
-            {showUploadZone && (
-              <div className="px-3 pb-3">
-                <DocumentUploadZone
-                  files={uploadedFiles}
-                  onFilesChange={setUploadedFiles}
-                  compact
-                />
-              </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {error && (
             <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
@@ -603,6 +642,55 @@ export default function SwipeCategorizationView({
                   </div>
                 )}
 
+                {/* Document Match from Inbox */}
+                {currentTransaction.matched_inbox_item && (
+                  <div className="p-4 rounded-lg border-2 border-blue-500/40 bg-blue-500/5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                        <Paperclip className="h-5 w-5" />
+                        <span className="font-semibold text-sm">
+                          {currentTransaction.matched_inbox_item.document_type === 'receipt'
+                            ? 'Matchat kvitto'
+                            : currentTransaction.matched_inbox_item.document_type === 'supplier_invoice'
+                            ? 'Matchad leverantörsfaktura'
+                            : 'Matchat dokument'}
+                        </span>
+                      </div>
+                      {currentTransaction.matched_inbox_item.match_confidence != null && (
+                        <Badge variant="outline" className="text-blue-600 border-blue-500">
+                          {Math.round(currentTransaction.matched_inbox_item.match_confidence * 100)}%
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="text-sm">
+                      {(() => {
+                        const ext = currentTransaction.matched_inbox_item.extracted_data as Record<string, unknown> | null
+                        if (!ext) return null
+                        const supplierName = (ext as { supplier?: { name?: string } })?.supplier?.name
+                        const merchantName = (ext as { merchant?: { name?: string } })?.merchant?.name
+                        const totals = ext as { totals?: { total?: number } }
+                        return (
+                          <>
+                            {(supplierName || merchantName) && (
+                              <p className="font-medium">{supplierName || merchantName}</p>
+                            )}
+                            {totals?.totals?.total != null && (
+                              <p className="text-muted-foreground">
+                                {formatCurrency(totals.totals.total)}
+                              </p>
+                            )}
+                          </>
+                        )
+                      })()}
+                      {currentTransaction.matched_inbox_item.suggested_template_id && (
+                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                          Mall: {currentTransaction.matched_inbox_item.suggested_template_id}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Warnings */}
                 {warnings.length > 0 && (
                   <div className="space-y-2 pt-4 border-t">
@@ -641,6 +729,23 @@ export default function SwipeCategorizationView({
               {error}
             </div>
           )}
+
+          {/* Document template match — primary action when inbox item has a suggested template */}
+          {currentTransaction.matched_inbox_item?.suggested_template_id && (() => {
+            const tmplId = currentTransaction.matched_inbox_item!.suggested_template_id!
+            const template = getTemplateById(tmplId)
+            if (!template) return null
+            return (
+              <Button
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => handleTemplateSelect(tmplId, currentTransaction.matched_inbox_item!.id)}
+                disabled={isProcessing}
+              >
+                <Paperclip className="mr-2 h-4 w-4" />
+                Bokför som {template.name_sv}
+              </Button>
+            )
+          })()}
 
           {/* Invoice match button - primary action when there's a match */}
           {currentTransaction.potential_invoice && onMatchInvoice && (

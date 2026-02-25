@@ -23,7 +23,7 @@ import DescribeTransactionDialog from '@/components/transactions/DescribeTransac
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/components/transactions/transaction-types'
 import { getDefaultAccountForCategory, getDefaultVatTreatmentForCategory } from '@/lib/bookkeeping/category-mapping'
 import type { TransactionWithInvoice, ViewMode, CategorizeHandler } from '@/components/transactions/transaction-types'
-import type { TransactionCategory, CreateTransactionInput, Invoice, Customer, VatTreatment } from '@/types'
+import type { TransactionCategory, CreateTransactionInput, Invoice, Customer, VatTreatment, InvoiceInboxItem } from '@/types'
 import type { SuggestedCategory, SuggestedTemplate } from '@/lib/transactions/category-suggestions'
 
 export default function TransactionsPage() {
@@ -114,9 +114,32 @@ export default function TransactionsPage() {
       }
     }
 
+    // Fetch matched inbox items for unbooked transactions
+    const unbookedTxIds = (txData || [])
+      .filter((t) => !t.journal_entry_id && t.is_business === null)
+      .map((t) => t.id)
+
+    let inboxItemMap: Record<string, InvoiceInboxItem> = {}
+    if (unbookedTxIds.length > 0) {
+      const { data: inboxItems } = await supabase
+        .from('invoice_inbox_items')
+        .select('*')
+        .in('matched_transaction_id', unbookedTxIds)
+        .in('status', ['ready', 'processing'])
+      if (inboxItems) {
+        inboxItemMap = inboxItems.reduce((acc, item) => {
+          if (item.matched_transaction_id) {
+            acc[item.matched_transaction_id] = item as InvoiceInboxItem
+          }
+          return acc
+        }, {} as Record<string, InvoiceInboxItem>)
+      }
+    }
+
     const transactionsWithInvoices: TransactionWithInvoice[] = (txData || []).map((t) => ({
       ...t,
       potential_invoice: t.potential_invoice_id ? invoiceMap[t.potential_invoice_id] : undefined,
+      matched_inbox_item: inboxItemMap[t.id] || undefined,
     }))
 
     setTransactions(transactionsWithInvoices)
@@ -176,7 +199,7 @@ export default function TransactionsPage() {
     }
   }, [transactions.length])
 
-  const handleCategorize: CategorizeHandler = async (id, isBusiness, category, vatTreatment, accountOverride) => {
+  const handleCategorize: CategorizeHandler = async (id, isBusiness, category, vatTreatment, accountOverride, templateId, inboxItemId) => {
     try {
       setProcessingId(id)
       const response = await fetch(`/api/transactions/${id}/categorize`, {
@@ -187,6 +210,8 @@ export default function TransactionsPage() {
           category,
           vat_treatment: vatTreatment,
           account_override: accountOverride,
+          template_id: templateId,
+          inbox_item_id: inboxItemId,
         }),
       })
 
@@ -446,10 +471,21 @@ export default function TransactionsPage() {
 
   async function openSwipeView() {
     try {
+      // Match invoices to transactions
       await fetch('/api/transactions/batch-match-invoices', { method: 'POST' })
         .then((r) => r.json())
         .then((data) => {
           if (data.matched > 0) fetchTransactions()
+        })
+    } catch {
+      // Non-critical
+    }
+    try {
+      // Run document matching sweep for latest inbox matches
+      await fetch('/api/documents/match-sweep', { method: 'POST' })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.data?.matched > 0) fetchTransactions()
         })
     } catch {
       // Non-critical

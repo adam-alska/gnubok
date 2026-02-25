@@ -15,7 +15,7 @@
 DO $$
 DECLARE
   -- >>> SET THE TARGET USER EMAIL HERE <<<
-  target_email TEXT := 'user@example.com';
+  target_email TEXT := 'jakob.wennberg@arcim.io';
   target_user_id UUID;
 BEGIN
   -- Resolve email to user ID
@@ -45,6 +45,17 @@ BEGIN
   ALTER TABLE public.audit_log DISABLE TRIGGER USER;
   ALTER TABLE public.company_settings DISABLE TRIGGER USER;
   ALTER TABLE public.profiles DISABLE TRIGGER USER;
+  ALTER TABLE public.chat_sessions DISABLE TRIGGER USER;
+  ALTER TABLE public.invoice_inbox_items DISABLE TRIGGER USER;
+
+  -- Temporarily drop fiscal period constraints (migrations 042-043).
+  -- The NOT VALID CHECK constraints are still enforced on UPDATE, so
+  -- the circular-FK-breaking UPDATEs below will fail on rows with
+  -- non-conforming dates. The EXCLUDE constraint can also interfere.
+  -- We re-add them all after deletion.
+  ALTER TABLE public.fiscal_periods DROP CONSTRAINT IF EXISTS no_overlapping_fiscal_periods;
+  ALTER TABLE public.fiscal_periods DROP CONSTRAINT IF EXISTS fiscal_period_start_first_of_month;
+  ALTER TABLE public.fiscal_periods DROP CONSTRAINT IF EXISTS fiscal_period_end_last_of_month;
 
   -- Break circular / self-referencing FK constraints
   UPDATE public.fiscal_periods SET closing_entry_id = NULL, opening_balance_entry_id = NULL, previous_period_id = NULL WHERE user_id = target_user_id;
@@ -61,6 +72,7 @@ BEGIN
   DELETE FROM public.invoice_reminders WHERE user_id = target_user_id;
   DELETE FROM public.supplier_invoice_items WHERE supplier_invoice_id IN (SELECT id FROM public.supplier_invoices WHERE user_id = target_user_id);
   DELETE FROM public.supplier_invoice_payments WHERE supplier_invoice_id IN (SELECT id FROM public.supplier_invoices WHERE user_id = target_user_id);
+  DELETE FROM public.invoice_inbox_items WHERE user_id = target_user_id;
   DELETE FROM public.document_attachments WHERE user_id = target_user_id;
   DELETE FROM public.journal_entry_lines WHERE journal_entry_id IN (SELECT id FROM public.journal_entries WHERE user_id = target_user_id);
   DELETE FROM public.journal_entries WHERE user_id = target_user_id;
@@ -85,6 +97,9 @@ BEGIN
   DELETE FROM public.cost_centers WHERE user_id = target_user_id;
   DELETE FROM public.projects WHERE user_id = target_user_id;
   DELETE FROM public.bank_file_imports WHERE user_id = target_user_id;
+  DELETE FROM public.chat_messages WHERE user_id = target_user_id;
+  DELETE FROM public.chat_sessions WHERE user_id = target_user_id;
+  DELETE FROM public.extension_data WHERE user_id = target_user_id;
   DELETE FROM public.audit_log WHERE user_id = target_user_id;
   DELETE FROM public.extension_toggles WHERE user_id = target_user_id;
   DELETE FROM public.company_settings WHERE user_id = target_user_id;
@@ -107,6 +122,26 @@ BEGIN
   ALTER TABLE public.audit_log ENABLE TRIGGER USER;
   ALTER TABLE public.company_settings ENABLE TRIGGER USER;
   ALTER TABLE public.profiles ENABLE TRIGGER USER;
+  ALTER TABLE public.chat_sessions ENABLE TRIGGER USER;
+  ALTER TABLE public.invoice_inbox_items ENABLE TRIGGER USER;
+
+  -- Re-add fiscal period constraints
+  ALTER TABLE public.fiscal_periods
+    ADD CONSTRAINT no_overlapping_fiscal_periods
+    EXCLUDE USING gist (
+      user_id WITH =,
+      daterange(period_start, period_end, '[]') WITH &&
+    );
+
+  ALTER TABLE public.fiscal_periods
+    ADD CONSTRAINT fiscal_period_start_first_of_month
+    CHECK (EXTRACT(DAY FROM period_start) = 1)
+    NOT VALID;
+
+  ALTER TABLE public.fiscal_periods
+    ADD CONSTRAINT fiscal_period_end_last_of_month
+    CHECK (period_end = (date_trunc('month', period_end) + interval '1 month - 1 day')::date)
+    NOT VALID;
 
   -- Delete the auth user
   DELETE FROM auth.users WHERE id = target_user_id;
