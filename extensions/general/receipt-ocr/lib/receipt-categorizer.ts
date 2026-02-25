@@ -6,6 +6,7 @@
  */
 
 import type { TransactionCategory, ReceiptLineItem, ExtractedLineItem } from '@/types'
+import { getTemplateById } from '@/lib/bookkeeping/booking-templates'
 
 // Category mappings from suggested category to TransactionCategory
 const CATEGORY_MAPPING: Record<string, TransactionCategory> = {
@@ -109,6 +110,16 @@ export function mapSuggestedCategory(suggestedCategory: string | null): Transact
 }
 
 /**
+ * Map a booking template ID to a TransactionCategory.
+ * Falls back to the template's `fallback_category` field.
+ */
+export function mapTemplateIdToCategory(templateId: string | null | undefined): TransactionCategory | null {
+  if (!templateId) return null
+  const template = getTemplateById(templateId)
+  return template?.fallback_category ?? null
+}
+
+/**
  * Get BAS account for a category
  */
 export function getBASAccount(category: TransactionCategory): string {
@@ -148,9 +159,15 @@ export function processLineItems(
   lineItems: ExtractedLineItem[]
 ): Array<ExtractedLineItem & { category: TransactionCategory | null; basAccount: string | null }> {
   return lineItems.map((item) => {
-    // First try the AI-suggested category
-    let category = mapSuggestedCategory(item.suggestedCategory)
-    let confidence = item.confidence || 0.8
+    // First try the AI-suggested template ID
+    let category = mapTemplateIdToCategory(item.suggestedTemplateId)
+    let confidence = category ? (item.confidence || 0.85) : 0
+
+    // Then try the AI-suggested category
+    if (!category) {
+      category = mapSuggestedCategory(item.suggestedCategory)
+      confidence = item.confidence || 0.8
+    }
 
     // If no AI suggestion, try pattern matching
     if (!category) {

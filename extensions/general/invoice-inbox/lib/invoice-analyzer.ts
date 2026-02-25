@@ -11,6 +11,7 @@
 import 'server-only'
 import Anthropic from '@anthropic-ai/sdk'
 import type { InvoiceExtractionResult, ExtractedInvoiceLineItem, VatBreakdownItem } from '../types'
+import { buildTemplatePromptSection } from '@/lib/bookkeeping/template-prompt'
 
 const anthropic = new Anthropic()
 
@@ -40,6 +41,8 @@ VIKTIGT:
 - Belopp ska vara numeriska värden utan valutasymboler
 - Ange konfidenstal (0.0-1.0) för hela extraheringen`
 
+  const templateSection = buildTemplatePromptSection()
+
   const userPrompt = `Analysera denna leverantörsfaktura och extrahera strukturerad data.
 
 Returnera ett JSON-objekt med följande struktur:
@@ -67,7 +70,8 @@ Returnera ett JSON-objekt med följande struktur:
       "unitPrice": 100.00,
       "lineTotal": 100.00,
       "vatRate": 25,
-      "accountSuggestion": "BAS-kontonummer som 5410 eller null"
+      "accountSuggestion": "BAS-kontonummer som 5410 eller null",
+      "suggestedTemplateId": "mall-id eller null"
     }
   ],
   "totals": {
@@ -82,10 +86,13 @@ Returnera ett JSON-objekt med följande struktur:
       "amount": 25.00
     }
   ],
-  "confidence": 0.95
+  "confidence": 0.95,
+  "suggestedTemplateId": "mall-id för hela fakturan eller null"
 }
 
-KONTOKATEGORIER (BAS):
+${templateSection}
+
+KONTOKATEGORIER (BAS, backup om ingen mall matchar):
 - 4000-4999: Varuinköp, material
 - 5010: Lokalhyra
 - 5410: Förbrukningsinventarier
@@ -212,6 +219,7 @@ function validateAndEnhanceResult(raw: unknown): InvoiceExtractionResult {
     },
     vatBreakdown: validateVatBreakdown(data.vatBreakdown),
     confidence: validateNumber(data.confidence) || 0.5,
+    suggestedTemplateId: validateString(data.suggestedTemplateId) || undefined,
   }
 }
 
@@ -228,6 +236,7 @@ function validateLineItems(data: any): ExtractedInvoiceLineItem[] {
       lineTotal: validateNumber(item.lineTotal) || 0,
       vatRate: validateNumber(item.vatRate),
       accountSuggestion: validateAccountNumber(item.accountSuggestion as string | undefined),
+      suggestedTemplateId: validateString(item.suggestedTemplateId as string | undefined) || undefined,
     }))
     .filter((item: ExtractedInvoiceLineItem) => item.lineTotal > 0 || item.description.length > 0)
 }

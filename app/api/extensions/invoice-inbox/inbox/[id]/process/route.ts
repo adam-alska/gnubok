@@ -5,6 +5,8 @@ import { eventBus } from '@/lib/events/bus'
 import { analyzeInvoice } from '@/extensions/general/invoice-inbox/lib/invoice-analyzer'
 import { matchSupplier } from '@/extensions/general/invoice-inbox/lib/supplier-matcher'
 import { getSettings } from '@/extensions/general/invoice-inbox'
+import { matchDocumentToTransactions } from '@/lib/documents/document-matcher'
+import type { InvoiceInboxItem } from '@/types'
 
 ensureInitialized()
 
@@ -87,16 +89,27 @@ export async function POST(
       }
     }
 
-    // Update inbox item
+    // Update inbox item with extraction + template suggestion
+    const updateData: Record<string, unknown> = {
+      status: 'ready',
+      extracted_data: extraction as unknown as Record<string, unknown>,
+      confidence: extraction.confidence,
+      matched_supplier_id: matchedSupplierId,
+      error_message: null,
+      // Reset previous match on re-process
+      matched_transaction_id: null,
+      match_confidence: null,
+      match_method: null,
+    }
+
+    if (extraction.suggestedTemplateId) {
+      updateData.suggested_template_id = extraction.suggestedTemplateId
+      updateData.suggested_template_confidence = extraction.confidence
+    }
+
     const { data: updatedItem, error: updateError } = await supabase
       .from('invoice_inbox_items')
-      .update({
-        status: 'ready',
-        extracted_data: extraction as unknown as Record<string, unknown>,
-        confidence: extraction.confidence,
-        matched_supplier_id: matchedSupplierId,
-        error_message: null,
-      })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single()
@@ -114,6 +127,28 @@ export async function POST(
           userId: user.id,
         },
       })
+
+      // Document-to-transaction matching (non-blocking)
+      try {
+        const matchResult = await matchDocumentToTransactions(
+          supabase,
+          user.id,
+          updatedItem as InvoiceInboxItem
+        )
+
+        if (matchResult) {
+          await supabase
+            .from('invoice_inbox_items')
+            .update({
+              matched_transaction_id: matchResult.transactionId,
+              match_confidence: matchResult.confidence,
+              match_method: matchResult.method,
+            })
+            .eq('id', id)
+        }
+      } catch (matchError) {
+        console.error('[invoice-inbox] Transaction matching failed:', matchError)
+      }
     }
 
     return NextResponse.json({ data: updatedItem })

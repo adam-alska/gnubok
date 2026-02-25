@@ -2,9 +2,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { evaluateMappingRules } from '@/lib/bookkeeping/mapping-engine'
 import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-entries'
 import { getBestInvoiceMatch } from '@/lib/invoices/invoice-matching'
+import { findSupplierInvoiceMatch } from '@/lib/invoices/supplier-invoice-matching'
 import { tryReconcileTransaction, fetchUnlinkedGLLines } from '@/lib/reconciliation/bank-reconciliation'
 import type { UnlinkedGLLine } from '@/lib/reconciliation/bank-reconciliation'
-import type { Transaction, RawTransaction, IngestResult } from '@/types'
+import type { Transaction, RawTransaction, IngestResult, SupplierInvoice } from '@/types'
 
 // Re-export types for backward compatibility
 export type { RawTransaction, IngestResult } from '@/types'
@@ -90,6 +91,21 @@ export async function ingestTransactions(
     glLinePool = await fetchUnlinkedGLLines(supabase, userId)
   } catch {
     // Non-critical — reconciliation will be skipped
+  }
+
+  // Pre-fetch unpaid supplier invoices for expense matching (non-critical)
+  let unpaidSupplierInvoices: SupplierInvoice[] = []
+  try {
+    const { data } = await supabase
+      .from('supplier_invoices')
+      .select('*, supplier:suppliers(*)')
+      .eq('user_id', userId)
+      .in('status', ['registered', 'approved'])
+      .gt('remaining_amount', 0)
+
+    if (data) unpaidSupplierInvoices = data as SupplierInvoice[]
+  } catch {
+    // Non-critical — supplier invoice matching will be skipped
   }
 
   for (const raw of rawTransactions) {
@@ -187,6 +203,36 @@ export async function ingestTransactions(
             .eq('id', newTransaction.id)
 
           result.auto_matched_invoices++
+        }
+      } catch {
+        // Non-critical — continue processing
+      }
+    }
+
+    // 3b. For expense transactions, try supplier invoice matching
+    if (newTransaction.amount < 0 && unpaidSupplierInvoices.length > 0) {
+      try {
+        const match = findSupplierInvoiceMatch(
+          newTransaction as Transaction,
+          unpaidSupplierInvoices
+        )
+
+        if (match) {
+          if (match.confidence >= 0.85) {
+            // Auto-link at high confidence
+            await supabase
+              .from('transactions')
+              .update({ supplier_invoice_id: match.supplierInvoice.id })
+              .eq('id', newTransaction.id)
+
+            result.auto_matched_invoices++
+          } else {
+            // Store as suggestion at lower confidence (0.70–0.85)
+            await supabase
+              .from('transactions')
+              .update({ potential_supplier_invoice_id: match.supplierInvoice.id })
+              .eq('id', newTransaction.id)
+          }
         }
       } catch {
         // Non-critical — continue processing

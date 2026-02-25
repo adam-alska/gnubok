@@ -87,10 +87,12 @@ export default function InvoiceInboxWorkspace({ userId }: WorkspaceComponentProp
     fetchSuppliers()
   }, [fetchItems, fetchSettings, fetchSuppliers])
 
-  function handleUploadComplete(newItem: InvoiceInboxItem) {
-    setItems((prev) => [newItem, ...prev])
-    // Poll for processing completion
-    pollItem(newItem.id)
+  function handleUploadComplete(result: InvoiceInboxItem | InvoiceInboxItem[]) {
+    const newItems = Array.isArray(result) ? result : [result]
+    setItems((prev) => [...newItems, ...prev])
+    for (const item of newItems) {
+      pollItem(item.id)
+    }
   }
 
   async function pollItem(itemId: string) {

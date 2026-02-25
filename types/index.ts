@@ -223,6 +223,9 @@ export interface Transaction {
   // Potential invoice match (suggested, not confirmed)
   potential_invoice_id: string | null
 
+  // Potential supplier invoice match (suggested, not confirmed)
+  potential_supplier_invoice_id: string | null
+
   // Bookkeeping
   journal_entry_id: string | null
   mcc_code: number | null
@@ -759,7 +762,7 @@ export interface TaxEstimate {
 export type RiskLevel = 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH'
 
 // Account types
-export type AccountType = 'asset' | 'equity' | 'liability' | 'revenue' | 'expense'
+export type AccountType = 'asset' | 'equity' | 'liability' | 'revenue' | 'expense' | 'untaxed_reserves'
 export type NormalBalance = 'debit' | 'credit'
 export type PlanType = 'k1' | 'full_bas'
 
@@ -810,6 +813,7 @@ export interface BASAccount {
   default_vat_code: string | null
   description: string | null
   sru_code: string | null
+  k2_excluded: boolean
   sort_order: number
   created_at: string
   updated_at: string
@@ -1344,6 +1348,9 @@ export interface SIEAccountMapping {
 export type InboxItemStatus = 'pending' | 'processing' | 'ready' | 'confirmed' | 'rejected' | 'error'
 export type InboxItemSource = 'email' | 'upload'
 
+// Document classification type for unified inbox routing
+export type DocumentClassificationType = 'supplier_invoice' | 'receipt' | 'government_letter' | 'unknown'
+
 export interface InvoiceInboxItem {
   id: string
   user_id: string
@@ -1358,6 +1365,21 @@ export interface InvoiceInboxItem {
   matched_supplier_id: string | null
   created_supplier_invoice_id: string | null
   error_message: string | null
+
+  // Unified document inbox fields
+  document_type: DocumentClassificationType
+  linked_receipt_id: string | null
+  raw_email_payload: Record<string, unknown> | null
+
+  // AI template suggestion
+  suggested_template_id: string | null
+  suggested_template_confidence: number | null
+
+  // Transaction matching
+  matched_transaction_id: string | null
+  match_confidence: number | null
+  match_method: 'payment_reference' | 'amount_date' | 'amount_merchant' | 'receipt_match' | null
+
   created_at: string
   updated_at: string
 
@@ -1365,6 +1387,7 @@ export interface InvoiceInboxItem {
   document?: DocumentAttachment
   supplier?: Supplier
   supplier_invoice?: SupplierInvoice
+  receipt?: Receipt
 }
 
 // ============================================================
@@ -1405,6 +1428,11 @@ export interface Receipt {
   // Restaurant representation data
   representation_persons: number | null
   representation_purpose: string | null
+  representation_business_connection: string | null
+
+  // Source tracking (for email-originated receipts)
+  source: 'upload' | 'camera' | 'email'
+  email_from: string | null
 
   // Transaction matching
   matched_transaction_id: string | null
@@ -1472,6 +1500,7 @@ export interface ReceiptExtractionResult {
     isForeignMerchant: boolean
   }
   confidence: number
+  suggestedTemplateId?: string
 }
 
 // Extracted line item from AI
@@ -1482,6 +1511,7 @@ export interface ExtractedLineItem {
   lineTotal: number
   vatRate: number | null
   suggestedCategory: string | null
+  suggestedTemplateId?: string
   confidence?: number
 }
 
@@ -1939,6 +1969,7 @@ export interface InvoiceExtractionResult {
   }
   vatBreakdown: VatBreakdownItem[]
   confidence: number
+  suggestedTemplateId?: string
 }
 
 export interface ExtractedInvoiceLineItem {
@@ -1948,6 +1979,7 @@ export interface ExtractedInvoiceLineItem {
   lineTotal: number
   vatRate: number | null
   accountSuggestion: string | null
+  suggestedTemplateId?: string
 }
 
 export interface VatBreakdownItem {

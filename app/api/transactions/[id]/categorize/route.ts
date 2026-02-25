@@ -159,11 +159,17 @@ export async function POST(
     const template = getTemplateById(body.template_id)
     if (template) {
       finalCategory = is_business ? template.fallback_category : 'private'
+      console.log(`[categorize] tx=${id} using template="${body.template_id}" (${template.name_sv}) → category=${finalCategory}, debit=${template.debit_account}, credit=${template.credit_account}, vat=${template.vat_treatment}`)
     } else {
       return NextResponse.json({ error: 'Invalid template_id' }, { status: 400 })
     }
   } else {
     finalCategory = is_business ? (category || 'uncategorized') : 'private'
+    console.log(`[categorize] tx=${id} using category="${finalCategory}" vat=${body.vat_treatment || 'default'} account_override=${body.account_override || 'none'}`)
+  }
+
+  if (body.inbox_item_id) {
+    console.log(`[categorize] tx=${id} will confirm inbox item=${body.inbox_item_id} and link document`)
   }
 
   // Build mapping result from template or category
@@ -184,6 +190,12 @@ export async function POST(
       body.vat_treatment
     )
   }
+
+  console.log(`[categorize] tx=${id} mapping result:`, {
+    debit: mappingResult.debit_account,
+    credit: mappingResult.credit_account,
+    vatLines: mappingResult.vat_lines.map((v) => `${v.account_number} debit=${v.debit_amount} credit=${v.credit_amount}`),
+  })
 
   // Apply account override if provided (only for business transactions)
   if (is_business && body.account_override) {
@@ -284,6 +296,36 @@ export async function POST(
       }
     } catch (linkErr) {
       console.error('[categorize] Failed to link receipt document:', linkErr)
+    }
+  }
+
+  // Confirm matched inbox item and link its document to the journal entry
+  if (body.inbox_item_id) {
+    try {
+      await supabase
+        .from('invoice_inbox_items')
+        .update({ status: 'confirmed' })
+        .eq('id', body.inbox_item_id)
+        .eq('user_id', user.id)
+
+      // Link inbox item's document to the journal entry
+      if (journalEntryId) {
+        const { data: inboxItem } = await supabase
+          .from('invoice_inbox_items')
+          .select('document_id')
+          .eq('id', body.inbox_item_id)
+          .single()
+
+        if (inboxItem?.document_id) {
+          await supabase
+            .from('document_attachments')
+            .update({ journal_entry_id: journalEntryId })
+            .eq('id', inboxItem.document_id)
+            .eq('user_id', user.id)
+        }
+      }
+    } catch (inboxErr) {
+      console.error('[categorize] Failed to update inbox item:', inboxErr)
     }
   }
 

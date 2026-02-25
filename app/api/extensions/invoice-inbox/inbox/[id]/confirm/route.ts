@@ -49,7 +49,7 @@ export async function POST(
 
     if (!supplierId) {
       // Create new supplier from extracted data
-      const supplierName = extraction.supplier.name
+      const supplierName = extraction.supplier?.name
       if (!supplierName) {
         return NextResponse.json({ error: 'Supplier name is required' }, { status: 400 })
       }
@@ -60,13 +60,13 @@ export async function POST(
           user_id: user.id,
           name: supplierName,
           supplier_type: 'swedish_business',
-          org_number: extraction.supplier.orgNumber || null,
-          vat_number: extraction.supplier.vatNumber || null,
-          bankgiro: extraction.supplier.bankgiro || null,
-          plusgiro: extraction.supplier.plusgiro || null,
+          org_number: extraction.supplier?.orgNumber || null,
+          vat_number: extraction.supplier?.vatNumber || null,
+          bankgiro: extraction.supplier?.bankgiro || null,
+          plusgiro: extraction.supplier?.plusgiro || null,
           default_expense_account: '6200',
           default_payment_terms: 30,
-          default_currency: extraction.invoice.currency || 'SEK',
+          default_currency: extraction.invoice?.currency || 'SEK',
         })
         .select()
         .single()
@@ -99,7 +99,7 @@ export async function POST(
     }
 
     // Build line items from extraction
-    const items = extraction.lineItems.map((item, index) => {
+    const items = (extraction.lineItems || []).map((item, index) => {
       const vatRate = item.vatRate != null ? item.vatRate / 100 : 0.25
       const lineTotal = Math.round(item.lineTotal * 100) / 100
       const vatAmount = Math.round(lineTotal * vatRate * 100) / 100
@@ -118,7 +118,7 @@ export async function POST(
     })
 
     // If no line items, create a single item from totals
-    if (items.length === 0 && extraction.totals.total) {
+    if (items.length === 0 && extraction.totals?.total) {
       const total = extraction.totals.total
       const vatAmount = extraction.totals.vatAmount || 0
       const subtotal = extraction.totals.subtotal || total - vatAmount
@@ -155,13 +155,13 @@ export async function POST(
         user_id: user.id,
         supplier_id: supplierId,
         arrival_number: arrivalNum,
-        supplier_invoice_number: extraction.invoice.invoiceNumber || `INBOX-${Date.now()}`,
-        invoice_date: extraction.invoice.invoiceDate || new Date().toISOString().split('T')[0],
-        due_date: extraction.invoice.dueDate || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+        supplier_invoice_number: extraction.invoice?.invoiceNumber || `INBOX-${Date.now()}`,
+        invoice_date: extraction.invoice?.invoiceDate || new Date().toISOString().split('T')[0],
+        due_date: extraction.invoice?.dueDate || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
         status: 'registered',
-        currency: extraction.invoice.currency || 'SEK',
+        currency: extraction.invoice?.currency || 'SEK',
         vat_treatment: vatTreatment,
-        payment_reference: extraction.invoice.paymentReference || null,
+        payment_reference: extraction.invoice?.paymentReference || null,
         subtotal: Math.round(subtotal * 100) / 100,
         vat_amount: Math.round(vatAmount * 100) / 100,
         total: Math.round(total * 100) / 100,

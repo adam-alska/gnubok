@@ -15,7 +15,7 @@ export type SIEEncoding = 'cp437' | 'utf8'
 export type SIEImportStatus = 'pending' | 'mapped' | 'completed' | 'failed'
 
 // Match type for account mapping
-export type AccountMatchType = 'exact' | 'name' | 'class' | 'manual'
+export type AccountMatchType = 'exact' | 'name' | 'class' | 'manual' | 'bas_range'
 
 // Parse issue severity
 export type ParseIssueSeverity = 'error' | 'warning' | 'info'

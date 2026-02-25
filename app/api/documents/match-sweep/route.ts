@@ -1,0 +1,31 @@
+import { createClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+import { runDocumentMatchingSweep } from '@/lib/documents/batch-match'
+
+export async function POST(request: Request) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Optional: pass specific inbox item IDs to match
+  let inboxItemIds: string[] | undefined
+  try {
+    const body = await request.json()
+    if (Array.isArray(body?.inboxItemIds)) {
+      inboxItemIds = body.inboxItemIds
+    }
+  } catch {
+    // No body or invalid JSON — sweep all unmatched items
+  }
+
+  try {
+    const result = await runDocumentMatchingSweep(supabase, user.id, inboxItemIds)
+    return NextResponse.json({ data: result })
+  } catch (error) {
+    console.error('[match-sweep] Failed:', error)
+    return NextResponse.json({ error: 'Match sweep failed' }, { status: 500 })
+  }
+}

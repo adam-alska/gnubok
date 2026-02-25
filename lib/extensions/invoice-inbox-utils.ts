@@ -1,4 +1,4 @@
-import type { InboxItemStatus, InvoiceExtractionResult } from '@/types'
+import type { InboxItemStatus, InvoiceExtractionResult, DocumentClassificationType } from '@/types'
 
 const STATUS_LABELS: Record<InboxItemStatus, string> = {
   pending: 'Väntar',
@@ -49,5 +49,45 @@ export function formatExtractionSummary(
     supplierName: data.supplier?.name ?? '',
     total: data.totals?.total ?? 0,
     lineCount: data.lineItems?.length ?? 0,
+  }
+}
+
+// Document type labels (Swedish)
+const DOCUMENT_TYPE_LABELS: Record<DocumentClassificationType, string> = {
+  supplier_invoice: 'Faktura',
+  receipt: 'Kvitto',
+  government_letter: 'Myndighetspost',
+  unknown: 'Övrigt',
+}
+
+export function getDocumentTypeLabel(type: DocumentClassificationType): string {
+  return DOCUMENT_TYPE_LABELS[type] ?? type
+}
+
+const DOCUMENT_TYPE_VARIANTS: Record<DocumentClassificationType, string> = {
+  supplier_invoice: 'default',
+  receipt: 'secondary',
+  government_letter: 'outline',
+  unknown: 'outline',
+}
+
+export function getDocumentTypeVariant(type: DocumentClassificationType): string {
+  return DOCUMENT_TYPE_VARIANTS[type] ?? 'outline'
+}
+
+/**
+ * Format extraction summary for receipt documents
+ */
+export function formatReceiptSummary(
+  data: Record<string, unknown> | null | undefined
+): { merchantName: string; total: number } {
+  if (!data) {
+    return { merchantName: '', total: 0 }
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const d = data as any
+  return {
+    merchantName: d.merchant?.name ?? '',
+    total: d.totals?.total ?? 0,
   }
 }

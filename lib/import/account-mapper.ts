@@ -2,12 +2,12 @@
  * Account Mapping Engine
  *
  * Maps accounts from an imported SIE file to the user's BAS chart of accounts.
- * Uses exact account number matching only — no fuzzy/heuristic matching.
+ * Uses exact account number matching against the BAS reference, with a fallback
+ * for valid BAS-range sub-accounts (1000-8999) not in the reference.
  * This aligns with Swedish industry standard (e.g. Fortnox): exact match,
  * create new, or let the user map manually.
  */
 
-import type { BASAccount } from '@/types'
 import type {
   SIEAccount,
   AccountMapping,
@@ -16,12 +16,34 @@ import type {
 } from './types'
 
 /**
+ * Minimal account shape needed for mapping.
+ * Both BASAccount (from user chart) and BASReferenceAccount (from reference data)
+ * satisfy this interface.
+ */
+export type MappableAccount = {
+  account_number: string
+  account_name: string
+}
+
+/**
+ * Check if an account number is in the valid BAS range (1000-8999).
+ * Standard Swedish BAS accounts are 4-digit numbers in classes 1-8.
+ */
+function isValidBASRange(accountNumber: string): boolean {
+  if (!/^\d{4}$/.test(accountNumber)) return false
+  const num = parseInt(accountNumber, 10)
+  return num >= 1000 && num <= 8999
+}
+
+/**
  * Find the best matching BAS account for a source account.
- * Only matches on exact account number — no fuzzy matching.
+ * First tries exact match against the reference, then falls back to
+ * self-mapping for valid BAS-range accounts not in the reference
+ * (common for sub-accounts like 1241 Personbilar under 1240).
  */
 function findBestMatch(
   source: SIEAccount,
-  basAccounts: BASAccount[],
+  basAccounts: MappableAccount[],
   existingOverride?: AccountMapping
 ): AccountMapping | null {
   // If there's a user override, use it
@@ -32,7 +54,7 @@ function findBestMatch(
     }
   }
 
-  // Exact account number match
+  // Exact account number match against reference
   const exactMatch = basAccounts.find(
     (target) => source.number === target.account_number
   )
@@ -49,6 +71,21 @@ function findBestMatch(
     }
   }
 
+  // Fallback: if the account is a valid BAS-range number (1000-8999),
+  // self-map it using the name from the SIE file. These are standard
+  // BAS sub-accounts not in our reference (e.g. 1241 Personbilar).
+  if (isValidBASRange(source.number) && source.name) {
+    return {
+      sourceAccount: source.number,
+      sourceName: source.name,
+      targetAccount: source.number,
+      targetName: source.name,
+      confidence: 0.9,
+      matchType: 'bas_range',
+      isOverride: false,
+    }
+  }
+
   // No match found
   return null
 }
@@ -58,7 +95,7 @@ function findBestMatch(
  */
 export function suggestMappings(
   sourceAccounts: SIEAccount[],
-  basAccounts: BASAccount[],
+  basAccounts: MappableAccount[],
   existingMappings?: SIEAccountMappingRecord[]
 ): AccountMapping[] {
   // Convert existing mappings to a lookup map
@@ -132,6 +169,7 @@ export function getMappingStats(mappings: AccountMapping[]): {
   mapped: number
   unmapped: number
   exact: number
+  basRange: number
   name: number
   class: number
   manual: number
@@ -143,6 +181,7 @@ export function getMappingStats(mappings: AccountMapping[]): {
   const unmapped = total - mapped
 
   const exact = mappings.filter((m) => m.matchType === 'exact').length
+  const basRange = mappings.filter((m) => m.matchType === 'bas_range').length
   const name = mappings.filter((m) => m.matchType === 'name').length
   const classMatch = mappings.filter((m) => m.matchType === 'class').length
   const manual = mappings.filter((m) => m.matchType === 'manual').length
@@ -159,6 +198,7 @@ export function getMappingStats(mappings: AccountMapping[]): {
     mapped,
     unmapped,
     exact,
+    basRange,
     name,
     class: classMatch,
     manual,

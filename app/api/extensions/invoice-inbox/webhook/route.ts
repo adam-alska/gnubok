@@ -4,6 +4,8 @@ import { Webhook } from 'svix'
 import { parseInboundPayload, extractAttachments, resolveUserFromEmail } from '@/extensions/general/invoice-inbox/lib/email-handler'
 import { analyzeInvoice } from '@/extensions/general/invoice-inbox/lib/invoice-analyzer'
 import { matchSupplier } from '@/extensions/general/invoice-inbox/lib/supplier-matcher'
+import { classifyDocument } from '@/lib/documents/classifier'
+import { processReceiptFromDocument } from '@/extensions/general/receipt-ocr/lib/receipt-pipeline'
 import crypto from 'crypto'
 
 function createServiceClient() {
@@ -19,11 +21,31 @@ function createServiceClient() {
   )
 }
 
+/**
+ * Build raw email payload for BFL 7 kap. 2§ archiving.
+ * Includes full email headers and body — excludes binary attachment content.
+ */
+function buildRawEmailPayload(body: Record<string, unknown>, payload: { from: string; to: string; subject: string; created_at: string }): Record<string, unknown> {
+  return {
+    from: payload.from,
+    to: payload.to,
+    subject: payload.subject,
+    created_at: payload.created_at,
+    text: body.text ?? null,
+    html: body.html ?? null,
+    headers: body.headers ?? null,
+    message_id: body.message_id ?? null,
+    in_reply_to: body.in_reply_to ?? null,
+    references: body.references ?? null,
+    archived_at: new Date().toISOString(),
+  }
+}
+
 export async function POST(request: Request) {
   // Verify webhook signature
   const webhookSecret = process.env.RESEND_WEBHOOK_SECRET
   if (!webhookSecret) {
-    console.error('[invoice-inbox] RESEND_WEBHOOK_SECRET not configured')
+    console.error('[document-inbox] RESEND_WEBHOOK_SECRET not configured')
     return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 })
   }
 
@@ -61,15 +83,17 @@ export async function POST(request: Request) {
   const userId = await resolveUserFromEmail(payload.to, supabase)
 
   if (!userId) {
-    console.warn(`[invoice-inbox] No user found for email: ${payload.to}`)
+    console.warn(`[document-inbox] No user found for email: ${payload.to}`)
     return NextResponse.json({ error: 'User not found' }, { status: 404 })
   }
+
+  // Build raw email payload for BFL 7:2 archiving (no binary attachment content)
+  const rawEmailPayload = buildRawEmailPayload(body, payload)
 
   // Extract file attachments
   const attachments = extractAttachments(payload)
 
   if (attachments.length === 0) {
-    // Create inbox item with error status (no attachments)
     await supabase
       .from('invoice_inbox_items')
       .insert({
@@ -80,6 +104,7 @@ export async function POST(request: Request) {
         email_subject: payload.subject,
         email_received_at: payload.created_at,
         error_message: 'No supported attachments found',
+        raw_email_payload: rawEmailPayload,
       })
 
     return NextResponse.json({ data: { processed: 0, message: 'No attachments' } })
@@ -99,7 +124,7 @@ export async function POST(request: Request) {
         .upload(storagePath, buffer, { contentType: attachment.content_type })
 
       if (uploadError) {
-        console.error('[invoice-inbox] Upload failed:', uploadError)
+        console.error('[document-inbox] Upload failed:', uploadError)
         continue
       }
 
@@ -120,7 +145,19 @@ export async function POST(request: Request) {
 
       if (docError || !document) continue
 
-      // Create inbox item
+      // Classify document type
+      let documentType: 'supplier_invoice' | 'receipt' | 'government_letter' | 'unknown' = 'supplier_invoice'
+      let isReverseCharge = false
+      try {
+        const classification = await classifyDocument(attachment.content, attachment.content_type)
+        documentType = classification.type
+        isReverseCharge = classification.isReverseCharge ?? false
+        console.log(`[document-inbox] Classified as ${documentType} (confidence: ${classification.confidence})`)
+      } catch (classifyErr) {
+        console.error('[document-inbox] Classification failed, defaulting to supplier_invoice:', classifyErr)
+      }
+
+      // Create inbox item with document type and raw email payload
       const { data: inboxItem, error: itemError } = await supabase
         .from('invoice_inbox_items')
         .insert({
@@ -131,41 +168,103 @@ export async function POST(request: Request) {
           email_subject: payload.subject,
           email_received_at: payload.created_at,
           document_id: document.id,
+          document_type: documentType,
+          raw_email_payload: rawEmailPayload,
         })
         .select()
         .single()
 
       if (itemError || !inboxItem) continue
 
-      // Process: analyze invoice
+      // Route based on document type
       try {
-        const extraction = await analyzeInvoice(attachment.content, attachment.content_type)
+        switch (documentType) {
+          case 'supplier_invoice': {
+            // Existing flow: analyze invoice + supplier match
+            const extraction = await analyzeInvoice(attachment.content, attachment.content_type)
 
-        // Supplier matching
-        let matchedSupplierId: string | null = null
-        const { data: suppliers } = await supabase
-          .from('suppliers')
-          .select('*')
-          .eq('user_id', userId)
+            // Store reverse charge flag from classifier in extracted data
+            const extractedData = {
+              ...(extraction as unknown as Record<string, unknown>),
+              isReverseCharge,
+            }
 
-        if (suppliers && suppliers.length > 0) {
-          const match = matchSupplier(extraction, suppliers)
-          if (match && match.confidence >= 0.7) {
-            matchedSupplierId = match.supplierId
+            // Supplier matching
+            let matchedSupplierId: string | null = null
+            const { data: suppliers } = await supabase
+              .from('suppliers')
+              .select('*')
+              .eq('user_id', userId)
+
+            if (suppliers && suppliers.length > 0) {
+              const match = matchSupplier(extraction, suppliers)
+              if (match && match.confidence >= 0.7) {
+                matchedSupplierId = match.supplierId
+              }
+            }
+
+            await supabase
+              .from('invoice_inbox_items')
+              .update({
+                status: 'ready',
+                extracted_data: extractedData,
+                confidence: extraction.confidence,
+                matched_supplier_id: matchedSupplierId,
+              })
+              .eq('id', inboxItem.id)
+            break
+          }
+
+          case 'receipt': {
+            // Receipt pipeline: extract + categorize + match transactions
+            const { data: urlData } = supabase.storage.from('documents').getPublicUrl(storagePath)
+
+            const result = await processReceiptFromDocument(supabase, userId, attachment.content, attachment.content_type, {
+              documentId: document.id,
+              source: 'email',
+              emailFrom: payload.from,
+              storageUrl: urlData.publicUrl,
+            })
+
+            await supabase
+              .from('invoice_inbox_items')
+              .update({
+                status: 'ready',
+                linked_receipt_id: result.receipt.id,
+                confidence: result.receipt.extraction_confidence,
+              })
+              .eq('id', inboxItem.id)
+            break
+          }
+
+          case 'government_letter': {
+            // Store with status ready for manual review
+            await supabase
+              .from('invoice_inbox_items')
+              .update({
+                status: 'ready',
+                extracted_data: {
+                  sender: payload.from,
+                  subject: payload.subject,
+                  body: typeof body.text === 'string' ? body.text : null,
+                },
+              })
+              .eq('id', inboxItem.id)
+            break
+          }
+
+          case 'unknown':
+          default: {
+            // Store with status ready for manual handling
+            await supabase
+              .from('invoice_inbox_items')
+              .update({ status: 'ready' })
+              .eq('id', inboxItem.id)
+            break
           }
         }
-
-        await supabase
-          .from('invoice_inbox_items')
-          .update({
-            status: 'ready',
-            extracted_data: extraction as unknown as Record<string, unknown>,
-            confidence: extraction.confidence,
-            matched_supplier_id: matchedSupplierId,
-          })
-          .eq('id', inboxItem.id)
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Analysis failed'
+        const message = err instanceof Error ? err.message : 'Processing failed'
         await supabase
           .from('invoice_inbox_items')
           .update({ status: 'error', error_message: message })
@@ -174,7 +273,7 @@ export async function POST(request: Request) {
 
       processed.push(inboxItem.id)
     } catch (err) {
-      console.error('[invoice-inbox] Processing attachment failed:', err)
+      console.error('[document-inbox] Processing attachment failed:', err)
     }
   }
 
