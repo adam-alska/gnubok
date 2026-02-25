@@ -6,7 +6,7 @@ import {
   formatExtractionSummary,
 } from '../invoice-inbox-utils'
 import type { InboxItemStatus } from '@/types'
-import type { InvoiceExtractionResult } from '@/extensions/general/invoice-inbox/types'
+import type { InvoiceExtractionResult } from '@/types'
 
 describe('getStatusLabel', () => {
   const cases: [InboxItemStatus, string][] = [

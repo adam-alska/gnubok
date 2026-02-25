@@ -231,6 +231,30 @@ function OnboardingPageContent() {
               return
             }
 
+            // Delete any existing fiscal periods that have no journal entries,
+            // so re-running onboarding with different dates doesn't create
+            // overlapping periods (DB exclusion constraint would reject it).
+            const { data: existingPeriods } = await supabase
+              .from('fiscal_periods')
+              .select('id')
+              .eq('user_id', user.id)
+
+            if (existingPeriods && existingPeriods.length > 0) {
+              for (const ep of existingPeriods) {
+                const { count } = await supabase
+                  .from('journal_entries')
+                  .select('id', { count: 'exact', head: true })
+                  .eq('fiscal_period_id', ep.id)
+
+                if (count === 0) {
+                  await supabase
+                    .from('fiscal_periods')
+                    .delete()
+                    .eq('id', ep.id)
+                }
+              }
+            }
+
             await supabase.from('fiscal_periods').upsert({
               user_id: user.id,
               name: periodName,

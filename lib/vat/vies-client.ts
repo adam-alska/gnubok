@@ -1,5 +1,5 @@
 import { createLogger } from '@/lib/logger'
-import { EU_COUNTRIES } from '@/extensions/export/shared/eu-countries'
+import { EU_COUNTRIES } from '@/lib/vat/eu-countries'
 import type { VatValidationResult } from '@/types'
 
 const log = createLogger('vies-client')

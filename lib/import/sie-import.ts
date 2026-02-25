@@ -101,8 +101,8 @@ async function ensureFiscalPeriod(
   startDate: Date,
   endDate: Date
 ): Promise<string> {
-  // Check for existing fiscal period
-  const { data: existing } = await supabase
+  // Check for an existing period that contains the SIE date range
+  const { data: containing } = await supabase
     .from('fiscal_periods')
     .select('id')
     .eq('user_id', userId)
@@ -110,8 +110,23 @@ async function ensureFiscalPeriod(
     .gte('period_end', formatDate(endDate))
     .single()
 
-  if (existing) {
-    return existing.id
+  if (containing) {
+    return containing.id
+  }
+
+  // Check for any overlapping period (DB exclusion constraint would reject
+  // a new insert that overlaps). Use the overlapping period instead.
+  const { data: overlapping } = await supabase
+    .from('fiscal_periods')
+    .select('id')
+    .eq('user_id', userId)
+    .lte('period_start', formatDate(endDate))
+    .gte('period_end', formatDate(startDate))
+    .order('period_start', { ascending: false })
+    .limit(1)
+
+  if (overlapping && overlapping.length > 0) {
+    return overlapping[0].id
   }
 
   // Create new fiscal period

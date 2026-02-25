@@ -2,8 +2,6 @@ import { extensionRegistry } from './registry'
 import { receiptOcrExtension } from '@/extensions/general/receipt-ocr'
 import { aiCategorizationExtension } from '@/extensions/general/ai-categorization'
 import { pushNotificationsExtension } from '@/extensions/general/push-notifications'
-import { sruExportExtension } from '@/extensions/sru-export'
-import { neBilagaExtension } from '@/extensions/ne-bilaga'
 import { aiChatExtension } from '@/extensions/general/ai-chat'
 import { invoiceInboxExtension } from '@/extensions/general/invoice-inbox'
 import { calendarExtension } from '@/extensions/general/calendar'
@@ -26,8 +24,6 @@ const FIRST_PARTY_EXTENSIONS: Extension[] = [
   receiptOcrExtension,
   aiCategorizationExtension,
   pushNotificationsExtension,
-  sruExportExtension,
-  neBilagaExtension,
   aiChatExtension,
   invoiceInboxExtension,
   calendarExtension,

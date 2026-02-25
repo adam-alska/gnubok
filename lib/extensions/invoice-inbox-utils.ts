@@ -1,5 +1,4 @@
-import type { InboxItemStatus } from '@/types'
-import type { InvoiceExtractionResult } from '@/extensions/general/invoice-inbox/types'
+import type { InboxItemStatus, InvoiceExtractionResult } from '@/types'
 
 const STATUS_LABELS: Record<InboxItemStatus, string> = {
   pending: 'Väntar',

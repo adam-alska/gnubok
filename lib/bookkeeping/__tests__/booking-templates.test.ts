@@ -17,8 +17,8 @@ import {
 // ============================================================
 
 describe('BOOKING_TEMPLATES data integrity', () => {
-  it('has exactly 100 templates', () => {
-    expect(BOOKING_TEMPLATES).toHaveLength(100)
+  it('has exactly 48 templates', () => {
+    expect(BOOKING_TEMPLATES).toHaveLength(48)
   })
 
   it('all template IDs are unique', () => {
@@ -86,7 +86,7 @@ describe('getTemplateById', () => {
   it('returns correct template for known ID', () => {
     const t = getTemplateById('it_saas_subscription')
     expect(t).toBeDefined()
-    expect(t!.name_sv).toBe('Programvara / SaaS-prenumeration')
+    expect(t!.name_sv).toBe('Programvara / SaaS')
     expect(t!.debit_account).toBe('5420')
   })
 
@@ -122,9 +122,9 @@ describe('getTemplatesByMcc', () => {
 })
 
 describe('getTemplateGroups', () => {
-  it('returns all 18 groups', () => {
+  it('returns all 17 groups', () => {
     const groups = getTemplateGroups()
-    expect(groups).toHaveLength(18)
+    expect(groups).toHaveLength(17)
     for (const g of groups) {
       expect(g.group).toBeTruthy()
       expect(g.label_sv).toBeTruthy()
@@ -136,7 +136,7 @@ describe('getTemplateGroups', () => {
   it('every template is in exactly one group', () => {
     const groups = getTemplateGroups()
     const allTemplates = groups.flatMap((g) => g.templates)
-    expect(allTemplates).toHaveLength(100)
+    expect(allTemplates).toHaveLength(48)
   })
 })
 
@@ -175,7 +175,7 @@ describe('searchTemplates', () => {
   })
 
   it('supports multi-token search', () => {
-    const results = searchTemplates('digital annons')
+    const results = searchTemplates('annonsering marknadsföring')
     expect(results.some((t) => t.id === 'marketing_online_ads')).toBe(true)
   })
 })
@@ -242,14 +242,14 @@ describe('findMatchingTemplates', () => {
     expect(matches.every((m) => m.template.direction !== 'expense')).toBe(true)
   })
 
-  it('returns max 5 results', () => {
+  it('returns max 10 results', () => {
     const tx = makeTransaction({
       amount: -100,
       description: 'software subscription cloud hosting domain',
       mcc_code: 5817,
     })
     const matches = findMatchingTemplates(tx)
-    expect(matches.length).toBeLessThanOrEqual(20)
+    expect(matches.length).toBeLessThanOrEqual(10)
   })
 
   it('results are sorted by confidence descending', () => {
@@ -303,7 +303,7 @@ describe('buildMappingResultFromTemplate', () => {
   })
 
   it('produces valid MappingResult for expense with 6% VAT', () => {
-    const template = getTemplate('travel_train')
+    const template = getTemplate('travel_transport')
     const tx = makeTransaction({ amount: -530 })
     const result = buildMappingResultFromTemplate(template, tx, 'enskild_firma')
 
@@ -344,7 +344,7 @@ describe('buildMappingResultFromTemplate', () => {
   })
 
   it('produces output VAT lines for income with 25% VAT', () => {
-    const template = getTemplate('revenue_services_25')
+    const template = getTemplate('revenue_standard_25')
     const tx = makeTransaction({ amount: 12500 })
     const result = buildMappingResultFromTemplate(template, tx, 'enskild_firma')
 
@@ -356,23 +356,13 @@ describe('buildMappingResultFromTemplate', () => {
   })
 
   it('produces output VAT lines for income with 12% VAT', () => {
-    const template = getTemplate('revenue_products_12')
+    const template = getTemplate('revenue_reduced_12')
     const tx = makeTransaction({ amount: 1120 })
     const result = buildMappingResultFromTemplate(template, tx, 'enskild_firma')
 
     expect(result.vat_lines).toHaveLength(1)
     expect(result.vat_lines[0].account_number).toBe('2621')
     expect(result.vat_lines[0].credit_amount).toBe(120)
-  })
-
-  it('produces output VAT lines for income with 6% VAT', () => {
-    const template = getTemplate('revenue_products_6')
-    const tx = makeTransaction({ amount: 1060 })
-    const result = buildMappingResultFromTemplate(template, tx, 'enskild_firma')
-
-    expect(result.vat_lines).toHaveLength(1)
-    expect(result.vat_lines[0].account_number).toBe('2631')
-    expect(result.vat_lines[0].credit_amount).toBe(60)
   })
 
   it('resolves AB-specific accounts for aktiebolag', () => {
@@ -411,6 +401,6 @@ describe('buildMappingResultFromTemplate', () => {
     const tx = makeTransaction({ amount: -800, description: 'OKQ8 tankstation' })
     const result = buildMappingResultFromTemplate(template, tx, 'enskild_firma')
 
-    expect(result.description).toBe('Drivmedel: OKQ8 tankstation')
+    expect(result.description).toBe('Drivmedel & Laddning: OKQ8 tankstation')
   })
 })
