@@ -799,6 +799,12 @@ mockResult({ data: makeTransaction(), error: null })
 
 `YYYYMMDD00NNNN_descriptive_name.sql` — next migration: `20240101000046_*.sql`
 
+### Placeholder Migrations
+
+Some migrations are no-op placeholders to preserve the numbering sequence:
+- **012** (`tax_codes`) — Planned but never deployed. The system operates without the `tax_codes` table.
+- **023** (`document_version_chain`) — Planned but never deployed. Document versioning columns/functions do not exist in production.
+
 ### Migration Rules
 
 1. **Always enable RLS** on new tables: `ALTER TABLE public.tablename ENABLE ROW LEVEL SECURITY;`
@@ -833,12 +839,12 @@ mockResult({ data: makeTransaction(), error: null })
 
 ### Recent Migrations
 
-- **Migration 039 (`invoice_inbox`)** — Invoice inbox table for supplier invoice intake via email/upload.
+- **Migration 039 (`invoice_inbox`)** — Invoice inbox table with document type classification, AI extraction, supplier/transaction matching, and receipt linking.
 - **Migration 040 (`booking_template_embeddings`)** — Booking templates with AI embeddings for suggestion matching.
 - **Migration 041 (`user_description_matching`)** — User description matching for transaction categorization.
-- **Migration 042 (`full_bas_2026` + `prevent_overlapping_fiscal_periods`)** — Full BAS 2026 account catalog and fiscal period overlap prevention.
+- **Migration 042 (`prevent_overlapping_fiscal_periods`)** — Exclusion constraint preventing overlapping fiscal periods per user.
 - **Migration 043 (`enforce_fiscal_period_month_boundaries`)** — Ensures fiscal periods start/end on month boundaries.
-- **Migration 044 (`document_matching`)** — Document-to-transaction matching support.
+- **Migration 044 (`full_bas_2026`)** — Full BAS 2026 account catalog, K2-excluded flag, and SRU code backfill.
 - **Migration 045 (`expand_account_type_untaxed_reserves`)** — Adds `untaxed_reserves` to `chart_of_accounts.account_type` CHECK constraint for BAS 21xx accounts (obeskattade reserver).
 
 ---

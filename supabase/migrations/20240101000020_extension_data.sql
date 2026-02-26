@@ -1,9 +1,8 @@
 -- ============================================================
--- Extension Data & Event Log Tables
--- Part 3: Event Bus & Extension Registry
+-- Extension Data Table
+-- Generic key-value store for extensions
 -- ============================================================
 
--- Generic key-value store for extensions
 create table if not exists extension_data (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users not null,
@@ -34,31 +33,16 @@ create policy "Users can delete own extension data"
   on extension_data for delete
   using (auth.uid() = user_id);
 
+-- Indexes
+create index if not exists idx_extension_data_user_id on extension_data (user_id);
+create index if not exists idx_extension_data_user_ext_key on extension_data (user_id, extension_id, key);
+
 -- Auto-update updated_at
-create trigger extension_data_updated_at
+create trigger set_updated_at_extension_data
   before update on extension_data
-  for each row execute function update_updated_at();
+  for each row execute function update_updated_at_column();
 
--- Append-only event log for observability
-create table if not exists event_log (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users not null,
-  event_type text not null,
-  payload jsonb not null default '{}',
-  created_at timestamptz default now()
-);
-
--- RLS: users can select and insert only (no update, no delete)
-alter table event_log enable row level security;
-
-create policy "Users can select own event log"
-  on event_log for select
-  using (auth.uid() = user_id);
-
-create policy "Users can insert own event log"
-  on event_log for insert
-  with check (auth.uid() = user_id);
-
--- Index for querying by event type
-create index if not exists idx_event_log_user_type on event_log (user_id, event_type);
-create index if not exists idx_event_log_created_at on event_log (created_at);
+-- Audit trigger
+create trigger audit_extension_data
+  after insert or update or delete on extension_data
+  for each row execute function write_audit_log();

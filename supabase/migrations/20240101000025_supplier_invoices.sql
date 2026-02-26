@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS public.suppliers (
   address_line2   text,
   postal_code     text,
   city            text,
-  country         text NOT NULL DEFAULT 'SE',
+  country         text DEFAULT 'SE',
 
   -- Payment details
   bankgiro        text,
@@ -33,11 +33,17 @@ CREATE TABLE IF NOT EXISTS public.suppliers (
   bank_account    text,
   iban            text,
   bic             text,
+  clearing_number text,
+  account_number  text,
 
   -- Defaults
   default_expense_account text,  -- e.g. '5010'
-  default_payment_terms   integer NOT NULL DEFAULT 30,
+  default_payment_terms   integer DEFAULT 30,
   default_currency        text NOT NULL DEFAULT 'SEK',
+
+  -- Classification
+  category        text,
+  is_active       boolean DEFAULT true,
 
   -- Notes
   notes           text,
@@ -48,24 +54,25 @@ CREATE TABLE IF NOT EXISTS public.suppliers (
 
 ALTER TABLE public.suppliers ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view own suppliers"
+CREATE POLICY "suppliers_select"
   ON public.suppliers FOR SELECT
   USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can insert own suppliers"
+CREATE POLICY "suppliers_insert"
   ON public.suppliers FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Users can update own suppliers"
+CREATE POLICY "suppliers_update"
   ON public.suppliers FOR UPDATE
   USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can delete own suppliers"
+CREATE POLICY "suppliers_delete"
   ON public.suppliers FOR DELETE
   USING (auth.uid() = user_id);
 
 CREATE INDEX idx_suppliers_user_id ON public.suppliers (user_id);
 CREATE INDEX idx_suppliers_name ON public.suppliers (user_id, name);
+CREATE INDEX idx_suppliers_is_active ON public.suppliers (user_id, is_active);
 
 -- =============================================================================
 -- 2. supplier_invoices table
