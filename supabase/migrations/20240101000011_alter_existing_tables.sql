@@ -63,9 +63,10 @@ ALTER TABLE public.journal_entry_lines
 ALTER TABLE public.journal_entry_lines
   ADD COLUMN IF NOT EXISTS project text;
 
-CREATE INDEX IF NOT EXISTS idx_journal_entry_lines_tax_code ON public.journal_entry_lines (tax_code);
-CREATE INDEX IF NOT EXISTS idx_journal_entry_lines_cost_center ON public.journal_entry_lines (cost_center);
-CREATE INDEX IF NOT EXISTS idx_journal_entry_lines_project ON public.journal_entry_lines (project);
+-- Note: idx_journal_entry_lines_cost_center and idx_journal_entry_lines_project
+-- are created by migration 015 (dimensions) on the UUID FK columns (cost_center_id, project_id).
+-- The text dimension columns (cost_center, project) are supplementary and don't need separate indexes.
+CREATE INDEX IF NOT EXISTS idx_journal_entry_lines_tax_code ON public.journal_entry_lines (tax_code) WHERE (tax_code IS NOT NULL);
 
 -- =============================================================================
 -- 4. fiscal_periods: Add lock and retention columns
