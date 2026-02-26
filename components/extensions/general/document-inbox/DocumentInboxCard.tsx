@@ -33,10 +33,10 @@ function formatRelativeTime(dateStr: string): string {
   return `${diffD} dagar sedan`
 }
 
-function formatSEK(amount: number): string {
+function formatAmount(amount: number, currency: string = 'SEK'): string {
   return new Intl.NumberFormat('sv-SE', {
     style: 'currency',
-    currency: 'SEK',
+    currency,
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount)
@@ -53,7 +53,7 @@ function getDocumentIcon(type: DocumentClassificationType) {
   }
 }
 
-function getSummaryText(item: InvoiceInboxItem): { label: string; total: number } {
+function getSummaryText(item: InvoiceInboxItem): { label: string; total: number; currency: string } {
   const type = item.document_type ?? 'supplier_invoice'
 
   switch (type) {
@@ -63,23 +63,26 @@ function getSummaryText(item: InvoiceInboxItem): { label: string; total: number 
       return {
         label: (item.supplier as { name?: string } | undefined)?.name ?? (summary.supplierName || 'Okänd leverantör'),
         total: summary.total,
+        currency: summary.currency,
       }
     }
     case 'receipt': {
-      const receipt = item.receipt as { merchant_name?: string; total_amount?: number } | undefined
+      const receipt = item.receipt as { merchant_name?: string; total_amount?: number; currency?: string } | undefined
       return {
         label: receipt?.merchant_name ?? 'Okänd handlare',
         total: receipt?.total_amount ?? 0,
+        currency: receipt?.currency || 'SEK',
       }
     }
     case 'government_letter': {
       return {
         label: item.email_from ?? 'Okänd avsändare',
         total: 0,
+        currency: 'SEK',
       }
     }
     default: {
-      return { label: 'Granska manuellt', total: 0 }
+      return { label: 'Granska manuellt', total: 0, currency: 'SEK' }
     }
   }
 }
@@ -92,7 +95,7 @@ export default function DocumentInboxCard({ item, onClick }: DocumentInboxCardPr
   const docTypeVariant = getDocumentTypeVariant(docType) as 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning'
 
   const fileName = (item.document as { file_name?: string } | undefined)?.file_name ?? 'Okänd fil'
-  const { label: summaryLabel, total } = getSummaryText(item)
+  const { label: summaryLabel, total, currency } = getSummaryText(item)
 
   return (
     <Card
@@ -122,7 +125,7 @@ export default function DocumentInboxCard({ item, onClick }: DocumentInboxCardPr
 
         <div className="flex flex-col items-end gap-1 shrink-0">
           {total > 0 && (
-            <span className="text-sm font-medium">{formatSEK(total)}</span>
+            <span className="text-sm font-medium">{formatAmount(total, currency)}</span>
           )}
           <div className="flex items-center gap-1.5">
             <Badge variant={docTypeVariant} className="text-[10px] px-1.5 py-0">

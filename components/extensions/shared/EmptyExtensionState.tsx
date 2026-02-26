@@ -7,8 +7,8 @@ interface EmptyExtensionStateProps {
 }
 
 export default function EmptyExtensionState({
-  title = 'Ingen data \u00e4nnu',
-  description = 'Data kommer att visas h\u00e4r n\u00e4r det finns tillg\u00e4ngligt.',
+  title = 'Ingen data ännu',
+  description = 'Data kommer att visas här när det finns tillgängligt.',
   icon,
 }: EmptyExtensionStateProps) {
   return (

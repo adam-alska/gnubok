@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { ApiRouteDefinition, ExtensionContext } from '@/lib/extensions/types'
 import type { ConfirmReceiptInput, Receipt, ReceiptLineItem, Transaction } from '@/types'
 import { analyzeReceipt } from './lib/receipt-analyzer'
-import { processLineItems } from './lib/receipt-categorizer'
+import { processLineItems, getDefaultClassification } from './lib/receipt-categorizer'
 import { findTransactionMatches } from './lib/receipt-matcher'
 import { getSettings, saveSettings } from './index'
 
@@ -144,6 +144,10 @@ async function handleUpload(
 
       // Process and categorize line items
       const processedLineItems = processLineItems(extraction.lineItems)
+      const { defaultIsBusiness } = getDefaultClassification(
+        extraction.flags.isRestaurant,
+        extraction.flags.isSystembolaget
+      )
 
       // Update receipt with extracted data
       const { error: updateError } = await supabase
@@ -184,6 +188,7 @@ async function handleUpload(
           suggested_category: item.suggestedCategory,
           category: item.category,
           bas_account: item.basAccount,
+          is_business: defaultIsBusiness,
           sort_order: index,
         }))
 

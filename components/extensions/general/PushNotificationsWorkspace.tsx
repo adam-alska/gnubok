@@ -8,7 +8,7 @@ export default function PushNotificationsWorkspace({ userId }: WorkspaceComponen
   return (
     <EmptyExtensionState
       title="Push-notiser"
-      description="Konfigurera push-notiser under Inst\u00e4llningar. Notiser skickas automatiskt vid viktiga h\u00e4ndelser."
+      description="Konfigurera push-notiser under Inställningar. Notiser skickas automatiskt vid viktiga händelser."
       icon={<Bell className="h-12 w-12 text-muted-foreground/40 mb-4" />}
     />
   )

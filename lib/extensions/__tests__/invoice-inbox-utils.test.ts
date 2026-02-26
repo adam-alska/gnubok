@@ -65,6 +65,7 @@ describe('formatExtractionSummary', () => {
       supplierName: '',
       total: 0,
       lineCount: 0,
+      currency: 'SEK',
     })
   })
 
@@ -73,6 +74,7 @@ describe('formatExtractionSummary', () => {
       supplierName: '',
       total: 0,
       lineCount: 0,
+      currency: 'SEK',
     })
   })
 
@@ -106,6 +108,7 @@ describe('formatExtractionSummary', () => {
       supplierName: 'Acme AB',
       total: 250,
       lineCount: 2,
+      currency: 'SEK',
     })
   })
 
@@ -123,6 +126,7 @@ describe('formatExtractionSummary', () => {
       supplierName: '',
       total: 0,
       lineCount: 0,
+      currency: 'SEK',
     })
   })
 })

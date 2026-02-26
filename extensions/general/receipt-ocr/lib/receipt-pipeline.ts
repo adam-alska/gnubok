@@ -9,9 +9,9 @@
 
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Receipt, ReceiptMatchCandidate } from '@/types'
+import type { Receipt, ReceiptMatchCandidate, ReceiptExtractionResult } from '@/types'
 import { analyzeReceipt } from './receipt-analyzer'
-import { processLineItems } from './receipt-categorizer'
+import { processLineItems, getDefaultClassification } from './receipt-categorizer'
 import { autoMatchReceipts } from './receipt-matcher'
 import { eventBus } from '@/lib/events/bus'
 
@@ -20,6 +20,7 @@ export interface ReceiptPipelineOptions {
   source: 'upload' | 'camera' | 'email'
   emailFrom?: string
   storageUrl: string
+  preExtracted?: ReceiptExtractionResult
 }
 
 export interface ProcessedReceipt {
@@ -43,12 +44,16 @@ export async function processReceiptFromDocument(
   mimeType: string,
   opts: ReceiptPipelineOptions
 ): Promise<ProcessedReceipt> {
-  // 1. Analyze receipt with Claude Vision
+  // 1. Use pre-extracted data if available, otherwise analyze with Claude Vision
   const validImageType = mimeType as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
-  const extraction = await analyzeReceipt(base64, validImageType)
+  const extraction = opts.preExtracted ?? await analyzeReceipt(base64, validImageType)
 
-  // 2. Categorize line items
+  // 2. Categorize line items and apply default business classification
   const processedLineItems = processLineItems(extraction.lineItems)
+  const { defaultIsBusiness } = getDefaultClassification(
+    extraction.flags.isRestaurant,
+    extraction.flags.isSystembolaget
+  )
 
   // 3. Insert receipt record
   const { data: receipt, error: insertError } = await supabase
@@ -98,6 +103,7 @@ export async function processReceiptFromDocument(
       suggested_category: item.suggestedCategory,
       category: item.category,
       bas_account: item.basAccount,
+      is_business: defaultIsBusiness,
       sort_order: index,
     }))
 

@@ -2,9 +2,8 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import { Webhook } from 'svix'
 import { parseInboundPayload, extractAttachments, resolveUserFromEmail } from '@/extensions/general/invoice-inbox/lib/email-handler'
-import { analyzeInvoice } from '@/extensions/general/invoice-inbox/lib/invoice-analyzer'
 import { matchSupplier } from '@/extensions/general/invoice-inbox/lib/supplier-matcher'
-import { classifyDocument } from '@/lib/documents/classifier'
+import { analyzeDocument } from '@/lib/ai/document-analyzer'
 import { processReceiptFromDocument } from '@/extensions/general/receipt-ocr/lib/receipt-pipeline'
 import crypto from 'crypto'
 
@@ -145,14 +144,13 @@ export async function POST(request: Request) {
 
       if (docError || !document) continue
 
-      // Classify document type
+      // Unified classify + extract in a single Claude call
       let documentType: 'supplier_invoice' | 'receipt' | 'government_letter' | 'unknown' = 'supplier_invoice'
-      let isReverseCharge = false
+      let unifiedResult: Awaited<ReturnType<typeof analyzeDocument>> | null = null
       try {
-        const classification = await classifyDocument(attachment.content, attachment.content_type)
-        documentType = classification.type
-        isReverseCharge = classification.isReverseCharge ?? false
-        console.log(`[document-inbox] Classified as ${documentType} (confidence: ${classification.confidence})`)
+        unifiedResult = await analyzeDocument(attachment.content, attachment.content_type)
+        documentType = unifiedResult.classification.type
+        console.log(`[document-inbox] Classified as ${documentType} (confidence: ${unifiedResult.classification.confidence})`)
       } catch (classifyErr) {
         console.error('[document-inbox] Classification failed, defaulting to supplier_invoice:', classifyErr)
       }
@@ -180,10 +178,15 @@ export async function POST(request: Request) {
       try {
         switch (documentType) {
           case 'supplier_invoice': {
-            // Existing flow: analyze invoice + supplier match
-            const extraction = await analyzeInvoice(attachment.content, attachment.content_type)
+            // Use pre-extracted invoice data from unified call
+            const extraction = unifiedResult?.invoice
+            if (!extraction) {
+              throw new Error('No invoice extraction available')
+            }
 
-            // Store reverse charge flag from classifier in extracted data
+            const isReverseCharge = unifiedResult?.classification.isReverseCharge ?? false
+
+            // Store reverse charge flag in extracted data
             const extractedData = {
               ...(extraction as unknown as Record<string, unknown>),
               isReverseCharge,
@@ -216,7 +219,7 @@ export async function POST(request: Request) {
           }
 
           case 'receipt': {
-            // Receipt pipeline: extract + categorize + match transactions
+            // Use pre-extracted receipt data from unified call
             const { data: urlData } = supabase.storage.from('documents').getPublicUrl(storagePath)
 
             const result = await processReceiptFromDocument(supabase, userId, attachment.content, attachment.content_type, {
@@ -224,6 +227,7 @@ export async function POST(request: Request) {
               source: 'email',
               emailFrom: payload.from,
               storageUrl: urlData.publicUrl,
+              preExtracted: unifiedResult?.receipt ?? undefined,
             })
 
             await supabase

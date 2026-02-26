@@ -41,7 +41,7 @@ export default function ReceiptsPage() {
     setIsLoading(true)
     try {
       const [receiptsRes, queueRes] = await Promise.all([
-        fetch('/api/extensions/receipt-ocr'),
+        fetch('/api/extensions/ext/receipt-ocr'),
         fetch('/api/extensions/ext/receipt-ocr/queue'),
       ])
 
