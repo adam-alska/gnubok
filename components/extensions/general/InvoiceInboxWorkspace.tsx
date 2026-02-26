@@ -118,9 +118,17 @@ export default function InvoiceInboxWorkspace({ userId }: WorkspaceComponentProp
     }
   }
 
-  async function handleConfirm(itemId: string, supplierId?: string) {
-    const body: Record<string, string> = {}
-    if (supplierId) body.supplier_id = supplierId
+  async function handleConfirm(
+    itemId: string,
+    supplierId?: string,
+    newSupplierData?: import('@/components/extensions/general/invoice-inbox/InboxDetailDialog').NewSupplierData
+  ) {
+    const body: Record<string, unknown> = {}
+    if (supplierId) {
+      body.supplier_id = supplierId
+    } else if (newSupplierData) {
+      body.new_supplier = newSupplierData
+    }
 
     const res = await fetch(`/api/extensions/ext/invoice-inbox/inbox/${itemId}/confirm`, {
       method: 'POST',
