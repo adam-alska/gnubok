@@ -604,34 +604,53 @@ async function handleConfirmInboxItem(
   const body = await request.json().catch(() => ({}))
 
   try {
+    console.log('[invoice-inbox] Confirm: starting for item', id, 'extraction keys:', Object.keys(extraction))
+
     // Resolve supplier: use matched, use body override, or create new
     let supplierId = body.supplier_id || inboxItem.matched_supplier_id
 
     if (!supplierId) {
-      // Create new supplier from extracted data
-      const supplierName = extraction.supplier?.name
+      // Use frontend-provided supplier data if available, otherwise fall back to extraction
+      const frontendSupplier = body.new_supplier as {
+        name?: string
+        supplier_type?: string
+        org_number?: string
+        vat_number?: string
+        bankgiro?: string
+        plusgiro?: string
+        default_expense_account?: string
+        default_currency?: string
+      } | undefined
+
+      const supplierName = frontendSupplier?.name || extraction.supplier?.name
       if (!supplierName) {
         return NextResponse.json({ error: 'Supplier name is required' }, { status: 400 })
       }
+
+      const validSupplierTypes = ['swedish_business', 'eu_business', 'non_eu_business']
+      const supplierType = frontendSupplier?.supplier_type && validSupplierTypes.includes(frontendSupplier.supplier_type)
+        ? frontendSupplier.supplier_type
+        : 'swedish_business'
 
       const { data: newSupplier, error: supplierError } = await supabase
         .from('suppliers')
         .insert({
           user_id: userId,
           name: supplierName,
-          supplier_type: 'swedish_business',
-          org_number: extraction.supplier?.orgNumber || null,
-          vat_number: extraction.supplier?.vatNumber || null,
-          bankgiro: extraction.supplier?.bankgiro || null,
-          plusgiro: extraction.supplier?.plusgiro || null,
-          default_expense_account: '6200',
+          supplier_type: supplierType,
+          org_number: frontendSupplier?.org_number || extraction.supplier?.orgNumber || null,
+          vat_number: frontendSupplier?.vat_number || extraction.supplier?.vatNumber || null,
+          bankgiro: frontendSupplier?.bankgiro || extraction.supplier?.bankgiro || null,
+          plusgiro: frontendSupplier?.plusgiro || extraction.supplier?.plusgiro || null,
+          default_expense_account: frontendSupplier?.default_expense_account || '6200',
           default_payment_terms: 30,
-          default_currency: extraction.invoice?.currency || 'SEK',
+          default_currency: frontendSupplier?.default_currency || extraction.invoice?.currency || 'SEK',
         })
         .select()
         .single()
 
       if (supplierError || !newSupplier) {
+        console.error('[invoice-inbox] Confirm: supplier creation failed:', supplierError)
         return NextResponse.json({ error: 'Failed to create supplier' }, { status: 500 })
       }
 
@@ -647,6 +666,7 @@ async function handleConfirmInboxItem(
       .single()
 
     if (supplierCheckError || !supplier) {
+      console.error('[invoice-inbox] Confirm: supplier check failed:', supplierCheckError, 'supplierId=', supplierId)
       return NextResponse.json({ error: 'Supplier not found' }, { status: 404 })
     }
 
@@ -655,45 +675,99 @@ async function handleConfirmInboxItem(
       .rpc('get_next_arrival_number', { p_user_id: userId })
 
     if (arrivalError) {
+      console.error('[invoice-inbox] Confirm: arrival number error:', arrivalError)
       return NextResponse.json({ error: 'Failed to get arrival number' }, { status: 500 })
     }
 
-    // Build line items from extraction
-    const items = (extraction.lineItems || []).map((item, index) => {
-      const vatRate = item.vatRate != null ? item.vatRate / 100 : 0.25
-      const lineTotal = Math.round(item.lineTotal * 100) / 100
-      const vatAmount = Math.round(lineTotal * vatRate * 100) / 100
-      return {
-        sort_order: index,
-        description: item.description,
-        quantity: item.quantity || 1,
-        unit: 'st',
-        unit_price: item.unitPrice != null ? item.unitPrice : lineTotal,
-        line_total: lineTotal,
-        account_number: item.accountSuggestion || supplier.default_expense_account || '6200',
-        vat_code: null,
-        vat_rate: vatRate,
-        vat_amount: vatAmount,
+    console.log('[invoice-inbox] Confirm: supplierId=', supplierId, 'arrivalNum=', arrivalNum)
+
+    // Build line items from extraction.
+    // The AI extraction may return lineTotal as gross (incl. VAT) or net.
+    // Cross-check with extraction.totals to determine the correct split.
+    const extractedTotals = extraction.totals
+    const rawLineItems = extraction.lineItems || []
+
+    const items: Array<{
+      sort_order: number
+      description: string
+      quantity: number
+      unit: string
+      unit_price: number
+      line_total: number
+      account_number: string
+      vat_code: null
+      vat_rate: number
+      vat_amount: number
+    }> = []
+
+    if (rawLineItems.length > 0 && extractedTotals?.subtotal != null && extractedTotals?.vatAmount != null) {
+      // We have both line items and reliable totals — use totals for amounts
+      // and distribute proportionally across line items
+      const rawSum = rawLineItems.reduce((s, i) => s + (i.lineTotal || 0), 0)
+      const knownSubtotal = extractedTotals.subtotal
+      const knownVat = extractedTotals.vatAmount
+      const knownVatRate = knownSubtotal > 0
+        ? Math.round((knownVat / knownSubtotal) * 100) / 100
+        : 0.25
+
+      for (let index = 0; index < rawLineItems.length; index++) {
+        const item = rawLineItems[index]
+        // Distribute the known subtotal proportionally by each line's share
+        const proportion = rawSum > 0 ? (item.lineTotal || 0) / rawSum : 1 / rawLineItems.length
+        const lineNet = Math.round(knownSubtotal * proportion * 100) / 100
+        const lineVat = Math.round(knownVat * proportion * 100) / 100
+        items.push({
+          sort_order: index,
+          description: item.description,
+          quantity: item.quantity || 1,
+          unit: 'st',
+          unit_price: lineNet,
+          line_total: lineNet,
+          account_number: item.accountSuggestion || supplier.default_expense_account || '6200',
+          vat_code: null,
+          vat_rate: knownVatRate,
+          vat_amount: lineVat,
+        })
       }
-    })
+    } else if (rawLineItems.length > 0) {
+      // Line items but no reliable totals — use per-line vatRate
+      for (let index = 0; index < rawLineItems.length; index++) {
+        const item = rawLineItems[index]
+        const vatRate = item.vatRate != null ? item.vatRate / 100 : 0.25
+        const lineTotal = Math.round(item.lineTotal * 100) / 100
+        const vatAmount = Math.round(lineTotal * vatRate * 100) / 100
+        items.push({
+          sort_order: index,
+          description: item.description,
+          quantity: item.quantity || 1,
+          unit: 'st',
+          unit_price: item.unitPrice != null ? item.unitPrice : lineTotal,
+          line_total: lineTotal,
+          account_number: item.accountSuggestion || supplier.default_expense_account || '6200',
+          vat_code: null,
+          vat_rate: vatRate,
+          vat_amount: vatAmount,
+        })
+      }
+    }
 
     // If no line items, create a single item from totals
-    if (items.length === 0 && extraction.totals?.total) {
-      const total = extraction.totals.total
-      const vatAmount = extraction.totals.vatAmount || 0
-      const subtotal = extraction.totals.subtotal || total - vatAmount
-      const vatRate = subtotal > 0 ? Math.round((vatAmount / subtotal) * 100) / 100 : 0.25
+    if (items.length === 0 && extractedTotals?.total) {
+      const total = extractedTotals.total
+      const vatAmt = extractedTotals.vatAmount || 0
+      const sub = extractedTotals.subtotal || total - vatAmt
+      const vatRate = sub > 0 ? Math.round((vatAmt / sub) * 100) / 100 : 0.25
       items.push({
         sort_order: 0,
         description: 'Fakturabelopp',
         quantity: 1,
         unit: 'st',
-        unit_price: subtotal,
-        line_total: subtotal,
+        unit_price: sub,
+        line_total: sub,
         account_number: supplier.default_expense_account || '6200',
         vat_code: null,
         vat_rate: vatRate,
-        vat_amount: Math.round(vatAmount * 100) / 100,
+        vat_amount: Math.round(vatAmt * 100) / 100,
       })
     }
 
@@ -707,6 +781,8 @@ async function handleConfirmInboxItem(
     if (primaryVatRate === 0.12) vatTreatment = 'reduced_12'
     else if (primaryVatRate === 0.06) vatTreatment = 'reduced_6'
     else if (primaryVatRate === 0) vatTreatment = 'exempt'
+
+    console.log('[invoice-inbox] Confirm: items=', items.length, 'subtotal=', subtotal, 'vat=', vatAmount, 'total=', total, 'vatTreatment=', vatTreatment)
 
     // Insert supplier invoice
     const { data: invoice, error: invoiceError } = await supabase
@@ -733,8 +809,11 @@ async function handleConfirmInboxItem(
       .single()
 
     if (invoiceError || !invoice) {
+      console.error('[invoice-inbox] Confirm: invoice insert error:', invoiceError)
       return NextResponse.json({ error: invoiceError?.message || 'Failed to create invoice' }, { status: 500 })
     }
+
+    console.log('[invoice-inbox] Confirm: invoice created id=', invoice.id)
 
     // Insert line items
     const itemInserts = items.map((item) => ({
@@ -747,6 +826,7 @@ async function handleConfirmInboxItem(
       .insert(itemInserts)
 
     if (itemsError) {
+      console.error('[invoice-inbox] Confirm: items insert error:', itemsError, 'payload:', JSON.stringify(itemInserts))
       await supabase.from('supplier_invoices').delete().eq('id', invoice.id)
       return NextResponse.json({ error: itemsError.message }, { status: 500 })
     }
@@ -784,7 +864,7 @@ async function handleConfirmInboxItem(
       },
     })
   } catch (error) {
-    console.error('[invoice-inbox] Confirm failed:', error)
+    console.error('[invoice-inbox] Confirm failed:', error instanceof Error ? error.stack : error)
     return NextResponse.json({ error: 'Confirmation failed' }, { status: 500 })
   }
 }

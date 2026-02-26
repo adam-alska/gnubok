@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import type { InvoiceInboxItem, Supplier } from '@/types'
+import { useState, useEffect } from 'react'
+import type { InvoiceInboxItem, Supplier, SupplierType } from '@/types'
 import type { InvoiceExtractionResult } from '@/extensions/general/invoice-inbox/types'
 import {
   Dialog,
@@ -13,6 +13,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -34,13 +36,24 @@ import {
   getStatusVariant,
   getConfidenceLabel,
 } from '@/lib/extensions/invoice-inbox-utils'
-import { Loader2, RefreshCw, Check, X } from 'lucide-react'
+import { Loader2, RefreshCw, Check, X, ChevronDown } from 'lucide-react'
+
+export interface NewSupplierData {
+  name: string
+  supplier_type: SupplierType
+  org_number: string
+  vat_number: string
+  bankgiro: string
+  plusgiro: string
+  default_expense_account: string
+  default_currency: string
+}
 
 interface InboxDetailDialogProps {
   item: InvoiceInboxItem | null
   open: boolean
   onOpenChange: (open: boolean) => void
-  onConfirm: (itemId: string, supplierId?: string) => Promise<void>
+  onConfirm: (itemId: string, supplierId?: string, newSupplierData?: NewSupplierData) => Promise<void>
   onReject: (itemId: string) => Promise<void>
   onReprocess: (itemId: string) => Promise<void>
   suppliers: Supplier[]
@@ -67,6 +80,34 @@ export default function InboxDetailDialog({
 }: InboxDetailDialogProps) {
   const [loading, setLoading] = useState<'confirm' | 'reject' | 'reprocess' | null>(null)
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | undefined>(undefined)
+  const [supplierFormOpen, setSupplierFormOpen] = useState(false)
+  const [newSupplier, setNewSupplier] = useState<NewSupplierData>({
+    name: '',
+    supplier_type: 'swedish_business',
+    org_number: '',
+    vat_number: '',
+    bankgiro: '',
+    plusgiro: '',
+    default_expense_account: '6200',
+    default_currency: 'SEK',
+  })
+
+  // Pre-populate supplier form when item changes
+  const extractionForEffect = item?.extracted_data as unknown as InvoiceExtractionResult | null
+  useEffect(() => {
+    if (!extractionForEffect?.supplier) return
+    const s = extractionForEffect.supplier
+    setNewSupplier({
+      name: s.name ?? '',
+      supplier_type: 'swedish_business',
+      org_number: s.orgNumber ?? '',
+      vat_number: s.vatNumber ?? '',
+      bankgiro: s.bankgiro ?? '',
+      plusgiro: s.plusgiro ?? '',
+      default_expense_account: '6200',
+      default_currency: extractionForEffect.invoice?.currency || 'SEK',
+    })
+  }, [extractionForEffect])
 
   if (!item) return null
 
@@ -78,16 +119,25 @@ export default function InboxDetailDialog({
 
   const matchedSupplierName = (item.supplier as { name?: string } | undefined)?.name
   const supplierId = selectedSupplierId ?? item.matched_supplier_id ?? undefined
+  const isCreatingNewSupplier = !supplierId
 
   const canConfirm = item.status === 'ready' && extraction != null
   const canReprocess = item.status !== 'confirmed'
   const canReject = item.status !== 'confirmed' && item.status !== 'rejected'
 
+  function updateSupplierField<K extends keyof NewSupplierData>(field: K, value: NewSupplierData[K]) {
+    setNewSupplier((prev) => ({ ...prev, [field]: value }))
+  }
+
   async function handleAction(action: 'confirm' | 'reject' | 'reprocess') {
     setLoading(action)
     try {
       if (action === 'confirm') {
-        await onConfirm(item!.id, supplierId)
+        await onConfirm(
+          item!.id,
+          supplierId,
+          isCreatingNewSupplier ? newSupplier : undefined
+        )
       } else if (action === 'reject') {
         await onReject(item!.id)
       } else {
@@ -185,6 +235,82 @@ export default function InboxDetailDialog({
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Inline new supplier form */}
+              {isCreatingNewSupplier && (
+                <div className="rounded-md border bg-muted/30 p-3 space-y-3">
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between text-sm font-medium"
+                    onClick={() => setSupplierFormOpen((o) => !o)}
+                  >
+                    <span>Granska leverantörsuppgifter</span>
+                    <ChevronDown className={`h-4 w-4 transition-transform ${supplierFormOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {supplierFormOpen && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="col-span-2 space-y-1">
+                        <Label className="text-xs">Namn</Label>
+                        <Input
+                          value={newSupplier.name}
+                          onChange={(e) => updateSupplierField('name', e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Typ</Label>
+                        <Select
+                          value={newSupplier.supplier_type}
+                          onValueChange={(v) => updateSupplierField('supplier_type', v as SupplierType)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="swedish_business">Svenskt företag</SelectItem>
+                            <SelectItem value="eu_business">EU-företag</SelectItem>
+                            <SelectItem value="non_eu_business">Utomeuropeiskt</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Org.nr</Label>
+                        <Input
+                          value={newSupplier.org_number}
+                          onChange={(e) => updateSupplierField('org_number', e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Bankgiro</Label>
+                        <Input
+                          value={newSupplier.bankgiro}
+                          onChange={(e) => updateSupplierField('bankgiro', e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Plusgiro</Label>
+                        <Input
+                          value={newSupplier.plusgiro}
+                          onChange={(e) => updateSupplierField('plusgiro', e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Kostnadskonto</Label>
+                        <Input
+                          value={newSupplier.default_expense_account}
+                          onChange={(e) => updateSupplierField('default_expense_account', e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Valuta</Label>
+                        <Input
+                          value={newSupplier.default_currency}
+                          onChange={(e) => updateSupplierField('default_currency', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <Separator />
