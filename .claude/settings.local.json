@@ -37,7 +37,8 @@
       "WebFetch(domain:www.faronline.se)",
       "WebFetch(domain:www.worldstopexports.com)",
       "WebFetch(domain:www.riksbank.se)",
-      "WebFetch(domain:www.avalara.com)"
+      "WebFetch(domain:www.avalara.com)",
+      "Bash(done)"
     ]
   }
 }
