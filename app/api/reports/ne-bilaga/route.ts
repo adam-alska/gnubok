@@ -40,7 +40,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const declaration = await generateNEDeclaration(user.id, periodId)
+    const declaration = await generateNEDeclaration(supabase, user.id, periodId)
 
     if (format === 'sru') {
       // Generate and return SRU file

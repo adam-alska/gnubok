@@ -7,9 +7,6 @@ import type {
   DocumentAttachment,
   Receipt,
   CreditNote,
-  CAMT053Statement,
-  CAMT054Notification,
-  AuditSecurityEvent,
   ReconciliationMethod,
   InvoiceInboxItem,
   SupplierInvoice,
@@ -29,21 +26,16 @@ export type CoreEvent =
   // Invoicing
   | { type: 'invoice.created'; payload: { invoice: Invoice; userId: string } }
   | { type: 'invoice.sent'; payload: { invoice: Invoice; userId: string } }
-  | { type: 'invoice.paid'; payload: { invoice: Invoice; transaction: Transaction; kursdifferens?: number; userId: string } }
-  | { type: 'invoice.overdue'; payload: { invoice: Invoice; days: number; userId: string } }
   | { type: 'credit_note.created'; payload: { creditNote: CreditNote; userId: string } }
   // Banking
   | { type: 'transaction.synced'; payload: { transactions: Transaction[]; userId: string } }
   | { type: 'transaction.categorized'; payload: { transaction: Transaction; account: string; taxCode: string; userId: string } }
   | { type: 'transaction.reconciled'; payload: { transaction: Transaction; journalEntryId: string; method: ReconciliationMethod; userId: string } }
-  | { type: 'bank.statement_received'; payload: { statement: CAMT053Statement; userId: string } }
-  | { type: 'bank.payment_notification'; payload: { notification: CAMT054Notification; userId: string } }
   // Periods
   | { type: 'period.locked'; payload: { period: FiscalPeriod; userId: string } }
   | { type: 'period.year_closed'; payload: { period: FiscalPeriod; userId: string } }
   // Customers
   | { type: 'customer.created'; payload: { customer: Customer; userId: string } }
-  | { type: 'customer.pseudonymized'; payload: { customerId: string; userId: string } }
   // Receipts
   | { type: 'receipt.extracted'; payload: {
       receipt: Receipt;
@@ -68,8 +60,6 @@ export type CoreEvent =
   | { type: 'supplier_invoice.received'; payload: { inboxItem: InvoiceInboxItem; userId: string } }
   | { type: 'supplier_invoice.extracted'; payload: { inboxItem: InvoiceInboxItem; confidence: number; userId: string } }
   | { type: 'supplier_invoice.confirmed'; payload: { inboxItem: InvoiceInboxItem; supplierInvoice: SupplierInvoice; userId: string } }
-  // Audit
-  | { type: 'audit.security_event'; payload: { event: AuditSecurityEvent; userId: string } }
 
 // ============================================================
 // Helper Types

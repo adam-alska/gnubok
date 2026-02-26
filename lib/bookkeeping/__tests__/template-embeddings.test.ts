@@ -1,233 +1,104 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { makeTransaction, createMockSupabase } from '@/tests/helpers'
-import { BOOKING_TEMPLATES } from '../booking-templates'
+import { makeTransaction } from '@/tests/helpers'
+import { extensionRegistry } from '@/lib/extensions/registry'
 
-// Mock server-only (no-op in tests)
-vi.mock('server-only', () => ({}))
-
-// Mock OpenAI Embeddings
-vi.mock('@langchain/openai', () => {
-  class MockOpenAIEmbeddings {
-    embedQuery = vi.fn().mockResolvedValue(new Array(1536).fill(0.1))
-    embedDocuments = vi.fn().mockImplementation((texts: string[]) =>
-      Promise.resolve(texts.map(() => new Array(1536).fill(0.1)))
-    )
-  }
-  return { OpenAIEmbeddings: MockOpenAIEmbeddings }
-})
-
-// Mock Supabase
-const { supabase: mockSupabase, mockResult } = createMockSupabase()
-vi.mock('@/lib/supabase/server', () => ({
-  createServiceClient: vi.fn().mockResolvedValue(mockSupabase),
+// Mock the extension registry
+vi.mock('@/lib/extensions/registry', () => ({
+  extensionRegistry: {
+    get: vi.fn(),
+  },
 }))
 
-describe('template-embeddings', () => {
+describe('template-embeddings facade', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  describe('buildEmbeddingText', () => {
-    it('includes all relevant fields for a template', async () => {
-      const { buildEmbeddingText } = await import('../template-embeddings')
+  describe('findSimilarTemplates', () => {
+    it('delegates to ai-categorization extension service when available', async () => {
+      const mockResults = [{ template: { id: 'test' }, confidence: 0.9 }]
+      const mockFindSimilar = vi.fn().mockResolvedValue(mockResults)
 
-      const template = BOOKING_TEMPLATES.find((t) => t.id === 'premises_rent')!
-      const text = buildEmbeddingText(template)
+      vi.mocked(extensionRegistry.get).mockReturnValue({
+        id: 'ai-categorization',
+        name: 'AI',
+        version: '1.0.0',
+        services: { findSimilarTemplates: mockFindSimilar },
+      })
 
-      // Should include Swedish and English name
-      expect(text).toContain('Lokalhyra')
-      expect(text).toContain('Office rent')
+      const { findSimilarTemplates } = await import('../template-embeddings')
+      const tx = makeTransaction({ description: 'SPOTIFY', amount: -109 })
+      const results = await findSimilarTemplates(tx, 'enskild_firma')
 
-      // Should include description
-      expect(text).toContain(template.description_sv)
-
-      // Should include keywords
-      expect(text).toContain('hyra')
-      expect(text).toContain('lokal')
-
-      // Should include group
-      expect(text).toContain('premises')
-
-      // Should include direction
-      expect(text).toContain('utgift')
-
-      // Should include accounts
-      expect(text).toContain('5010')
-      expect(text).toContain('1930')
+      expect(mockFindSimilar).toHaveBeenCalledWith(tx, 'enskild_firma', undefined, undefined)
+      expect(results).toEqual(mockResults)
     })
 
-    it('includes VAT treatment when present', async () => {
-      const { buildEmbeddingText } = await import('../template-embeddings')
+    it('falls back to keyword matching when extension not loaded', async () => {
+      vi.mocked(extensionRegistry.get).mockReturnValue(undefined)
 
-      const template = BOOKING_TEMPLATES.find((t) => t.id === 'premises_electricity')!
-      const text = buildEmbeddingText(template)
+      const { findSimilarTemplates } = await import('../template-embeddings')
+      const tx = makeTransaction({ description: 'SPOTIFY', amount: -109 })
+      const results = await findSimilarTemplates(tx)
 
-      expect(text).toContain('standard_25')
-      expect(text).toContain('25%')
-    })
-
-    it('includes special rules when present', async () => {
-      const { buildEmbeddingText } = await import('../template-embeddings')
-
-      const template = BOOKING_TEMPLATES.find((t) => t.id === 'premises_rent')!
-      const text = buildEmbeddingText(template)
-
-      expect(text).toContain(template.special_rules_sv!)
-    })
-
-    it('includes MCC codes when present', async () => {
-      const { buildEmbeddingText } = await import('../template-embeddings')
-
-      const template = BOOKING_TEMPLATES.find((t) => t.id === 'premises_electricity')!
-      const text = buildEmbeddingText(template)
-
-      expect(text).toContain('4900')
-    })
-
-    it('includes deductibility note for non-full deductibility', async () => {
-      const { buildEmbeddingText } = await import('../template-embeddings')
-
-      const template = BOOKING_TEMPLATES.find((t) => t.deductibility === 'non_deductible')!
-      const text = buildEmbeddingText(template)
-
-      expect(text).toContain('non_deductible')
-    })
-
-    it('generates text for all 45 templates without error', async () => {
-      const { buildEmbeddingText } = await import('../template-embeddings')
-
-      for (const template of BOOKING_TEMPLATES) {
-        const text = buildEmbeddingText(template)
-        expect(text.length).toBeGreaterThan(10)
-      }
+      // Should return keyword-based matches (may be empty for generic text)
+      expect(Array.isArray(results)).toBe(true)
     })
   })
 
-  describe('buildTransactionQueryText', () => {
-    it('combines description, merchant, and direction', async () => {
-      const { buildTransactionQueryText } = await import('../template-embeddings')
+  describe('seedAllTemplateEmbeddings', () => {
+    it('delegates to extension service when available', async () => {
+      const mockSeed = vi.fn().mockResolvedValue({ seeded: 48, errors: [] })
 
-      const tx = makeTransaction({
-        description: 'SPOTIFY PREMIUM',
-        merchant_name: 'Spotify',
-        amount: -109,
-        mcc_code: 5815,
+      vi.mocked(extensionRegistry.get).mockReturnValue({
+        id: 'ai-categorization',
+        name: 'AI',
+        version: '1.0.0',
+        services: { seedAllTemplateEmbeddings: mockSeed },
       })
 
-      const text = buildTransactionQueryText(tx)
+      const { seedAllTemplateEmbeddings } = await import('../template-embeddings')
+      const result = await seedAllTemplateEmbeddings()
 
-      expect(text).toContain('SPOTIFY PREMIUM')
-      expect(text).toContain('Spotify')
-      expect(text).toContain('MCC 5815')
-      expect(text).toContain('utgift')
+      expect(mockSeed).toHaveBeenCalled()
+      expect(result).toEqual({ seeded: 48, errors: [] })
     })
 
-    it('marks positive amounts as income', async () => {
-      const { buildTransactionQueryText } = await import('../template-embeddings')
+    it('returns error when extension not loaded', async () => {
+      vi.mocked(extensionRegistry.get).mockReturnValue(undefined)
 
-      const tx = makeTransaction({
-        description: 'Inbetalning',
-        amount: 5000,
-      })
+      const { seedAllTemplateEmbeddings } = await import('../template-embeddings')
+      const result = await seedAllTemplateEmbeddings()
 
-      const text = buildTransactionQueryText(tx)
-      expect(text).toContain('intäkt')
-    })
-
-    it('handles null merchant_name and mcc_code', async () => {
-      const { buildTransactionQueryText } = await import('../template-embeddings')
-
-      const tx = makeTransaction({
-        description: 'Some payment',
-        merchant_name: null,
-        mcc_code: null,
-        amount: -100,
-      })
-
-      const text = buildTransactionQueryText(tx)
-      expect(text).toContain('Some payment')
-      expect(text).toContain('utgift')
-      expect(text).not.toContain('MCC')
-    })
-
-    it('prepends user description when provided', async () => {
-      const { buildTransactionQueryText } = await import('../template-embeddings')
-
-      const tx = makeTransaction({
-        description: 'SWE REST 4521 STHLM',
-        merchant_name: 'Unknown',
-        amount: -450,
-      })
-
-      const text = buildTransactionQueryText(tx, 'business lunch with client')
-
-      // User description should appear first
-      expect(text.indexOf('business lunch with client')).toBe(0)
-      // Transaction data should still be present
-      expect(text).toContain('SWE REST 4521 STHLM')
-      expect(text).toContain('Unknown')
-      expect(text).toContain('utgift')
-    })
-
-    it('behaves identically when userDescription is undefined', async () => {
-      const { buildTransactionQueryText } = await import('../template-embeddings')
-
-      const tx = makeTransaction({
-        description: 'SPOTIFY PREMIUM',
-        merchant_name: 'Spotify',
-        amount: -109,
-      })
-
-      const withoutDesc = buildTransactionQueryText(tx)
-      const withUndefined = buildTransactionQueryText(tx, undefined)
-
-      expect(withoutDesc).toBe(withUndefined)
+      expect(result.seeded).toBe(0)
+      expect(result.errors).toHaveLength(1)
     })
   })
 
   describe('getSchemaVersion', () => {
-    it('returns a consistent hash string', async () => {
+    it('delegates to extension service when available', async () => {
+      const mockVersion = vi.fn().mockResolvedValue('abc123def456')
+
+      vi.mocked(extensionRegistry.get).mockReturnValue({
+        id: 'ai-categorization',
+        name: 'AI',
+        version: '1.0.0',
+        services: { getSchemaVersion: mockVersion },
+      })
+
       const { getSchemaVersion } = await import('../template-embeddings')
+      const result = await getSchemaVersion()
 
-      const v1 = getSchemaVersion()
-      const v2 = getSchemaVersion()
-
-      expect(v1).toBe(v2)
-      expect(v1).toHaveLength(12)
-      expect(v1).toMatch(/^[a-f0-9]+$/)
-    })
-  })
-
-  describe('findSimilarTemplates', () => {
-    it('returns empty array on RPC error (graceful fallback)', async () => {
-      const { findSimilarTemplates } = await import('../template-embeddings')
-
-      // Mock staleness check
-      mockResult({ data: { schema_version: 'test' }, error: null })
-
-      const tx = makeTransaction({
-        description: 'SPOTIFY',
-        amount: -109,
-      })
-
-      // The mock will return error for the RPC call
-      mockResult({ data: null, error: { message: 'RPC failed' } })
-      const results = await findSimilarTemplates(tx)
-      expect(results).toEqual([])
+      expect(result).toBe('abc123def456')
     })
 
-    it('returns empty array when no embeddings exist', async () => {
-      const { findSimilarTemplates } = await import('../template-embeddings')
+    it('returns "none" when extension not loaded', async () => {
+      vi.mocked(extensionRegistry.get).mockReturnValue(undefined)
 
-      mockResult({ data: [], error: null })
+      const { getSchemaVersion } = await import('../template-embeddings')
+      const result = await getSchemaVersion()
 
-      const tx = makeTransaction({
-        description: 'Random purchase',
-        amount: -50,
-      })
-
-      const results = await findSimilarTemplates(tx)
-      expect(results).toEqual([])
+      expect(result).toBe('none')
     })
   })
 })

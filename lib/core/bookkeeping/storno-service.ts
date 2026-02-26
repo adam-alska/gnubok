@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { eventBus } from '@/lib/events'
 import type {
   CreateJournalEntryLineInput,
@@ -23,6 +23,7 @@ import { validateBalance, getNextVoucherNumber } from '@/lib/bookkeeping/engine'
  * Returns: { reversal, corrected } - the two new entries created
  */
 export async function correctEntry(
+  supabase: SupabaseClient,
   userId: string,
   originalEntryId: string,
   correctedLines: CreateJournalEntryLineInput[]
@@ -34,8 +35,6 @@ export async function correctEntry(
       `Corrected entry is not balanced: debits (${balance.totalDebit}) != credits (${balance.totalCredit})`
     )
   }
-
-  const supabase = await createClient()
 
   // Fetch original entry with lines
   const { data: original, error: fetchError } = await supabase
@@ -57,6 +56,7 @@ export async function correctEntry(
 
   // ===== Step 1: Create storno (reversal) entry =====
   const reversalVoucherNumber = await getNextVoucherNumber(
+    supabase,
     userId,
     original.fiscal_period_id,
     original.voucher_series || 'A'
@@ -146,6 +146,7 @@ export async function correctEntry(
 
   try {
     const correctedVoucherNumber = await getNextVoucherNumber(
+      supabase,
       userId,
       original.fiscal_period_id,
       original.voucher_series || 'A'

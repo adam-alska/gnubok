@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    await saveMappings(user.id, mappings)
+    await saveMappings(supabase, user.id, mappings)
     return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json(

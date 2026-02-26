@@ -1,4 +1,5 @@
 import type { Extension, ExtensionContext } from '@/lib/extensions/types'
+import { aiCategorizationApiRoutes } from './api-routes'
 import type { EventPayload } from '@/lib/events/types'
 import type { Transaction, EntityType } from '@/types'
 import {
@@ -10,7 +11,6 @@ import {
   type AccountUsageEntry,
   type MerchantHistoryEntry,
 } from './categorizer'
-import { findSimilarTemplates } from '@/lib/bookkeeping/template-embeddings'
 import type { BookingTemplate } from '@/lib/bookkeeping/booking-templates'
 
 // ============================================================
@@ -287,6 +287,7 @@ async function buildEnrichedContext(
 
   // Find candidate templates via embedding search
   // Use a representative subset of transactions to find candidates
+  const { findSimilarTemplates } = await import('./lib/template-embeddings')
   const representativeTransactions = transactions.slice(0, 5)
   const candidateMap = new Map<string, BookingTemplate>()
 
@@ -356,12 +357,36 @@ export const aiCategorizationExtension: Extension = {
   id: 'ai-categorization',
   name: 'AI Kategorisering',
   version: '1.0.0',
+  sector: 'general',
+  apiRoutes: aiCategorizationApiRoutes,
   eventHandlers: [
     { eventType: 'transaction.synced', handler: handleTransactionSynced },
   ],
   settingsPanel: {
     label: 'AI Kategorisering',
     path: '/settings/extensions/ai-categorization',
+  },
+  services: {
+    findSimilarTemplates: async (...args: unknown[]) => {
+      const { findSimilarTemplates } = await import('./lib/template-embeddings')
+      return findSimilarTemplates(
+        args[0] as Transaction,
+        args[1] as EntityType | undefined,
+        args[2] as number | undefined,
+        args[3] as string | undefined
+      )
+    },
+    seedAllTemplateEmbeddings: async () => {
+      const { seedAllTemplateEmbeddings } = await import('./lib/template-embeddings')
+      return seedAllTemplateEmbeddings()
+    },
+    getSchemaVersion: async () => {
+      const { getSchemaVersion } = await import('./lib/template-embeddings')
+      return getSchemaVersion()
+    },
+    categorizeTransactions: async (...args: unknown[]) => {
+      return categorizeTransactions(args[0] as string, args[1] as string[])
+    },
   },
   async onInstall(ctx) {
     await ctx.settings.set('settings', DEFAULT_SETTINGS)

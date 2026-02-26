@@ -170,6 +170,7 @@ describe('POST /api/transactions/batch-describe', () => {
 
     // Verify mapping rule was saved with user description
     expect(mockSaveUserMappingRule).toHaveBeenCalledWith(
+      expect.anything(),
       'user-1',
       'Staples',
       '6110',

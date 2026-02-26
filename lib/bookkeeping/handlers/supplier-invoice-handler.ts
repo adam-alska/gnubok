@@ -54,6 +54,7 @@ async function handleSupplierInvoiceConfirmed(
 
   try {
     const journalEntry = await createSupplierInvoiceRegistrationEntry(
+      supabase,
       userId,
       supplierInvoice,
       items as SupplierInvoiceItem[],

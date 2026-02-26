@@ -1,5 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
-import { sendEmail } from '@/lib/email/resend'
+import { getEmailService } from '@/lib/email/service'
 import {
   generateReminderEmailHtml,
   generateReminderEmailText,
@@ -110,7 +110,7 @@ export async function sendReminder(
     actionUrl
   }
 
-  const result = await sendEmail({
+  const result = await getEmailService().sendEmail({
     to: customer.email,
     subject: generateReminderEmailSubject(emailData),
     html: generateReminderEmailHtml(emailData),

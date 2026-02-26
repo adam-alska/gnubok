@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
-import { seedAllTemplateEmbeddings, getSchemaVersion } from '@/lib/bookkeeping/template-embeddings'
+import { extensionRegistry } from '@/lib/extensions/registry'
+import { ensureInitialized } from '@/lib/init'
+
+ensureInitialized()
 
 export async function POST(request: Request) {
   const authHeader = request.headers.get('authorization')
@@ -9,14 +12,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const aiExt = extensionRegistry.get('ai-categorization')
+  if (!aiExt?.services?.seedAllTemplateEmbeddings || !aiExt?.services?.getSchemaVersion) {
+    return NextResponse.json(
+      { error: 'ai-categorization extension not loaded' },
+      { status: 503 }
+    )
+  }
+
   try {
-    const { seeded, errors } = await seedAllTemplateEmbeddings()
+    const { seeded, errors } = await aiExt.services.seedAllTemplateEmbeddings()
+    const schemaVersion = await aiExt.services.getSchemaVersion()
 
     return NextResponse.json({
       success: errors.length === 0,
       seeded,
       errors,
-      schema_version: getSchemaVersion(),
+      schema_version: schemaVersion,
     })
   } catch (error) {
     return NextResponse.json(

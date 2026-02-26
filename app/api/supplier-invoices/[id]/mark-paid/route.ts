@@ -63,6 +63,7 @@ export async function POST(
   try {
     if (accountingMethod === 'cash') {
       const journalEntry = await createSupplierInvoiceCashEntry(
+        supabase,
         user.id,
         invoice as SupplierInvoice,
         (invoice.items || []) as SupplierInvoiceItem[],
@@ -72,6 +73,7 @@ export async function POST(
       if (journalEntry) journalEntryId = journalEntry.id
     } else {
       const journalEntry = await createSupplierInvoicePaymentEntry(
+        supabase,
         user.id,
         invoice as SupplierInvoice,
         paymentAmount,

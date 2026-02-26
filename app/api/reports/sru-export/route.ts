@@ -73,7 +73,7 @@ export async function GET(request: Request) {
     }
 
     // Aggregate balances by SRU code
-    const sruBalances = await aggregateBalancesBySRU(user.id, periodId)
+    const sruBalances = await aggregateBalancesBySRU(supabase, user.id, periodId)
 
     if (format === 'sru') {
       // Generate and return SRU file

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { eventBus } from '@/lib/events'
 import { createJournalEntry } from '@/lib/bookkeeping/engine'
 import { generateTrialBalance } from '@/lib/reports/trial-balance'
@@ -19,10 +19,10 @@ import type {
  * Returns blocking errors and informational warnings.
  */
 export async function validateYearEndReadiness(
+  supabase: SupabaseClient,
   userId: string,
   fiscalPeriodId: string
 ): Promise<YearEndValidation> {
-  const supabase = await createClient()
   const errors: string[] = []
   const warnings: string[] = []
 
@@ -84,7 +84,7 @@ export async function validateYearEndReadiness(
   }
 
   // Check: trial balance is balanced
-  const trialBalance = await generateTrialBalance(userId, fiscalPeriodId)
+  const trialBalance = await generateTrialBalance(supabase, userId, fiscalPeriodId)
   const trialBalanceBalanced = trialBalance.isBalanced
 
   if (!trialBalanceBalanced) {
@@ -120,10 +120,10 @@ export async function validateYearEndReadiness(
  * Shows the net result, closing account, and the journal entry lines that would be created.
  */
 export async function previewYearEndClosing(
+  supabase: SupabaseClient,
   userId: string,
   fiscalPeriodId: string
 ): Promise<YearEndPreview> {
-  const supabase = await createClient()
 
   // Get entity type to determine closing account
   const { data: settings } = await supabase
@@ -140,11 +140,11 @@ export async function previewYearEndClosing(
       : 'Årets resultat'
 
   // Get income statement for net result
-  const incomeStatement = await generateIncomeStatement(userId, fiscalPeriodId)
+  const incomeStatement = await generateIncomeStatement(supabase, userId, fiscalPeriodId)
   const netResult = incomeStatement.net_result
 
   // Get trial balance for individual account balances in class 3-8
-  const { rows } = await generateTrialBalance(userId, fiscalPeriodId)
+  const { rows } = await generateTrialBalance(supabase, userId, fiscalPeriodId)
   const resultAccounts = rows.filter(
     (r) => r.account_class >= 3 && r.account_class <= 8
   )
@@ -233,16 +233,15 @@ export async function previewYearEndClosing(
  * 7. Generate opening balances in next period
  */
 export async function executeYearEndClosing(
+  supabase: SupabaseClient,
   userId: string,
   fiscalPeriodId: string
 ): Promise<YearEndResult> {
   // 1. Validate readiness
-  const validation = await validateYearEndReadiness(userId, fiscalPeriodId)
+  const validation = await validateYearEndReadiness(supabase, userId, fiscalPeriodId)
   if (!validation.ready) {
     throw new Error(`Year-end closing not ready: ${validation.errors.join('; ')}`)
   }
-
-  const supabase = await createClient()
 
   // Fetch the period for dates
   const { data: period } = await supabase
@@ -257,14 +256,14 @@ export async function executeYearEndClosing(
   }
 
   // 2. Get closing preview
-  const preview = await previewYearEndClosing(userId, fiscalPeriodId)
+  const preview = await previewYearEndClosing(supabase, userId, fiscalPeriodId)
 
   if (preview.closingLines.length === 0) {
     throw new Error('No result accounts to close — period has no activity')
   }
 
   // 3. Create closing entry via the journal engine
-  const closingEntry = await createJournalEntry(userId, {
+  const closingEntry = await createJournalEntry(supabase, userId, {
     fiscal_period_id: fiscalPeriodId,
     entry_date: period.period_end,
     description: `Årsbokslut ${period.name}`,
@@ -285,16 +284,17 @@ export async function executeYearEndClosing(
   }
 
   // 5. Lock the period
-  await lockPeriod(userId, fiscalPeriodId)
+  await lockPeriod(supabase, userId, fiscalPeriodId)
 
   // 6. Close the period
-  await closePeriod(userId, fiscalPeriodId)
+  await closePeriod(supabase, userId, fiscalPeriodId)
 
   // 7. Create next period
-  const nextPeriod = await createNextPeriod(userId, fiscalPeriodId)
+  const nextPeriod = await createNextPeriod(supabase, userId, fiscalPeriodId)
 
   // 8. Generate opening balances in next period
   const openingBalanceEntry = await generateOpeningBalances(
+    supabase,
     userId,
     fiscalPeriodId,
     nextPeriod.id
@@ -330,11 +330,11 @@ export async function executeYearEndClosing(
  * The entry must be balanced (total debit openings = total credit openings).
  */
 export async function generateOpeningBalances(
+  supabase: SupabaseClient,
   userId: string,
   closedPeriodId: string,
   nextPeriodId: string
 ): Promise<JournalEntry> {
-  const supabase = await createClient()
 
   // Get next period for the entry date
   const { data: nextPeriod } = await supabase
@@ -349,7 +349,7 @@ export async function generateOpeningBalances(
   }
 
   // Get trial balance of closed period (includes the closing entry)
-  const { rows } = await generateTrialBalance(userId, closedPeriodId)
+  const { rows } = await generateTrialBalance(supabase, userId, closedPeriodId)
 
   // Filter to balance sheet accounts (class 1-2) with non-zero closing balance
   const balanceSheetAccounts = rows.filter(
@@ -397,7 +397,7 @@ export async function generateOpeningBalances(
   }
 
   // Create opening balance entry in next period
-  const openingEntry = await createJournalEntry(userId, {
+  const openingEntry = await createJournalEntry(supabase, userId, {
     fiscal_period_id: nextPeriodId,
     entry_date: nextPeriod.period_start,
     description: `Ingående balans ${nextPeriod.name}`,

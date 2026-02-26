@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import type { SIEExportOptions, JournalEntry, JournalEntryLine, BASAccount } from '@/types'
 
@@ -12,10 +12,10 @@ import type { SIEExportOptions, JournalEntry, JournalEntryLine, BASAccount } fro
  * Line format: #TAG field1 field2 ...
  */
 export async function generateSIEExport(
+  supabase: SupabaseClient,
   userId: string,
   options: SIEExportOptions
 ): Promise<string> {
-  const supabase = await createClient()
 
   // Fetch fiscal period
   const { data: period } = await supabase

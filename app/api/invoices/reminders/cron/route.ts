@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { processOverdueReminders } from '@/lib/invoices/reminder-processor'
-import { isResendConfigured } from '@/lib/email/resend'
+import { getEmailService } from '@/lib/email/service'
 
 // Verify cron secret for security
 function verifyCronSecret(request: Request): boolean {
@@ -31,8 +31,8 @@ export async function GET(request: Request) {
   }
 
   // Check if email service is configured
-  if (!isResendConfigured()) {
-    console.error('Resend not configured, skipping reminder cron')
+  if (!getEmailService().isConfigured()) {
+    console.error('Email service not configured, skipping reminder cron')
     return NextResponse.json({
       success: false,
       error: 'Email service not configured'

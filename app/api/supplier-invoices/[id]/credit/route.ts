@@ -103,6 +103,7 @@ export async function POST(
   if (accountingMethod === 'accrual') {
     try {
       const journalEntry = await createSupplierCreditNoteEntry(
+        supabase,
         user.id,
         creditNote as SupplierInvoice,
         creditItems as SupplierInvoiceItem[],

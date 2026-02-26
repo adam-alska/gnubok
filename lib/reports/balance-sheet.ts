@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { generateTrialBalance } from './trial-balance'
 import type { BalanceSheetReport, BalanceSheetSection, TrialBalanceRow } from '@/types'
 
@@ -9,10 +10,11 @@ import type { BalanceSheetReport, BalanceSheetSection, TrialBalanceRow } from '@
  * - Eget kapital och skulder (2xxx): Equity and liabilities
  */
 export async function generateBalanceSheet(
+  supabase: SupabaseClient,
   userId: string,
   fiscalPeriodId: string
 ): Promise<BalanceSheetReport> {
-  const { rows } = await generateTrialBalance(userId, fiscalPeriodId)
+  const { rows } = await generateTrialBalance(supabase, userId, fiscalPeriodId)
 
   // Filter to balance sheet accounts (class 1-2)
   const balanceRows = rows.filter(

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export interface ARReconciliationResult {
   ar_ledger_total: number
@@ -12,10 +12,10 @@ export interface ARReconciliationResult {
  * Account 1510 is debit-normal (asset): balance = debits - credits.
  */
 export async function generateARReconciliation(
+  supabase: SupabaseClient,
   userId: string,
   periodId: string
 ): Promise<ARReconciliationResult> {
-  const supabase = await createClient()
 
   // Get total outstanding from customer invoices
   const { data: invoices } = await supabase

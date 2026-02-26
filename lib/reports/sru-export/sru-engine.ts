@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import type { JournalEntry, JournalEntryLine } from '@/types'
 
@@ -35,10 +35,10 @@ export interface SRUCoverageStats {
  * Returns a Map of sru_code → summed amount, plus per-account detail.
  */
 export async function aggregateBalancesBySRU(
+  supabase: SupabaseClient,
   userId: string,
   fiscalPeriodId: string
 ): Promise<Map<string, SRUBalance>> {
-  const supabase = await createClient()
 
   // Fetch all posted journal entries with lines for this period
   const { data: entries, error: entriesError } = await supabase
@@ -118,8 +118,7 @@ export async function aggregateBalancesBySRU(
  * Get SRU code coverage stats for a user's chart of accounts.
  * Returns how many accounts have vs lack SRU codes.
  */
-export async function getSRUCoverage(userId: string): Promise<SRUCoverageStats> {
-  const supabase = await createClient()
+export async function getSRUCoverage(supabase: SupabaseClient, userId: string): Promise<SRUCoverageStats> {
 
   const accounts = await fetchAllRows<{ account_number: string; account_name: string; sru_code: string | null }>(({ from, to }) =>
     supabase

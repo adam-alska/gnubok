@@ -6,7 +6,7 @@
  * All operations are wrapped to ensure atomic behavior.
  */
 
-import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createJournalEntry } from '@/lib/bookkeeping/engine'
 import type {
   ParsedSIEFile,
@@ -76,10 +76,10 @@ export function generateImportPreview(
  * Check if a file has already been imported
  */
 export async function checkDuplicateImport(
+  supabase: SupabaseClient,
   userId: string,
   fileContent: string
 ): Promise<SIEImport | null> {
-  const supabase = await createClient()
   const fileHash = await calculateFileHash(fileContent)
 
   const { data } = await supabase
@@ -96,7 +96,7 @@ export async function checkDuplicateImport(
  * Create a fiscal period if one doesn't exist for the date range
  */
 async function ensureFiscalPeriod(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SupabaseClient,
   userId: string,
   startDate: Date,
   endDate: Date
@@ -160,6 +160,7 @@ async function ensureFiscalPeriod(
  * Create opening balance journal entry from IB amounts
  */
 async function createOpeningBalanceEntry(
+  supabase: SupabaseClient,
   userId: string,
   fiscalPeriodId: string,
   parsed: ParsedSIEFile,
@@ -230,7 +231,7 @@ async function createOpeningBalanceEntry(
   const fiscalYearStart = parsed.stats.fiscalYearStart
   const entryDate = fiscalYearStart ? formatDate(fiscalYearStart) : formatDate(new Date())
 
-  const entry = await createJournalEntry(userId, {
+  const entry = await createJournalEntry(supabase, userId, {
     fiscal_period_id: fiscalPeriodId,
     entry_date: entryDate,
     description: 'Ingående balanser från SIE-import',
@@ -246,13 +247,13 @@ async function createOpeningBalanceEntry(
  * Create journal entries from vouchers using batch insert for performance
  */
 async function importVouchers(
+  supabase: SupabaseClient,
   userId: string,
   fiscalPeriodId: string,
   parsed: ParsedSIEFile,
   accountMap: Map<string, string>,
   voucherSeries: string
 ): Promise<{ created: number; ids: string[]; errors: string[] }> {
-  const supabase = await createClient()
   const results = {
     created: 0,
     ids: [] as string[],
@@ -439,7 +440,7 @@ async function importVouchers(
  * Record the import in the database
  */
 async function recordImport(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SupabaseClient,
   userId: string,
   parsed: ParsedSIEFile,
   fileContent: string,
@@ -485,11 +486,10 @@ async function recordImport(
  * Save account mappings to the database for future use
  */
 export async function saveMappings(
+  supabase: SupabaseClient,
   userId: string,
   mappings: AccountMapping[]
 ): Promise<void> {
-  const supabase = await createClient()
-
   // Filter to only mapped accounts
   const mappingsToSave = mappings
     .filter((m) => m.targetAccount)
@@ -519,9 +519,7 @@ export async function saveMappings(
 /**
  * Load existing account mappings for a user
  */
-export async function loadMappings(userId: string): Promise<Map<string, AccountMapping>> {
-  const supabase = await createClient()
-
+export async function loadMappings(supabase: SupabaseClient, userId: string): Promise<Map<string, AccountMapping>> {
   const { data } = await supabase
     .from('sie_account_mappings')
     .select('*')
@@ -548,6 +546,7 @@ export async function loadMappings(userId: string): Promise<Map<string, AccountM
  * Execute the full SIE import
  */
 export async function executeSIEImport(
+  supabase: SupabaseClient,
   userId: string,
   parsed: ParsedSIEFile,
   mappings: AccountMapping[],
@@ -572,8 +571,6 @@ export async function executeSIEImport(
   }
 
   try {
-    const supabase = await createClient()
-
     // Validate all accounts are mapped
     const unmapped = mappings.filter((m) => !m.targetAccount)
     if (unmapped.length > 0) {
@@ -584,7 +581,7 @@ export async function executeSIEImport(
     }
 
     // Check for duplicate import
-    const duplicate = await checkDuplicateImport(userId, options.fileContent)
+    const duplicate = await checkDuplicateImport(supabase, userId, options.fileContent)
     if (duplicate) {
       result.errors.push(
         `This file has already been imported on ${new Date(duplicate.imported_at!).toLocaleDateString('sv-SE')}`
@@ -632,6 +629,7 @@ export async function executeSIEImport(
     // Import opening balances
     if (options.importOpeningBalances && parsed.openingBalances.length > 0 && result.fiscalPeriodId) {
       result.openingBalanceEntryId = await createOpeningBalanceEntry(
+        supabase,
         userId,
         result.fiscalPeriodId,
         parsed,
@@ -647,6 +645,7 @@ export async function executeSIEImport(
     // Import transactions (SIE4 only)
     if (options.importTransactions && parsed.vouchers.length > 0 && result.fiscalPeriodId) {
       const voucherResults = await importVouchers(
+        supabase,
         userId,
         result.fiscalPeriodId,
         parsed,
@@ -660,7 +659,7 @@ export async function executeSIEImport(
     }
 
     // Save account mappings for future use
-    await saveMappings(userId, mappings)
+    await saveMappings(supabase, userId, mappings)
 
     // Record the import
     result.importId = await recordImport(

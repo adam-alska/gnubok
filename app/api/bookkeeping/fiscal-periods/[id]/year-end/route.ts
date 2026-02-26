@@ -23,8 +23,8 @@ export async function GET(
 
   try {
     const [validation, preview] = await Promise.all([
-      validateYearEndReadiness(user.id, id),
-      previewYearEndClosing(user.id, id),
+      validateYearEndReadiness(supabase, user.id, id),
+      previewYearEndClosing(supabase, user.id, id),
     ])
 
     return NextResponse.json({ data: { validation, preview } })
@@ -52,7 +52,7 @@ export async function POST(
   }
 
   try {
-    const result = await executeYearEndClosing(user.id, id)
+    const result = await executeYearEndClosing(supabase, user.id, id)
     return NextResponse.json({ data: result })
   } catch (err) {
     return NextResponse.json(

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import type {
   VatDeclaration,
@@ -113,13 +113,13 @@ function round(value: number): number {
  * but not used — the method is already baked into journal entry timing.
  */
 export async function calculateVatDeclaration(
+  supabase: SupabaseClient,
   userId: string,
   periodType: VatPeriodType,
   year: number,
   period: number,
   _accountingMethod: AccountingMethod = 'accrual'
 ): Promise<VatDeclaration> {
-  const supabase = await createClient()
   const { start, end } = calculatePeriodDates(periodType, year, period)
 
   // Fetch all posted journal entry lines on VAT-relevant accounts for the period

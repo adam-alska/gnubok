@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import type { TrialBalanceRow } from '@/types'
 
@@ -9,6 +9,7 @@ import type { TrialBalanceRow } from '@/types'
  * filtered by fiscal period. Verifies total debits = total credits.
  */
 export async function generateTrialBalance(
+  supabase: SupabaseClient,
   userId: string,
   fiscalPeriodId: string
 ): Promise<{
@@ -17,7 +18,6 @@ export async function generateTrialBalance(
   totalCredit: number
   isBalanced: boolean
 }> {
-  const supabase = await createClient()
 
   // Get all posted journal entry lines for this period, grouped by account
   const { data, error } = await supabase.rpc('generate_trial_balance', {
@@ -27,7 +27,7 @@ export async function generateTrialBalance(
 
   if (error) {
     // Fallback: manual aggregation via SQL
-    return generateTrialBalanceManual(userId, fiscalPeriodId)
+    return generateTrialBalanceManual(supabase, userId, fiscalPeriodId)
   }
 
   if (data) {
@@ -43,13 +43,14 @@ export async function generateTrialBalance(
     }
   }
 
-  return generateTrialBalanceManual(userId, fiscalPeriodId)
+  return generateTrialBalanceManual(supabase, userId, fiscalPeriodId)
 }
 
 /**
  * Manual trial balance generation using direct queries
  */
 async function generateTrialBalanceManual(
+  supabase: SupabaseClient,
   userId: string,
   fiscalPeriodId: string
 ): Promise<{
@@ -58,7 +59,6 @@ async function generateTrialBalanceManual(
   totalCredit: number
   isBalanced: boolean
 }> {
-  const supabase = await createClient()
 
   // Get all journal entry lines for posted entries in this period
   const { data: entries, error: entriesError } = await supabase

@@ -70,7 +70,7 @@ export default function InboxUploadZone({
           }
         }
 
-        const res = await fetch('/api/extensions/invoice-inbox/inbox', {
+        const res = await fetch('/api/extensions/ext/invoice-inbox/inbox', {
           method: 'POST',
           body: formData,
         })

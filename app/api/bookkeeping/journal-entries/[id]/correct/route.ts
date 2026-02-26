@@ -24,7 +24,7 @@ export async function POST(
   const body = validation.data
 
   try {
-    const result = await correctEntry(user.id, id, body.lines)
+    const result = await correctEntry(supabase, user.id, id, body.lines)
     return NextResponse.json({ data: result })
   } catch (err) {
     return NextResponse.json(

@@ -15,7 +15,7 @@ export async function POST(
   }
 
   try {
-    const period = await closePeriod(user.id, id)
+    const period = await closePeriod(supabase, user.id, id)
     return NextResponse.json({ data: period })
   } catch (err) {
     return NextResponse.json(

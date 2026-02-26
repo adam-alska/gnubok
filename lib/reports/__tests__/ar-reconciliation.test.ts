@@ -20,19 +20,18 @@ function makeBuilder() {
 function makeClient() {
   return {
     from: vi.fn().mockImplementation(() => makeBuilder()),
-  }
+  } as any
 }
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => makeClient()),
-}))
-
 import { generateARReconciliation } from '../ar-reconciliation'
+
+let supabase: ReturnType<typeof makeClient>
 
 beforeEach(() => {
   vi.clearAllMocks()
   resultIdx = 0
   results = []
+  supabase = makeClient()
 })
 
 describe('generateARReconciliation', () => {
@@ -56,7 +55,7 @@ describe('generateARReconciliation', () => {
       },
     ]
 
-    const result = await generateARReconciliation('user-1', 'period-1')
+    const result = await generateARReconciliation(supabase, 'user-1', 'period-1')
 
     // AR: (5000-2000) + (3000-0) = 6000
     expect(result.ar_ledger_total).toBe(6000)
@@ -85,7 +84,7 @@ describe('generateARReconciliation', () => {
       },
     ]
 
-    const result = await generateARReconciliation('user-1', 'period-1')
+    const result = await generateARReconciliation(supabase, 'user-1', 'period-1')
 
     expect(result.ar_ledger_total).toBe(5000)
     expect(result.account_1510_balance).toBe(6000)
@@ -99,7 +98,7 @@ describe('generateARReconciliation', () => {
       { data: [], error: null },
     ]
 
-    const result = await generateARReconciliation('user-1', 'period-1')
+    const result = await generateARReconciliation(supabase, 'user-1', 'period-1')
 
     expect(result.ar_ledger_total).toBe(0)
     expect(result.account_1510_balance).toBe(0)
@@ -118,7 +117,7 @@ describe('generateARReconciliation', () => {
       },
     ]
 
-    const result = await generateARReconciliation('user-1', 'period-1')
+    const result = await generateARReconciliation(supabase, 'user-1', 'period-1')
 
     expect(result.ar_ledger_total).toBe(0)
     expect(result.account_1510_balance).toBe(3000)
@@ -139,7 +138,7 @@ describe('generateARReconciliation', () => {
       },
     ]
 
-    const result = await generateARReconciliation('user-1', 'period-1')
+    const result = await generateARReconciliation(supabase, 'user-1', 'period-1')
 
     // Balance = debits - credits = 10000 - 4000 - 3000 = 3000
     expect(result.account_1510_balance).toBe(3000)
@@ -161,7 +160,7 @@ describe('generateARReconciliation', () => {
       },
     ]
 
-    const result = await generateARReconciliation('user-1', 'period-1')
+    const result = await generateARReconciliation(supabase, 'user-1', 'period-1')
 
     expect(result.ar_ledger_total).toBe(66.77)
     expect(result.account_1510_balance).toBe(66.77)

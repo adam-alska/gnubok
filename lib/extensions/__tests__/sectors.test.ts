@@ -1,3 +1,40 @@
+import { resolve, join, dirname } from 'path'
+import { readdirSync, readFileSync } from 'fs'
+
+/**
+ * Build EXTENSION_DEFINITIONS from manifest.json files so the test
+ * is independent of extensions.config.json.
+ */
+function buildDefinitionsFromManifests(): Record<string, unknown[]> {
+  const extensionsDir = resolve(__dirname, '../../../extensions')
+  const result: Record<string, unknown[]> = {}
+
+  function walk(dir: string) {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const fullPath = join(dir, entry.name)
+      if (entry.isDirectory()) {
+        walk(fullPath)
+      } else if (entry.name === 'manifest.json') {
+        const manifest = JSON.parse(readFileSync(fullPath, 'utf-8'))
+        const sector: string = manifest.sector
+        if (!result[sector]) result[sector] = []
+        result[sector].push({
+          slug: manifest.id,
+          sector: manifest.sector,
+          ...manifest.definition,
+        })
+      }
+    }
+  }
+
+  walk(extensionsDir)
+  return result
+}
+
+vi.mock('@/lib/extensions/_generated/sector-definitions', () => ({
+  EXTENSION_DEFINITIONS: buildDefinitionsFromManifests(),
+}))
+
 import {
   SECTORS,
   getSector,
@@ -7,12 +44,12 @@ import {
 } from '../sectors'
 
 describe('sectors registry', () => {
-  it('should have 7 sectors', () => {
-    expect(SECTORS.length).toBe(7)
+  it('should have 1 sector', () => {
+    expect(SECTORS.length).toBe(1)
   })
 
-  it('should have 24 total extensions', () => {
-    expect(getAllExtensions().length).toBe(24)
+  it('should have 9 total extensions', () => {
+    expect(getAllExtensions().length).toBe(9)
   })
 
   it('should have unique slugs within each sector', () => {
@@ -30,10 +67,10 @@ describe('sectors registry', () => {
   })
 
   it('getSector returns correct sector', () => {
-    const sector = getSector('restaurant')
+    const sector = getSector('general')
     expect(sector).toBeDefined()
-    expect(sector!.slug).toBe('restaurant')
-    expect(sector!.name).toBe('Restaurang & Café')
+    expect(sector!.slug).toBe('general')
+    expect(sector!.name).toBe('Generella verktyg')
   })
 
   it('getSector returns undefined for unknown slug', () => {
@@ -42,21 +79,21 @@ describe('sectors registry', () => {
   })
 
   it('getExtensionDefinition returns correct extension', () => {
-    const ext = getExtensionDefinition('restaurant', 'food-cost')
+    const ext = getExtensionDefinition('general', 'ai-chat')
     expect(ext).toBeDefined()
-    expect(ext!.slug).toBe('food-cost')
-    expect(ext!.name).toBe('Food Cost %')
-    expect(ext!.sector).toBe('restaurant')
+    expect(ext!.slug).toBe('ai-chat')
+    expect(ext!.name).toBe('AI-assistent')
+    expect(ext!.sector).toBe('general')
   })
 
   it('getExtensionDefinition returns undefined for unknown extension', () => {
-    const ext = getExtensionDefinition('restaurant', 'nonexistent')
+    const ext = getExtensionDefinition('general', 'nonexistent')
     expect(ext).toBeUndefined()
   })
 
   it('getExtensionsBySector returns extensions for a sector', () => {
-    const extensions = getExtensionsBySector('restaurant')
-    expect(extensions.length).toBe(4)
+    const extensions = getExtensionsBySector('general')
+    expect(extensions.length).toBe(9)
   })
 
   it('all extensions have required fields', () => {

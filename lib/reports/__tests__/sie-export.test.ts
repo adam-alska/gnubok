@@ -20,19 +20,18 @@ function makeBuilder() {
 function makeClient() {
   return {
     from: vi.fn().mockImplementation(() => makeBuilder()),
-  }
+  } as any
 }
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => makeClient()),
-}))
-
 import { generateSIEExport } from '../sie-export'
+
+let supabase: ReturnType<typeof makeClient>
 
 beforeEach(() => {
   vi.clearAllMocks()
   resultIdx = 0
   results = []
+  supabase = makeClient()
 })
 
 const baseOptions = {
@@ -49,7 +48,7 @@ describe('generateSIEExport', () => {
       { data: null, error: null },
     ]
 
-    await expect(generateSIEExport('user-1', baseOptions))
+    await expect(generateSIEExport(supabase, 'user-1', baseOptions))
       .rejects.toThrow('Fiscal period not found')
   })
 
@@ -67,7 +66,7 @@ describe('generateSIEExport', () => {
       { data: [], error: null },
     ]
 
-    const output = await generateSIEExport('user-1', baseOptions)
+    const output = await generateSIEExport(supabase, 'user-1', baseOptions)
     const lines = output.split('\r\n')
 
     expect(lines[0]).toBe('#FLAGGA 0')
@@ -89,7 +88,7 @@ describe('generateSIEExport', () => {
       { data: [], error: null },
     ]
 
-    const output = await generateSIEExport('user-1', {
+    const output = await generateSIEExport(supabase, 'user-1', {
       ...baseOptions,
       org_number: null,
     })
@@ -116,7 +115,7 @@ describe('generateSIEExport', () => {
       { data: [], error: null },
     ]
 
-    const output = await generateSIEExport('user-1', baseOptions)
+    const output = await generateSIEExport(supabase, 'user-1', baseOptions)
 
     expect(output).toContain('#KONTO 1930 "Företagskonto"')
     expect(output).toContain('#SRU 1930 7301')
@@ -155,7 +154,7 @@ describe('generateSIEExport', () => {
       { data: [], error: null },
     ]
 
-    const output = await generateSIEExport('user-1', baseOptions)
+    const output = await generateSIEExport(supabase, 'user-1', baseOptions)
 
     expect(output).toContain('#VER "A" 1 20240315 "Sale invoice"')
     expect(output).toContain('{')
@@ -186,7 +185,7 @@ describe('generateSIEExport', () => {
       },
     ]
 
-    const output = await generateSIEExport('user-1', baseOptions)
+    const output = await generateSIEExport(supabase, 'user-1', baseOptions)
 
     expect(output).toContain('#DIM 1 "Kostnadsställe"')
     expect(output).toContain('#DIM 6 "Projekt"')
@@ -219,7 +218,7 @@ describe('generateSIEExport', () => {
       { data: [{ code: 'P001', name: 'Projekt Alpha', is_active: true }], error: null },
     ]
 
-    const output = await generateSIEExport('user-1', baseOptions)
+    const output = await generateSIEExport(supabase, 'user-1', baseOptions)
 
     expect(output).toContain('\t#TRANS 5010 {1 "CC1" 6 "P001"} 8000.00 20240315')
     expect(output).toContain('\t#TRANS 1930 {} -8000.00 20240315')
@@ -251,7 +250,7 @@ describe('generateSIEExport', () => {
       { data: [], error: null },
     ]
 
-    const output = await generateSIEExport('user-1', baseOptions)
+    const output = await generateSIEExport(supabase, 'user-1', baseOptions)
 
     // Account 1510 (class 1) → #UB, balance = 1250 - 0 = 1250
     expect(output).toContain('#UB 0 1510 1250.00')
@@ -286,7 +285,7 @@ describe('generateSIEExport', () => {
       { data: [], error: null },
     ]
 
-    const output = await generateSIEExport('user-1', baseOptions)
+    const output = await generateSIEExport(supabase, 'user-1', baseOptions)
 
     expect(output).toContain('#VER "A" 1 20240115 "Invoice for \\"consulting\\""')
   })
@@ -300,7 +299,7 @@ describe('generateSIEExport', () => {
       { data: [], error: null },
     ]
 
-    const output = await generateSIEExport('user-1', baseOptions)
+    const output = await generateSIEExport(supabase, 'user-1', baseOptions)
 
     // Every line should end with \r\n
     expect(output).toContain('\r\n')
@@ -322,7 +321,7 @@ describe('generateSIEExport', () => {
       { data: [], error: null },
     ]
 
-    const output = await generateSIEExport('user-1', baseOptions)
+    const output = await generateSIEExport(supabase, 'user-1', baseOptions)
 
     expect(output).not.toContain('#VER')
     expect(output).not.toContain('#TRANS')
@@ -337,7 +336,7 @@ describe('generateSIEExport', () => {
       { data: [], error: null },
     ]
 
-    const output = await generateSIEExport('user-1', baseOptions)
+    const output = await generateSIEExport(supabase, 'user-1', baseOptions)
 
     expect(output).not.toContain('#DIM')
     expect(output).not.toContain('#OBJEKT')

@@ -45,7 +45,7 @@ export default function InvoiceInboxWorkspace({ userId }: WorkspaceComponentProp
 
   const fetchItems = useCallback(async () => {
     try {
-      const res = await fetch('/api/extensions/invoice-inbox/inbox')
+      const res = await fetch('/api/extensions/ext/invoice-inbox/inbox')
       if (res.ok) {
         const { data } = await res.json()
         setItems(data ?? [])
@@ -59,7 +59,7 @@ export default function InvoiceInboxWorkspace({ userId }: WorkspaceComponentProp
 
   const fetchSettings = useCallback(async () => {
     try {
-      const res = await fetch('/api/extensions/invoice-inbox/settings')
+      const res = await fetch('/api/extensions/ext/invoice-inbox/settings')
       if (res.ok) {
         const { data } = await res.json()
         if (data) setSettings(data)
@@ -99,7 +99,7 @@ export default function InvoiceInboxWorkspace({ userId }: WorkspaceComponentProp
     for (let i = 0; i < 20; i++) {
       await new Promise((r) => setTimeout(r, 3000))
       try {
-        const res = await fetch(`/api/extensions/invoice-inbox/inbox/${itemId}`)
+        const res = await fetch(`/api/extensions/ext/invoice-inbox/inbox/${itemId}`)
         if (!res.ok) continue
         const { data } = await res.json()
         if (data && data.status !== 'processing') {
@@ -122,7 +122,7 @@ export default function InvoiceInboxWorkspace({ userId }: WorkspaceComponentProp
     const body: Record<string, string> = {}
     if (supplierId) body.supplier_id = supplierId
 
-    const res = await fetch(`/api/extensions/invoice-inbox/inbox/${itemId}/confirm`, {
+    const res = await fetch(`/api/extensions/ext/invoice-inbox/inbox/${itemId}/confirm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -138,7 +138,7 @@ export default function InvoiceInboxWorkspace({ userId }: WorkspaceComponentProp
   }
 
   async function handleReject(itemId: string) {
-    const res = await fetch(`/api/extensions/invoice-inbox/inbox/${itemId}`, {
+    const res = await fetch(`/api/extensions/ext/invoice-inbox/inbox/${itemId}`, {
       method: 'DELETE',
     })
 
@@ -156,7 +156,7 @@ export default function InvoiceInboxWorkspace({ userId }: WorkspaceComponentProp
     )
     setSelectedItem(null)
 
-    const res = await fetch(`/api/extensions/invoice-inbox/inbox/${itemId}/process`, {
+    const res = await fetch(`/api/extensions/ext/invoice-inbox/inbox/${itemId}/process`, {
       method: 'POST',
     })
 
@@ -172,7 +172,7 @@ export default function InvoiceInboxWorkspace({ userId }: WorkspaceComponentProp
   }
 
   async function handleSaveSettings(updated: InvoiceInboxSettings) {
-    const res = await fetch('/api/extensions/invoice-inbox/settings', {
+    const res = await fetch('/api/extensions/ext/invoice-inbox/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updated),

@@ -68,6 +68,7 @@ export async function POST(
   if (isRealInvoice && accountingMethod === 'accrual') {
     try {
       const journalEntry = await createInvoiceJournalEntry(
+        supabase,
         user.id,
         invoice as Invoice,
         (settings?.entity_type as EntityType) || 'enskild_firma'

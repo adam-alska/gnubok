@@ -42,7 +42,7 @@ export default function ReceiptsPage() {
     try {
       const [receiptsRes, queueRes] = await Promise.all([
         fetch('/api/extensions/receipt-ocr'),
-        fetch('/api/extensions/receipt-ocr/queue'),
+        fetch('/api/extensions/ext/receipt-ocr/queue'),
       ])
 
       const [receiptsData, queueData] = await Promise.all([
@@ -109,7 +109,7 @@ export default function ReceiptsPage() {
   }) => {
     if (!selectedReceipt) return
 
-    const response = await fetch(`/api/extensions/receipt-ocr/${selectedReceipt.id}/confirm`, {
+    const response = await fetch(`/api/extensions/ext/receipt-ocr/${selectedReceipt.id}/confirm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -129,7 +129,7 @@ export default function ReceiptsPage() {
   const handleMatchReceipt = async (transactionId: string, confidence: number) => {
     if (!selectedReceipt) return
 
-    const response = await fetch(`/api/extensions/receipt-ocr/${selectedReceipt.id}/match`, {
+    const response = await fetch(`/api/extensions/ext/receipt-ocr/${selectedReceipt.id}/match`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ transaction_id: transactionId, match_confidence: confidence }),

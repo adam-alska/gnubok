@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 
 export interface JournalRegisterLine {
@@ -33,10 +33,10 @@ export interface JournalRegisterReport {
  * BFL 5 kap. 1 § — registreringsordning: all vouchers in chronological registration order.
  */
 export async function generateJournalRegister(
+  supabase: SupabaseClient,
   userId: string,
   periodId: string
 ): Promise<JournalRegisterReport> {
-  const supabase = await createClient()
 
   // Get fiscal period dates
   const { data: period } = await supabase

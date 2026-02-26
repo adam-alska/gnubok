@@ -21,19 +21,18 @@ function makeClient() {
   return {
     from: vi.fn().mockImplementation(() => makeBuilder()),
     rpc: vi.fn().mockImplementation(async () => results[resultIdx++] ?? { data: null, error: null }),
-  }
+  } as any
 }
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => makeClient()),
-}))
-
 import { generateGeneralLedger } from '../general-ledger'
+
+let supabase: ReturnType<typeof makeClient>
 
 beforeEach(() => {
   vi.clearAllMocks()
   resultIdx = 0
   results = []
+  supabase = makeClient()
 })
 
 describe('generateGeneralLedger', () => {
@@ -43,7 +42,7 @@ describe('generateGeneralLedger', () => {
       { data: null, error: null },
     ]
 
-    const report = await generateGeneralLedger('user-1', 'period-1')
+    const report = await generateGeneralLedger(supabase, 'user-1', 'period-1')
     expect(report.accounts).toEqual([])
     expect(report.period).toEqual({ start: '', end: '' })
   })
@@ -56,7 +55,7 @@ describe('generateGeneralLedger', () => {
       { data: [], error: null },
     ]
 
-    const report = await generateGeneralLedger('user-1', 'period-1')
+    const report = await generateGeneralLedger(supabase, 'user-1', 'period-1')
     expect(report.accounts).toEqual([])
     expect(report.period).toEqual({ start: '2024-01-01', end: '2024-12-31' })
   })
@@ -98,7 +97,7 @@ describe('generateGeneralLedger', () => {
       { data: [], error: null },
     ]
 
-    const report = await generateGeneralLedger('user-1', 'period-1')
+    const report = await generateGeneralLedger(supabase, 'user-1', 'period-1')
 
     expect(report.accounts).toHaveLength(4)
     expect(report.accounts.map((a) => a.account_number)).toEqual(['1510', '1930', '2611', '3001'])
@@ -157,7 +156,7 @@ describe('generateGeneralLedger', () => {
       },
     ]
 
-    const report = await generateGeneralLedger('user-1', 'period-2')
+    const report = await generateGeneralLedger(supabase, 'user-1', 'period-2')
 
     const acc1930 = report.accounts.find((a) => a.account_number === '1930')!
     expect(acc1930.opening_balance).toBe(10000)
@@ -191,7 +190,7 @@ describe('generateGeneralLedger', () => {
       { data: [], error: null },
     ]
 
-    const report = await generateGeneralLedger('user-1', 'period-1', '1500', '1999')
+    const report = await generateGeneralLedger(supabase, 'user-1', 'period-1', '1500', '1999')
 
     // Only accounts in 1500–1999 range
     expect(report.accounts.map((a) => a.account_number)).toEqual(['1510', '1930'])
@@ -225,7 +224,7 @@ describe('generateGeneralLedger', () => {
       { data: [], error: null },
     ]
 
-    const report = await generateGeneralLedger('user-1', 'period-1')
+    const report = await generateGeneralLedger(supabase, 'user-1', 'period-1')
     const acc = report.accounts[0]
 
     // e3 (Jan 5) first, then e1 (Jan 10, #1), then e2 (Jan 10, #2)
@@ -253,7 +252,7 @@ describe('generateGeneralLedger', () => {
       { data: [], error: null },
     ]
 
-    const report = await generateGeneralLedger('user-1', 'period-1')
+    const report = await generateGeneralLedger(supabase, 'user-1', 'period-1')
     const acc = report.accounts[0]
     expect(acc.total_debit).toBe(33.33)
     expect(acc.closing_balance).toBe(33.33)

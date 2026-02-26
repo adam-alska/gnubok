@@ -3,9 +3,6 @@ import { createMockSupabase, makeTransaction } from '@/tests/helpers'
 
 // Mock Supabase
 const { supabase: mockSupabase, mockResult } = createMockSupabase()
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn().mockResolvedValue(mockSupabase),
-}))
 
 // Mock booking-templates (needed by evaluateMappingRules)
 vi.mock('../booking-templates', () => ({
@@ -24,7 +21,7 @@ describe('mapping-engine', () => {
 
       mockResult({ data: null, error: null })
 
-      await saveUserMappingRule('user-1', 'ICA Maxi', '5410', '1930', false)
+      await saveUserMappingRule(mockSupabase as never, 'user-1', 'ICA Maxi', '5410', '1930', false)
 
       // Verify insert was called via supabase.from().insert()
       expect(mockSupabase.from).toHaveBeenCalledWith('mapping_rules')
@@ -36,6 +33,7 @@ describe('mapping-engine', () => {
       mockResult({ data: null, error: null })
 
       await saveUserMappingRule(
+        mockSupabase as never,
         'user-1',
         'Restaurant XYZ',
         '6071',
@@ -56,7 +54,7 @@ describe('mapping-engine', () => {
 
       // Should not throw
       await expect(
-        saveUserMappingRule('user-1', 'ICA Maxi', '5410', '1930', false)
+        saveUserMappingRule(mockSupabase as never, 'user-1', 'ICA Maxi', '5410', '1930', false)
       ).resolves.toBeUndefined()
     })
 
@@ -66,7 +64,7 @@ describe('mapping-engine', () => {
       mockResult({ data: null, error: null })
 
       // Merchant name with regex special chars
-      await saveUserMappingRule('user-1', 'Test (Pty) Ltd.', '5410', '1930', false)
+      await saveUserMappingRule(mockSupabase as never, 'user-1', 'Test (Pty) Ltd.', '5410', '1930', false)
 
       expect(mockSupabase.from).toHaveBeenCalledWith('mapping_rules')
     })
@@ -79,7 +77,7 @@ describe('mapping-engine', () => {
       const tx = makeTransaction({ amount: -100, merchant_name: 'Unknown' })
       mockResult({ data: [], error: null })
 
-      const result = await evaluateMappingRules('user-1', tx)
+      const result = await evaluateMappingRules(mockSupabase as never, 'user-1', tx)
 
       expect(result.debit_account).toBe('6991')
       expect(result.credit_account).toBe('1930')
@@ -131,7 +129,7 @@ describe('mapping-engine', () => {
         error: null,
       })
 
-      const result = await evaluateMappingRules('user-1', tx)
+      const result = await evaluateMappingRules(mockSupabase as never, 'user-1', tx)
 
       expect(result.debit_account).toBe('5410')
       expect(result.credit_account).toBe('1930')

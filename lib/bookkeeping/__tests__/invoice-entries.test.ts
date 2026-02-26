@@ -6,7 +6,7 @@ import type { Invoice, InvoiceItem, CreateJournalEntryInput } from '@/types'
 vi.mock('../engine', () => ({
   findFiscalPeriod: vi.fn().mockResolvedValue('period-1'),
   createJournalEntry: vi.fn().mockImplementation(
-    async (_userId: string, input: CreateJournalEntryInput) => ({
+    async (_supabase: unknown, _userId: string, input: CreateJournalEntryInput) => ({
       id: 'entry-1',
       ...input,
       lines: input.lines,
@@ -168,10 +168,10 @@ describe('createInvoiceJournalEntry — per-line VAT', () => {
       ],
     })
 
-    await createInvoiceJournalEntry('user-1', invoice)
+    await createInvoiceJournalEntry(null as never, 'user-1', invoice)
 
     expect(mockedCreateEntry).toHaveBeenCalledOnce()
-    const input = mockedCreateEntry.mock.calls[0][1]
+    const input = mockedCreateEntry.mock.calls[0][2]
 
     // Should have 3 lines: 1510 debit, 3001 credit, 2611 credit
     expect(input.lines).toHaveLength(3)
@@ -207,10 +207,10 @@ describe('createInvoiceJournalEntry — per-line VAT', () => {
     invoice.vat_amount = 198
     invoice.total = 1198
 
-    await createInvoiceJournalEntry('user-1', invoice)
+    await createInvoiceJournalEntry(null as never, 'user-1', invoice)
 
     expect(mockedCreateEntry).toHaveBeenCalledOnce()
-    const input = mockedCreateEntry.mock.calls[0][1]
+    const input = mockedCreateEntry.mock.calls[0][2]
 
     // Should have 5 lines: 1510, 3001(25%), 2611(25%), 3002(12%), 2621(12%)
     expect(input.lines).toHaveLength(5)
@@ -248,10 +248,10 @@ describe('createInvoiceJournalEntry — per-line VAT', () => {
       ],
     })
 
-    await createInvoiceJournalEntry('user-1', invoice)
+    await createInvoiceJournalEntry(null as never, 'user-1', invoice)
 
     expect(mockedCreateEntry).toHaveBeenCalledOnce()
-    const input = mockedCreateEntry.mock.calls[0][1]
+    const input = mockedCreateEntry.mock.calls[0][2]
 
     // Should have 2 lines: 1510 debit, 3308 credit (no VAT)
     expect(input.lines).toHaveLength(2)
@@ -285,9 +285,9 @@ describe('createInvoiceJournalEntry — per-line VAT', () => {
     invoice.vat_amount = 378
     invoice.total = 2378
 
-    await createInvoiceJournalEntry('user-1', invoice)
+    await createInvoiceJournalEntry(null as never, 'user-1', invoice)
 
-    const input = mockedCreateEntry.mock.calls[0][1]
+    const input = mockedCreateEntry.mock.calls[0][2]
 
     const totalDebit = input.lines.reduce((sum, l) => sum + l.debit_amount, 0)
     const totalCredit = input.lines.reduce((sum, l) => sum + l.credit_amount, 0)
@@ -315,10 +315,10 @@ describe('createCreditNoteJournalEntry — per-line VAT', () => {
       ],
     })
 
-    await createCreditNoteJournalEntry('user-1', creditNote)
+    await createCreditNoteJournalEntry(null as never, 'user-1', creditNote)
 
     expect(mockedCreateEntry).toHaveBeenCalledOnce()
-    const input = mockedCreateEntry.mock.calls[0][1]
+    const input = mockedCreateEntry.mock.calls[0][2]
 
     // Revenue and VAT lines should be debits (reversed)
     const debit3001 = input.lines.find((l) => l.account_number === '3001')
@@ -363,10 +363,10 @@ describe('createInvoiceCashEntry — per-line VAT', () => {
       ],
     })
 
-    await createInvoiceCashEntry('user-1', invoice, '2024-07-01')
+    await createInvoiceCashEntry(null as never, 'user-1', invoice, '2024-07-01')
 
     expect(mockedCreateEntry).toHaveBeenCalledOnce()
-    const input = mockedCreateEntry.mock.calls[0][1]
+    const input = mockedCreateEntry.mock.calls[0][2]
 
     // Debit 1930 (bank account) instead of 1510
     const debit1930 = input.lines.find((l) => l.account_number === '1930')

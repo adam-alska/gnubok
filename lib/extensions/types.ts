@@ -10,7 +10,7 @@ import type { EntityType, RawTransaction, IngestResult } from '@/types'
 export type ExtensionCategory = 'accounting' | 'reports' | 'import' | 'operations'
 
 /** Sector slugs for extension organization */
-export type SectorSlug = 'general' | 'restaurant' | 'construction' | 'hotel' | 'tech' | 'ecommerce' | 'export'
+export type SectorSlug = 'general'
 
 /** How an extension gets its data */
 export type ExtensionDataPattern = 'core' | 'manual' | 'both'
@@ -176,6 +176,7 @@ export interface Extension {
   id: string
   name: string
   version: string
+  sector?: SectorSlug
 
   // Surfaces
   routes?: RouteDefinition[]
@@ -187,6 +188,10 @@ export interface Extension {
   settingsPanel?: SettingsPanelDefinition
   taxCodes?: TaxCodeDefinition[]
   dimensionTypes?: DimensionDefinition[]
+
+  /** Named services this extension provides to core via registry lookup */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  services?: Record<string, (...args: any[]) => Promise<any>>
 
   // Lifecycle hooks
   onInstall?(ctx: ExtensionContext): Promise<void>

@@ -70,7 +70,7 @@ export default function ReceiptInboxDetail({
     if (!item?.linked_receipt_id) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/extensions/receipt-ocr/${item.linked_receipt_id}`)
+      const res = await fetch(`/api/extensions/ext/receipt-ocr/${item.linked_receipt_id}`)
       if (res.ok) {
         const { data } = await res.json()
         if (data?.line_items) {
@@ -129,7 +129,7 @@ export default function ReceiptInboxDetail({
       }
 
       const res = await fetch(
-        `/api/extensions/invoice-inbox/inbox/${item.id}/confirm-receipt`,
+        `/api/extensions/ext/invoice-inbox/inbox/${item.id}/confirm-receipt`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

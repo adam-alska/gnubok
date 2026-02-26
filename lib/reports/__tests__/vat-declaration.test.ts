@@ -20,12 +20,8 @@ function makeBuilder() {
 function makeClient() {
   return {
     from: vi.fn().mockImplementation(() => makeBuilder()),
-  }
+  } as any
 }
-
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => makeClient()),
-}))
 
 import {
   calculatePeriodDates,
@@ -35,10 +31,13 @@ import {
 } from '../vat-declaration'
 import type { VatDeclaration } from '@/types'
 
+let supabase: ReturnType<typeof makeClient>
+
 beforeEach(() => {
   vi.clearAllMocks()
   resultIdx = 0
   results = []
+  supabase = makeClient()
 })
 
 // ============================================================
@@ -168,7 +167,7 @@ describe('calculateVatDeclaration', () => {
       { data: [], error: null },
     ]
 
-    const result = await calculateVatDeclaration('user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
 
     expect(result.rutor.ruta05).toBe(0)
     expect(result.rutor.ruta06).toBe(0)
@@ -195,7 +194,7 @@ describe('calculateVatDeclaration', () => {
       { data: [{ source_type: 'invoice_created' }, { source_type: 'invoice_created' }], error: null },
     ]
 
-    const result = await calculateVatDeclaration('user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
 
     expect(result.rutor.ruta05).toBe(2500)
     expect(result.rutor.ruta06).toBe(600)
@@ -218,7 +217,7 @@ describe('calculateVatDeclaration', () => {
       { data: [{ source_type: 'bank_transaction' }, { source_type: 'bank_transaction' }], error: null },
     ]
 
-    const result = await calculateVatDeclaration('user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
 
     expect(result.rutor.ruta48).toBe(370)
     expect(result.transactionCount).toBe(2)
@@ -236,7 +235,7 @@ describe('calculateVatDeclaration', () => {
       { data: [], error: null },
     ]
 
-    const result = await calculateVatDeclaration('user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
 
     // Both 2641 and 2645 debit balances sum into ruta48
     expect(result.rutor.ruta48).toBe(700)
@@ -254,7 +253,7 @@ describe('calculateVatDeclaration', () => {
       { data: [], error: null },
     ]
 
-    const result = await calculateVatDeclaration('user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
 
     expect(result.rutor.ruta39).toBe(8000)
     expect(result.rutor.ruta40).toBe(12000)
@@ -276,7 +275,7 @@ describe('calculateVatDeclaration', () => {
       { data: [{ source_type: 'invoice_created' }, { source_type: 'credit_note' }], error: null },
     ]
 
-    const result = await calculateVatDeclaration('user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
 
     // Net: 2500 - 625 = 1875 output VAT, 10000 - 2500 = 7500 revenue
     expect(result.rutor.ruta05).toBe(1875)
@@ -297,7 +296,7 @@ describe('calculateVatDeclaration', () => {
       { data: [], error: null },
     ]
 
-    const result = await calculateVatDeclaration('user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
 
     expect(result.rutor.ruta05).toBe(2500)
     expect(result.rutor.ruta48).toBe(350)
@@ -316,7 +315,7 @@ describe('calculateVatDeclaration', () => {
       { data: [], error: null },
     ]
 
-    const result = await calculateVatDeclaration('user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
 
     expect(result.rutor.ruta49).toBe(-2500) // 500 - 3000
   })
@@ -328,7 +327,7 @@ describe('calculateVatDeclaration', () => {
     ]
 
     // Should not throw — parameter accepted but not used
-    const result = await calculateVatDeclaration('user-1', 'monthly', 2024, 1, 'cash')
+    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1, 'cash')
     expect(result.rutor.ruta49).toBe(0)
   })
 
@@ -353,7 +352,7 @@ describe('calculateVatDeclaration', () => {
       { data: [], error: null },
     ]
 
-    const result = await calculateVatDeclaration('user-1', 'quarterly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'user-1', 'quarterly', 2024, 1)
 
     expect(result.rutor.ruta05).toBe(2500)
     expect(result.rutor.ruta06).toBe(600)

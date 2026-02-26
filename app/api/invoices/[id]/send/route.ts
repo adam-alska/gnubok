@@ -4,7 +4,7 @@ import { eventBus } from '@/lib/events'
 import { ensureInitialized } from '@/lib/init'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { InvoicePDF } from '@/lib/invoices/pdf-template'
-import { sendEmail, isResendConfigured } from '@/lib/email/resend'
+import { getEmailService } from '@/lib/email/service'
 import {
   generateInvoiceEmailHtml,
   generateInvoiceEmailText,
@@ -29,10 +29,11 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Check if Resend is configured
-  if (!isResendConfigured()) {
+  // Check if email is configured
+  const emailService = getEmailService()
+  if (!emailService.isConfigured()) {
     return NextResponse.json(
-      { error: 'E-posttjänsten är inte konfigurerad. Kontakta support.' },
+      { error: 'E-posttjänsten är inte konfigurerad. Aktivera e-posttillägget i inställningar.' },
       { status: 503 }
     )
   }
@@ -129,7 +130,7 @@ export async function POST(
     }
 
     // Send email
-    const result = await sendEmail({
+    const result = await emailService.sendEmail({
       to: customer.email,
       subject: generateInvoiceEmailSubject(emailData),
       html: generateInvoiceEmailHtml(emailData),
@@ -171,6 +172,7 @@ export async function POST(
     if (isRealInvoice && ((company as Record<string, unknown>).accounting_method === 'accrual' || !(company as Record<string, unknown>).accounting_method)) {
       try {
         const journalEntry = await createInvoiceJournalEntry(
+          supabase,
           user.id,
           invoice as Invoice,
           (company as CompanySettings).entity_type
@@ -192,7 +194,7 @@ export async function POST(
     if (isRealInvoice) {
       try {
         const pdfArrayBuffer = new Uint8Array(pdfBuffer).buffer as ArrayBuffer
-        await uploadDocument(user.id, {
+        await uploadDocument(supabase, user.id, {
           name: filename,
           buffer: pdfArrayBuffer,
           type: 'application/pdf',

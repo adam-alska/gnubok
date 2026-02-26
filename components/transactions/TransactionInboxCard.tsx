@@ -55,8 +55,6 @@ export default function TransactionInboxCard({
   const topSuggestion = suggestions?.[0]
   const isUncategorized = transaction.is_business === null && !transaction.journal_entry_id
   const showCheckbox = isBatchMode && isUncategorized
-  const hasWeakSuggestions = !topSuggestion || topSuggestion.confidence < 0.55
-  const showTemplateFallback = hasWeakSuggestions && templateSuggestions && templateSuggestions.length > 0
   const hasDocumentMatch = !!transaction.matched_inbox_item
 
   function handleSuggestionClick(suggestion: SuggestedCategory) {
@@ -217,25 +215,6 @@ export default function TransactionInboxCard({
                     </span>
                   )}
                 </Button>
-              )}
-
-              {/* Fallback templates when no strong suggestion */}
-              {showTemplateFallback && !hasInvoiceMatch && (
-                <>
-                  <span className="text-[10px] text-muted-foreground">Osaker? Prova:</span>
-                  {templateSuggestions!.slice(0, 3).map((tmpl) => (
-                    <Button
-                      key={tmpl.template_id}
-                      size="sm"
-                      variant="outline"
-                      className="h-8 text-xs border-dashed"
-                      onClick={() => onOpenDescribe?.(transaction)}
-                      disabled={isProcessing || isDisabled}
-                    >
-                      {tmpl.name_sv}
-                    </Button>
-                  ))}
-                </>
               )}
 
               {/* Describe transaction */}

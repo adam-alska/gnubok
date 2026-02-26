@@ -10,6 +10,8 @@ import type { TrialBalanceRow } from '@/types'
 
 const mockTrialBalance = vi.mocked(generateTrialBalance)
 
+const supabase = {} as any
+
 beforeEach(() => {
   vi.clearAllMocks()
 })
@@ -38,7 +40,7 @@ describe('generateIncomeStatement', () => {
       isBalanced: true,
     })
 
-    const report = await generateIncomeStatement('user-1', 'period-1')
+    const report = await generateIncomeStatement(supabase, 'user-1', 'period-1')
 
     expect(report.revenue_sections).toEqual([])
     expect(report.expense_sections).toEqual([])
@@ -57,7 +59,7 @@ describe('generateIncomeStatement', () => {
       isBalanced: false,
     })
 
-    const report = await generateIncomeStatement('user-1', 'period-1')
+    const report = await generateIncomeStatement(supabase, 'user-1', 'period-1')
 
     expect(report.revenue_sections).toHaveLength(1)
     expect(report.revenue_sections[0].title).toBe('Huvudintäkter')
@@ -78,7 +80,7 @@ describe('generateIncomeStatement', () => {
       isBalanced: false,
     })
 
-    const report = await generateIncomeStatement('user-1', 'period-1')
+    const report = await generateIncomeStatement(supabase, 'user-1', 'period-1')
 
     expect(report.expense_sections).toHaveLength(2)
     expect(report.expense_sections[0].title).toBe('Lokalkostnader')
@@ -98,7 +100,7 @@ describe('generateIncomeStatement', () => {
       isBalanced: false,
     })
 
-    const report = await generateIncomeStatement('user-1', 'period-1')
+    const report = await generateIncomeStatement(supabase, 'user-1', 'period-1')
 
     expect(report.financial_sections).toHaveLength(2)
     // Financial uses credit - debit
@@ -121,7 +123,7 @@ describe('generateIncomeStatement', () => {
       isBalanced: false,
     })
 
-    const report = await generateIncomeStatement('user-1', 'period-1')
+    const report = await generateIncomeStatement(supabase, 'user-1', 'period-1')
 
     expect(report.total_revenue).toBe(20000)
     expect(report.total_expenses).toBe(8000)
@@ -141,7 +143,7 @@ describe('generateIncomeStatement', () => {
       isBalanced: false,
     })
 
-    const report = await generateIncomeStatement('user-1', 'period-1')
+    const report = await generateIncomeStatement(supabase, 'user-1', 'period-1')
 
     // Only the significant revenue row should appear
     const revenueSection = report.revenue_sections.find(s => s.title === 'Huvudintäkter')!
@@ -161,7 +163,7 @@ describe('generateIncomeStatement', () => {
       isBalanced: false,
     })
 
-    const report = await generateIncomeStatement('user-1', 'period-1')
+    const report = await generateIncomeStatement(supabase, 'user-1', 'period-1')
 
     // Only the non-empty section should remain
     expect(report.revenue_sections).toHaveLength(1)
@@ -180,7 +182,7 @@ describe('generateIncomeStatement', () => {
       isBalanced: true,
     })
 
-    const report = await generateIncomeStatement('user-1', 'period-1')
+    const report = await generateIncomeStatement(supabase, 'user-1', 'period-1')
 
     // Only class 3 should appear
     expect(report.revenue_sections).toHaveLength(1)

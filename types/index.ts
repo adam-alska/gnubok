@@ -1665,25 +1665,6 @@ export interface CreditNote extends Invoice {
   credited_invoice_id: string
 }
 
-/** CAMT.053 bank statement (placeholder — CAMT parsing not yet implemented) */
-export interface CAMT053Statement {
-  messageId: string
-  statements: unknown[]
-}
-
-/** CAMT.054 payment notification (placeholder — CAMT parsing not yet implemented) */
-export interface CAMT054Notification {
-  messageId: string
-  notifications: unknown[]
-}
-
-/** Security event payload for audit events */
-export interface AuditSecurityEvent {
-  eventType: string
-  description: string
-  metadata: Record<string, unknown>
-}
-
 /** Generic key-value store record for extensions */
 export interface ExtensionDataRecord {
   id: string

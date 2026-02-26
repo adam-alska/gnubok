@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 
 export interface GeneralLedgerLine {
@@ -32,12 +32,12 @@ export interface GeneralLedgerReport {
  * BFL 5 kap. 1 § — systematisk ordning: all transactions grouped by account.
  */
 export async function generateGeneralLedger(
+  supabase: SupabaseClient,
   userId: string,
   periodId: string,
   accountFrom?: string,
   accountTo?: string
 ): Promise<GeneralLedgerReport> {
-  const supabase = await createClient()
 
   // Get fiscal period dates
   const { data: period } = await supabase

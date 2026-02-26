@@ -123,6 +123,7 @@ describe('POST /api/invoices/[id]/mark-paid', () => {
     expect(body.paid_amount).toBe(12500)
     expect(body.journal_entry_id).toBe('je-1')
     expect(mockCreateInvoicePaymentJournalEntry).toHaveBeenCalledWith(
+      expect.anything(),
       'user-1',
       expect.objectContaining({ id: 'inv-1' }),
       expect.any(String)
@@ -155,6 +156,7 @@ describe('POST /api/invoices/[id]/mark-paid', () => {
     expect(body.success).toBe(true)
     expect(body.journal_entry_id).toBe('je-2')
     expect(mockCreateInvoiceCashEntry).toHaveBeenCalledWith(
+      expect.anything(),
       'user-1',
       expect.objectContaining({ id: 'inv-1' }),
       expect.any(String),

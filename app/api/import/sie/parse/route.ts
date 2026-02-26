@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     const content = decodeBuffer(arrayBuffer, encoding)
 
     // Check for duplicate import
-    const duplicate = await checkDuplicateImport(user.id, content)
+    const duplicate = await checkDuplicateImport(supabase, user.id, content)
     if (duplicate) {
       return NextResponse.json({
         error: 'duplicate',

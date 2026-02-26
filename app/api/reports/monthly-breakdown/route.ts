@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const data = await generateMonthlyBreakdown(user.id, periodId)
+    const data = await generateMonthlyBreakdown(supabase, user.id, periodId)
     return NextResponse.json({ data })
   } catch {
     return NextResponse.json({ error: 'Failed to generate monthly breakdown' }, { status: 500 })

@@ -38,7 +38,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await evaluateMappingRules(user.id, transaction)
+    const result = await evaluateMappingRules(supabase, user.id, transaction)
     return NextResponse.json({ data: result })
   } catch (err) {
     return NextResponse.json(

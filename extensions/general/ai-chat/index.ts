@@ -1,4 +1,5 @@
 import type { Extension } from '@/lib/extensions/types'
+import { aiChatApiRoutes } from './api-routes'
 
 /**
  * AI Chat Extension
@@ -15,6 +16,8 @@ export const aiChatExtension: Extension = {
   id: 'ai-chat',
   name: 'AI-assistent',
   version: '1.0.0',
+  sector: 'general',
+  apiRoutes: aiChatApiRoutes,
   settingsPanel: {
     label: 'AI-assistent',
     path: '/settings/extensions/ai-chat',

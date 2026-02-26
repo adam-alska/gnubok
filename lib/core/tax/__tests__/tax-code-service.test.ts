@@ -26,10 +26,6 @@ function makeClient() {
   }
 }
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => makeClient()),
-}))
-
 import { getTaxCodeByCode, calculateMomsFromTaxCodes } from '../tax-code-service'
 
 beforeEach(() => {
@@ -50,7 +46,8 @@ describe('getTaxCodeByCode', () => {
 
     results = [{ data: userCode, error: null }]
 
-    const result = await getTaxCodeByCode('user-1', 'MP1')
+    const supabase = makeClient()
+    const result = await getTaxCodeByCode(supabase as never, 'user-1', 'MP1')
     expect(result).not.toBeNull()
     expect(result!.user_id).toBe('user-1')
     expect(result!.description).toBe('Custom 25% moms')
@@ -59,7 +56,8 @@ describe('getTaxCodeByCode', () => {
   it('returns null when code does not exist', async () => {
     results = [{ data: null, error: { code: 'PGRST116' } }]
 
-    const result = await getTaxCodeByCode('user-1', 'NONEXISTENT')
+    const supabase = makeClient()
+    const result = await getTaxCodeByCode(supabase as never, 'user-1', 'NONEXISTENT')
     expect(result).toBeNull()
   })
 })
@@ -96,7 +94,8 @@ describe('calculateMomsFromTaxCodes', () => {
       { data: [mp1, ip1], error: null },
     ]
 
-    const result = await calculateMomsFromTaxCodes('user-1', '2024-01-01', '2024-12-31')
+    const supabase = makeClient()
+    const result = await calculateMomsFromTaxCodes(supabase as never, 'user-1', '2024-01-01', '2024-12-31')
 
     expect(result.length).toBeGreaterThan(0)
     // Results should be sorted by box

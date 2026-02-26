@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import type {
   FiscalPeriod,
@@ -155,10 +155,10 @@ function roundToKrona(value: number): number {
  * Generate NE declaration for a fiscal period
  */
 export async function generateNEDeclaration(
+  supabase: SupabaseClient,
   userId: string,
   fiscalPeriodId: string
 ): Promise<NEDeclaration> {
-  const supabase = await createClient()
 
   // Fetch fiscal period
   const { data: period, error: periodError } = await supabase

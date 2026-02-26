@@ -15,7 +15,7 @@ export async function POST(
   }
 
   try {
-    const reversalEntry = await reverseEntry(user.id, id)
+    const reversalEntry = await reverseEntry(supabase, user.id, id)
     return NextResponse.json({ data: reversalEntry })
   } catch (err) {
     return NextResponse.json(

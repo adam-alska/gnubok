@@ -32,7 +32,6 @@ export default function BankFileConfirmStep({
   isLoading,
 }: BankFileConfirmStepProps) {
   const [skipDuplicates, setSkipDuplicates] = useState(true)
-  const [autoCategorize, setAutoCategorize] = useState(true)
 
   const { transactions, stats, date_from, date_to, format_name } = parseResult
   const refsCount = transactions.filter((t) => t.reference).length
@@ -118,30 +117,14 @@ export default function BankFileConfirmStep({
               </div>
             </div>
 
-            <div className="flex items-center space-x-3">
-              <Checkbox
-                id="auto-categorize"
-                checked={autoCategorize}
-                onCheckedChange={(checked) => setAutoCategorize(checked === true)}
-              />
-              <div>
-                <Label htmlFor="auto-categorize" className="text-sm font-medium cursor-pointer">
-                  Auto-bokför kända transaktioner
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Skapar automatiskt bokföringsposter för transaktioner med hög konfidens
-                </p>
-              </div>
-            </div>
           </div>
 
           {/* Warning note */}
           <div className="flex gap-3 p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
             <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-muted-foreground">
-              Importerade transaktioner som inte automatiskt bokförs visas som
-              &quot;obokförda&quot; på transaktionssidan. Du kan bokföra dem manuellt
-              efteråt.
+              Importerade transaktioner visas som &quot;obokförda&quot; på
+              transaktionssidan. Du kan bokföra dem manuellt efteråt.
             </p>
           </div>
         </CardContent>
@@ -156,7 +139,7 @@ export default function BankFileConfirmStep({
         <Button
           onClick={() => onExecute({
             skip_duplicates: skipDuplicates,
-            auto_categorize: autoCategorize,
+            auto_categorize: false,
           })}
           disabled={isLoading}
         >

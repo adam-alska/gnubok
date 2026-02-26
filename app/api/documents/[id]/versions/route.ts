@@ -36,7 +36,7 @@ export async function POST(
 
     const buffer = await file.arrayBuffer()
 
-    const newVersion = await createNewVersion(user.id, id, {
+    const newVersion = await createNewVersion(supabase, user.id, id, {
       name: file.name,
       buffer,
       type: file.type,

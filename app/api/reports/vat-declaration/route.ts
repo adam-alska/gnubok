@@ -101,6 +101,7 @@ export async function GET(request: Request) {
 
   try {
     const declaration = await calculateVatDeclaration(
+      supabase,
       user.id,
       periodType,
       year,

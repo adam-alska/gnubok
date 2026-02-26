@@ -191,6 +191,7 @@ export async function ingestTransactions(
         // OCR/reference matching is handled inside getBestInvoiceMatch
         // (which calls findMatchingInvoices, which now checks references)
         const bestMatch = await getBestInvoiceMatch(
+          supabase,
           userId,
           newTransaction as Transaction,
           0.50
@@ -242,12 +243,14 @@ export async function ingestTransactions(
     // 4. Evaluate mapping rules for auto-categorization
     try {
       const mappingResult = await evaluateMappingRules(
+        supabase,
         userId,
         newTransaction as Transaction
       )
 
       if (mappingResult.confidence >= 0.8 && !mappingResult.requires_review) {
         const journalEntry = await createTransactionJournalEntry(
+          supabase,
           userId,
           newTransaction as Transaction,
           mappingResult

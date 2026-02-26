@@ -245,6 +245,7 @@ export async function POST(
 
   try {
     const journalEntry = await createTransactionJournalEntry(
+      supabase,
       user.id,
       transaction as Transaction,
       mappingResult
@@ -264,6 +265,7 @@ export async function POST(
   if (is_business && transaction.merchant_name) {
     try {
       await saveUserMappingRule(
+        supabase,
         user.id,
         transaction.merchant_name,
         mappingResult.debit_account,

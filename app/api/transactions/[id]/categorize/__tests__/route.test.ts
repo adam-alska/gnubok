@@ -156,6 +156,7 @@ describe('POST /api/transactions/[id]/categorize', () => {
     expect(body.journal_entry_id).toBe('je-1')
     expect(body.category).toBe('expense_software')
     expect(mockSaveUserMappingRule).toHaveBeenCalledWith(
+      expect.anything(),
       'user-1',
       'GitHub',
       '6200',

@@ -3,6 +3,7 @@ import { matchSupplier } from './lib/supplier-matcher'
 import type { Extension, ExtensionContext } from '@/lib/extensions/types'
 import type { EventPayload } from '@/lib/events/types'
 import type { InvoiceInboxSettings } from './types'
+import { invoiceInboxApiRoutes } from './api-routes'
 
 // ============================================================
 // Settings
@@ -210,6 +211,8 @@ export const invoiceInboxExtension: Extension = {
   id: 'invoice-inbox',
   name: 'Invoice Inbox',
   version: '1.0.0',
+  sector: 'general',
+  apiRoutes: invoiceInboxApiRoutes,
   eventHandlers: [
     { eventType: 'document.uploaded', handler: handleDocumentUploaded },
   ],

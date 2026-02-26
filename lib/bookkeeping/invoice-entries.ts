@@ -2,6 +2,7 @@ import { createJournalEntry, findFiscalPeriod } from './engine'
 import { generateSalesVatLines, generateReverseChargeLines } from './vat-entries'
 import { getVatTreatmentForRate } from '@/lib/invoices/vat-rules'
 import { createLogger } from '@/lib/logger'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   CreateJournalEntryInput,
   CreateJournalEntryLineInput,
@@ -112,11 +113,12 @@ function generatePerRateLines(
  *   Credit 3305 Försäljning tjänst Export [subtotal]
  */
 export async function createInvoiceJournalEntry(
+  supabase: SupabaseClient,
   userId: string,
   invoice: Invoice,
   entityType: EntityType = 'enskild_firma'
 ): Promise<JournalEntry | null> {
-  const fiscalPeriodId = await findFiscalPeriod(userId, invoice.invoice_date)
+  const fiscalPeriodId = await findFiscalPeriod(supabase, userId, invoice.invoice_date)
   if (!fiscalPeriodId) {
     log.warn('No open fiscal period found for invoice date:', invoice.invoice_date)
     return null
@@ -167,7 +169,7 @@ export async function createInvoiceJournalEntry(
     lines,
   }
 
-  return createJournalEntry(userId, input)
+  return createJournalEntry(supabase, userId, input)
 }
 
 /**
@@ -177,11 +179,12 @@ export async function createInvoiceJournalEntry(
  *   Credit 1510 Kundfordringar      [total]
  */
 export async function createInvoicePaymentJournalEntry(
+  supabase: SupabaseClient,
   userId: string,
   invoice: Invoice,
   paymentDate: string
 ): Promise<JournalEntry | null> {
-  const fiscalPeriodId = await findFiscalPeriod(userId, paymentDate)
+  const fiscalPeriodId = await findFiscalPeriod(supabase, userId, paymentDate)
   if (!fiscalPeriodId) {
     log.warn('No open fiscal period found for payment date:', paymentDate)
     return null
@@ -211,7 +214,7 @@ export async function createInvoicePaymentJournalEntry(
     lines,
   }
 
-  return createJournalEntry(userId, input)
+  return createJournalEntry(supabase, userId, input)
 }
 
 /**
@@ -223,11 +226,12 @@ export async function createInvoicePaymentJournalEntry(
  *   Credit 1510 Kundfordringar      [total]
  */
 export async function createCreditNoteJournalEntry(
+  supabase: SupabaseClient,
   userId: string,
   creditNote: Invoice,
   entityType: EntityType = 'enskild_firma'
 ): Promise<JournalEntry | null> {
-  const fiscalPeriodId = await findFiscalPeriod(userId, creditNote.invoice_date)
+  const fiscalPeriodId = await findFiscalPeriod(supabase, userId, creditNote.invoice_date)
   if (!fiscalPeriodId) {
     log.warn('No open fiscal period found for credit note date:', creditNote.invoice_date)
     return null
@@ -289,7 +293,7 @@ export async function createCreditNoteJournalEntry(
     lines,
   }
 
-  return createJournalEntry(userId, input)
+  return createJournalEntry(supabase, userId, input)
 }
 
 /**
@@ -301,12 +305,13 @@ export async function createCreditNoteJournalEntry(
  *   Credit 26xx Utgående moms       [vat per rate]  (if applicable)
  */
 export async function createInvoiceCashEntry(
+  supabase: SupabaseClient,
   userId: string,
   invoice: Invoice,
   paymentDate: string,
   entityType: EntityType = 'enskild_firma'
 ): Promise<JournalEntry | null> {
-  const fiscalPeriodId = await findFiscalPeriod(userId, paymentDate)
+  const fiscalPeriodId = await findFiscalPeriod(supabase, userId, paymentDate)
   if (!fiscalPeriodId) {
     log.warn('No open fiscal period found for payment date:', paymentDate)
     return null
@@ -355,7 +360,7 @@ export async function createInvoiceCashEntry(
     lines,
   }
 
-  return createJournalEntry(userId, input)
+  return createJournalEntry(supabase, userId, input)
 }
 
 /**
