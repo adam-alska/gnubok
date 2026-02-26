@@ -13,7 +13,7 @@
     "icon": "Calendar",
     "dataPattern": "core",
     "readsCoreTables": ["invoices", "deadlines", "customers"],
-    "description": "Fullstandig kalendervy med manads-, vecko- och dagsvisning",
-    "longDescription": "Se alla fakturadatum och deadlines i en interaktiv kalender med manads-, vecko- och dagsvy."
+    "description": "Fullständig kalendervy med månads-, vecko- och dagsvisning",
+    "longDescription": "Se alla fakturadatum och deadlines i en interaktiv kalender med månads-, vecko- och dagsvy."
   }
 }

@@ -145,7 +145,7 @@ export default function DeadlinesPage() {
 
       toast({
         title: 'Deadline uppdaterad',
-        description: 'Dina andringar har sparats',
+        description: 'Dina ändringar har sparats',
       })
 
       fetchData()

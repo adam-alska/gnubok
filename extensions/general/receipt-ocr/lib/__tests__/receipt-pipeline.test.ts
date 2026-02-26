@@ -12,6 +12,11 @@ vi.mock('../receipt-analyzer', () => ({
 // Mock receipt categorizer
 vi.mock('../receipt-categorizer', () => ({
   processLineItems: vi.fn(),
+  getDefaultClassification: vi.fn().mockReturnValue({
+    defaultIsBusiness: true,
+    requiresReview: false,
+    warningMessage: null,
+  }),
 }))
 
 // Mock receipt matcher

@@ -46,11 +46,11 @@ interface InboxDetailDialogProps {
   suppliers: Supplier[]
 }
 
-function formatSEK(amount: number | null): string {
+function formatAmount(amount: number | null, currency: string = 'SEK'): string {
   if (amount == null) return '-'
   return new Intl.NumberFormat('sv-SE', {
     style: 'currency',
-    currency: 'SEK',
+    currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount)
@@ -71,6 +71,7 @@ export default function InboxDetailDialog({
   if (!item) return null
 
   const extraction = item.extracted_data as unknown as InvoiceExtractionResult | null
+  const currency = extraction?.invoice.currency || 'SEK'
   const confidence = getConfidenceLabel(item.confidence)
   const confidenceVariant = confidence.variant as 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning'
   const statusVariant = getStatusVariant(item.status) as 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning'
@@ -240,10 +241,10 @@ export default function InboxDetailDialog({
                             <TableCell className="text-sm">{line.description}</TableCell>
                             <TableCell className="text-right text-sm">{line.quantity}</TableCell>
                             <TableCell className="text-right text-sm">
-                              {line.unitPrice != null ? formatSEK(line.unitPrice) : '-'}
+                              {line.unitPrice != null ? formatAmount(line.unitPrice, currency) : '-'}
                             </TableCell>
                             <TableCell className="text-right text-sm font-medium">
-                              {formatSEK(line.lineTotal)}
+                              {formatAmount(line.lineTotal, currency)}
                             </TableCell>
                             <TableCell className="text-right text-sm">
                               {line.vatRate != null ? `${line.vatRate}%` : '-'}
@@ -263,16 +264,16 @@ export default function InboxDetailDialog({
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Netto</span>
-                <span>{formatSEK(extraction.totals.subtotal)}</span>
+                <span>{formatAmount(extraction.totals.subtotal, currency)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Moms</span>
-                <span>{formatSEK(extraction.totals.vatAmount)}</span>
+                <span>{formatAmount(extraction.totals.vatAmount, currency)}</span>
               </div>
               <Separator />
               <div className="flex justify-between font-medium text-base">
                 <span>Totalt</span>
-                <span>{formatSEK(extraction.totals.total)}</span>
+                <span>{formatAmount(extraction.totals.total, currency)}</span>
               </div>
             </div>
           </>

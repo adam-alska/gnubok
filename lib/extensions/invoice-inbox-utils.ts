@@ -41,14 +41,15 @@ export function getConfidenceLabel(confidence: number | null): { label: string; 
 
 export function formatExtractionSummary(
   data: InvoiceExtractionResult | null | undefined
-): { supplierName: string; total: number; lineCount: number } {
+): { supplierName: string; total: number; lineCount: number; currency: string } {
   if (!data) {
-    return { supplierName: '', total: 0, lineCount: 0 }
+    return { supplierName: '', total: 0, lineCount: 0, currency: 'SEK' }
   }
   return {
     supplierName: data.supplier?.name ?? '',
     total: data.totals?.total ?? 0,
     lineCount: data.lineItems?.length ?? 0,
+    currency: data.invoice?.currency || 'SEK',
   }
 }
 

@@ -277,7 +277,7 @@ export function getDefaultClassification(
   }
 
   return {
-    defaultIsBusiness: null, // User decides per item
+    defaultIsBusiness: true, // Default to business for normal receipts
     requiresReview: false,
     warningMessage: null,
   }

@@ -24,8 +24,8 @@ export default function ExtensionWorkspaceLoader({
         <WorkspaceComponent userId={userId} />
       ) : (
         <EmptyExtensionState
-          title="Kommer snart"
-          description={`${definition.name} \u00e4r under utveckling och kommer snart att vara tillg\u00e4ngligt.`}
+          title="Bakgrundstjänst"
+          description={`${definition.name} körs i bakgrunden och har ingen egen vy. Du kan hantera inställningar under Inställningar.`}
         />
       )}
     </ExtensionWorkspaceShell>

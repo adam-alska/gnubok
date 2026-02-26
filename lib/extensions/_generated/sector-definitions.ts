@@ -83,8 +83,8 @@ export const EXTENSION_DEFINITIONS: Record<string, ExtensionDefinition[]> = {
           "category": "operations",
           "icon": "Calendar",
           "dataPattern": "core",
-          "description": "Fullstandig kalendervy med manads-, vecko- och dagsvisning",
-          "longDescription": "Se alla fakturadatum och deadlines i en interaktiv kalender med manads-, vecko- och dagsvy.",
+          "description": "Fullständig kalendervy med månads-, vecko- och dagsvisning",
+          "longDescription": "Se alla fakturadatum och deadlines i en interaktiv kalender med månads-, vecko- och dagsvy.",
           "readsCoreTables": [
                 "invoices",
                 "deadlines",

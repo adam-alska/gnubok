@@ -145,9 +145,9 @@ describe('getDefaultClassification', () => {
     expect(result.warningMessage).toContain('Restaurangbesök')
   })
 
-  it('non-restaurant, non-systembolaget has no warning', () => {
+  it('normal receipt defaults to business', () => {
     const result = getDefaultClassification(false, false)
-    expect(result.defaultIsBusiness).toBeNull()
+    expect(result.defaultIsBusiness).toBe(true)
     expect(result.requiresReview).toBe(false)
     expect(result.warningMessage).toBeNull()
   })

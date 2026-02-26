@@ -31,18 +31,17 @@ function formatRelativeTime(dateStr: string): string {
   return `${diffD} dagar sedan`
 }
 
-function formatSEK(amount: number): string {
+function formatAmount(amount: number, currency: string = 'SEK'): string {
   return new Intl.NumberFormat('sv-SE', {
     style: 'currency',
-    currency: 'SEK',
+    currency,
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount)
 }
 
 export default function InboxItemCard({ item, onClick }: InboxItemCardProps) {
-  const extraction = item.extracted_data as unknown as InvoiceExtractionResult | null
-  const summary = formatExtractionSummary(extraction)
+  const summary = formatExtractionSummary(item.extracted_data as unknown as InvoiceExtractionResult | null)
   const confidence = getConfidenceLabel(item.confidence)
   const statusVariant = getStatusVariant(item.status) as 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning'
   const confidenceVariant = confidence.variant as 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning'
@@ -80,7 +79,7 @@ export default function InboxItemCard({ item, onClick }: InboxItemCardProps) {
 
         <div className="flex flex-col items-end gap-1 shrink-0">
           {summary.total > 0 && (
-            <span className="text-sm font-medium">{formatSEK(summary.total)}</span>
+            <span className="text-sm font-medium">{formatAmount(summary.total, summary.currency)}</span>
           )}
           <div className="flex items-center gap-1.5">
             {item.confidence != null && (

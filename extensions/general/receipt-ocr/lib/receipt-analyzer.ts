@@ -1,24 +1,21 @@
 /**
- * Receipt Analyzer using Claude Haiku Vision API
+ * Receipt Analyzer — delegates to lib/ai/document-analyzer for extraction,
+ * then applies receipt-specific validation and enhancement.
  *
- * SERVER-ONLY: This module uses the Anthropic SDK and must only be imported
- * in server components or API routes.
+ * SERVER-ONLY: uses the shared vision client via document-analyzer.
  *
- * Analyzes receipt images and extracts line items, merchant info,
- * and special flags (restaurant, Systembolaget, foreign merchant).
+ * Preserved public API: analyzeReceipt() and estimateProductValue().
  */
 
 import 'server-only'
-import Anthropic from '@anthropic-ai/sdk'
 import { ChatAnthropic } from '@langchain/anthropic'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { z } from 'zod'
-import type { ReceiptExtractionResult, ExtractedLineItem } from '@/types'
-import { buildTemplatePromptSection } from '@/lib/bookkeeping/template-prompt'
+import type { ReceiptExtractionResult } from '@/types'
+import { extractReceipt } from '@/lib/ai/document-analyzer'
 import {
   SYSTEMBOLAGET_PATTERNS,
   RESTAURANT_PATTERNS,
-  RESTAURANT_MCC_CODES,
 } from './receipt-utils'
 
 // Re-export client-safe functions for convenience
@@ -29,255 +26,46 @@ export {
   detectRestaurant,
 } from './receipt-utils'
 
-const anthropic = new Anthropic()
-
-// Maximum retries for API calls
+// Retry config for estimateProductValue (still uses LangChain, not vision-client)
 const MAX_RETRIES = 3
 const RETRY_DELAY_MS = 1000
 
 /**
- * Analyze a receipt image using Claude Haiku Vision
+ * Analyze a receipt image using Claude Haiku Vision.
+ * Delegates extraction to the shared core, then applies receipt-specific enhancements.
  */
 export async function analyzeReceipt(
   imageBase64: string,
   mimeType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif' = 'image/jpeg'
 ): Promise<ReceiptExtractionResult> {
-  const systemPrompt = `Du är expert på att extrahera data från svenska kvitton och fakturor.
-Din uppgift är att noggrant analysera kvittobilden och extrahera all relevant information.
-
-VIKTIGT:
-- Extrahera VARJE artikelrad, inte bara summan
-- Identifiera momssats per rad om möjligt (25%, 12%, 6%)
-- Flagga om detta är: restaurang, Systembolaget, eller utländsk handlare
-- Svenska organisationsnummer är i format XXXXXX-XXXX
-- Momsregistreringsnummer börjar med SE
-- Datum ska vara i ISO-format (YYYY-MM-DD)
-- Belopp ska vara numeriska värden utan valutasymboler
-- Ange konfidenstal (0.0-1.0) för hela extraheringen baserat på bildkvalitet`
-
-  const templateSection = buildTemplatePromptSection()
-
-  const userPrompt = `Analysera detta kvitto och extrahera strukturerad data.
-
-Returnera ett JSON-objekt med följande struktur:
-
-{
-  "merchant": {
-    "name": "Handlarens namn",
-    "orgNumber": "XXXXXX-XXXX eller null",
-    "vatNumber": "SE... eller null",
-    "isForeign": false
-  },
-  "receipt": {
-    "date": "YYYY-MM-DD",
-    "time": "HH:MM eller null",
-    "currency": "SEK"
-  },
-  "lineItems": [
-    {
-      "description": "Artikelbeskrivning",
-      "quantity": 1,
-      "unitPrice": 100.00,
-      "lineTotal": 100.00,
-      "vatRate": 25,
-      "suggestedCategory": "equipment|software|travel|office|marketing|professional_services|education|other",
-      "suggestedTemplateId": "mall-id eller null"
-    }
-  ],
-  "totals": {
-    "subtotal": 100.00,
-    "vatAmount": 25.00,
-    "total": 125.00
-  },
-  "flags": {
-    "isRestaurant": false,
-    "isSystembolaget": false,
-    "isForeignMerchant": false
-  },
-  "confidence": 0.95,
-  "suggestedTemplateId": "mall-id för hela kvittot eller null"
-}
-
-${templateSection}
-
-KATEGORIER för suggestedCategory (backup om ingen mall matchar):
-- equipment: Datorer, telefoner, kameror, teknikprylar
-- software: Program, appar, molntjänster, prenumerationer
-- travel: Flyg, tåg, hotell, taxi
-- office: Kontorsmaterial, möbler, hyra
-- marketing: Reklam, marknadsföring, PR
-- professional_services: Konsulter, redovisning, juridik
-- education: Kurser, böcker, utbildning
-- other: Övrigt
-
-Returnera ENDAST JSON-objektet, ingen annan text.`
-
-  let lastError: Error | null = null
-
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    try {
-      const message = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 4096,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image',
-                source: {
-                  type: 'base64',
-                  media_type: mimeType,
-                  data: imageBase64,
-                },
-              },
-              {
-                type: 'text',
-                text: userPrompt,
-              },
-            ],
-          },
-        ],
-        system: systemPrompt,
-      })
-
-      // Extract the text content
-      const content = message.content[0]
-      if (content.type !== 'text') {
-        throw new Error('Unexpected response type from AI')
-      }
-
-      // Parse the JSON response - strip markdown code blocks if present
-      let jsonText = content.text.trim()
-
-      if (jsonText.startsWith('```json')) {
-        jsonText = jsonText.slice(7)
-      } else if (jsonText.startsWith('```')) {
-        jsonText = jsonText.slice(3)
-      }
-      if (jsonText.endsWith('```')) {
-        jsonText = jsonText.slice(0, -3)
-      }
-      jsonText = jsonText.trim()
-
-      const parsed = JSON.parse(jsonText)
-
-      // Validate and enhance the result
-      return validateAndEnhanceResult(parsed)
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error('Unknown error')
-
-      // Don't retry on JSON parse errors
-      if (error instanceof SyntaxError) {
-        throw new Error(`Failed to parse AI response: ${lastError.message}`)
-      }
-
-      // Wait before retrying
-      if (attempt < MAX_RETRIES - 1) {
-        await sleep(RETRY_DELAY_MS * (attempt + 1))
-      }
-    }
-  }
-
-  throw new Error(`Receipt analysis failed after ${MAX_RETRIES} attempts: ${lastError?.message}`)
+  const raw = await extractReceipt(imageBase64, mimeType)
+  return validateAndEnhanceResult(raw)
 }
 
 /**
- * Validate and enhance the extraction result
+ * Receipt-specific validation and enhancement.
+ * Applies Systembolaget/restaurant/foreign merchant detection
+ * on top of the core extraction result.
  */
-function validateAndEnhanceResult(raw: unknown): ReceiptExtractionResult {
-  if (!raw || typeof raw !== 'object') {
-    throw new Error('Invalid extraction result: not an object')
-  }
+function validateAndEnhanceResult(result: ReceiptExtractionResult): ReceiptExtractionResult {
+  // Detect special merchants using local patterns
+  const merchantName = (result.merchant.name || '').toLowerCase()
+  const isSystembolaget = result.flags.isSystembolaget || detectSystembolagetLocal(merchantName)
+  const isRestaurant = result.flags.isRestaurant || detectRestaurantLocal(merchantName)
+  const isForeign = result.flags.isForeignMerchant || detectForeignMerchant(result.merchant, result.receipt.currency)
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const data = raw as any
-
-  const merchant = data.merchant || {}
-  const receipt = data.receipt || {}
-  const totals = data.totals || {}
-  const flags = data.flags || {}
-
-  // Validate line items
-  const lineItems = validateLineItems(data.lineItems)
-
-  // Detect special merchants if not already flagged
-  const merchantName = (merchant.name || '').toLowerCase()
-  const isSystembolaget = flags.isSystembolaget || detectSystembolagetLocal(merchantName)
-  const isRestaurant = flags.isRestaurant || detectRestaurantLocal(merchantName)
-  const isForeign = flags.isForeignMerchant || detectForeignMerchant(merchant, receipt.currency)
-
-  const result: ReceiptExtractionResult = {
+  return {
+    ...result,
     merchant: {
-      name: validateString(merchant.name),
-      orgNumber: validateOrgNumber(merchant.orgNumber),
-      vatNumber: validateVatNumber(merchant.vatNumber),
+      ...result.merchant,
       isForeign,
-    },
-    receipt: {
-      date: validateDate(receipt.date),
-      time: validateTime(receipt.time),
-      currency: validateString(receipt.currency) || 'SEK',
-    },
-    lineItems,
-    totals: {
-      subtotal: validateNumber(totals.subtotal),
-      vatAmount: validateNumber(totals.vatAmount),
-      total: validateNumber(totals.total),
     },
     flags: {
       isRestaurant,
       isSystembolaget,
       isForeignMerchant: isForeign,
     },
-    confidence: validateNumber(data.confidence) || 0.5,
-    suggestedTemplateId: validateString(data.suggestedTemplateId) || undefined,
   }
-
-  return result
-}
-
-/**
- * Validate line items array
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function validateLineItems(data: any): ExtractedLineItem[] {
-  if (!Array.isArray(data)) return []
-
-  return data
-    .filter((item) => item && typeof item === 'object' && item.description)
-    .map((item) => ({
-      description: String(item.description).trim(),
-      quantity: validateNumber(item.quantity) || 1,
-      unitPrice: validateNumber(item.unitPrice),
-      lineTotal: validateNumber(item.lineTotal) || 0,
-      vatRate: validateNumber(item.vatRate),
-      suggestedCategory: validateCategory(item.suggestedCategory),
-      suggestedTemplateId: validateString(item.suggestedTemplateId) || undefined,
-      confidence: validateNumber(item.confidence) || undefined,
-    }))
-    .filter((item) => item.lineTotal > 0 || item.description.length > 0)
-}
-
-/**
- * Validate expense category suggestion
- */
-function validateCategory(value: unknown): string | null {
-  const validCategories = [
-    'equipment',
-    'software',
-    'travel',
-    'office',
-    'marketing',
-    'professional_services',
-    'education',
-    'other',
-  ]
-
-  if (typeof value === 'string' && validCategories.includes(value)) {
-    return value
-  }
-  return null
 }
 
 /**
@@ -297,104 +85,27 @@ function detectRestaurantLocal(merchantName: string): boolean {
 /**
  * Detect if merchant is foreign (non-Swedish)
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function detectForeignMerchant(merchant: any, currency?: string): boolean {
-  // Check currency (non-SEK suggests foreign)
-  if (currency && currency !== 'SEK') {
-    return true
-  }
+function detectForeignMerchant(
+  merchant: ReceiptExtractionResult['merchant'],
+  currency?: string
+): boolean {
+  if (currency && currency !== 'SEK') return true
 
-  // Check org number format (Swedish org numbers are 10 digits)
   const orgNumber = merchant.orgNumber || ''
-  if (orgNumber && !isSwedishOrgNumber(orgNumber)) {
-    return true
+  if (orgNumber) {
+    const digits = orgNumber.replace(/\D/g, '')
+    if (digits.length !== 10) return true
   }
 
-  // Check VAT number (Swedish starts with SE)
   const vatNumber = merchant.vatNumber || ''
-  if (vatNumber && !vatNumber.toUpperCase().startsWith('SE')) {
-    return true
-  }
+  if (vatNumber && !vatNumber.toUpperCase().startsWith('SE')) return true
 
   return false
 }
 
-/**
- * Check if org number is Swedish format
- */
-function isSwedishOrgNumber(value: string): boolean {
-  const digits = value.replace(/\D/g, '')
-  return digits.length === 10
-}
-
-// Validation helpers
-function validateString(value: unknown): string | null {
-  if (typeof value === 'string' && value.trim()) {
-    return value.trim()
-  }
-  return null
-}
-
-function validateNumber(value: unknown): number | null {
-  if (typeof value === 'number' && !isNaN(value)) {
-    return value
-  }
-  if (typeof value === 'string') {
-    const parsed = parseFloat(value.replace(/[^\d.-]/g, ''))
-    if (!isNaN(parsed)) {
-      return parsed
-    }
-  }
-  return null
-}
-
-function validateDate(value: unknown): string | null {
-  if (typeof value !== 'string') return null
-
-  const date = new Date(value)
-  if (isNaN(date.getTime())) return null
-
-  return date.toISOString().split('T')[0]
-}
-
-function validateTime(value: unknown): string | null {
-  if (typeof value !== 'string') return null
-
-  // Match HH:MM or HH:MM:SS
-  const match = value.match(/^(\d{2}):(\d{2})(:\d{2})?$/)
-  if (match) {
-    return `${match[1]}:${match[2]}`
-  }
-  return null
-}
-
-function validateOrgNumber(value: unknown): string | null {
-  if (typeof value !== 'string') return null
-
-  const digits = value.replace(/\D/g, '')
-
-  // Swedish org numbers are 10 digits
-  if (digits.length === 10) {
-    return `${digits.slice(0, 6)}-${digits.slice(6)}`
-  }
-
-  return null
-}
-
-function validateVatNumber(value: unknown): string | null {
-  if (typeof value !== 'string') return null
-
-  const cleaned = value.trim().toUpperCase()
-  if (cleaned.startsWith('SE') && cleaned.length >= 12) {
-    return cleaned
-  }
-
-  return null
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
+// ============================================================
+// Product Value Estimation (LangChain — separate from receipt analysis)
+// ============================================================
 
 const ProductEstimationSchema = z.object({
   estimatedValue: z.number().describe('Uppskattat marknadsvärde i SEK'),
@@ -404,8 +115,8 @@ const ProductEstimationSchema = z.object({
 })
 
 /**
- * Estimate product value from image using Claude Vision via LangChain
- * Used for gift/product registration without receipt
+ * Estimate product value from image using Claude Vision via LangChain.
+ * Used for gift/product registration without receipt.
  */
 export async function estimateProductValue(
   imageBase64: string,
@@ -466,4 +177,8 @@ Din uppgift är att identifiera produkten och ge en rimlig uppskattning av dess 
   }
 
   throw new Error(`Product value estimation failed after ${MAX_RETRIES} attempts: ${lastError?.message}`)
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }

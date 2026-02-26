@@ -181,8 +181,21 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           const data = await response.json()
           throw new Error(data.error || 'Kunde inte markera som betald')
         }
+      } else if (status === 'cancelled') {
+        // Only drafts and proformas can be cancelled directly — sent/overdue/paid
+        // invoices have committed journal entries and require a credit note instead
+        if (invoice.status !== 'draft') {
+          const docType = ((invoice as Invoice & { document_type?: InvoiceDocumentType }).document_type || 'invoice') as InvoiceDocumentType
+          if (docType !== 'proforma') {
+            throw new Error('Bokförda fakturor kan inte makuleras. Skapa en kreditfaktura istället.')
+          }
+        }
+        const { error } = await supabase
+          .from('invoices')
+          .update({ status })
+          .eq('id', invoice.id)
+        if (error) throw new Error(error.message)
       } else {
-        // Other status changes (cancelled) — direct update is fine
         const { error } = await supabase
           .from('invoices')
           .update({ status })
@@ -870,15 +883,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                         Skapa kreditfaktura
                       </Button>
                     </Link>
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => updateStatus('cancelled')}
-                      disabled={isUpdating}
-                    >
-                      <XCircle className="mr-2 h-4 w-4" />
-                      Makulera
-                    </Button>
                   </>
                 )}
                 {invoice.status === 'paid' && isRealInvoice && (

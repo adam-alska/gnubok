@@ -20,7 +20,7 @@ export default function ExtensionWorkspaceShell({
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
         <Link href="/extensions" className="hover:text-foreground transition-colors">
-          Till\u00e4gg
+          Tillägg
         </Link>
         <span>/</span>
         <Link

@@ -34,10 +34,10 @@ interface ReceiptInboxDetailProps {
   onConfirm: () => void
 }
 
-function formatSEK(amount: number): string {
+function formatAmount(amount: number, currency: string = 'SEK'): string {
   return new Intl.NumberFormat('sv-SE', {
     style: 'currency',
-    currency: 'SEK',
+    currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount)
@@ -180,7 +180,7 @@ export default function ReceiptInboxDetail({
               <div>
                 <span className="text-muted-foreground">Totalbelopp</span>
                 <p className="font-medium">
-                  {receipt.total_amount ? formatSEK(receipt.total_amount) : '-'}
+                  {receipt.total_amount ? formatAmount(receipt.total_amount) : '-'}
                 </p>
               </div>
               <div>
@@ -217,7 +217,7 @@ export default function ReceiptInboxDetail({
                       <div className="flex-1 min-w-0">
                         <p className="text-sm truncate">{li.description}</p>
                         <p className="text-xs text-muted-foreground">
-                          {formatSEK(li.line_total)}
+                          {formatAmount(li.line_total)}
                           {li.vat_rate != null && ` (${li.vat_rate}% moms)`}
                         </p>
                       </div>
@@ -237,8 +237,8 @@ export default function ReceiptInboxDetail({
             {/* Totals */}
             {lineItems.length > 0 && (
               <div className="flex gap-4 text-sm">
-                <Badge variant="default">Företag: {formatSEK(Math.round(businessTotal * 100) / 100)}</Badge>
-                <Badge variant="secondary">Privat: {formatSEK(Math.round(privateTotal * 100) / 100)}</Badge>
+                <Badge variant="default">Företag: {formatAmount(Math.round(businessTotal * 100) / 100)}</Badge>
+                <Badge variant="secondary">Privat: {formatAmount(Math.round(privateTotal * 100) / 100)}</Badge>
               </div>
             )}
 

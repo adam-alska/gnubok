@@ -31,14 +31,19 @@ vi.mock('@/extensions/general/invoice-inbox/lib/email-handler', () => ({
   resolveUserFromEmail: vi.fn(),
 }))
 
-// Mock invoice analyzer
-vi.mock('@/extensions/general/invoice-inbox/lib/invoice-analyzer', () => ({
-  analyzeInvoice: vi.fn(),
+// Mock unified document analyzer
+vi.mock('@/lib/ai/document-analyzer', () => ({
+  analyzeDocument: vi.fn(),
 }))
 
 // Mock supplier matcher
 vi.mock('@/extensions/general/invoice-inbox/lib/supplier-matcher', () => ({
   matchSupplier: vi.fn(),
+}))
+
+// Mock receipt pipeline
+vi.mock('@/extensions/general/receipt-ocr/lib/receipt-pipeline', () => ({
+  processReceiptFromDocument: vi.fn(),
 }))
 
 import { POST } from '../route'

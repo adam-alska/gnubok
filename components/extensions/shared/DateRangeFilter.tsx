@@ -43,9 +43,9 @@ export default function DateRangeFilter({ onRangeChange, className }: DateRangeF
   }
 
   const periods: { key: Period; label: string }[] = [
-    { key: 'month', label: 'M\u00e5nad' },
+    { key: 'month', label: 'Månad' },
     { key: 'quarter', label: 'Kvartal' },
-    { key: 'year', label: '\u00c5r' },
+    { key: 'year', label: 'År' },
   ]
 
   return (
