@@ -193,13 +193,14 @@ describe('suggestMappings', () => {
     expect(result).toHaveLength(0)
   })
 
-  it('handles empty BAS accounts — everything unmapped', () => {
+  it('handles empty BAS accounts — bas_range fallback for valid accounts', () => {
     const source = [makeSIEAccount('1510', 'Kundfordringar')]
     const result = suggestMappings(source, [])
 
     expect(result).toHaveLength(1)
-    expect(result[0].targetAccount).toBe('')
-    expect(result[0].confidence).toBe(0)
+    expect(result[0].targetAccount).toBe('1510')
+    expect(result[0].confidence).toBe(0.9)
+    expect(result[0].matchType).toBe('bas_range')
   })
 
   it('accepts BASReferenceAccount objects (full BAS reference)', () => {
