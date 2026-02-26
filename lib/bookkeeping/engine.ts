@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { eventBus } from '@/lib/events'
 import type {
   CreateJournalEntryInput,
@@ -34,11 +34,11 @@ export function validateBalance(lines: CreateJournalEntryLineInput[]): {
  * Uses the concurrent-safe INSERT ON CONFLICT implementation in the database
  */
 export async function getNextVoucherNumber(
+  supabase: SupabaseClient,
   userId: string,
   fiscalPeriodId: string,
   series: string = 'A'
 ): Promise<number> {
-  const supabase = await createClient()
 
   const { data, error } = await supabase.rpc('next_voucher_number', {
     p_user_id: userId,
@@ -57,7 +57,7 @@ export async function getNextVoucherNumber(
  * Resolve account IDs from account numbers for a user
  */
 async function resolveAccountIds(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SupabaseClient,
   userId: string,
   lines: CreateJournalEntryLineInput[]
 ): Promise<Map<string, string>> {
@@ -85,10 +85,10 @@ async function resolveAccountIds(
  * Find the fiscal period for a given date
  */
 export async function findFiscalPeriod(
+  supabase: SupabaseClient,
   userId: string,
   date: string
 ): Promise<string | null> {
-  const supabase = await createClient()
 
   // Overlapping periods are prevented by a DB exclusion constraint
   // (migration 042). limit(1) is kept as a defensive measure.
@@ -140,6 +140,7 @@ function buildLineInserts(
  * The entry stays in 'draft' status until commitEntry() is called.
  */
 export async function createDraftEntry(
+  supabase: SupabaseClient,
   userId: string,
   input: CreateJournalEntryInput
 ): Promise<JournalEntry> {
@@ -150,8 +151,6 @@ export async function createDraftEntry(
       `Journal entry is not balanced: debits (${balance.totalDebit}) != credits (${balance.totalCredit})`
     )
   }
-
-  const supabase = await createClient()
 
   // Resolve account IDs
   const accountIdMap = await resolveAccountIds(supabase, userId, input.lines)
@@ -211,10 +210,10 @@ export async function createDraftEntry(
  * Triggers balance validation and sets committed_at via DB triggers
  */
 export async function commitEntry(
+  supabase: SupabaseClient,
   userId: string,
   entryId: string
 ): Promise<JournalEntry> {
-  const supabase = await createClient()
 
   // Fetch the draft entry
   const { data: entry, error: fetchError } = await supabase
@@ -231,6 +230,7 @@ export async function commitEntry(
 
   // Assign voucher number
   const voucherNumber = await getNextVoucherNumber(
+    supabase,
     userId,
     entry.fiscal_period_id,
     entry.voucher_series || 'A'
@@ -273,6 +273,7 @@ export async function commitEntry(
  * Validates balance, resolves account IDs, assigns voucher number, inserts atomically.
  */
 export async function createJournalEntry(
+  supabase: SupabaseClient,
   userId: string,
   input: CreateJournalEntryInput
 ): Promise<JournalEntry> {
@@ -284,13 +285,12 @@ export async function createJournalEntry(
     )
   }
 
-  const supabase = await createClient()
-
   // Resolve account IDs
   const accountIdMap = await resolveAccountIds(supabase, userId, input.lines)
 
   // Get next voucher number
   const voucherNumber = await getNextVoucherNumber(
+    supabase,
     userId,
     input.fiscal_period_id,
     input.voucher_series || 'A'
@@ -367,10 +367,10 @@ export async function createJournalEntry(
  * Sets reversed_by_id/reverses_id links for compliance tracking
  */
 export async function reverseEntry(
+  supabase: SupabaseClient,
   userId: string,
   entryId: string
 ): Promise<JournalEntry> {
-  const supabase = await createClient()
 
   // Fetch original entry with lines
   const { data: original, error } = await supabase
@@ -408,6 +408,7 @@ export async function reverseEntry(
 
   // Get voucher number for the reversal
   const voucherNumber = await getNextVoucherNumber(
+    supabase,
     userId,
     original.fiscal_period_id,
     original.voucher_series || 'A'

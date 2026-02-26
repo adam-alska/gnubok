@@ -378,6 +378,7 @@ async function createCreditNote(
   if (completeCreditNote && accountingMethod === 'accrual') {
     try {
       const journalEntry = await createCreditNoteJournalEntry(
+        supabase,
         userId,
         completeCreditNote as Invoice,
         entityType

@@ -108,6 +108,7 @@ export async function POST(request: Request) {
       let journalEntryId: string | null = null
       try {
         const journalEntry = await createTransactionJournalEntry(
+          supabase,
           user.id,
           tx as Transaction,
           mappingResult
@@ -152,6 +153,7 @@ export async function POST(request: Request) {
       const sampleTx = transactions[0] as Transaction
       const sampleResult = buildMappingResultFromTemplate(template, sampleTx, entityType)
       await saveUserMappingRule(
+        supabase,
         user.id,
         merchant_name,
         sampleResult.debit_account,

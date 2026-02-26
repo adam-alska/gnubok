@@ -137,7 +137,7 @@ describe('POST /api/bookkeeping/journal-entries', () => {
 
     expect(status).toBe(200)
     expect(body.data).toEqual(entry)
-    expect(mockCreateJournalEntry).toHaveBeenCalledWith('user-1', input)
+    expect(mockCreateJournalEntry).toHaveBeenCalledWith(expect.anything(), 'user-1', input)
   })
 
   it('returns 400 when engine throws', async () => {

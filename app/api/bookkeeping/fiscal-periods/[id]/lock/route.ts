@@ -15,7 +15,7 @@ export async function POST(
   }
 
   try {
-    const period = await lockPeriod(user.id, id)
+    const period = await lockPeriod(supabase, user.id, id)
     return NextResponse.json({ data: period })
   } catch (err) {
     return NextResponse.json(

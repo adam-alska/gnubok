@@ -38,7 +38,7 @@ export async function POST(request: Request) {
 
     const buffer = await file.arrayBuffer()
 
-    const document = await uploadDocument(user.id, {
+    const document = await uploadDocument(supabase, user.id, {
       name: file.name,
       buffer,
       type: file.type,

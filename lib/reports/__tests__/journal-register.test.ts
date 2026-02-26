@@ -20,19 +20,18 @@ function makeBuilder() {
 function makeClient() {
   return {
     from: vi.fn().mockImplementation(() => makeBuilder()),
-  }
+  } as any
 }
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => makeClient()),
-}))
-
 import { generateJournalRegister } from '../journal-register'
+
+let supabase: ReturnType<typeof makeClient>
 
 beforeEach(() => {
   vi.clearAllMocks()
   resultIdx = 0
   results = []
+  supabase = makeClient()
 })
 
 describe('generateJournalRegister', () => {
@@ -41,7 +40,7 @@ describe('generateJournalRegister', () => {
       { data: null, error: null },
     ]
 
-    const report = await generateJournalRegister('user-1', 'period-1')
+    const report = await generateJournalRegister(supabase, 'user-1', 'period-1')
     expect(report.entries).toEqual([])
     expect(report.total_entries).toBe(0)
     expect(report.period).toEqual({ start: '', end: '' })
@@ -53,7 +52,7 @@ describe('generateJournalRegister', () => {
       { data: [], error: null },
     ]
 
-    const report = await generateJournalRegister('user-1', 'period-1')
+    const report = await generateJournalRegister(supabase, 'user-1', 'period-1')
     expect(report.entries).toEqual([])
     expect(report.total_entries).toBe(0)
     expect(report.period).toEqual({ start: '2024-01-01', end: '2024-12-31' })
@@ -94,7 +93,7 @@ describe('generateJournalRegister', () => {
       },
     ]
 
-    const report = await generateJournalRegister('user-1', 'period-1')
+    const report = await generateJournalRegister(supabase, 'user-1', 'period-1')
 
     expect(report.total_entries).toBe(2)
     expect(report.entries[0].voucher_number).toBe(1)
@@ -137,7 +136,7 @@ describe('generateJournalRegister', () => {
       { data: [], error: null },
     ]
 
-    const report = await generateJournalRegister('user-1', 'period-1')
+    const report = await generateJournalRegister(supabase, 'user-1', 'period-1')
 
     expect(report.entries[0].status).toBe('reversed')
     expect(report.entries[1].status).toBe('posted')
@@ -168,7 +167,7 @@ describe('generateJournalRegister', () => {
       },
     ]
 
-    const report = await generateJournalRegister('user-1', 'period-1')
+    const report = await generateJournalRegister(supabase, 'user-1', 'period-1')
 
     const line1930 = report.entries[0].lines.find((l) => l.account_number === '1930')!
     expect(line1930.account_name).toBe('Företagskonto')
@@ -197,7 +196,7 @@ describe('generateJournalRegister', () => {
       { data: [], error: null },
     ]
 
-    const report = await generateJournalRegister('user-1', 'period-1')
+    const report = await generateJournalRegister(supabase, 'user-1', 'period-1')
     expect(report.entries[0].voucher_series).toBe('A')
   })
 })

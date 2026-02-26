@@ -117,7 +117,7 @@ export function NotificationSettings({ onSettingsChange }: NotificationSettingsP
         return
       }
 
-      const vapidResponse = await fetch('/api/extensions/push-notifications/subscribe')
+      const vapidResponse = await fetch('/api/extensions/ext/push-notifications/subscribe')
       const { vapidPublicKey } = await vapidResponse.json()
 
       if (!vapidPublicKey) {
@@ -130,7 +130,7 @@ export function NotificationSettings({ onSettingsChange }: NotificationSettingsP
         applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
       })
 
-      const response = await fetch('/api/extensions/push-notifications/subscribe', {
+      const response = await fetch('/api/extensions/ext/push-notifications/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(subscription.toJSON()),
@@ -162,7 +162,7 @@ export function NotificationSettings({ onSettingsChange }: NotificationSettingsP
       if (subscription) {
         await subscription.unsubscribe()
 
-        await fetch('/api/extensions/push-notifications/subscribe', {
+        await fetch('/api/extensions/ext/push-notifications/subscribe', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ endpoint: subscription.endpoint }),

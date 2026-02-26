@@ -26,10 +26,6 @@ function makeClient() {
   }
 }
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => makeClient()),
-}))
-
 vi.mock('@/lib/bookkeeping/engine', () => ({
   validateBalance: vi.fn().mockReturnValue({ valid: true, totalDebit: 1000, totalCredit: 1000 }),
   getNextVoucherNumber: vi.fn(async () => ++resultIdx), // just increment
@@ -100,14 +96,16 @@ describe('correctEntry', () => {
 
   it('creates reversal with swapped debit/credit lines', async () => {
     setupResults()
-    const result = await correctEntry('user-1', 'orig-1', correctedLines)
+    const supabase = makeClient()
+    const result = await correctEntry(supabase as never, 'user-1', 'orig-1', correctedLines)
     expect(result.reversal).toBeDefined()
     expect(result.reversal.reverses_id).toBe('orig-1')
   })
 
   it('links original ↔ reversal ↔ corrected via IDs', async () => {
     setupResults()
-    const result = await correctEntry('user-1', 'orig-1', correctedLines)
+    const supabase = makeClient()
+    const result = await correctEntry(supabase as never, 'user-1', 'orig-1', correctedLines)
     expect(result.reversal.id).toBe('reversal-1')
     expect(result.corrected.id).toBe('corrected-1')
     expect(result.corrected.correction_of_id).toBe('orig-1')
@@ -120,8 +118,9 @@ describe('correctEntry', () => {
       totalCredit: 1000,
     })
 
+    const supabase = makeClient()
     await expect(
-      correctEntry('user-1', 'orig-1', [
+      correctEntry(supabase as never, 'user-1', 'orig-1', [
         { account_number: '5420', debit_amount: 1200, credit_amount: 0 },
         { account_number: '1930', debit_amount: 0, credit_amount: 1000 },
       ])
@@ -134,7 +133,8 @@ describe('correctEntry', () => {
     const handler = vi.fn()
     eventBus.on('journal_entry.corrected', handler)
 
-    await correctEntry('user-1', 'orig-1', correctedLines)
+    const supabase = makeClient()
+    await correctEntry(supabase as never, 'user-1', 'orig-1', correctedLines)
 
     expect(handler).toHaveBeenCalledOnce()
     expect(handler).toHaveBeenCalledWith(

@@ -10,10 +10,19 @@ import {
 // Mock init
 vi.mock('@/lib/init', () => ({ ensureInitialized: vi.fn() }))
 
-// Mock template embeddings
+// Mock extension registry
 const mockFindSimilarTemplates = vi.fn().mockResolvedValue([])
-vi.mock('@/lib/bookkeeping/template-embeddings', () => ({
-  findSimilarTemplates: (...args: unknown[]) => mockFindSimilarTemplates(...args),
+vi.mock('@/lib/extensions/registry', () => ({
+  extensionRegistry: {
+    get: vi.fn().mockReturnValue({
+      id: 'ai-categorization',
+      name: 'AI',
+      version: '1.0.0',
+      services: {
+        findSimilarTemplates: (...args: unknown[]) => mockFindSimilarTemplates(...args),
+      },
+    }),
+  },
 }))
 
 // Mock Supabase

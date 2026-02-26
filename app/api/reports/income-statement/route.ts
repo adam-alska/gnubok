@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     .single()
 
   try {
-    const result = await generateIncomeStatement(user.id, periodId)
+    const result = await generateIncomeStatement(supabase, user.id, periodId)
 
     if (period) {
       result.period = {

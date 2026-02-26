@@ -12,8 +12,6 @@ import { makeJournalEntry, makeTransaction } from '@/tests/helpers'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/supabase/server')
-
 const mockEvaluateMappingRules = vi.fn()
 vi.mock('@/lib/bookkeeping/mapping-engine', () => ({
   evaluateMappingRules: (...args: unknown[]) => mockEvaluateMappingRules(...args),
@@ -231,6 +229,7 @@ describe('ingestTransactions', () => {
 
     expect(result.auto_matched_invoices).toBe(1)
     expect(mockGetBestInvoiceMatch).toHaveBeenCalledWith(
+      expect.anything(), // supabase client
       USER_ID,
       expect.objectContaining({ id: 'tx-income' }),
       0.50
@@ -300,6 +299,7 @@ describe('ingestTransactions', () => {
 
     expect(result.auto_categorized).toBe(1)
     expect(mockCreateTransactionJournalEntry).toHaveBeenCalledWith(
+      expect.anything(),
       USER_ID,
       expect.objectContaining({ id: 'tx-cat' }),
       expect.objectContaining({ confidence: 0.85 })

@@ -60,7 +60,7 @@ describe('POST /api/bookkeeping/journal-entries/[id]/reverse', () => {
 
     expect(status).toBe(200)
     expect(body.data).toEqual(reversalEntry)
-    expect(mockReverseEntry).toHaveBeenCalledWith('user-1', 'entry-1')
+    expect(mockReverseEntry).toHaveBeenCalledWith(expect.anything(), 'user-1', 'entry-1')
   })
 
   it('returns 400 when engine throws', async () => {

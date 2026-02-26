@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Invoice, Transaction, Customer } from '@/types'
 
 export interface InvoiceMatch {
@@ -117,6 +117,7 @@ function calculateMatchScore(
  * Returns matches sorted by confidence, filtered to >= 50% confidence
  */
 export async function findMatchingInvoices(
+  supabase: SupabaseClient,
   userId: string,
   transaction: Transaction
 ): Promise<InvoiceMatch[]> {
@@ -124,8 +125,6 @@ export async function findMatchingInvoices(
   if (transaction.amount <= 0) {
     return []
   }
-
-  const supabase = await createClient()
 
   // Query unpaid invoices (sent or overdue) with customer info
   const { data: invoices, error } = await supabase
@@ -222,11 +221,12 @@ export async function findMatchingInvoices(
  * Returns the highest confidence match if it meets the threshold
  */
 export async function getBestInvoiceMatch(
+  supabase: SupabaseClient,
   userId: string,
   transaction: Transaction,
   minConfidence: number = 0.80
 ): Promise<InvoiceMatch | null> {
-  const matches = await findMatchingInvoices(userId, transaction)
+  const matches = await findMatchingInvoices(supabase, userId, transaction)
 
   if (matches.length > 0 && matches[0].confidence >= minConfidence) {
     return matches[0]

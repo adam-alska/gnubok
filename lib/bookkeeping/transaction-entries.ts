@@ -1,6 +1,7 @@
 import { createJournalEntry, findFiscalPeriod } from './engine'
 import { generateInputVatLine, generateReverseChargeLines, extractNetAmount, extractVatAmount } from './vat-entries'
 import { createLogger } from '@/lib/logger'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   CreateJournalEntryInput,
   CreateJournalEntryLineInput,
@@ -38,6 +39,7 @@ const log = createLogger('transaction-entries')
  *   Credit 3xxx Revenue account        [total]
  */
 export async function createTransactionJournalEntry(
+  supabase: SupabaseClient,
   userId: string,
   transaction: Transaction,
   mappingResult: MappingResult
@@ -48,7 +50,7 @@ export async function createTransactionJournalEntry(
     )
   }
 
-  const fiscalPeriodId = await findFiscalPeriod(userId, transaction.date)
+  const fiscalPeriodId = await findFiscalPeriod(supabase, userId, transaction.date)
   if (!fiscalPeriodId) {
     log.warn('No open fiscal period found for transaction date:', transaction.date)
     return null
@@ -183,7 +185,7 @@ export async function createTransactionJournalEntry(
     lines,
   }
 
-  return createJournalEntry(userId, input)
+  return createJournalEntry(supabase, userId, input)
 }
 
 /**

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getSuggestedCategories, mergeAiSuggestions, getSuggestedTemplates, type SuggestedCategory, type SuggestedTemplate } from '@/lib/transactions/category-suggestions'
+import { extensionRegistry } from '@/lib/extensions/registry'
 import type { Transaction, TransactionCategory, EntityType } from '@/types'
 
 // Minimum confidence threshold — below this, suggestions are considered weak
@@ -195,10 +196,12 @@ export async function POST(request: Request) {
     )
 
     try {
-      const { categorizeTransactions } = await import(
-        '@/extensions/general/ai-categorization'
-      )
-      const aiResults = await categorizeTransactions(user.id, needsAiIds)
+      const aiExt = extensionRegistry.get('ai-categorization')
+      if (!aiExt?.services?.categorizeTransactions) {
+        console.log('[suggest-categories] AI categorization extension not loaded, skipping on-demand AI')
+        return NextResponse.json({ suggestions, template_suggestions })
+      }
+      const aiResults: Array<{ transactionId: string; category: string; basAccount: string; confidence: number; reasoning: string; isPrivate?: boolean; templateId?: string }> = await aiExt.services.categorizeTransactions(user.id, needsAiIds)
 
       console.log(
         '[suggest-categories] AI categorization results:',

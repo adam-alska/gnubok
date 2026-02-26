@@ -36,7 +36,7 @@ export default function ScanReceiptPage() {
       formData.append('image', blob, 'receipt.jpg')
 
       // Upload and analyze
-      const response = await fetch('/api/extensions/receipt-ocr/upload', {
+      const response = await fetch('/api/extensions/ext/receipt-ocr/upload', {
         method: 'POST',
         body: formData,
       })
@@ -70,7 +70,7 @@ export default function ScanReceiptPage() {
   }) => {
     if (!receipt) return
 
-    const response = await fetch(`/api/extensions/receipt-ocr/${receipt.id}/confirm`, {
+    const response = await fetch(`/api/extensions/ext/receipt-ocr/${receipt.id}/confirm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -90,7 +90,7 @@ export default function ScanReceiptPage() {
   const handleMatch = async (transactionId: string, confidence: number) => {
     if (!receipt) return
 
-    const response = await fetch(`/api/extensions/receipt-ocr/${receipt.id}/match`, {
+    const response = await fetch(`/api/extensions/ext/receipt-ocr/${receipt.id}/match`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ transaction_id: transactionId, match_confidence: confidence }),

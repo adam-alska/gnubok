@@ -187,6 +187,7 @@ describe('POST /api/transactions/[id]/match-invoice', () => {
 
     // Verify accrual payment entry was called
     expect(mockCreateInvoicePaymentJournalEntry).toHaveBeenCalledWith(
+      expect.anything(),
       'user-1',
       expect.objectContaining({ id: VALID_UUID }),
       '2024-06-15'

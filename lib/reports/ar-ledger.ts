@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export interface ARInvoiceDetail {
   invoice_id: string
@@ -37,10 +37,10 @@ export interface ARLedgerReport {
  * BFL 5 kap. 4 § — sidoordnad bokföring: outstanding customer invoices with aging.
  */
 export async function generateARLedger(
+  supabase: SupabaseClient,
   userId: string,
   asOfDate?: string
 ): Promise<ARLedgerReport> {
-  const supabase = await createClient()
   const refDate = asOfDate ? new Date(asOfDate) : new Date()
 
   // Fetch all unpaid/sent/overdue invoices with customer info

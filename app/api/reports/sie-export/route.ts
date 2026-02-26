@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const sieContent = await generateSIEExport(user.id, {
+    const sieContent = await generateSIEExport(supabase, user.id, {
       fiscal_period_id: periodId,
       company_name: company.company_name || 'Unknown',
       org_number: company.org_number,

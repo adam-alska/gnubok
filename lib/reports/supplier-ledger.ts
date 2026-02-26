@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export interface SupplierLedgerEntry {
   supplier_id: string
@@ -23,10 +23,10 @@ export interface SupplierLedgerReport {
  * Generate supplier ledger (leverantörsreskontra) with aging analysis
  */
 export async function generateSupplierLedger(
+  supabase: SupabaseClient,
   userId: string,
   asOfDate?: string
 ): Promise<SupplierLedgerReport> {
-  const supabase = await createClient()
   const refDate = asOfDate ? new Date(asOfDate) : new Date()
 
   // Fetch all unpaid/partially_paid supplier invoices

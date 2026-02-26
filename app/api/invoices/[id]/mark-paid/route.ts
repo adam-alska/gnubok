@@ -86,6 +86,7 @@ export async function POST(
       if (accountingMethod === 'accrual') {
         // Faktureringsmetoden: clear receivable (Debit 1930, Credit 1510)
         const journalEntry = await createInvoicePaymentJournalEntry(
+          supabase,
           user.id,
           invoice as Invoice,
           paymentDate
@@ -94,6 +95,7 @@ export async function POST(
       } else {
         // Kontantmetoden: combined revenue entry (Debit 1930, Credit 30xx, Credit 26xx)
         const journalEntry = await createInvoiceCashEntry(
+          supabase,
           user.id,
           invoice as Invoice,
           paymentDate,

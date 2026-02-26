@@ -49,7 +49,7 @@ export async function POST(
   // Create journal entry via the engine
   let journalEntry
   try {
-    journalEntry = await createJournalEntry(user.id, {
+    journalEntry = await createJournalEntry(supabase, user.id, {
       fiscal_period_id,
       entry_date,
       description,

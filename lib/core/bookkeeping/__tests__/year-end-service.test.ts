@@ -27,10 +27,6 @@ function makeClient() {
   }
 }
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => makeClient()),
-}))
-
 vi.mock('@/lib/reports/trial-balance', () => ({
   generateTrialBalance: vi.fn(),
 }))
@@ -80,7 +76,8 @@ describe('validateYearEndReadiness', () => {
       totalCredit: 0,
     } as never)
 
-    const result = await validateYearEndReadiness('user-1', 'fp-1')
+    const supabase = makeClient()
+    const result = await validateYearEndReadiness(supabase as never, 'user-1', 'fp-1')
     expect(result.ready).toBe(false)
     expect(result.errors.some((e: string) => e.includes('draft'))).toBe(true)
   })
@@ -101,7 +98,8 @@ describe('validateYearEndReadiness', () => {
       totalCredit: 9500,
     } as never)
 
-    const result = await validateYearEndReadiness('user-1', 'fp-1')
+    const supabase = makeClient()
+    const result = await validateYearEndReadiness(supabase as never, 'user-1', 'fp-1')
     expect(result.ready).toBe(false)
     expect(result.trialBalanceBalanced).toBe(false)
     expect(result.errors.some((e: string) => e.includes('Trial balance'))).toBe(true)
@@ -110,17 +108,15 @@ describe('validateYearEndReadiness', () => {
   it('warns on voucher gaps', async () => {
     const period = makeFiscalPeriod({ id: 'fp-1', is_closed: false, closing_entry_id: null })
 
-    // Override makeClient to return gaps from rpc
-    const { createClient } = await import('@/lib/supabase/server')
+    // Create a client with custom rpc that returns gap data
     const builder = makeBuilder()
-    const client = {
+    const supabase = {
       from: vi.fn().mockImplementation(() => builder),
       rpc: vi.fn().mockResolvedValue({
         data: [{ gap_start: 5, gap_end: 7 }],
         error: null,
       }),
     }
-    vi.mocked(createClient).mockResolvedValue(client as never)
 
     resultIdx = 0
     results = [
@@ -136,7 +132,7 @@ describe('validateYearEndReadiness', () => {
       totalCredit: 10000,
     } as never)
 
-    const result = await validateYearEndReadiness('user-1', 'fp-1')
+    const result = await validateYearEndReadiness(supabase as never, 'user-1', 'fp-1')
     expect(result.warnings.some((w: string) => w.includes('gap'))).toBe(true)
     expect(result.voucherGaps).toHaveLength(1)
   })
@@ -164,7 +160,8 @@ describe('previewYearEndClosing', () => {
       totalCredit: 500000,
     } as never)
 
-    const preview = await previewYearEndClosing('user-1', 'fp-1')
+    const supabase = makeClient()
+    const preview = await previewYearEndClosing(supabase as never, 'user-1', 'fp-1')
 
     expect(preview.netResult).toBe(150000)
     expect(preview.closingAccount).toBe('2099')
@@ -189,7 +186,8 @@ describe('previewYearEndClosing', () => {
       totalCredit: 100000,
     } as never)
 
-    const preview = await previewYearEndClosing('user-1', 'fp-1')
+    const supabase = makeClient()
+    const preview = await previewYearEndClosing(supabase as never, 'user-1', 'fp-1')
 
     expect(preview.closingAccount).toBe('2010')
     expect(preview.closingAccountName).toBe('Eget kapital')

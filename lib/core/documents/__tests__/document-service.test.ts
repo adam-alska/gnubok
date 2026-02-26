@@ -43,13 +43,12 @@ function makeClient(storageOverrides: Record<string, unknown> = {}) {
   }
 }
 
+// Keep createServiceClient mock since ensureDocumentsBucket still uses it
 vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => makeClient()),
   createServiceClient: vi.fn(async () => makeClient()),
 }))
 
 import { uploadDocument, createNewVersion, verifyIntegrity, _resetBucketVerified } from '../document-service'
-import { createClient } from '@/lib/supabase/server'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -57,8 +56,6 @@ beforeEach(() => {
   _resetBucketVerified()
   resultIdx = 0
   results = []
-  // Reset the mock to use default makeClient
-  vi.mocked(createClient).mockImplementation(async () => makeClient() as never)
 })
 
 describe('uploadDocument', () => {
@@ -76,8 +73,9 @@ describe('uploadDocument', () => {
     const handler = vi.fn()
     eventBus.on('document.uploaded', handler)
 
+    const supabase = makeClient()
     const buffer = new TextEncoder().encode('test content').buffer
-    const result = await uploadDocument('user-1', {
+    const result = await uploadDocument(supabase as never, 'user-1', {
       name: 'test.pdf',
       buffer: buffer as ArrayBuffer,
       type: 'application/pdf',
@@ -115,8 +113,9 @@ describe('createNewVersion', () => {
       { data: newVersion, error: null },   // insert new version
     ]
 
+    const supabase = makeClient()
     const buffer = new TextEncoder().encode('new content').buffer
-    const result = await createNewVersion('user-1', 'doc-1', {
+    const result = await createNewVersion(supabase as never, 'user-1', 'doc-1', {
       name: 'test-v2.pdf',
       buffer: buffer as ArrayBuffer,
       type: 'application/pdf',
@@ -140,17 +139,15 @@ describe('verifyIntegrity', () => {
       { data: { storage_path: 'docs/test.pdf', sha256_hash: expectedHash }, error: null },
     ]
 
-    // Override createClient to provide matching download content
-    vi.mocked(createClient).mockImplementation(async () =>
-      makeClient({
-        download: vi.fn().mockResolvedValue({
-          data: new Blob([content]),
-          error: null,
-        }),
-      }) as never
-    )
+    // Create a client with matching download content
+    const supabase = makeClient({
+      download: vi.fn().mockResolvedValue({
+        data: new Blob([content]),
+        error: null,
+      }),
+    })
 
-    const result = await verifyIntegrity('user-1', 'doc-1')
+    const result = await verifyIntegrity(supabase as never, 'user-1', 'doc-1')
     expect(result.valid).toBe(true)
     expect(result.storedHash).toBe(expectedHash)
     expect(result.computedHash).toBe(expectedHash)
@@ -161,16 +158,14 @@ describe('verifyIntegrity', () => {
       { data: { storage_path: 'docs/test.pdf', sha256_hash: 'stored-hash-abc' }, error: null },
     ]
 
-    vi.mocked(createClient).mockImplementation(async () =>
-      makeClient({
-        download: vi.fn().mockResolvedValue({
-          data: new Blob(['different content']),
-          error: null,
-        }),
-      }) as never
-    )
+    const supabase = makeClient({
+      download: vi.fn().mockResolvedValue({
+        data: new Blob(['different content']),
+        error: null,
+      }),
+    })
 
-    const result = await verifyIntegrity('user-1', 'doc-1')
+    const result = await verifyIntegrity(supabase as never, 'user-1', 'doc-1')
     expect(result.valid).toBe(false)
     expect(result.storedHash).toBe('stored-hash-abc')
     expect(result.computedHash).not.toBe('stored-hash-abc')

@@ -69,7 +69,7 @@ export async function POST(request: Request) {
   const body = validation.data
 
   try {
-    const entry = await createJournalEntry(user.id, body)
+    const entry = await createJournalEntry(supabase, user.id, body)
     return NextResponse.json({ data: entry })
   } catch (err) {
     return NextResponse.json(

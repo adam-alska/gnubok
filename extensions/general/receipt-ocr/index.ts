@@ -1,6 +1,7 @@
 import { analyzeReceipt } from './lib/receipt-analyzer'
 import { processLineItems } from './lib/receipt-categorizer'
 import { autoMatchReceipts } from './lib/receipt-matcher'
+import { receiptOcrApiRoutes } from './api-routes'
 import type { Extension, ExtensionContext } from '@/lib/extensions/types'
 import type { EventPayload } from '@/lib/events/types'
 import type { Receipt } from '@/types'
@@ -310,6 +311,8 @@ export const receiptOcrExtension: Extension = {
   id: 'receipt-ocr',
   name: 'Receipt OCR',
   version: '1.0.0',
+  sector: 'general',
+  apiRoutes: receiptOcrApiRoutes,
   eventHandlers: [
     { eventType: 'document.uploaded', handler: handleDocumentUploaded },
     { eventType: 'transaction.synced', handler: handleTransactionSynced },

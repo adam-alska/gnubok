@@ -21,19 +21,18 @@ function makeClient() {
   return {
     from: vi.fn().mockImplementation(() => makeBuilder()),
     rpc: vi.fn().mockImplementation(async () => results[resultIdx++] ?? { data: null, error: null }),
-  }
+  } as any
 }
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => makeClient()),
-}))
-
 import { generateTrialBalance } from '../trial-balance'
+
+let supabase: ReturnType<typeof makeClient>
 
 beforeEach(() => {
   vi.clearAllMocks()
   resultIdx = 0
   results = []
+  supabase = makeClient()
 })
 
 describe('generateTrialBalance', () => {
@@ -69,7 +68,7 @@ describe('generateTrialBalance', () => {
       },
     ]
 
-    const result = await generateTrialBalance('user-1', 'period-1')
+    const result = await generateTrialBalance(supabase, 'user-1', 'period-1')
 
     expect(result.rows).toHaveLength(2)
     expect(result.totalDebit).toBe(5000)
@@ -104,7 +103,7 @@ describe('generateTrialBalance', () => {
       },
     ]
 
-    const result = await generateTrialBalance('user-1', 'period-1')
+    const result = await generateTrialBalance(supabase, 'user-1', 'period-1')
 
     expect(result.rows).toHaveLength(2)
     expect(result.totalDebit).toBe(1000)
@@ -120,7 +119,7 @@ describe('generateTrialBalance', () => {
       { data: [], error: null },
     ]
 
-    const result = await generateTrialBalance('user-1', 'period-1')
+    const result = await generateTrialBalance(supabase, 'user-1', 'period-1')
 
     expect(result.rows).toEqual([])
     expect(result.isBalanced).toBe(true)
@@ -134,7 +133,7 @@ describe('generateTrialBalance', () => {
       { data: [], error: null },
     ]
 
-    const result = await generateTrialBalance('user-1', 'period-1')
+    const result = await generateTrialBalance(supabase, 'user-1', 'period-1')
 
     expect(result.rows).toEqual([])
     expect(result.totalDebit).toBe(0)
@@ -168,7 +167,7 @@ describe('generateTrialBalance', () => {
       },
     ]
 
-    const result = await generateTrialBalance('user-1', 'period-1')
+    const result = await generateTrialBalance(supabase, 'user-1', 'period-1')
 
     expect(result.rows).toHaveLength(2)
     // Sorted by account number
@@ -199,7 +198,7 @@ describe('generateTrialBalance', () => {
       { data: [], error: null },
     ]
 
-    const result = await generateTrialBalance('user-1', 'period-1')
+    const result = await generateTrialBalance(supabase, 'user-1', 'period-1')
 
     expect(result.rows[0].account_name).toBe('Konto 9999')
   })
@@ -221,7 +220,7 @@ describe('generateTrialBalance', () => {
       { data: [], error: null },
     ]
 
-    const result = await generateTrialBalance('user-1', 'period-1')
+    const result = await generateTrialBalance(supabase, 'user-1', 'period-1')
 
     expect(result.rows[0].account_class).toBe(5)
   })
@@ -252,7 +251,7 @@ describe('generateTrialBalance', () => {
       },
     ]
 
-    const result = await generateTrialBalance('user-1', 'period-1')
+    const result = await generateTrialBalance(supabase, 'user-1', 'period-1')
 
     expect(result.rows[0].closing_debit).toBe(100)
     expect(result.totalDebit).toBe(100)
@@ -292,7 +291,7 @@ describe('generateTrialBalance', () => {
       },
     ]
 
-    const result = await generateTrialBalance('user-1', 'period-1')
+    const result = await generateTrialBalance(supabase, 'user-1', 'period-1')
 
     expect(result.totalDebit).toBe(1000)
     expect(result.totalCredit).toBe(999)
@@ -307,7 +306,7 @@ describe('generateTrialBalance', () => {
       { data: null, error: { message: 'DB error' } },
     ]
 
-    const result = await generateTrialBalance('user-1', 'period-1')
+    const result = await generateTrialBalance(supabase, 'user-1', 'period-1')
 
     expect(result.rows).toEqual([])
     expect(result.isBalanced).toBe(true)

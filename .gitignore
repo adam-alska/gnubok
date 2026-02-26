@@ -40,3 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Extension registry (auto-generated but defaults are committed)
+# Run `npm run setup:extensions` to regenerate after changing extensions.config.json
+# The empty defaults in lib/extensions/_generated/ are committed so core compiles
+# out of the box without running the generator.

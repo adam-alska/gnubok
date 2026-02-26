@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { generateTrialBalance } from './trial-balance'
 import type { IncomeStatementReport, IncomeStatementSection, TrialBalanceRow } from '@/types'
 
@@ -11,10 +12,11 @@ import type { IncomeStatementReport, IncomeStatementSection, TrialBalanceRow } f
  * - Årets resultat: Net result
  */
 export async function generateIncomeStatement(
+  supabase: SupabaseClient,
   userId: string,
   fiscalPeriodId: string
 ): Promise<IncomeStatementReport> {
-  const { rows } = await generateTrialBalance(userId, fiscalPeriodId)
+  const { rows } = await generateTrialBalance(supabase, userId, fiscalPeriodId)
 
   // Filter to income/expense accounts (class 3-8)
   const incomeExpenseRows = rows.filter(

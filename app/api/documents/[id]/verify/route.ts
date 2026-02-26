@@ -24,7 +24,7 @@ export async function POST(
   const { id } = await params
 
   try {
-    const result = await verifyIntegrity(user.id, id)
+    const result = await verifyIntegrity(supabase, user.id, id)
 
     return NextResponse.json({ data: result })
   } catch (error) {

@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server'
 import { ensureInitialized } from '@/lib/init'
 import { validateBody } from '@/lib/api/validate'
 import { DescribeTransactionSchema } from '@/lib/api/schemas'
-import { findSimilarTemplates } from '@/lib/bookkeeping/template-embeddings'
+import { extensionRegistry } from '@/lib/extensions/registry'
+import { findMatchingTemplates, type TemplateMatch } from '@/lib/bookkeeping/booking-templates'
 import type { Transaction, EntityType } from '@/types'
 
 ensureInitialized()
@@ -47,12 +48,19 @@ export async function POST(
   const entityType: EntityType = (settings?.entity_type as EntityType) || 'enskild_firma'
 
   // Run embedding search with user description dominating the query
-  const templates = await findSimilarTemplates(
-    transaction as Transaction,
-    entityType,
-    10,
-    description
-  )
+  let templates: TemplateMatch[]
+  const aiExt = extensionRegistry.get('ai-categorization')
+  if (aiExt?.services?.findSimilarTemplates) {
+    templates = await aiExt.services.findSimilarTemplates(
+      transaction as Transaction,
+      entityType,
+      10,
+      description
+    )
+  } else {
+    // Fallback to keyword matching when AI extension not loaded
+    templates = findMatchingTemplates(transaction as Transaction, entityType)
+  }
 
   // Flag if top confidence is too low
   const needsMoreDetail = templates.length === 0 || templates[0].confidence < 0.55

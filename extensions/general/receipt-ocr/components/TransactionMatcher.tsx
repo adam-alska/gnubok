@@ -34,7 +34,7 @@ export default function TransactionMatcher({
       setIsLoading(true)
       setError(null)
       try {
-        const response = await fetch(`/api/extensions/receipt-ocr/${receipt.id}/match`, {
+        const response = await fetch(`/api/extensions/ext/receipt-ocr/${receipt.id}/match`, {
           method: 'POST',
         })
         const data = await response.json()

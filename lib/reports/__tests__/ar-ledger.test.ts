@@ -20,19 +20,18 @@ function makeBuilder() {
 function makeClient() {
   return {
     from: vi.fn().mockImplementation(() => makeBuilder()),
-  }
+  } as any
 }
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => makeClient()),
-}))
-
 import { generateARLedger } from '../ar-ledger'
+
+let supabase: ReturnType<typeof makeClient>
 
 beforeEach(() => {
   vi.clearAllMocks()
   resultIdx = 0
   results = []
+  supabase = makeClient()
 })
 
 describe('generateARLedger', () => {
@@ -41,7 +40,7 @@ describe('generateARLedger', () => {
       { data: [], error: null },
     ]
 
-    const report = await generateARLedger('user-1')
+    const report = await generateARLedger(supabase, 'user-1')
     expect(report.entries).toEqual([])
     expect(report.total_outstanding).toBe(0)
     expect(report.unpaid_count).toBe(0)
@@ -52,7 +51,7 @@ describe('generateARLedger', () => {
       { data: null, error: { message: 'DB error' } },
     ]
 
-    const report = await generateARLedger('user-1')
+    const report = await generateARLedger(supabase, 'user-1')
     expect(report.entries).toEqual([])
     expect(report.total_outstanding).toBe(0)
   })
@@ -107,7 +106,7 @@ describe('generateARLedger', () => {
       },
     ]
 
-    const report = await generateARLedger('user-1', asOfDate)
+    const report = await generateARLedger(supabase, 'user-1', asOfDate)
 
     expect(report.unpaid_count).toBe(3)
     expect(report.entries).toHaveLength(2)
@@ -150,7 +149,7 @@ describe('generateARLedger', () => {
       },
     ]
 
-    const report = await generateARLedger('user-1', '2024-06-15')
+    const report = await generateARLedger(supabase, 'user-1', '2024-06-15')
 
     expect(report.entries[0].invoices[0].outstanding).toBe(2500)
     expect(report.total_outstanding).toBe(2500)
@@ -189,7 +188,7 @@ describe('generateARLedger', () => {
       },
     ]
 
-    const report = await generateARLedger('user-1', '2024-05-15')
+    const report = await generateARLedger(supabase, 'user-1', '2024-05-15')
 
     // Sorted by due_date: F001 (June 1) before F002 (July 1)
     expect(report.entries[0].invoices[0].invoice_number).toBe('F001')
@@ -217,7 +216,7 @@ describe('generateARLedger', () => {
       },
     ]
 
-    const report = await generateARLedger('user-1', '2024-06-15')
+    const report = await generateARLedger(supabase, 'user-1', '2024-06-15')
     expect(report.entries[0].invoices[0].outstanding).toBe(66.77)
     expect(report.total_outstanding).toBe(66.77)
   })
@@ -243,7 +242,7 @@ describe('generateARLedger', () => {
       },
     ]
 
-    const report = await generateARLedger('user-1', '2024-06-15')
+    const report = await generateARLedger(supabase, 'user-1', '2024-06-15')
     expect(report.entries[0].customer_name).toBe('Okänd kund')
   })
 })

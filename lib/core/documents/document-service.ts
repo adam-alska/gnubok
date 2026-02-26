@@ -1,4 +1,5 @@
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { createServiceClient } from '@/lib/supabase/server'
 import { eventBus } from '@/lib/events'
 import type { DocumentAttachment, CreateDocumentAttachmentInput, DocumentUploadSource } from '@/types'
 
@@ -50,6 +51,7 @@ export async function computeSHA256(buffer: ArrayBuffer): Promise<string> {
  * Upload a document and create a record with SHA-256 integrity hash
  */
 export async function uploadDocument(
+  supabase: SupabaseClient,
   userId: string,
   file: { name: string; buffer: ArrayBuffer; type?: string },
   metadata: {
@@ -59,7 +61,6 @@ export async function uploadDocument(
   } = {}
 ): Promise<DocumentAttachment> {
   await ensureDocumentsBucket()
-  const supabase = await createClient()
 
   // Compute SHA-256 hash
   const sha256Hash = await computeSHA256(file.buffer)
@@ -126,12 +127,12 @@ export async function uploadDocument(
  * - Single transaction (insert new + mark old superseded)
  */
 export async function createNewVersion(
+  supabase: SupabaseClient,
   userId: string,
   originalId: string,
   file: { name: string; buffer: ArrayBuffer; type?: string }
 ): Promise<DocumentAttachment> {
   await ensureDocumentsBucket()
-  const supabase = await createClient()
 
   // Compute SHA-256 hash
   const sha256Hash = await computeSHA256(file.buffer)
@@ -186,12 +187,12 @@ export async function createNewVersion(
  * Link an existing document to a journal entry
  */
 export async function linkToJournalEntry(
+  supabase: SupabaseClient,
   userId: string,
   documentId: string,
   journalEntryId: string,
   journalEntryLineId?: string
 ): Promise<DocumentAttachment> {
-  const supabase = await createClient()
 
   const { data, error } = await supabase
     .from('document_attachments')
@@ -215,10 +216,10 @@ export async function linkToJournalEntry(
  * Verify document integrity by re-hashing and comparing
  */
 export async function verifyIntegrity(
+  supabase: SupabaseClient,
   userId: string,
   documentId: string
 ): Promise<{ valid: boolean; storedHash: string; computedHash: string }> {
-  const supabase = await createClient()
 
   // Fetch document record
   const { data: doc, error: docError } = await supabase

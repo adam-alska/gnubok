@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export interface MonthlyBreakdownMonth {
   label: string
@@ -24,10 +24,10 @@ const MONTH_LABELS = [
  * - Class 4-7 (40xx-79xx) = expenses (debit side)
  */
 export async function generateMonthlyBreakdown(
+  supabase: SupabaseClient,
   userId: string,
   fiscalPeriodId: string
 ): Promise<MonthlyBreakdown> {
-  const supabase = await createClient()
 
   // Get the fiscal period date range
   const { data: period, error: periodError } = await supabase

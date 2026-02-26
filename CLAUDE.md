@@ -17,11 +17,12 @@ erp-base is a Swedish-focused accounting SaaS for sole traders (enskild firma) a
 ## Commands
 
 ```bash
-npm run dev          # Start development server
-npm run build        # Production build
-npm run lint         # ESLint
-npm test             # Run all Vitest tests
-npx vitest run <dir> # Run tests in a specific directory
+npm run dev              # Start development server (runs setup:extensions first)
+npm run build            # Production build (runs setup:extensions first)
+npm run lint             # ESLint
+npm test                 # Run all Vitest tests
+npx vitest run <dir>     # Run tests in a specific directory
+npm run setup:extensions # Regenerate extension registry from extensions.config.json
 ```
 
 ---
@@ -50,7 +51,7 @@ components/
                           TaxTodoWidget, UpcomingDeadlinesWidget
   extensions/             Extension marketplace UI (ExtensionCard, SectorCard,
                           ExtensionToggleButton, workspace components,
-                          per-sector subdirectories, shared reusable components)
+                          general/ subdirectory for general extension workspaces)
   import/                 Bank file import workflow components (SIE + bank file steps)
   invoices/               InvoiceReviewContent
   onboarding/             NewUserChecklist, setup step components
@@ -60,36 +61,18 @@ components/
   transactions/           Transaction list, categorization, booking, swipe review,
                           batch operations, invoice matching, VAT treatment
 
-extensions/               Sector-based extension hierarchy
+extensions/               Config-driven extension directory (general only)
   general/                General-purpose extensions (all businesses)
     ai-categorization/    AI-powered transaction categorization
     ai-chat/              Claude-based chat assistant (LangChain RAG)
     calendar/             Payment calendar views, deadline cards, payment summary
-    enable-banking/       PSD2 bank integration (opt-in, commented out in loader)
+    email/                Email service (Resend) — registers via EmailService interface
+    enable-banking/       PSD2 bank integration (opt-in)
     example-logger/       Minimal reference extension (not loaded)
     invoice-inbox/        Supplier invoice intake via email/upload with AI extraction
     push-notifications/   Web push notification system
     receipt-ocr/          Receipt image OCR processing (includes components/pages)
     user-description-match/ User description matching for transaction categorization
-  restaurant/             Restaurant & cafe sector
-    food-cost/            Food cost percentage calculator
-    earnings-per-liter/   Revenue per liter of alcohol
-    pos-import/           POS Z-report import
-    tip-tracking/         Tip tracking per shift/employee
-  construction/           Construction & trades sector
-    rot-calculator/       ROT tax deduction calculator
-    project-cost/         Project cost tracking
-  hotel/                  Hotel & lodging sector
-    revpar/               Revenue Per Available Room
-    occupancy/            Occupancy rate tracking
-  tech/                   IT & consulting sector
-    billable-hours/       Billable hours & utilization rate
-    project-billing/      Project billing analysis
-  ecommerce/              E-commerce sector
-    shopify-import/       Shopify order import
-    multichannel-revenue/ Multi-channel revenue analysis
-  ne-bilaga/              NE tax form attachment generation (top-level)
-  sru-export/             SRU file export (top-level)
 
 lib/
   api/                    Zod validation schemas and utilities for API routes
@@ -118,24 +101,32 @@ lib/
   calendar/               Calendar utilities, ICS feed generation
   currency/               Riksbanken exchange rates
   deadlines/              Tax deadline tracking, status engine
-  email/                  Email service (Resend), invoice/reminder templates
+  email/                  Email service interface and registry
+    service.ts            EmailService interface, NoopEmailService default,
+                          getEmailService()/registerEmailService() registry
+    resend.ts             Legacy Resend helpers (invoice/reminder templates)
   errors/                 Error message utilities (get-error-message.ts)
   events/                 Event bus (bus.ts, types.ts)
   extensions/             Extension system
-    loader.ts             FIRST_PARTY_EXTENSIONS array, static imports
+    loader.ts             Loads extensions from generated FIRST_PARTY_EXTENSIONS
     registry.ts           Runtime extension registry
     types.ts              Extension, Sector, ExtensionDefinition, toggle types
-    sectors.ts            Sector & extension metadata registry (pure data)
+    sectors.ts            Sector shells + generated extension definitions
     hooks.ts              React hooks for extension state
     context-factory.ts    Extension context builder
     toggle-check.ts       Extension enable/disable logic
     validation.ts         Extension data validation
-    workspace-registry.tsx Extension workspace component registry
+    workspace-registry.tsx Workspace component lookup from generated map
     icon-resolver.tsx     Dynamic icon lookup for extensions
     use-account-totals.ts Hook for account balance queries
     use-extension-data.ts Hook for extension-specific data
     invoice-inbox-utils.ts Utilities for supplier invoice inbox
     use-mock-data.ts      Mock data utilities for development
+    _generated/           Code-generated files (DO NOT EDIT)
+      extension-list.ts   FIRST_PARTY_EXTENSIONS array
+      sector-definitions.ts EXTENSION_DEFINITIONS per sector
+      workspace-map.tsx   Lazy-loaded workspace component registry
+      enabled-extensions.ts Set of enabled extension IDs
   hooks/                  React hooks (use-unsaved-changes.ts)
   import/                 SIE parser, SIE import orchestrator, bank file parser
     bank-file/            Bank file parser with format modules
@@ -143,17 +134,35 @@ lib/
                           ica-banken, lansforsakringar, lunar, skandia
   invoices/               VAT rules, invoice matching, PDF template, reminder processor
   reconciliation/         Bank reconciliation engine (4-pass matching algorithm)
-  reports/                Financial reports (trial-balance, income-statement,
-                          balance-sheet, vat-declaration, sie-export,
-                          supplier-ledger, supplier-reconciliation,
-                          general-ledger, journal-register,
-                          ar-ledger, ar-reconciliation, monthly-breakdown)
+  reports/                Financial reports
+    trial-balance.ts      Trial balance report
+    income-statement.ts   Income statement (resultatrakning)
+    balance-sheet.ts      Balance sheet (balansrakning)
+    vat-declaration.ts    VAT declaration (momsdeklaration)
+    sie-export.ts         SIE file export
+    general-ledger.ts     General ledger (huvudbok)
+    journal-register.ts   Journal register (grundbok)
+    ar-ledger.ts          Accounts receivable ledger
+    ar-reconciliation.ts  AR reconciliation
+    supplier-ledger.ts    Supplier/AP ledger
+    supplier-reconciliation.ts Supplier reconciliation
+    monthly-breakdown.ts  Monthly breakdown report
+    ne-bilaga/            NE tax form attachment (core report, not extension)
+      ne-engine.ts        NE declaration engine
+      types.ts            NE-specific types
+    sru-export/           SRU file export (core report, not extension)
+      sru-engine.ts       SRU generation engine
+      sru-generator.ts    SRU file generator
+      sru-generic-generator.ts Generic SRU generator
+      types.ts            SRU-specific types
   supabase/               Client setup (client.ts = browser, server.ts = server/admin,
                           fetch-all.ts = pagination helper, middleware.ts)
   tax/                    Tax calculations, deadlines, deadline generator,
                           Swedish holidays, expense warnings
   transactions/           Transaction processing, category suggestions
-  vat/                    VAT utilities (VIES client for EU VAT validation)
+  vat/                    VAT utilities
+    vies-client.ts        VIES EU VAT number validation
+    moms-box-mapping.ts   BAS account to momsdeklaration box mapping
   init.ts                 Extension loader (idempotent, called by API routes)
   logger.ts               Centralized logging utility
   utils.ts                Shared utility functions
@@ -161,13 +170,18 @@ lib/
 types/index.ts            Canonical type definitions (single source of truth)
 types/chat.ts             Chat-specific type definitions
 tests/helpers.ts          Mock factories and fixture builders
-supabase/migrations/      SQL migration files
-scripts/                  Utility scripts (clear-user-data.sql, copy-extensions.mjs,
-                          move-extensions.js, setup-phase8.js)
+supabase/migrations/      SQL migration files (45 files)
+scripts/
+  generate-extension-registry.ts  Code generator for extension system
+  create-extension.ts     Helper for creating new extensions
+  clear-user-data.sql     Utility SQL for data cleanup
 dev_docs/                 Project documentation (BAS account guides, gap analysis,
                           Enable Banking docs, Bokio reference screenshots)
-extensions.md             Extension system design document (architecture, data patterns,
-                          sector model, workspace pattern, migration plan)
+extensions.config.json    Extension opt-in configuration (controls which extensions load)
+extensions.schema.json    JSON Schema for extensions.config.json
+extensions.md             Extension system design document
+.github/workflows/        CI workflows
+  core-build.yml          PR build — verifies core builds/tests with zero extensions
 ```
 
 ### Key Relationships
@@ -176,7 +190,9 @@ extensions.md             Extension system design document (architecture, data p
 - **API routes** that emit events must call `ensureInitialized()` (from `lib/init.ts`) at module level to load extensions.
 - **Event bus** (`lib/events/bus.ts`) is a module-level singleton. Core services emit, extensions subscribe.
 - **Supabase clients**: browser (`lib/supabase/client.ts`), server with user cookies (`createClient()` from `lib/supabase/server.ts`), and service role (`createServiceClient()`).
-- **Extension sector system**: Extensions are organized by business sector (`lib/extensions/sectors.ts`). Users can browse/toggle extensions via the marketplace UI (`app/(dashboard)/extensions/`). Sector-specific extension workspaces are rendered at `app/(dashboard)/e/[sector]/[slug]/`.
+- **Extension system**: Extensions are opt-in via `extensions.config.json`. Code generation (`npm run setup:extensions`) produces static imports from manifests. Core builds and runs with zero extensions.
+- **Email service**: Core defines `EmailService` interface in `lib/email/service.ts` with a `NoopEmailService` default. The `email` extension registers the real Resend implementation at load time. Core uses `getEmailService()` which degrades gracefully.
+- **NE-bilaga and SRU export** are core reports (in `lib/reports/`), not extensions. They are always available.
 
 ---
 
@@ -260,43 +276,145 @@ These rules exist for legal compliance and are enforced by database triggers. **
 
 ---
 
-## Extension Development
+## Extension System
 
-Extensions are first-party plugins organized by business sector in the `/extensions/` directory, loaded statically at startup.
+Extensions are opt-in plugins controlled by `extensions.config.json`. The system uses a manifest-driven, code-generated architecture where core builds and runs with zero extensions.
+
+### How It Works
+
+1. Each extension has a `manifest.json` declaring its metadata, entry point, workspace component, dependencies, and required env vars.
+2. `extensions.config.json` lists which extensions to load (by ID).
+3. `npm run setup:extensions` reads the config and manifests, then generates four files in `lib/extensions/_generated/`:
+   - `extension-list.ts` — `FIRST_PARTY_EXTENSIONS` array (static imports)
+   - `sector-definitions.ts` — `EXTENSION_DEFINITIONS` map for marketplace UI
+   - `workspace-map.tsx` — Lazy-loaded workspace component registry
+   - `enabled-extensions.ts` — Set of enabled extension IDs
+4. `predev` and `prebuild` hooks run this automatically.
+
+### Enabling Extensions
+
+Edit `extensions.config.json`:
+```json
+{
+  "$schema": "./extensions.schema.json",
+  "extensions": ["receipt-ocr", "ai-categorization", "email"]
+}
+```
+
+Then run `npm run setup:extensions` (or just `npm run dev`/`npm run build`).
+
+### Available Extensions
+
+All extensions live in `extensions/general/` with `manifest.json` files:
+
+| Extension | Category | Data Pattern | Env Vars Required |
+|-----------|----------|--------------|-------------------|
+| `receipt-ocr` | import | manual | `ANTHROPIC_API_KEY` |
+| `ai-categorization` | operations | core | `OPENAI_API_KEY` |
+| `ai-chat` | operations | manual | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` |
+| `push-notifications` | operations | core | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` |
+| `invoice-inbox` | import | manual | `ANTHROPIC_API_KEY` |
+| `calendar` | operations | core | — |
+| `enable-banking` | import | manual | `ENABLE_BANKING_APP_ID`, `ENABLE_BANKING_PRIVATE_KEY` |
+| `email` | operations | core | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` |
+| `user-description-match` | operations | core | — |
 
 ### Sector System
 
-Extensions are grouped into sectors defined in `lib/extensions/sectors.ts`. Each sector targets a specific industry (restaurant, construction, hotel, tech, ecommerce) or serves all businesses (general). The sector registry provides metadata used by the extension marketplace UI.
+Only the `general` sector exists. Extensions are grouped under it.
 
 Key types (from `lib/extensions/types.ts`):
-- `SectorSlug` — `'general' | 'restaurant' | 'construction' | 'hotel' | 'tech' | 'ecommerce'`
-- `ExtensionDefinition` — Marketplace metadata (slug, name, sector, category, icon, dataPattern, description)
+- `SectorSlug` — `'general'`
+- `ExtensionDefinition` — Marketplace metadata (slug, name, sector, category, icon, dataPattern, description, longDescription, readsCoreTables, hasOwnData)
 - `ExtensionCategory` — `'import' | 'operations' | 'reports' | 'accounting'`
 - `ExtensionDataPattern` — `'core' | 'manual' | 'both'` (how extension accesses data)
 - `ExtensionToggle` — Per-user enable/disable state for extensions
 
 ### Creating a New Extension
 
-1. Create `extensions/<sector>/<name>/index.ts`
-2. Export an object implementing the `Extension` interface from `lib/extensions/types.ts`
-3. Add a static import to the `FIRST_PARTY_EXTENSIONS` array in `lib/extensions/loader.ts`
-4. Add metadata to the appropriate sector in `lib/extensions/sectors.ts`
-5. Extensions **cannot** use dynamic imports (Next.js bundling constraint)
+Use the scaffolding script:
 
-### Currently Loaded Extensions (FIRST_PARTY_EXTENSIONS)
+```bash
+npx tsx scripts/create-extension.ts \
+  --name my-extension \
+  --sector general \
+  --category operations \
+  --description "Short description"
+```
 
+This creates:
+1. `extensions/general/my-extension/manifest.json` — Full manifest template
+2. `extensions/general/my-extension/index.ts` — Extension object skeleton
+3. `extensions/general/my-extension/api-routes.ts` — Empty API routes array
+4. Updates `extensions.schema.json` with the new ID
+
+Then to activate:
+1. Add `"my-extension"` to `extensions.config.json`
+2. Run `npm run setup:extensions` to regenerate
+
+**Manual steps** (if not using the script):
+1. Create `extensions/general/<name>/manifest.json` (see Manifest Format below)
+2. Create `extensions/general/<name>/index.ts` exporting an `Extension` object
+3. Optionally create `extensions/general/<name>/api-routes.ts` for API endpoints
+4. Add the extension ID to `extensions.schema.json` and `extensions.config.json`
+5. Run `npm run setup:extensions`
+
+**Constraints**: Extensions **cannot** use dynamic imports (Next.js bundling constraint).
+
+### Manifest Format
+
+Every extension declares a `manifest.json`. All fields are required unless noted:
+
+```json
+{
+  "id": "my-extension",
+  "sector": "general",
+  "exportName": "myExtensionExtension",
+  "entryPoint": "@/extensions/general/my-extension",
+  "workspace": "@/components/extensions/general/MyExtensionWorkspace",
+  "requiredEnvVars": ["MY_API_KEY"],
+  "optionalEnvVars": [],
+  "npmDependencies": ["some-sdk"],
+  "definition": {
+    "name": "My Extension",
+    "category": "operations",
+    "icon": "Wrench",
+    "dataPattern": "core",
+    "readsCoreTables": ["transactions"],
+    "hasOwnData": false,
+    "description": "Short one-line description (Swedish)",
+    "longDescription": "Multi-line description (Swedish)",
+    "quickAction": {
+      "label": "Do Thing",
+      "description": "Does the thing",
+      "icon": "Wrench",
+      "href": "/my-page"
+    },
+    "subscriptionNotice": "Optional notice shown when enabling"
+  }
+}
 ```
-receiptOcrExtension              @/extensions/general/receipt-ocr
-aiCategorizationExtension        @/extensions/general/ai-categorization
-pushNotificationsExtension       @/extensions/general/push-notifications
-sruExportExtension               @/extensions/sru-export
-neBilagaExtension                @/extensions/ne-bilaga
-aiChatExtension                  @/extensions/general/ai-chat
-invoiceInboxExtension            @/extensions/general/invoice-inbox
-calendarExtension                @/extensions/general/calendar
-userDescriptionMatchExtension    @/extensions/general/user-description-match
-# enableBankingExtension         @/extensions/general/enable-banking  (commented out, opt-in)
-```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique kebab-case ID |
+| `sector` | string | Always `"general"` |
+| `exportName` | string \| null | Named export from `entryPoint` (null = metadata-only, no runtime code) |
+| `entryPoint` | string \| null | Import path to Extension definition (null if no runtime code) |
+| `workspace` | string \| null | Import path to React workspace component (null if no UI) |
+| `requiredEnvVars` | string[] | Env vars that must be set for the extension to function |
+| `optionalEnvVars` | string[] | Env vars that enhance but are not required |
+| `npmDependencies` | string[] | npm packages the extension needs |
+| `definition.name` | string | Display name for marketplace UI |
+| `definition.category` | string | `'import'` \| `'operations'` \| `'reports'` \| `'accounting'` |
+| `definition.icon` | string | Lucide icon name (e.g., `"Camera"`, `"Brain"`) |
+| `definition.dataPattern` | string | `'core'` (reads existing data), `'manual'` (user submits data), `'both'` |
+| `definition.readsCoreTables` | string[] | Optional. Which tables it reads (for `core`/`both` pattern) |
+| `definition.hasOwnData` | boolean | Optional. Whether users submit data (for `manual`/`both` pattern) |
+| `definition.description` | string | One-line description (Swedish) |
+| `definition.longDescription` | string | Multi-line description (Swedish) |
+| `definition.quickAction` | object | Optional. Dashboard quick action button |
+| `definition.subscriptionNotice` | string | Optional. Notice shown when user enables the extension |
 
 ### Extension Interface
 
@@ -305,6 +423,7 @@ interface Extension {
   id: string              // Unique identifier (e.g. 'receipt-ocr')
   name: string            // Display name
   version: string         // Semver
+  sector?: SectorSlug     // Always 'general'
 
   // Surfaces (all optional)
   routes?: RouteDefinition[]
@@ -316,6 +435,7 @@ interface Extension {
   settingsPanel?: SettingsPanelDefinition
   taxCodes?: TaxCodeDefinition[]
   dimensionTypes?: DimensionDefinition[]
+  services?: Record<string, (...args: any[]) => Promise<any>>
 
   // Lifecycle hooks
   onInstall?(ctx: ExtensionContext): Promise<void>
@@ -323,10 +443,164 @@ interface Extension {
 }
 ```
 
-### Minimal Example
+### Extension Context
 
-See `extensions/general/example-logger/index.ts`:
+Event handlers and API route handlers receive an `ExtensionContext` (`lib/extensions/context-factory.ts`):
 
+```typescript
+interface ExtensionContext {
+  userId: string              // Current authenticated user
+  extensionId: string         // Which extension is running
+  supabase: SupabaseClient    // Pre-authenticated Supabase client
+  emit(event: CoreEvent): Promise<void>  // Emit events to event bus
+  settings: ExtensionSettings // Key-value store (JSONB in extension_data table)
+  storage: ExtensionStorage   // Supabase Storage wrapper
+  log: ExtensionLogger        // Scoped logging (prefixed "ext:extension-id")
+  services: ExtensionServices // Core services (ingestTransactions, etc.)
+}
+```
+
+**ExtensionSettings** — Key-value JSONB persisted in `extension_data` table:
+```typescript
+await ctx.settings.get<MySettings>()           // Get 'settings' key (default)
+await ctx.settings.get<MyConfig>('config')     // Get specific key
+await ctx.settings.set('settings', newValue)   // Set value
+```
+
+**ExtensionStorage** — Supabase Storage wrapper:
+```typescript
+await ctx.storage.upload('receipts', path, data, { contentType: 'image/jpeg' })
+await ctx.storage.download('receipts', path)
+ctx.storage.getPublicUrl('receipts', path)
+```
+
+**ExtensionLogger** — Namespaced logging:
+```typescript
+ctx.log.info('Processing receipt')   // logs: "ext:receipt-ocr: Processing receipt"
+ctx.log.warn('Low confidence')
+ctx.log.error('OCR failed', error)
+```
+
+### Extension API Routes
+
+Extensions expose API endpoints via `apiRoutes`. These are dispatched through a single catch-all route at `app/api/extensions/ext/[...path]/route.ts`.
+
+**URL scheme**: `/api/extensions/ext/{extensionId}/{...routePath}`
+
+Examples:
+- `POST /api/extensions/ext/receipt-ocr/upload` → matches `POST /upload`
+- `GET /api/extensions/ext/receipt-ocr/abc123` → matches `GET /:id`
+- `POST /api/extensions/ext/ai-categorization/suggestions` → matches `POST /suggestions`
+
+**Defining routes** (in `api-routes.ts`):
+```typescript
+import type { ApiRouteDefinition, ExtensionContext } from '@/lib/extensions/types'
+import { NextResponse } from 'next/server'
+
+export const myApiRoutes: ApiRouteDefinition[] = [
+  {
+    method: 'GET',
+    path: '/',
+    handler: async (request: Request, ctx?: ExtensionContext) => {
+      const userId = ctx!.userId
+      const { data } = await ctx!.supabase
+        .from('my_table')
+        .select('*')
+        .eq('user_id', userId)
+      return NextResponse.json({ data })
+    },
+  },
+  {
+    method: 'GET',
+    path: '/:id',
+    handler: async (request: Request, ctx?: ExtensionContext) => {
+      // Path params are extracted as _paramName search params
+      const id = new URL(request.url).searchParams.get('_id')
+      // ...
+    },
+  },
+  {
+    method: 'POST',
+    path: '/:id/confirm',
+    handler: async (request: Request, ctx?: ExtensionContext) => {
+      const id = new URL(request.url).searchParams.get('_id')
+      const body = await request.json()
+      // Emit events after success:
+      await ctx!.emit({ type: 'receipt.confirmed', payload: { ... } })
+      return NextResponse.json({ data: result })
+    },
+  },
+]
+```
+
+**Dispatcher behavior**:
+1. Authenticates user (401 if not logged in)
+2. Looks up extension in registry (404 if not found)
+3. Checks extension toggle for user (403 if disabled)
+4. Matches HTTP method + path pattern (supports `:param` wildcards)
+5. Builds `ExtensionContext` and calls the matched handler
+
+### Service Provider Pattern
+
+Extensions can register capabilities that core calls without direct imports. Two patterns:
+
+**1. Interface registration (email pattern)**:
+
+Core defines an interface with a no-op default (`lib/email/service.ts`):
+```typescript
+export interface EmailService {
+  sendEmail(options: SendEmailOptions): Promise<SendEmailResult>
+  isConfigured(): boolean
+}
+
+let emailService: EmailService = new NoopEmailService()
+export function getEmailService(): EmailService { return emailService }
+export function registerEmailService(svc: EmailService): void { emailService = svc }
+```
+
+Extension registers the real implementation at load time (`extensions/general/email/index.ts`):
+```typescript
+import { registerEmailService } from '@/lib/email/service'
+import { ResendEmailService } from './lib/resend-service'
+
+registerEmailService(new ResendEmailService())
+
+export const emailExtension: Extension = {
+  id: 'email',
+  name: 'E-post (Resend)',
+  version: '1.0.0',
+}
+```
+
+Core callers use `getEmailService()` — gracefully degrades if extension not loaded.
+
+**2. Services record (ai-categorization pattern)**:
+
+Extension exposes named functions via `services`:
+```typescript
+export const aiCategorizationExtension: Extension = {
+  id: 'ai-categorization',
+  name: 'AI Kategorisering',
+  version: '1.0.0',
+  services: {
+    findSimilarTemplates: async (...args: unknown[]) => {
+      const { findSimilarTemplates } = await import('./lib/template-embeddings')
+      return findSimilarTemplates(args[0], args[1], args[2], args[3])
+    },
+  },
+}
+```
+
+Core looks up via registry (no direct import):
+```typescript
+const ext = extensionRegistry.get('ai-categorization')
+const results = await ext?.services?.findSimilarTemplates(tx, entityType, limit)
+if (results) { /* use results */ } // Gracefully degrades if not loaded
+```
+
+### Extension Examples
+
+**Minimal** — `extensions/general/example-logger/index.ts`:
 ```typescript
 import type { Extension } from '@/lib/extensions/types'
 import type { EventPayload } from '@/lib/events/types'
@@ -346,6 +620,47 @@ export const myExtension: Extension = {
 }
 ```
 
+**Full-featured** — Receipt OCR extension (`extensions/general/receipt-ocr/index.ts`):
+```typescript
+export const receiptOcrExtension: Extension = {
+  id: 'receipt-ocr',
+  name: 'Receipt OCR',
+  version: '1.0.0',
+  sector: 'general',
+  apiRoutes: receiptOcrApiRoutes,     // GET /, POST /upload, GET /:id, POST /:id/confirm, etc.
+  eventHandlers: [
+    { eventType: 'document.uploaded', handler: handleDocumentUploaded },
+    { eventType: 'transaction.synced', handler: handleTransactionSynced },
+  ],
+  mappingRuleTypes: [
+    { id: 'receipt-ocr-merchant', name: 'OCR Merchant Match', description: '...' },
+  ],
+  settingsPanel: {
+    label: 'Receipt OCR',
+    path: '/settings/extensions/receipt-ocr',
+  },
+  async onInstall(ctx) {
+    await ctx.settings.set('settings', DEFAULT_SETTINGS)
+  },
+}
+```
+
+### Key Extension Files
+
+| File | Purpose |
+|------|---------|
+| `extensions/general/*/manifest.json` | Metadata for each extension |
+| `extensions/general/*/index.ts` | Extension object (services, handlers, etc.) |
+| `extensions/general/*/api-routes.ts` | API route definitions |
+| `extensions.config.json` | Which extensions are enabled |
+| `extensions.schema.json` | JSON Schema for config validation |
+| `scripts/generate-extension-registry.ts` | Generator script |
+| `scripts/create-extension.ts` | Scaffolding helper |
+| `app/api/extensions/ext/[...path]/route.ts` | Catch-all API route dispatcher |
+| `lib/extensions/context-factory.ts` | Builds ExtensionContext for handlers |
+| `lib/extensions/loader.ts` | Loads FIRST_PARTY_EXTENSIONS into registry |
+| `lib/extensions/_generated/*` | Auto-generated files (DO NOT EDIT) |
+
 ### Available Event Types
 
 All defined in `lib/events/types.ts`:
@@ -358,25 +673,19 @@ All defined in `lib/events/types.ts`:
 | `document.uploaded` | `{ document, userId }` |
 | `invoice.created` | `{ invoice, userId }` |
 | `invoice.sent` | `{ invoice, userId }` |
-| `invoice.paid` | `{ invoice, transaction, kursdifferens?, userId }` |
-| `invoice.overdue` | `{ invoice, days, userId }` |
 | `credit_note.created` | `{ creditNote, userId }` |
 | `transaction.synced` | `{ transactions[], userId }` |
 | `transaction.categorized` | `{ transaction, account, taxCode, userId }` |
 | `transaction.reconciled` | `{ transaction, journalEntryId, method, userId }` |
-| `bank.statement_received` | `{ statement, userId }` |
-| `bank.payment_notification` | `{ notification, userId }` |
 | `period.locked` | `{ period, userId }` |
 | `period.year_closed` | `{ period, userId }` |
 | `customer.created` | `{ customer, userId }` |
-| `customer.pseudonymized` | `{ customerId, userId }` |
 | `receipt.extracted` | `{ receipt, documentId, confidence, userId }` |
 | `receipt.matched` | `{ receipt, transaction, confidence, autoMatched, userId }` |
 | `receipt.confirmed` | `{ receipt, businessTotal, privateTotal, userId }` |
 | `supplier_invoice.received` | `{ inboxItem, userId }` |
 | `supplier_invoice.extracted` | `{ inboxItem, confidence, userId }` |
 | `supplier_invoice.confirmed` | `{ inboxItem, supplierInvoice, userId }` |
-| `audit.security_event` | `{ event, userId }` |
 
 ### Event Bus Behavior
 
@@ -484,11 +793,11 @@ mockResult({ data: makeTransaction(), error: null })
 
 ### Location
 
-`supabase/migrations/` — currently 41 files numbered `20240101000001` through `20240101000041`.
+`supabase/migrations/` — currently 45 files numbered `20240101000001` through `20240101000045`.
 
 ### Naming Convention
 
-`YYYYMMDD00NNNN_descriptive_name.sql` — next migration: `20240101000042_*.sql`
+`YYYYMMDD00NNNN_descriptive_name.sql` — next migration: `20240101000046_*.sql`
 
 ### Migration Rules
 
@@ -524,18 +833,13 @@ mockResult({ data: makeTransaction(), error: null })
 
 ### Recent Migrations
 
-- **Migration 030 (`bank_reconciliation`)** — Adds `reconciliation_method` column to `transactions` (CHECK constraint for method types), indexes for unmatched transaction lookup, and RPC `get_unlinked_1930_lines()` for finding unreconciled GL lines.
-- **Migration 031 (`invoice_document_type`)** — Adds `document_type` column to `invoices` (CHECK: invoice/proforma/delivery_note, default 'invoice') and `converted_from_id` FK for tracking proforma-to-invoice conversions.
-- **Migration 032 (`add_accounting_method`)** — Adds `accounting_method` column to `company_settings` (CHECK: accrual/cash, default 'accrual') to support kontantmetoden vs faktureringsmetoden.
-- **Migration 033 (`ai_chat_schema`)** — AI chat conversation and message storage.
-- **Migration 034 (`fix_extension_data_trigger`)** — Fixes extension data trigger.
-- **Migration 035 (`fix_push_notifications`)** — Push notifications schema fix.
-- **Migration 036 (`fix_enable_banking`)** — Enable Banking schema fix.
-- **Migration 037 (`extension_toggles`)** — Extension toggle table for per-user enable/disable.
-- **Migration 038 (`fix_match_documents_search_path`)** — Fixes search path for document matching function.
 - **Migration 039 (`invoice_inbox`)** — Invoice inbox table for supplier invoice intake via email/upload.
 - **Migration 040 (`booking_template_embeddings`)** — Booking templates with AI embeddings for suggestion matching.
 - **Migration 041 (`user_description_matching`)** — User description matching for transaction categorization.
+- **Migration 042 (`full_bas_2026` + `prevent_overlapping_fiscal_periods`)** — Full BAS 2026 account catalog and fiscal period overlap prevention.
+- **Migration 043 (`enforce_fiscal_period_month_boundaries`)** — Ensures fiscal periods start/end on month boundaries.
+- **Migration 044 (`document_matching`)** — Document-to-transaction matching support.
+- **Migration 045 (`expand_account_type_untaxed_reserves`)** — Adds `untaxed_reserves` to `chart_of_accounts.account_type` CHECK constraint for BAS 21xx accounts (obeskattade reserver).
 
 ---
 
@@ -617,6 +921,17 @@ docs: update CLAUDE.md with extension guide
 
 ---
 
+## CI
+
+GitHub Actions workflow (`.github/workflows/core-build.yml`) runs on pull requests:
+- Resets `extensions.config.json` to empty (zero extensions)
+- Runs `setup:extensions`, `build`, and `test`
+- Verifies no core code (`lib/`, `app/api/`, `components/`) imports directly from `@/extensions/` (only generated files and the loader are allowed)
+
+This ensures the core application always builds and passes tests independently of any extensions.
+
+---
+
 ## Deployment
 
 Hosted on **Vercel** with cron jobs defined in `vercel.json`:
@@ -636,19 +951,21 @@ Hosted on **Vercel** with cron jobs defined in `vercel.json`:
 NEXT_PUBLIC_SUPABASE_URL          # Supabase project URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY     # Supabase anonymous key
 SUPABASE_SERVICE_ROLE_KEY         # Supabase service role key
-RESEND_API_KEY                    # Resend email service API key
-RESEND_FROM_EMAIL                 # Sender email for transactional mail
-RESEND_WEBHOOK_SECRET             # Webhook auth for Resend
-ENABLE_BANKING_APP_ID             # Enable Banking app ID
-ENABLE_BANKING_PRIVATE_KEY        # Enable Banking private key (base64-encoded)
-ENABLE_BANKING_SANDBOX            # Enable Banking sandbox mode flag
-ANTHROPIC_API_KEY                 # Claude API key (ai-chat)
-OPENAI_API_KEY                    # OpenAI API key (embeddings)
 NEXT_PUBLIC_APP_URL               # App base URL
 CRON_SECRET                       # Auth secret for Vercel cron jobs
-NEXT_PUBLIC_VAPID_PUBLIC_KEY      # Web push public key
-VAPID_PRIVATE_KEY                 # Web push private key
-VAPID_SUBJECT                     # VAPID subject (mailto: URI) for web push
+
+# Extension-dependent (only needed when extension is enabled)
+RESEND_API_KEY                    # Resend email service API key (email extension)
+RESEND_FROM_EMAIL                 # Sender email (email extension)
+RESEND_WEBHOOK_SECRET             # Webhook auth for Resend (email extension)
+ENABLE_BANKING_APP_ID             # Enable Banking app ID (enable-banking extension)
+ENABLE_BANKING_PRIVATE_KEY        # Enable Banking private key, base64 (enable-banking extension)
+ENABLE_BANKING_SANDBOX            # Enable Banking sandbox mode (enable-banking extension)
+ANTHROPIC_API_KEY                 # Claude API key (ai-chat, ai-categorization, receipt-ocr)
+OPENAI_API_KEY                    # OpenAI API key for embeddings (ai-categorization)
+NEXT_PUBLIC_VAPID_PUBLIC_KEY      # Web push public key (push-notifications extension)
+VAPID_PRIVATE_KEY                 # Web push private key (push-notifications extension)
+VAPID_SUBJECT                     # VAPID subject mailto: URI (push-notifications extension)
 ```
 
 ## Other

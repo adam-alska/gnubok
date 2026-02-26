@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AuditLogEntry, AuditAction } from '@/types'
 
 /**
@@ -22,10 +22,10 @@ export interface AuditLogFilters {
  * Get paginated audit log entries for a user
  */
 export async function getAuditLog(
+  supabase: SupabaseClient,
   userId: string,
   filters: AuditLogFilters = {}
 ): Promise<{ data: AuditLogEntry[]; count: number }> {
-  const supabase = await createClient()
   const page = filters.page ?? 1
   const pageSize = filters.pageSize ?? 50
   const offset = (page - 1) * pageSize
@@ -69,11 +69,11 @@ export async function getAuditLog(
  * Get full history of a single record (all mutations)
  */
 export async function getEntityHistory(
+  supabase: SupabaseClient,
   userId: string,
   tableName: string,
   recordId: string
 ): Promise<AuditLogEntry[]> {
-  const supabase = await createClient()
 
   const { data, error } = await supabase
     .from('audit_log')
@@ -95,10 +95,10 @@ export async function getEntityHistory(
  * original → storno (reversal) → corrected entry
  */
 export async function getCorrectionChain(
+  supabase: SupabaseClient,
   userId: string,
   journalEntryId: string
 ): Promise<AuditLogEntry[]> {
-  const supabase = await createClient()
 
   // First, find the entry and its linked entries
   const { data: entry, error: entryError } = await supabase

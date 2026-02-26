@@ -172,6 +172,7 @@ export async function POST(request: Request) {
 
     // Execute the import
     const result = await executeSIEImport(
+      supabase,
       user.id,
       parsed,
       mappings,

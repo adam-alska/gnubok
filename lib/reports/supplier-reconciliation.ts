@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export interface ReconciliationResult {
   supplier_ledger_total: number
@@ -11,10 +11,10 @@ export interface ReconciliationResult {
  * Compare sum of open supplier invoices against account 2440 balance
  */
 export async function generateReconciliation(
+  supabase: SupabaseClient,
   userId: string,
   periodId: string
 ): Promise<ReconciliationResult> {
-  const supabase = await createClient()
 
   // Get total outstanding from supplier invoices
   const { data: invoices } = await supabase

@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await generateTrialBalance(user.id, periodId)
+    const result = await generateTrialBalance(supabase, user.id, periodId)
     return NextResponse.json({ data: result })
   } catch (err) {
     return NextResponse.json(

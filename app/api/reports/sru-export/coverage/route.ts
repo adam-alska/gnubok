@@ -17,7 +17,7 @@ export async function GET() {
   }
 
   try {
-    const coverage = await getSRUCoverage(user.id)
+    const coverage = await getSRUCoverage(supabase, user.id)
     return NextResponse.json({ data: coverage })
   } catch (err) {
     console.error('Error fetching SRU coverage:', err)

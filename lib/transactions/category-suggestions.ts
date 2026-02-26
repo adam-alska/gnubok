@@ -1,7 +1,7 @@
 import { suggestCategory } from '@/lib/tax/expense-warnings'
 import { getExpenseAccountForCategory } from '@/lib/bookkeeping/category-mapping'
 import { findMatchingTemplates, type TemplateMatch } from '@/lib/bookkeeping/booking-templates'
-import { findSimilarTemplates } from '@/lib/bookkeeping/template-embeddings'
+import { extensionRegistry } from '@/lib/extensions/registry'
 import type { Transaction, TransactionCategory, EntityType, MappingRule } from '@/types'
 
 export interface SuggestedCategory {
@@ -257,7 +257,12 @@ export async function getSuggestedTemplates(
   let matches: TemplateMatch[]
 
   try {
-    matches = await findSimilarTemplates(transaction, entityType)
+    const aiExt = extensionRegistry.get('ai-categorization')
+    if (aiExt?.services?.findSimilarTemplates) {
+      matches = await aiExt.services.findSimilarTemplates(transaction, entityType)
+    } else {
+      matches = []
+    }
   } catch {
     matches = []
   }

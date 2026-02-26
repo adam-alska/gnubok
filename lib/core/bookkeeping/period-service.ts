@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { eventBus } from '@/lib/events'
 import { validatePeriodDuration } from '@/lib/bookkeeping/validate-period-duration'
 import type { FiscalPeriod, PeriodStatus } from '@/types'
@@ -8,10 +8,10 @@ import type { FiscalPeriod, PeriodStatus } from '@/types'
  * Requires: period exists, belongs to user, not already locked/closed.
  */
 export async function lockPeriod(
+  supabase: SupabaseClient,
   userId: string,
   fiscalPeriodId: string
 ): Promise<FiscalPeriod> {
-  const supabase = await createClient()
 
   // Fetch period
   const { data: period, error: fetchError } = await supabase
@@ -60,10 +60,10 @@ export async function lockPeriod(
  * Requires: period is locked AND closing_entry_id is set (year-end must run first).
  */
 export async function closePeriod(
+  supabase: SupabaseClient,
   userId: string,
   fiscalPeriodId: string
 ): Promise<FiscalPeriod> {
-  const supabase = await createClient()
 
   const { data: period, error: fetchError } = await supabase
     .from('fiscal_periods')
@@ -112,10 +112,10 @@ export async function closePeriod(
  * Sets previous_period_id for chain validation.
  */
 export async function createNextPeriod(
+  supabase: SupabaseClient,
   userId: string,
   currentPeriodId: string
 ): Promise<FiscalPeriod> {
-  const supabase = await createClient()
 
   const { data: current, error: fetchError } = await supabase
     .from('fiscal_periods')
@@ -198,10 +198,10 @@ export async function createNextPeriod(
  * Get status summary for a fiscal period.
  */
 export async function getPeriodStatus(
+  supabase: SupabaseClient,
   userId: string,
   fiscalPeriodId: string
 ): Promise<PeriodStatus> {
-  const supabase = await createClient()
 
   const { data: period, error: fetchError } = await supabase
     .from('fiscal_periods')

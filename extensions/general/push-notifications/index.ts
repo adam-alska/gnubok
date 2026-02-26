@@ -11,6 +11,7 @@
 
 import type { Extension, ExtensionContext } from '@/lib/extensions/types'
 import type { EventPayload } from '@/lib/events/types'
+import { pushNotificationsApiRoutes } from './api-routes'
 import { sendNotificationToUser } from './notification-sender'
 import {
   createPeriodLockedPayload,
@@ -243,6 +244,8 @@ export const pushNotificationsExtension: Extension = {
   id: 'push-notifications',
   name: 'Push-notiser',
   version: '1.0.0',
+  sector: 'general',
+  apiRoutes: pushNotificationsApiRoutes,
   eventHandlers: [
     { eventType: 'period.locked', handler: handlePeriodLocked },
     { eventType: 'period.year_closed', handler: handleYearClosed },

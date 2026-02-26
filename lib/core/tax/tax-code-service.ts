@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { TaxCode } from '@/types'
 
 /**
@@ -12,8 +12,7 @@ import type { TaxCode } from '@/types'
 /**
  * Get all active tax codes for a user (including system codes)
  */
-export async function getTaxCodes(userId: string): Promise<TaxCode[]> {
-  const supabase = await createClient()
+export async function getTaxCodes(supabase: SupabaseClient, userId: string): Promise<TaxCode[]> {
 
   const { data, error } = await supabase
     .from('tax_codes')
@@ -32,10 +31,10 @@ export async function getTaxCodes(userId: string): Promise<TaxCode[]> {
  * Get a single tax code by code string
  */
 export async function getTaxCodeByCode(
+  supabase: SupabaseClient,
   userId: string,
   code: string
 ): Promise<TaxCode | null> {
-  const supabase = await createClient()
 
   // Prefer user-specific code over system code
   const { data, error } = await supabase
@@ -72,11 +71,11 @@ export interface MomsBoxResult {
  * category-based VAT calculation.
  */
 export async function calculateMomsFromTaxCodes(
+  supabase: SupabaseClient,
   userId: string,
   periodStart: string,
   periodEnd: string
 ): Promise<MomsBoxResult[]> {
-  const supabase = await createClient()
 
   // Fetch journal entry lines with tax_code in the period
   const { data: lines, error: linesError } = await supabase
@@ -104,7 +103,7 @@ export async function calculateMomsFromTaxCodes(
   }
 
   // Fetch all tax codes for lookup
-  const taxCodes = await getTaxCodes(userId)
+  const taxCodes = await getTaxCodes(supabase, userId)
   const taxCodeMap = new Map<string, TaxCode>()
   for (const tc of taxCodes) {
     // User codes take precedence over system codes
@@ -154,8 +153,7 @@ export async function calculateMomsFromTaxCodes(
 /**
  * Seed tax codes for a user by calling the database function
  */
-export async function seedTaxCodes(userId: string): Promise<void> {
-  const supabase = await createClient()
+export async function seedTaxCodes(supabase: SupabaseClient, userId: string): Promise<void> {
 
   const { error } = await supabase.rpc('seed_tax_codes_for_user', {
     p_user_id: userId,

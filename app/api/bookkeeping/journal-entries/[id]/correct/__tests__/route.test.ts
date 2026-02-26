@@ -100,7 +100,7 @@ describe('POST /api/bookkeeping/journal-entries/[id]/correct', () => {
     expect(status).toBe(200)
     expect(body.data.reversal).toEqual(reversal)
     expect(body.data.corrected).toEqual(corrected)
-    expect(mockCorrectEntry).toHaveBeenCalledWith('user-1', 'entry-1', lines)
+    expect(mockCorrectEntry).toHaveBeenCalledWith(expect.anything(), 'user-1', 'entry-1', lines)
   })
 
   it('returns 400 when correctEntry throws for unbalanced lines', async () => {

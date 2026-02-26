@@ -20,19 +20,18 @@ function makeBuilder() {
 function makeClient() {
   return {
     from: vi.fn().mockImplementation(() => makeBuilder()),
-  }
+  } as any
 }
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => makeClient()),
-}))
-
 import { generateReconciliation } from '../supplier-reconciliation'
+
+let supabase: ReturnType<typeof makeClient>
 
 beforeEach(() => {
   vi.clearAllMocks()
   resultIdx = 0
   results = []
+  supabase = makeClient()
 })
 
 describe('generateReconciliation', () => {
@@ -56,7 +55,7 @@ describe('generateReconciliation', () => {
       },
     ]
 
-    const result = await generateReconciliation('user-1', 'period-1')
+    const result = await generateReconciliation(supabase, 'user-1', 'period-1')
 
     // Supplier total: 5000 + 3000 = 8000
     expect(result.supplier_ledger_total).toBe(8000)
@@ -84,7 +83,7 @@ describe('generateReconciliation', () => {
       },
     ]
 
-    const result = await generateReconciliation('user-1', 'period-1')
+    const result = await generateReconciliation(supabase, 'user-1', 'period-1')
 
     expect(result.supplier_ledger_total).toBe(5000)
     expect(result.account_2440_balance).toBe(7000)
@@ -98,7 +97,7 @@ describe('generateReconciliation', () => {
       { data: [], error: null },
     ]
 
-    const result = await generateReconciliation('user-1', 'period-1')
+    const result = await generateReconciliation(supabase, 'user-1', 'period-1')
 
     expect(result.supplier_ledger_total).toBe(0)
     expect(result.account_2440_balance).toBe(0)
@@ -117,7 +116,7 @@ describe('generateReconciliation', () => {
       },
     ]
 
-    const result = await generateReconciliation('user-1', 'period-1')
+    const result = await generateReconciliation(supabase, 'user-1', 'period-1')
 
     expect(result.supplier_ledger_total).toBe(0)
     expect(result.account_2440_balance).toBe(3000)
@@ -138,7 +137,7 @@ describe('generateReconciliation', () => {
       },
     ]
 
-    const result = await generateReconciliation('user-1', 'period-1')
+    const result = await generateReconciliation(supabase, 'user-1', 'period-1')
 
     // Balance = credits - debits = 15000 - 5000 - 3000 = 7000
     expect(result.account_2440_balance).toBe(7000)
@@ -161,7 +160,7 @@ describe('generateReconciliation', () => {
       },
     ]
 
-    const result = await generateReconciliation('user-1', 'period-1')
+    const result = await generateReconciliation(supabase, 'user-1', 'period-1')
 
     expect(result.supplier_ledger_total).toBe(66.67)
     expect(result.account_2440_balance).toBe(66.67)

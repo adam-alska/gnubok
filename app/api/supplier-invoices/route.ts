@@ -167,6 +167,7 @@ export async function POST(request: Request) {
   if (accountingMethod === 'accrual') {
     try {
       const journalEntry = await createSupplierInvoiceRegistrationEntry(
+        supabase,
         user.id,
         invoice as SupplierInvoice,
         items as SupplierInvoiceItem[],

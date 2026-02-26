@@ -1,0 +1,19 @@
+{
+  "id": "user-description-match",
+  "sector": "general",
+  "exportName": "userDescriptionMatchExtension",
+  "entryPoint": "@/extensions/general/user-description-match",
+  "workspace": "@/components/extensions/general/UserDescriptionMatchWorkspace",
+  "requiredEnvVars": [],
+  "optionalEnvVars": [],
+  "npmDependencies": [],
+  "definition": {
+    "name": "Beskrivningsmatchning",
+    "category": "operations",
+    "icon": "TextSearch",
+    "dataPattern": "core",
+    "readsCoreTables": ["transactions", "mapping_rules"],
+    "description": "Matcha transaktioner med egna beskrivningar",
+    "longDescription": "Beskriv vad en transaktion gäller med egna ord och få smarta bokföringsförslag. Systemet lär sig av dina beskrivningar och applicerar automatiskt på framtida transaktioner från samma leverantör."
+  }
+}

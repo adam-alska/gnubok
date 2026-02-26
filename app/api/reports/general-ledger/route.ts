@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'period_id is required' }, { status: 400 })
   }
 
-  const data = await generateGeneralLedger(user.id, periodId, accountFrom, accountTo)
+  const data = await generateGeneralLedger(supabase, user.id, periodId, accountFrom, accountTo)
 
   return NextResponse.json({ data })
 }

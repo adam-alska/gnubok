@@ -60,7 +60,7 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
     try {
       abortControllerRef.current = new AbortController()
 
-      const response = await fetch('/api/extensions/ai-chat/stream', {
+      const response = await fetch('/api/extensions/ext/ai-chat/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -175,7 +175,7 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
     setError(null)
 
     try {
-      const response = await fetch(`/api/extensions/ai-chat/sessions/${id}`)
+      const response = await fetch(`/api/extensions/ext/ai-chat/sessions/${id}`)
       if (!response.ok) {
         throw new Error('Failed to load session')
       }

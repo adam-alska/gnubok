@@ -60,6 +60,7 @@ describe('Supplier Invoice Core Handler', () => {
     })
 
     expect(mockCreateEntry).toHaveBeenCalledWith(
+      expect.anything(),
       'user-1',
       invoice,
       expect.any(Array),

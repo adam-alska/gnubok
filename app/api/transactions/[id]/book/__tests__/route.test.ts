@@ -155,7 +155,7 @@ describe('POST /api/transactions/[id]/book', () => {
     expect(body.journal_entry_id).toBe('je-new')
     expect(body.data.id).toBe('je-new')
 
-    expect(mockCreateJournalEntry).toHaveBeenCalledWith('user-1', {
+    expect(mockCreateJournalEntry).toHaveBeenCalledWith(expect.anything(), 'user-1', {
       fiscal_period_id: VALID_UUID,
       entry_date: '2025-01-15',
       description: 'Test booking',

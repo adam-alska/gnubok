@@ -241,7 +241,6 @@ export default function DashboardContent({ firstName, settings, summary, onboard
   // Quick action items
   const quickActions = [
     { href: '/invoices/new', icon: Receipt, label: 'Ny faktura', desc: 'Skapa och skicka', accent: true },
-    { href: '/receipts/scan', icon: Camera, label: 'Skanna kvitto', desc: 'Fotografera & spara' },
     { href: '/customers', icon: Users, label: 'Ny kund', desc: 'Lägg till kunduppgifter' },
     { href: '/transactions', icon: ArrowLeftRight, label: 'Transaktioner', desc: 'Bokför' },
   ]

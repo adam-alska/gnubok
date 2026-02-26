@@ -1,0 +1,30 @@
+name: Core Build (no extensions)
+
+on: [pull_request]
+
+jobs:
+  core-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Reset extensions config
+        run: echo '{"extensions":[]}' > extensions.config.json
+      - run: npm run setup:extensions
+      - run: npm run build
+      - run: npm test
+      - name: Check no core imports from extensions
+        run: |
+          VIOLATIONS=$(grep -r "from '@/extensions/" lib/ app/api/ components/ --include="*.ts" --include="*.tsx" \
+            | grep -v "app/api/extensions/" \
+            | grep -v "components/extensions/" \
+            | grep -v "lib/extensions/_generated/" \
+            | grep -v "lib/extensions/loader.ts" || true)
+          if [ -n "$VIOLATIONS" ]; then
+            echo "ERROR: Core code imports from @/extensions/:"
+            echo "$VIOLATIONS"
+            exit 1
+          fi

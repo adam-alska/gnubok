@@ -34,10 +34,12 @@ vi.mock('@/lib/invoices/pdf-template', () => ({
 }))
 
 const mockSendEmail = vi.fn()
-const mockIsResendConfigured = vi.fn()
-vi.mock('@/lib/email/resend', () => ({
-  sendEmail: (...args: unknown[]) => mockSendEmail(...args),
-  isResendConfigured: () => mockIsResendConfigured(),
+const mockIsConfigured = vi.fn()
+vi.mock('@/lib/email/service', () => ({
+  getEmailService: () => ({
+    sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+    isConfigured: () => mockIsConfigured(),
+  }),
 }))
 
 vi.mock('@/lib/email/invoice-templates', () => ({
@@ -84,7 +86,7 @@ describe('POST /api/invoices/[id]/send', () => {
     reset()
     eventBus.clear()
     mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
-    mockIsResendConfigured.mockReturnValue(true)
+    mockIsConfigured.mockReturnValue(true)
     mockRenderToBuffer.mockResolvedValue(Buffer.from('fake-pdf'))
   })
 
@@ -100,7 +102,7 @@ describe('POST /api/invoices/[id]/send', () => {
   })
 
   it('returns 503 when email service is not configured', async () => {
-    mockIsResendConfigured.mockReturnValue(false)
+    mockIsConfigured.mockReturnValue(false)
 
     const request = createMockRequest('/api/invoices/inv-1/send', { method: 'POST' })
     const response = await POST(request, createMockRouteParams({ id: 'inv-1' }))
@@ -181,6 +183,7 @@ describe('POST /api/invoices/[id]/send', () => {
       })
     )
     expect(mockCreateInvoiceJournalEntry).toHaveBeenCalledWith(
+      expect.anything(),
       'user-1',
       expect.objectContaining({ id: 'inv-1' }),
       'enskild_firma'

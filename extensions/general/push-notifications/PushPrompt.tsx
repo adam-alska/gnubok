@@ -63,7 +63,7 @@ export function PushPrompt({ onSubscribed, onDismissed }: PushPromptProps) {
       }
 
       // Get VAPID public key
-      const vapidResponse = await fetch('/api/extensions/push-notifications/subscribe')
+      const vapidResponse = await fetch('/api/extensions/ext/push-notifications/subscribe')
       const { vapidPublicKey } = await vapidResponse.json()
 
       if (!vapidPublicKey) {
@@ -78,7 +78,7 @@ export function PushPrompt({ onSubscribed, onDismissed }: PushPromptProps) {
       })
 
       // Send subscription to server
-      const response = await fetch('/api/extensions/push-notifications/subscribe', {
+      const response = await fetch('/api/extensions/ext/push-notifications/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(subscription.toJSON()),

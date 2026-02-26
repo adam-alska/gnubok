@@ -16,11 +16,11 @@ export async function GET(request: Request) {
   const asOfDate = searchParams.get('as_of_date') || undefined
   const periodId = searchParams.get('period_id') || undefined
 
-  const ledger = await generateSupplierLedger(user.id, asOfDate)
+  const ledger = await generateSupplierLedger(supabase, user.id, asOfDate)
 
   let reconciliation = null
   if (periodId) {
-    reconciliation = await generateReconciliation(user.id, periodId)
+    reconciliation = await generateReconciliation(supabase, user.id, periodId)
   }
 
   return NextResponse.json({

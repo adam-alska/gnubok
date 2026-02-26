@@ -20,6 +20,7 @@ import DescribeTransactionDialog from './DescribeTransactionDialog'
 import { formatAccountWithName } from '@/lib/bookkeeping/client-account-names'
 import type { TransactionCategory, VatTreatment, BASAccount } from '@/types'
 import type { SuggestedCategory, SuggestedTemplate } from '@/lib/transactions/category-suggestions'
+import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
 import type { TransactionWithInvoice, CategorizeHandler, MatchInvoiceHandler } from './transaction-types'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, VAT_TREATMENT_OPTIONS } from './transaction-types'
 
@@ -784,44 +785,18 @@ export default function SwipeCategorizationView({
             </div>
           )}
 
-          {/* Fallback templates when no strong suggestion */}
-          {(() => {
-            const txSuggestions = suggestions?.[currentTransaction.id]
-            const topConfidence = txSuggestions?.[0]?.confidence ?? 0
-            const templates = templateSuggestions?.[currentTransaction.id]
-            if (topConfidence < 0.55 && templates && templates.length > 0) {
-              return (
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground text-center">Osaker? Prova dessa mallar:</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {templates.slice(0, 3).map((tmpl) => (
-                      <Button
-                        key={tmpl.template_id}
-                        variant="outline"
-                        className="h-auto py-2.5 px-3 text-left justify-start border-dashed"
-                        onClick={() => setShowDescribeDialog(true)}
-                        disabled={isProcessing}
-                      >
-                        <span className="text-sm">{tmpl.name_sv}</span>
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              )
-            }
-            return null
-          })()}
-
-          {/* Describe transaction button */}
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => setShowDescribeDialog(true)}
-            disabled={isProcessing}
-          >
-            <MessageSquareText className="mr-2 h-4 w-4" />
-            Beskriv transaktion...
-          </Button>
+          {/* Describe transaction button — only when AI categorization is enabled */}
+          {ENABLED_EXTENSION_IDS.has('ai-categorization') && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setShowDescribeDialog(true)}
+              disabled={isProcessing}
+            >
+              <MessageSquareText className="mr-2 h-4 w-4" />
+              Beskriv transaktion...
+            </Button>
+          )}
 
           {/* Categorization button */}
           <Button

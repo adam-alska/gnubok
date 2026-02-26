@@ -106,6 +106,7 @@ export async function POST(
     if (accountingMethod === 'cash') {
       // Kontantmetoden: combined revenue entry with per-line VAT rates
       const journalEntry = await createInvoiceCashEntry(
+        supabase,
         user.id,
         invoice as Invoice,
         transaction.date,
@@ -115,6 +116,7 @@ export async function POST(
     } else {
       // Faktureringsmetoden: clear receivable (Debit 1930, Credit 1510)
       const journalEntry = await createInvoicePaymentJournalEntry(
+        supabase,
         user.id,
         invoice as Invoice,
         transaction.date

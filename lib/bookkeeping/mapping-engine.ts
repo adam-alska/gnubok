@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   generateInputVatLine,
   generateReverseChargeLines,
@@ -29,12 +29,11 @@ const CAPITALIZATION_THRESHOLD = 29400
  * 5. Risk fallback (priority 100) → 2013 (private)
  */
 export async function evaluateMappingRules(
+  supabase: SupabaseClient,
   userId: string,
   transaction: Transaction,
   entityType?: EntityType
 ): Promise<MappingResult> {
-  const supabase = await createClient()
-
   // Fetch all active rules (user-specific + system defaults), ordered by priority
   const { data: rules, error } = await supabase
     .from('mapping_rules')
@@ -239,6 +238,7 @@ function getDefaultResult(transaction: Transaction): MappingResult {
  * (latest description wins).
  */
 export async function saveUserMappingRule(
+  supabase: SupabaseClient,
   userId: string,
   merchantName: string,
   debitAccount: string,
@@ -247,8 +247,6 @@ export async function saveUserMappingRule(
   userDescription?: string,
   templateId?: string
 ): Promise<void> {
-  const supabase = await createClient()
-
   // Escape special regex characters in merchant name
   const escapedMerchant = merchantName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 

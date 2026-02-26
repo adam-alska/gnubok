@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'period_id is required' }, { status: 400 })
   }
 
-  const data = await generateJournalRegister(user.id, periodId)
+  const data = await generateJournalRegister(supabase, user.id, periodId)
 
   return NextResponse.json({ data })
 }
