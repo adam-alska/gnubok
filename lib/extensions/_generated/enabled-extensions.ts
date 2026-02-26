@@ -1,4 +1,13 @@
 // AUTO-GENERATED — do not edit. Run `npm run setup:extensions` to regenerate.
 
 export const ENABLED_EXTENSION_IDS: ReadonlySet<string> = new Set([
+  'receipt-ocr',
+  'ai-categorization',
+  'ai-chat',
+  'push-notifications',
+  'invoice-inbox',
+  'calendar',
+  'enable-banking',
+  'email',
+  'user-description-match',
 ])
