@@ -1,15 +1,12 @@
 'use client'
 
 import type { WorkspaceComponentProps } from '@/lib/extensions/workspace-registry'
-import EmptyExtensionState from '@/components/extensions/shared/EmptyExtensionState'
-import { MessageSquare } from 'lucide-react'
+import { ChatPanel } from '@/components/chat/ChatPanel'
 
 export default function AiChatWorkspace({ userId }: WorkspaceComponentProps) {
   return (
-    <EmptyExtensionState
-      title="AI-assistent"
-      description="Använd chattwidgeten i nedre högra hörnet för att ställa frågor om bokföring och skatt."
-      icon={<MessageSquare className="h-12 w-12 text-muted-foreground/40 mb-4" />}
-    />
+    <div className="h-[calc(100vh-10rem)] max-w-4xl mx-auto">
+      <ChatPanel className="h-full rounded-lg border border-border bg-background shadow-sm" />
+    </div>
   )
 }

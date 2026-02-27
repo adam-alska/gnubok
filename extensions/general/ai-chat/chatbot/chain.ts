@@ -11,7 +11,12 @@ import {
   documentsToSources,
   type RetrievedDocument,
 } from './retriever'
+import { routeMessage, type RouteType } from './router'
+import { createAccountingTools } from './tools'
+import { streamAgentResponse, type ToolResultEntry } from './agent'
+import { generateArtifact, type ArtifactSpec } from './artifacts'
 import type { ChatMessage, SourceReference } from '@/types/chat'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Initialize the LLM
 function getChatModel() {
@@ -134,4 +139,102 @@ export async function* streamChatResponse(
 
   // 6. Yield sources at the end
   yield { type: 'sources', data: documentsToSources(relevantDocs) }
+}
+
+// ── Routed response (data / hybrid / knowledge) ────────────────
+
+export type RoutedStreamEvent =
+  | { type: 'content'; content: string }
+  | { type: 'sources'; sources: SourceReference[] }
+  | { type: 'tool_start'; toolName: string }
+  | { type: 'artifact'; artifact: ArtifactSpec }
+  | { type: 'route'; route: RouteType }
+
+/**
+ * High-level streaming function: routes the message, then either uses
+ * the existing RAG chain (knowledge) or the LangGraph agent (data/hybrid).
+ * Generates artifact post-hoc on data/hybrid routes.
+ */
+export async function* streamRoutedResponse(
+  userMessage: string,
+  conversationHistory: ChatMessage[],
+  supabase: SupabaseClient,
+  userId: string,
+  sessionId?: string
+): AsyncGenerator<RoutedStreamEvent> {
+  // 1. Route the message
+  const { route, rewrittenQuery } = await routeMessage(userMessage, conversationHistory)
+  yield { type: 'route', route }
+
+  // 2. Knowledge-only: use existing RAG chain
+  if (route === 'knowledge') {
+    for await (const chunk of streamChatResponse(rewrittenQuery, conversationHistory)) {
+      if (chunk.type === 'content') {
+        yield { type: 'content', content: chunk.data as string }
+      } else if (chunk.type === 'sources') {
+        yield { type: 'sources', sources: chunk.data as SourceReference[] }
+      }
+    }
+    return
+  }
+
+  // 3. Data or hybrid: use LangGraph agent with tools
+  const tools = createAccountingTools(supabase, userId)
+
+  // For hybrid, get RAG context
+  let ragContext: string | undefined
+  let sources: SourceReference[] = []
+  if (route === 'hybrid') {
+    try {
+      const relevantDocs = await retrieveRelevantDocuments(rewrittenQuery)
+      ragContext = formatContextFromSources(
+        relevantDocs.map((doc) => ({
+          content: doc.content,
+          title: doc.title,
+          section_title: doc.section_title,
+          source_file: doc.source_file,
+        }))
+      )
+      sources = documentsToSources(relevantDocs)
+    } catch {
+      // RAG failure is non-critical for hybrid route
+    }
+  }
+
+  let fullContent = ''
+  let toolResults: ToolResultEntry[] = []
+
+  for await (const event of streamAgentResponse({
+    query: rewrittenQuery,
+    route,
+    tools,
+    conversationHistory,
+    ragContext,
+  })) {
+    if (event.type === 'tool_start') {
+      yield { type: 'tool_start', toolName: event.toolName! }
+    } else if (event.type === 'content') {
+      fullContent += event.content!
+      yield { type: 'content', content: event.content! }
+    } else if (event.type === 'done') {
+      toolResults = event.toolResults || []
+    }
+  }
+
+  // 4. Yield sources if hybrid
+  if (sources.length > 0) {
+    yield { type: 'sources', sources }
+  }
+
+  // 5. Generate artifact (post-processing)
+  if (toolResults.length > 0 && fullContent.length > 0) {
+    try {
+      const artifact = await generateArtifact(toolResults, fullContent)
+      if (artifact) {
+        yield { type: 'artifact', artifact }
+      }
+    } catch (e) {
+      console.warn('Artifact generation failed:', e)
+    }
+  }
 }

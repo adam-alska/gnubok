@@ -7,6 +7,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   sources: SourceReference[]
+  artifact?: ArtifactSpec | null
   created_at: string
 }
 
@@ -48,8 +49,47 @@ export interface ChatResponse {
 }
 
 export interface StreamChunk {
-  type: 'content' | 'sources' | 'done' | 'error'
+  type: 'content' | 'sources' | 'done' | 'error' | 'tool_start' | 'artifact'
   content?: string
   sources?: SourceReference[]
   error?: string
+  toolName?: string
+  artifact?: ArtifactSpec
+}
+
+// ── Artifact Types ──────────────────────────────────────────────
+
+export type ArtifactSpec =
+  | ChartArtifact
+  | TableArtifact
+  | KpiCardsArtifact
+  | AgingBucketsArtifact
+
+export interface ChartArtifact {
+  type: 'bar_chart' | 'line_chart' | 'pie_chart' | 'stacked_bar'
+  title: string
+  data: { label: string; value: number; color?: string }[]
+  unit?: string
+  subtitle?: string
+}
+
+export interface TableArtifact {
+  type: 'table'
+  title: string
+  columns: { key: string; label: string; align?: 'left' | 'right' }[]
+  rows: Record<string, string | number>[]
+  summary_row?: Record<string, string | number>
+}
+
+export interface KpiCardsArtifact {
+  type: 'kpi_cards'
+  title?: string
+  cards: { label: string; value: string; trend?: 'up' | 'down' | 'flat'; change?: string }[]
+}
+
+export interface AgingBucketsArtifact {
+  type: 'aging_buckets'
+  title: string
+  buckets: { label: string; amount: number; count: number }[]
+  total: number
 }

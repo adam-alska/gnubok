@@ -6,6 +6,17 @@ export const CHATBOT_CONFIG = {
   maxTokens: 2048,
   temperature: 0.3,
 
+  // Agent settings
+  agentModel: 'claude-sonnet-4-6',
+  agentMaxTokens: 4096,
+  maxAgentIterations: 5,
+
+  // Router settings
+  routerModel: 'claude-haiku-4-5-20251001',
+
+  // Artifact generation
+  artifactModel: 'claude-haiku-4-5-20251001',
+
   // Retrieval settings
   retrievalK: 5,
   similarityThreshold: 0.7,

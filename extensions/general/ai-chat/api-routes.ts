@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import type { ApiRouteDefinition, ExtensionContext } from '@/lib/extensions/types'
-import { generateChatResponse, streamChatResponse } from '@/extensions/general/ai-chat/chatbot/chain'
+import { generateChatResponse, streamChatResponse, streamRoutedResponse } from '@/extensions/general/ai-chat/chatbot/chain'
 import { CHATBOT_CONFIG } from '@/extensions/general/ai-chat/chatbot/config'
-import type { ChatMessage, ChatRequest, SourceReference } from '@/types/chat'
+import type { ChatMessage, ChatRequest, SourceReference, ArtifactSpec } from '@/types/chat'
 
 // Simple in-memory rate limiting (per user)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
@@ -258,6 +258,7 @@ async function handlePostStream(
     const encoder = new TextEncoder()
     let fullContent = ''
     let sources: SourceReference[] = []
+    let artifact: ArtifactSpec | null = null
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -267,22 +268,37 @@ async function handlePostStream(
             encoder.encode(`data: ${JSON.stringify({ type: 'session', session_id: sessionId })}\n\n`)
           )
 
-          // Stream the response
-          for await (const chunk of streamChatResponse(message.trim(), conversationHistory)) {
-            if (chunk.type === 'content') {
-              fullContent += chunk.data as string
+          // Stream the routed response (handles knowledge, data, and hybrid)
+          for await (const event of streamRoutedResponse(
+            message.trim(),
+            conversationHistory,
+            supabase,
+            userId,
+            sessionId
+          )) {
+            if (event.type === 'content') {
+              fullContent += event.content
               controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ type: 'content', content: chunk.data })}\n\n`)
+                encoder.encode(`data: ${JSON.stringify({ type: 'content', content: event.content })}\n\n`)
               )
-            } else if (chunk.type === 'sources') {
-              sources = chunk.data as SourceReference[]
+            } else if (event.type === 'sources') {
+              sources = event.sources
               controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ type: 'sources', sources: chunk.data })}\n\n`)
+                encoder.encode(`data: ${JSON.stringify({ type: 'sources', sources: event.sources })}\n\n`)
+              )
+            } else if (event.type === 'tool_start') {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ type: 'tool_start', toolName: event.toolName })}\n\n`)
+              )
+            } else if (event.type === 'artifact') {
+              artifact = event.artifact
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ type: 'artifact', artifact: event.artifact })}\n\n`)
               )
             }
           }
 
-          // Save the complete assistant message
+          // Save the complete assistant message (including artifact)
           const { data: savedMessage } = await supabase
             .from('chat_messages')
             .insert({
@@ -291,6 +307,7 @@ async function handlePostStream(
               role: 'assistant',
               content: fullContent,
               sources,
+              ...(artifact ? { artifact } : {}),
             })
             .select()
             .single()
