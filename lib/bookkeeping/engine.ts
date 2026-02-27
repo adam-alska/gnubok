@@ -270,96 +270,24 @@ export async function commitEntry(
 /**
  * Create a journal entry with lines (verifikation)
  * Convenience wrapper: creates draft + commits in one step.
- * Validates balance, resolves account IDs, assigns voucher number, inserts atomically.
+ * The voucher number is only assigned after lines are successfully inserted,
+ * preventing gaps in the voucher sequence (BFL 5 kap. 7§).
  */
 export async function createJournalEntry(
   supabase: SupabaseClient,
   userId: string,
   input: CreateJournalEntryInput
 ): Promise<JournalEntry> {
-  // Validate balance
-  const balance = validateBalance(input.lines)
-  if (!balance.valid) {
-    throw new Error(
-      `Journal entry is not balanced: debits (${balance.totalDebit}) != credits (${balance.totalCredit})`
-    )
-  }
+  const draft = await createDraftEntry(supabase, userId, input)
+  return commitEntry(supabase, userId, draft.id)
+}
 
-  // Resolve account IDs
-  const accountIdMap = await resolveAccountIds(supabase, userId, input.lines)
-
-  // Get next voucher number
-  const voucherNumber = await getNextVoucherNumber(
-    supabase,
-    userId,
-    input.fiscal_period_id,
-    input.voucher_series || 'A'
-  )
-
-  // Insert journal entry header
-  const { data: entry, error: entryError } = await supabase
-    .from('journal_entries')
-    .insert({
-      user_id: userId,
-      fiscal_period_id: input.fiscal_period_id,
-      voucher_number: voucherNumber,
-      voucher_series: input.voucher_series || 'A',
-      entry_date: input.entry_date,
-      description: input.description,
-      source_type: input.source_type,
-      source_id: input.source_id || null,
-      status: 'draft',
-    })
-    .select()
-    .single()
-
-  if (entryError || !entry) {
-    throw new Error(`Failed to create journal entry: ${entryError?.message}`)
-  }
-
-  // Insert journal entry lines with dimensions
-  const lineInserts = buildLineInserts(entry.id, input.lines, accountIdMap)
-
-  const { error: linesError } = await supabase
-    .from('journal_entry_lines')
-    .insert(lineInserts)
-
-  if (linesError) {
-    // Rollback entry
-    await supabase.from('journal_entries').delete().eq('id', entry.id)
-    throw new Error(`Failed to create journal entry lines: ${linesError.message}`)
-  }
-
-  // Post the entry (triggers balance validation + committed_at in DB)
-  const { data: postedEntry, error: postError } = await supabase
-    .from('journal_entries')
-    .update({ status: 'posted' })
-    .eq('id', entry.id)
-    .select()
-    .single()
-
-  if (postError) {
-    // Rollback
-    await supabase.from('journal_entry_lines').delete().eq('journal_entry_id', entry.id)
-    await supabase.from('journal_entries').delete().eq('id', entry.id)
-    throw new Error(`Failed to post journal entry: ${postError.message}`)
-  }
-
-  // Fetch complete entry with lines
-  const { data: completeEntry } = await supabase
-    .from('journal_entries')
-    .select('*, lines:journal_entry_lines(*)')
-    .eq('id', entry.id)
-    .single()
-
-  const result = completeEntry as JournalEntry
-
-  await eventBus.emit({
-    type: 'journal_entry.committed',
-    payload: { entry: result, userId },
-  })
-
-  return result
+/**
+ * Get the current date in Swedish timezone (Europe/Stockholm).
+ * Avoids UTC date shift when server runs in a different timezone.
+ */
+export function getSwedishLocalDate(): string {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Stockholm' }).format(new Date())
 }
 
 /**
@@ -369,7 +297,8 @@ export async function createJournalEntry(
 export async function reverseEntry(
   supabase: SupabaseClient,
   userId: string,
-  entryId: string
+  entryId: string,
+  reversalDate?: string
 ): Promise<JournalEntry> {
 
   // Fetch original entry with lines
@@ -406,6 +335,8 @@ export async function reverseEntry(
     project: line.project || undefined,
   }))
 
+  const entryDate = reversalDate || getSwedishLocalDate()
+
   // Get voucher number for the reversal
   const voucherNumber = await getNextVoucherNumber(
     supabase,
@@ -425,7 +356,7 @@ export async function reverseEntry(
       fiscal_period_id: original.fiscal_period_id,
       voucher_number: voucherNumber,
       voucher_series: original.voucher_series || 'A',
-      entry_date: new Date().toISOString().split('T')[0],
+      entry_date: entryDate,
       description: `Makulering: ${original.description}`,
       source_type: 'storno',
       source_id: original.source_id || null,

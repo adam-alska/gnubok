@@ -3,6 +3,7 @@
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { AccountNumber } from '@/components/ui/account-number'
+import { formatCurrency } from '@/lib/utils'
 import type { Supplier } from '@/types'
 
 interface ReviewLineItem {
@@ -209,21 +210,21 @@ export function SupplierInvoiceReviewContent({
       <div className="space-y-2 text-sm">
         <div className="flex justify-between">
           <span className="text-muted-foreground">Netto (exkl. moms)</span>
-          <span>{formatAmount(subtotal)} kr</span>
+          <span>{formatCurrency(subtotal, currency)}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Moms</span>
-          <span>{formatAmount(totalVat)} kr</span>
+          <span>{formatCurrency(totalVat, currency)}</span>
         </div>
         <Separator />
         <div className="flex justify-between font-bold text-2xl">
           <span>Totalt</span>
-          <span>{formatAmount(total)} kr</span>
+          <span>{formatCurrency(total, currency)}</span>
         </div>
         {currency !== 'SEK' && exchangeRate && (
           <div className="flex justify-between text-muted-foreground">
             <span>SEK-belopp (vid kurs {exchangeRate})</span>
-            <span>{formatAmount(total * parseFloat(exchangeRate))} kr</span>
+            <span>{formatCurrency(total * parseFloat(exchangeRate))}</span>
           </div>
         )}
       </div>

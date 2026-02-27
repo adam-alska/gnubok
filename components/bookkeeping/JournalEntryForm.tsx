@@ -12,6 +12,7 @@ import { JournalEntryReviewContent } from '@/components/bookkeeping/JournalEntry
 import DocumentUploadZone from '@/components/bookkeeping/DocumentUploadZone'
 import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
 import { getErrorMessage } from '@/lib/errors/get-error-message'
+import { formatCurrency } from '@/lib/utils'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import type { UploadedFile } from '@/components/bookkeeping/DocumentUploadZone'
 import type { CreateJournalEntryLineInput, FiscalPeriod, BASAccount, JournalEntrySourceType } from '@/types'
@@ -363,7 +364,7 @@ export default function JournalEntryForm({
 
       {!isBalanced && totalDebit > 0 && (
         <p className="text-sm text-red-600">
-          Differens: {Math.abs(totalDebit - totalCredit).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} kr
+          Differens: {formatCurrency(Math.abs(totalDebit - totalCredit))}
         </p>
       )}
 

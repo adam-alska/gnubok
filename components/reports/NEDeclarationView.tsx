@@ -7,10 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Download, AlertCircle } from 'lucide-react'
 import { AccountNumber } from '@/components/ui/account-number'
 import type { NEDeclaration } from '@/lib/reports/ne-bilaga/types'
-
-function formatAmount(amount: number): string {
-  return amount.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+import { formatCurrency } from '@/lib/utils'
 
 export function NEDeclarationView({ periodId }: { periodId: string }) {
   const [data, setData] = useState<NEDeclaration | null>(null)
@@ -156,9 +153,9 @@ export function NEDeclarationView({ periodId }: { periodId: string }) {
                   <tr className="border-t-2 font-semibold">
                     <td className="py-2">Summa intäkter</td>
                     <td className="py-2 text-right">
-                      {formatAmount(
+                      {formatCurrency(
                         data.rutor.R1 + data.rutor.R2 + data.rutor.R3 + data.rutor.R4
-                      )} kr
+                      )}
                     </td>
                   </tr>
                 </tfoot>
@@ -193,10 +190,10 @@ export function NEDeclarationView({ periodId }: { periodId: string }) {
                   <tr className="border-t-2 font-semibold">
                     <td className="py-2">Summa kostnader</td>
                     <td className="py-2 text-right">
-                      -{formatAmount(
+                      -{formatCurrency(
                         data.rutor.R5 + data.rutor.R6 + data.rutor.R7 +
                         data.rutor.R8 + data.rutor.R9 + data.rutor.R10
-                      )} kr
+                      )}
                     </td>
                   </tr>
                 </tfoot>
@@ -217,7 +214,7 @@ export function NEDeclarationView({ periodId }: { periodId: string }) {
                     data.rutor.R11 >= 0 ? 'text-green-600' : 'text-red-600'
                   }`}
                 >
-                  {formatAmount(data.rutor.R11)} kr
+                  {formatCurrency(data.rutor.R11)}
                 </span>
               </div>
             </CardContent>
@@ -270,7 +267,7 @@ function NEDeclarationRow({
           )}
         </td>
         <td className="py-2 text-right">
-          {isExpense && amount > 0 ? '-' : ''}{formatAmount(Math.abs(amount))} kr
+          {isExpense && amount > 0 ? '-' : ''}{formatCurrency(Math.abs(amount))}
         </td>
       </tr>
       {expanded && accounts.length > 0 && (
@@ -283,7 +280,7 @@ function NEDeclarationRow({
                     <td className="py-1"><AccountNumber number={acc.accountNumber} name={acc.accountName} size="sm" /></td>
                     <td className="py-1">{acc.accountName}</td>
                     <td className="py-1 text-right">
-                      {isExpense && acc.amount > 0 ? '-' : ''}{formatAmount(Math.abs(acc.amount))} kr
+                      {isExpense && acc.amount > 0 ? '-' : ''}{formatCurrency(Math.abs(acc.amount))}
                     </td>
                   </tr>
                 ))}

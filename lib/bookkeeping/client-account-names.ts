@@ -42,6 +42,7 @@ const ACCOUNT_NAMES: Record<string, string> = {
 
   // Other external expenses (6xxx)
   '6071': 'Representation',
+  '6110': 'Kontorsforbrukning',
   '6200': 'Telefon & internet',
   '6530': 'Redovisningstjanster',
   '6570': 'Bankavgifter',

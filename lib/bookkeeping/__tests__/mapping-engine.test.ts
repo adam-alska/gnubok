@@ -71,7 +71,7 @@ describe('mapping-engine', () => {
   })
 
   describe('evaluateMappingRules', () => {
-    it('returns default result when no rules match', async () => {
+    it('returns default result when no rules match (expense)', async () => {
       const { evaluateMappingRules } = await import('../mapping-engine')
 
       const tx = makeTransaction({ amount: -100, merchant_name: 'Unknown' })
@@ -83,6 +83,206 @@ describe('mapping-engine', () => {
       expect(result.credit_account).toBe('1930')
       expect(result.confidence).toBe(0.1)
       expect(result.requires_review).toBe(true)
+    })
+
+    it('returns VAT-neutral 3900 as default income account (not 3001)', async () => {
+      const { evaluateMappingRules } = await import('../mapping-engine')
+
+      const tx = makeTransaction({ amount: 500, merchant_name: 'Unknown' })
+      mockResult({ data: [], error: null })
+
+      const result = await evaluateMappingRules(mockSupabase as never, 'user-1', tx)
+
+      expect(result.debit_account).toBe('1930')
+      expect(result.credit_account).toBe('3900')
+      expect(result.requires_review).toBe(true)
+    })
+
+    it('uses 2893 for default_private with aktiebolag entity type', async () => {
+      const { evaluateMappingRules } = await import('../mapping-engine')
+
+      const tx = makeTransaction({ amount: -500, merchant_name: 'Private Purchase' })
+      mockResult({
+        data: [
+          {
+            id: 'rule-private',
+            user_id: null,
+            rule_name: 'Private fallback',
+            rule_type: 'merchant_name',
+            priority: 100,
+            mcc_codes: null,
+            merchant_pattern: 'Private',
+            description_pattern: null,
+            amount_min: null,
+            amount_max: null,
+            debit_account: null,
+            credit_account: null,
+            vat_treatment: null,
+            vat_debit_account: null,
+            vat_credit_account: null,
+            risk_level: 'LOW',
+            default_private: true,
+            requires_review: false,
+            confidence_score: 0.8,
+            capitalization_threshold: null,
+            capitalized_debit_account: null,
+            is_active: true,
+            source: 'system',
+            user_description: null,
+            template_id: null,
+            created_at: '2024-01-01',
+            updated_at: '2024-01-01',
+          },
+        ],
+        error: null,
+      })
+
+      const result = await evaluateMappingRules(mockSupabase as never, 'user-1', tx, 'aktiebolag')
+      expect(result.debit_account).toBe('2893')
+      expect(result.default_private).toBe(true)
+    })
+
+    it('uses 2013 for default_private with enskild_firma entity type', async () => {
+      const { evaluateMappingRules } = await import('../mapping-engine')
+
+      const tx = makeTransaction({ amount: -500, merchant_name: 'Private Purchase' })
+      mockResult({
+        data: [
+          {
+            id: 'rule-private',
+            user_id: null,
+            rule_name: 'Private fallback',
+            rule_type: 'merchant_name',
+            priority: 100,
+            mcc_codes: null,
+            merchant_pattern: 'Private',
+            description_pattern: null,
+            amount_min: null,
+            amount_max: null,
+            debit_account: null,
+            credit_account: null,
+            vat_treatment: null,
+            vat_debit_account: null,
+            vat_credit_account: null,
+            risk_level: 'LOW',
+            default_private: true,
+            requires_review: false,
+            confidence_score: 0.8,
+            capitalization_threshold: null,
+            capitalized_debit_account: null,
+            is_active: true,
+            source: 'system',
+            user_description: null,
+            template_id: null,
+            created_at: '2024-01-01',
+            updated_at: '2024-01-01',
+          },
+        ],
+        error: null,
+      })
+
+      const result = await evaluateMappingRules(mockSupabase as never, 'user-1', tx, 'enskild_firma')
+      expect(result.debit_account).toBe('2013')
+    })
+
+    it('applies year-based capitalization threshold from prisbasbelopp', async () => {
+      const { evaluateMappingRules } = await import('../mapping-engine')
+
+      // 2024 threshold = 28,650. This amount exceeds it.
+      const tx = makeTransaction({
+        amount: -30000,
+        date: '2024-06-15',
+        merchant_name: 'Equipment Store',
+      })
+
+      mockResult({
+        data: [
+          {
+            id: 'rule-cap',
+            user_id: null,
+            rule_name: 'Equipment',
+            rule_type: 'merchant_name',
+            priority: 50,
+            mcc_codes: null,
+            merchant_pattern: 'Equipment',
+            description_pattern: null,
+            amount_min: null,
+            amount_max: null,
+            debit_account: '5410',
+            credit_account: '1930',
+            vat_treatment: null,
+            vat_debit_account: null,
+            vat_credit_account: null,
+            risk_level: 'LOW',
+            default_private: false,
+            requires_review: false,
+            confidence_score: 0.9,
+            capitalization_threshold: null,
+            capitalized_debit_account: '1250',
+            is_active: true,
+            source: 'system',
+            user_description: null,
+            template_id: null,
+            created_at: '2024-01-01',
+            updated_at: '2024-01-01',
+          },
+        ],
+        error: null,
+      })
+
+      const result = await evaluateMappingRules(mockSupabase as never, 'user-1', tx)
+      // 30,000 > 28,650 (2024 half-PBB) → should capitalize to 1250
+      expect(result.debit_account).toBe('1250')
+    })
+
+    it('uses 2025 threshold for 2025 transactions', async () => {
+      const { evaluateMappingRules } = await import('../mapping-engine')
+
+      // 2025 threshold = 29,400. Amount of 29,000 is below it.
+      const tx = makeTransaction({
+        amount: -29000,
+        date: '2025-03-15',
+        merchant_name: 'Equipment Store',
+      })
+
+      mockResult({
+        data: [
+          {
+            id: 'rule-cap',
+            user_id: null,
+            rule_name: 'Equipment',
+            rule_type: 'merchant_name',
+            priority: 50,
+            mcc_codes: null,
+            merchant_pattern: 'Equipment',
+            description_pattern: null,
+            amount_min: null,
+            amount_max: null,
+            debit_account: '5410',
+            credit_account: '1930',
+            vat_treatment: null,
+            vat_debit_account: null,
+            vat_credit_account: null,
+            risk_level: 'LOW',
+            default_private: false,
+            requires_review: false,
+            confidence_score: 0.9,
+            capitalization_threshold: null,
+            capitalized_debit_account: '1250',
+            is_active: true,
+            source: 'system',
+            user_description: null,
+            template_id: null,
+            created_at: '2024-01-01',
+            updated_at: '2024-01-01',
+          },
+        ],
+        error: null,
+      })
+
+      const result = await evaluateMappingRules(mockSupabase as never, 'user-1', tx)
+      // 29,000 < 29,400 (2025 half-PBB) → should NOT capitalize
+      expect(result.debit_account).toBe('5410')
     })
 
     it('matches merchant_pattern rule', async () => {

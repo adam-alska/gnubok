@@ -4,6 +4,7 @@ import {
   createInvoicePaymentJournalEntry,
   createInvoiceCashEntry,
 } from '@/lib/bookkeeping/invoice-entries'
+import { MarkInvoicePaidSchema } from '@/lib/api/schemas'
 import type { EntityType, Invoice } from '@/types'
 
 /**
@@ -49,8 +50,24 @@ export async function POST(
     )
   }
 
+  // Parse optional body (backward compatible — body may be empty)
+  let exchangeRateDifference: number | undefined
+  let bodyPaymentDate: string | undefined
+  try {
+    const text = await request.text()
+    if (text) {
+      const parsed = MarkInvoicePaidSchema.safeParse(JSON.parse(text))
+      if (parsed.success) {
+        exchangeRateDifference = parsed.data.exchange_rate_difference
+        bodyPaymentDate = parsed.data.payment_date
+      }
+    }
+  } catch {
+    // No body or invalid JSON — use defaults
+  }
+
   const now = new Date().toISOString()
-  const paymentDate = now.split('T')[0]
+  const paymentDate = bodyPaymentDate || now.split('T')[0]
 
   // Update status to paid
   const { error: updateError } = await supabase
@@ -89,7 +106,8 @@ export async function POST(
           supabase,
           user.id,
           invoice as Invoice,
-          paymentDate
+          paymentDate,
+          exchangeRateDifference
         )
         journalEntryId = journalEntry?.id ?? null
       } else {

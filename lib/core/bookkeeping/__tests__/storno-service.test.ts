@@ -29,6 +29,7 @@ function makeClient() {
 vi.mock('@/lib/bookkeeping/engine', () => ({
   validateBalance: vi.fn().mockReturnValue({ valid: true, totalDebit: 1000, totalCredit: 1000 }),
   getNextVoucherNumber: vi.fn(async () => ++resultIdx), // just increment
+  getSwedishLocalDate: vi.fn().mockReturnValue('2024-06-15'),
 }))
 
 import { correctEntry } from '../storno-service'

@@ -39,6 +39,7 @@ const mockedCreateEntry = vi.mocked(createJournalEntry)
 // Import functions under test AFTER mocks are set up
 const {
   createInvoiceJournalEntry,
+  createInvoicePaymentJournalEntry,
   createCreditNoteJournalEntry,
   createInvoiceCashEntry,
 } = await import('../invoice-entries')
@@ -383,6 +384,191 @@ describe('createInvoiceCashEntry — per-line VAT', () => {
     expect(credit3002?.credit_amount).toBe(400)
 
     // Balance
+    const totalDebit = input.lines.reduce((sum, l) => sum + l.debit_amount, 0)
+    const totalCredit = input.lines.reduce((sum, l) => sum + l.credit_amount, 0)
+    expect(totalDebit).toBe(totalCredit)
+  })
+})
+
+describe('createInvoiceJournalEntry — EUR foreign currency', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('EUR invoice converts amounts to SEK using exchange rate', async () => {
+    // EUR 1,000 + EUR 250 VAT = EUR 1,250 total, rate 11.5
+    const invoice = makeInvoice({
+      currency: 'EUR',
+      exchange_rate: 11.5,
+      subtotal: 1000,
+      subtotal_sek: 11500,
+      vat_amount: 250,
+      vat_amount_sek: 2875,
+      total: 1250,
+      total_sek: 14375,
+      vat_treatment: 'standard_25',
+      items: [
+        makeItem({ line_total: 1000, vat_rate: 25, vat_amount: 250 }),
+      ],
+    })
+
+    await createInvoiceJournalEntry(null as never, 'user-1', invoice)
+
+    expect(mockedCreateEntry).toHaveBeenCalledOnce()
+    const input = mockedCreateEntry.mock.calls[0][2]
+
+    // All amounts should be in SEK
+    const debit1510 = input.lines.find((l) => l.account_number === '1510')
+    expect(debit1510?.debit_amount).toBe(14375) // 1000*11.5 + 250*11.5 = 14375
+
+    const credit3001 = input.lines.find((l) => l.account_number === '3001')
+    expect(credit3001?.credit_amount).toBe(11500) // 1000 * 11.5
+
+    const credit2611 = input.lines.find((l) => l.account_number === '2611')
+    expect(credit2611?.credit_amount).toBe(2875) // 250 * 11.5
+
+    // 1510 line should have currency metadata
+    expect(debit1510?.currency).toBe('EUR')
+    expect(debit1510?.amount_in_currency).toBe(1250)
+    expect(debit1510?.exchange_rate).toBe(11.5)
+
+    // Balance check
+    const totalDebit = input.lines.reduce((sum, l) => sum + l.debit_amount, 0)
+    const totalCredit = input.lines.reduce((sum, l) => sum + l.credit_amount, 0)
+    expect(totalDebit).toBe(totalCredit)
+  })
+
+  it('EUR invoice uses total_sek when available', async () => {
+    // Edge case: total_sek differs slightly from computed (e.g. pre-computed at different rate)
+    const invoice = makeInvoice({
+      currency: 'EUR',
+      exchange_rate: 11.5,
+      subtotal: 1000,
+      subtotal_sek: null,
+      vat_amount: 0,
+      vat_amount_sek: null,
+      total: 1000,
+      total_sek: null,
+      vat_treatment: 'export',
+      items: [
+        makeItem({ line_total: 1000, vat_rate: 0, vat_amount: 0 }),
+      ],
+    })
+
+    await createInvoiceJournalEntry(null as never, 'user-1', invoice)
+
+    const input = mockedCreateEntry.mock.calls[0][2]
+
+    // Revenue should be computed via exchange rate
+    const credit3305 = input.lines.find((l) => l.account_number === '3305')
+    expect(credit3305?.credit_amount).toBe(11500)
+
+    const debit1510 = input.lines.find((l) => l.account_number === '1510')
+    expect(debit1510?.debit_amount).toBe(11500)
+  })
+
+  it('SEK invoice still works unchanged (backward compatibility)', async () => {
+    const invoice = makeInvoice({
+      subtotal: 800,
+      vat_amount: 200,
+      total: 1000,
+      vat_treatment: 'standard_25',
+      items: [
+        makeItem({ line_total: 800, vat_rate: 25, vat_amount: 200 }),
+      ],
+    })
+
+    await createInvoiceJournalEntry(null as never, 'user-1', invoice)
+
+    const input = mockedCreateEntry.mock.calls[0][2]
+    const debit1510 = input.lines.find((l) => l.account_number === '1510')
+    expect(debit1510?.debit_amount).toBe(1000)
+
+    // No currency metadata for SEK
+    expect(debit1510?.currency).toBeUndefined()
+    expect(debit1510?.amount_in_currency).toBeUndefined()
+  })
+})
+
+describe('createInvoicePaymentJournalEntry — exchange rate difference', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('SEK payment creates simple 2-line entry', async () => {
+    const invoice = makeInvoice({ total: 1250 })
+
+    await createInvoicePaymentJournalEntry(null as never, 'user-1', invoice, '2024-07-15')
+
+    const input = mockedCreateEntry.mock.calls[0][2]
+    expect(input.lines).toHaveLength(2)
+
+    const debit1930 = input.lines.find((l) => l.account_number === '1930')
+    expect(debit1930?.debit_amount).toBe(1250)
+
+    const credit1510 = input.lines.find((l) => l.account_number === '1510')
+    expect(credit1510?.credit_amount).toBe(1250)
+  })
+
+  it('EUR payment with positive exchange rate difference (gain) creates 3 lines', async () => {
+    const invoice = makeInvoice({
+      currency: 'EUR',
+      exchange_rate: 11.5,
+      total: 1000,
+      total_sek: 11500,
+    })
+
+    // Gain of 200 SEK (received more than booked)
+    await createInvoicePaymentJournalEntry(null as never, 'user-1', invoice, '2024-07-15', 200)
+
+    const input = mockedCreateEntry.mock.calls[0][2]
+    expect(input.lines).toHaveLength(3)
+
+    // Debit 1930: actual SEK received = 11500 + 200 = 11700
+    const debit1930 = input.lines.find((l) => l.account_number === '1930')
+    expect(debit1930?.debit_amount).toBe(11700)
+
+    // Credit 1510: original booked amount
+    const credit1510 = input.lines.find((l) => l.account_number === '1510')
+    expect(credit1510?.credit_amount).toBe(11500)
+
+    // Credit 3960: exchange rate gain
+    const credit3960 = input.lines.find((l) => l.account_number === '3960')
+    expect(credit3960?.credit_amount).toBe(200)
+
+    // Balance check
+    const totalDebit = input.lines.reduce((sum, l) => sum + l.debit_amount, 0)
+    const totalCredit = input.lines.reduce((sum, l) => sum + l.credit_amount, 0)
+    expect(totalDebit).toBe(totalCredit)
+  })
+
+  it('EUR payment with negative exchange rate difference (loss) creates 3 lines', async () => {
+    const invoice = makeInvoice({
+      currency: 'EUR',
+      exchange_rate: 11.5,
+      total: 1000,
+      total_sek: 11500,
+    })
+
+    // Loss of 300 SEK (received less than booked)
+    await createInvoicePaymentJournalEntry(null as never, 'user-1', invoice, '2024-07-15', -300)
+
+    const input = mockedCreateEntry.mock.calls[0][2]
+    expect(input.lines).toHaveLength(3)
+
+    // Debit 1930: actual SEK received = 11500 + (-300) = 11200
+    const debit1930 = input.lines.find((l) => l.account_number === '1930')
+    expect(debit1930?.debit_amount).toBe(11200)
+
+    // Credit 1510: original booked amount
+    const credit1510 = input.lines.find((l) => l.account_number === '1510')
+    expect(credit1510?.credit_amount).toBe(11500)
+
+    // Debit 7960: exchange rate loss
+    const debit7960 = input.lines.find((l) => l.account_number === '7960')
+    expect(debit7960?.debit_amount).toBe(300)
+
+    // Balance check
     const totalDebit = input.lines.reduce((sum, l) => sum + l.debit_amount, 0)
     const totalCredit = input.lines.reduce((sum, l) => sum + l.credit_amount, 0)
     expect(totalDebit).toBe(totalCredit)

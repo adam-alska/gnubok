@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validateBalance } from '../engine'
+import { validateBalance, getSwedishLocalDate } from '../engine'
 import type { CreateJournalEntryLineInput } from '@/types'
 
 describe('validateBalance', () => {
@@ -60,5 +60,18 @@ describe('validateBalance', () => {
 
     const result = validateBalance(lines)
     expect(result.valid).toBe(false)
+  })
+})
+
+describe('getSwedishLocalDate', () => {
+  it('returns a date string in YYYY-MM-DD format', () => {
+    const date = getSwedishLocalDate()
+    expect(date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  it('returns a valid date', () => {
+    const date = getSwedishLocalDate()
+    const parsed = new Date(date)
+    expect(parsed.toString()).not.toBe('Invalid Date')
   })
 })

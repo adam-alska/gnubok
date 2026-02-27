@@ -2,6 +2,7 @@
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatCurrency } from '@/lib/utils'
 
 export interface MonthlyDataPoint {
   label: string
@@ -34,7 +35,7 @@ export function IncomeExpenseChart({ months }: IncomeExpenseChartProps) {
             />
             <Tooltip
               formatter={(value, name) => [
-                new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value)) + ' kr',
+                formatCurrency(Number(value)),
                 name === 'income' ? 'Intäkter' : 'Kostnader',
               ]}
             />

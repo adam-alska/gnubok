@@ -86,7 +86,13 @@ export const EXTENSION_DEFINITIONS: Record<string, ExtensionDefinition[]> = {
           "dataPattern": "manual",
           "description": "Ta emot alla dokument via e-post — fakturor, kvitton och myndighetspost",
           "longDescription": "Skicka alla affärsdokument till en dedikerad e-postadress. AI klassificerar automatiskt dokumenttyp (faktura, kvitto, myndighetspost), extraherar data och matchar mot transaktioner. En inkorg för alla dokument.",
-          "hasOwnData": true
+          "hasOwnData": true,
+          "quickAction": {
+                "label": "Dokumentinkorg",
+                "description": "Granska inkommande dokument",
+                "icon": "Inbox",
+                "href": "/e/general/invoice-inbox"
+          }
     },
     {
           "slug": "calendar",

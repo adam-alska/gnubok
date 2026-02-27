@@ -1,4 +1,5 @@
 import { createJournalEntry, findFiscalPeriod } from './engine'
+import { resolveSekAmount, buildCurrencyMetadata } from './currency-utils'
 import { generateSalesVatLines, generateReverseChargeLines } from './vat-entries'
 import { getVatTreatmentForRate } from '@/lib/invoices/vat-rules'
 import { createLogger } from '@/lib/logger'
@@ -23,9 +24,21 @@ function generatePerRateLines(
   items: InvoiceItem[],
   invoiceVatTreatment: VatTreatment,
   entityType: EntityType,
-  invoiceNumber: string
+  invoiceNumber: string,
+  currency?: string | null,
+  exchangeRate?: number | null
 ): CreateJournalEntryLineInput[] {
   const lines: CreateJournalEntryLineInput[] = []
+  const isForeign = currency != null && currency !== 'SEK'
+
+  // Helper: convert item amount to SEK when dealing with foreign currency
+  const toSek = (amount: number): number => {
+    if (!isForeign) return amount
+    if (exchangeRate != null && exchangeRate > 0) {
+      return Math.round(amount * exchangeRate * 100) / 100
+    }
+    return amount // fallback for legacy data
+  }
 
   // Check if items have per-line vat_rate set (new invoices)
   const hasPerLineVat = items.some((item) => item.vat_rate !== undefined && item.vat_rate !== null)
@@ -34,21 +47,34 @@ function generatePerRateLines(
     // Legacy fallback: single rate from invoice level
     const revenueAccount = getRevenueAccount(invoiceVatTreatment, entityType)
     const subtotal = items.reduce((sum, item) => sum + item.line_total, 0)
+    const subtotalSek = toSek(subtotal)
     lines.push({
       account_number: revenueAccount,
       debit_amount: 0,
-      credit_amount: subtotal,
+      credit_amount: subtotalSek,
       line_description: `Försäljning faktura ${invoiceNumber}`,
     })
 
     const totalVat = items.reduce((sum, item) => sum + (item.vat_amount || 0), 0)
     if (totalVat > 0) {
-      const vatLines = generateSalesVatLines({
-        vatTreatment: invoiceVatTreatment,
-        baseAmount: subtotal,
-        direction: 'sales',
-      })
-      lines.push(...vatLines)
+      if (isForeign) {
+        // For foreign currency, compute VAT in SEK directly
+        const vatSek = toSek(totalVat)
+        const vatAccount = getOutputVatAccount(invoiceVatTreatment)
+        lines.push({
+          account_number: vatAccount,
+          debit_amount: 0,
+          credit_amount: vatSek,
+          line_description: `Utgående moms`,
+        })
+      } else {
+        const vatLines = generateSalesVatLines({
+          vatTreatment: invoiceVatTreatment,
+          baseAmount: subtotal,
+          direction: 'sales',
+        })
+        lines.push(...vatLines)
+      }
     }
     return lines
   }
@@ -69,7 +95,7 @@ function generatePerRateLines(
       ? invoiceVatTreatment
       : getVatTreatmentForRate(rate)
     const revenueAccount = getRevenueAccount(treatment, entityType)
-    const roundedSubtotal = Math.round(group.subtotal * 100) / 100
+    const roundedSubtotal = Math.round(toSek(group.subtotal) * 100) / 100
 
     lines.push({
       account_number: revenueAccount,
@@ -78,7 +104,7 @@ function generatePerRateLines(
       line_description: `Försäljning faktura ${invoiceNumber}`,
     })
 
-    const roundedVat = Math.round(group.vatAmount * 100) / 100
+    const roundedVat = Math.round(toSek(group.vatAmount) * 100) / 100
     if (roundedVat !== 0) {
       const vatAccount = getOutputVatAccount(treatment)
       lines.push({
@@ -125,40 +151,64 @@ export async function createInvoiceJournalEntry(
   }
 
   const lines: CreateJournalEntryLineInput[] = []
+  const isForeign = invoice.currency !== 'SEK'
 
-  // Debit: Kundfordringar (total including VAT)
-  lines.push({
-    account_number: '1510',
-    debit_amount: invoice.total,
-    credit_amount: 0,
-    line_description: `Faktura ${invoice.invoice_number}`,
-    currency: invoice.currency,
-    amount_in_currency: invoice.currency !== 'SEK' ? invoice.total : undefined,
-    exchange_rate: invoice.exchange_rate || undefined,
-  })
+  // Credit lines: revenue + VAT per rate group (compute first to guarantee balance)
+  const creditLines: CreateJournalEntryLineInput[] = []
 
-  // Credit lines: revenue + VAT per rate group
   if (invoice.items && invoice.items.length > 0) {
-    lines.push(...generatePerRateLines(invoice.items, invoice.vat_treatment, entityType, invoice.invoice_number))
+    creditLines.push(...generatePerRateLines(
+      invoice.items, invoice.vat_treatment, entityType, invoice.invoice_number,
+      invoice.currency, invoice.exchange_rate
+    ))
   } else {
     // Fallback: no items available, use invoice-level amounts
     const revenueAccount = getRevenueAccount(invoice.vat_treatment, entityType)
-    lines.push({
+    const subtotalSek = resolveSekAmount(invoice.subtotal, invoice.subtotal_sek, invoice.currency, invoice.exchange_rate)
+
+    creditLines.push({
       account_number: revenueAccount,
       debit_amount: 0,
-      credit_amount: invoice.subtotal,
+      credit_amount: subtotalSek,
       line_description: `Försäljning faktura ${invoice.invoice_number}`,
     })
 
     if (invoice.vat_amount > 0) {
-      const vatLines = generateSalesVatLines({
-        vatTreatment: invoice.vat_treatment,
-        baseAmount: invoice.subtotal,
-        direction: 'sales',
-      })
-      lines.push(...vatLines)
+      if (isForeign) {
+        const vatSek = resolveSekAmount(invoice.vat_amount, invoice.vat_amount_sek, invoice.currency, invoice.exchange_rate)
+        const vatAccount = getOutputVatAccount(invoice.vat_treatment)
+        creditLines.push({
+          account_number: vatAccount,
+          debit_amount: 0,
+          credit_amount: vatSek,
+          line_description: `Utgående moms faktura ${invoice.invoice_number}`,
+        })
+      } else {
+        const vatLines = generateSalesVatLines({
+          vatTreatment: invoice.vat_treatment,
+          baseAmount: invoice.subtotal,
+          direction: 'sales',
+        })
+        creditLines.push(...vatLines)
+      }
     }
   }
+
+  // Debit: Kundfordringar — balance guarantee: debit = sum of all credit lines
+  const totalCredits = creditLines.reduce((sum, l) => sum + l.credit_amount, 0)
+  const debitAmount = isForeign
+    ? Math.round(totalCredits * 100) / 100
+    : resolveSekAmount(invoice.total, invoice.total_sek, invoice.currency, invoice.exchange_rate)
+
+  lines.push({
+    account_number: '1510',
+    debit_amount: debitAmount,
+    credit_amount: 0,
+    line_description: `Faktura ${invoice.invoice_number}`,
+    ...buildCurrencyMetadata(invoice.currency, isForeign ? invoice.total : undefined, invoice.exchange_rate),
+  })
+
+  lines.push(...creditLines)
 
   const input: CreateJournalEntryInput = {
     fiscal_period_id: fiscalPeriodId,
@@ -182,7 +232,8 @@ export async function createInvoicePaymentJournalEntry(
   supabase: SupabaseClient,
   userId: string,
   invoice: Invoice,
-  paymentDate: string
+  paymentDate: string,
+  exchangeRateDifference?: number
 ): Promise<JournalEntry | null> {
   const fiscalPeriodId = await findFiscalPeriod(supabase, userId, paymentDate)
   if (!fiscalPeriodId) {
@@ -190,25 +241,71 @@ export async function createInvoicePaymentJournalEntry(
     return null
   }
 
-  const lines: CreateJournalEntryLineInput[] = [
-    {
-      account_number: '1930', // Företagskonto
-      debit_amount: invoice.total,
+  const desc = `Betalning faktura ${invoice.invoice_number}`
+  const bookedSekAmount = resolveSekAmount(invoice.total, invoice.total_sek, invoice.currency, invoice.exchange_rate)
+  const lines: CreateJournalEntryLineInput[] = []
+
+  if (exchangeRateDifference && exchangeRateDifference !== 0) {
+    // Foreign currency with exchange rate difference
+    // For receivables: positive diff = gain (received more), negative = loss (received less)
+    const actualSekReceived = bookedSekAmount + exchangeRateDifference
+
+    // Debit: Bank at actual SEK received
+    lines.push({
+      account_number: '1930',
+      debit_amount: Math.round(actualSekReceived * 100) / 100,
       credit_amount: 0,
-      line_description: `Betalning faktura ${invoice.invoice_number}`,
-    },
-    {
-      account_number: '1510', // Kundfordringar
+      line_description: desc,
+    })
+
+    // Credit: Clear kundfordringar at original booked SEK amount
+    lines.push({
+      account_number: '1510',
       debit_amount: 0,
-      credit_amount: invoice.total,
-      line_description: `Betalning faktura ${invoice.invoice_number}`,
-    },
-  ]
+      credit_amount: Math.round(bookedSekAmount * 100) / 100,
+      line_description: desc,
+    })
+
+    // Exchange rate difference
+    if (exchangeRateDifference > 0) {
+      // Gain: Credit 3960 (received more than booked)
+      lines.push({
+        account_number: '3960',
+        debit_amount: 0,
+        credit_amount: Math.round(exchangeRateDifference * 100) / 100,
+        line_description: 'Valutakursvinst',
+      })
+    } else {
+      // Loss: Debit 7960 (received less than booked)
+      lines.push({
+        account_number: '7960',
+        debit_amount: Math.round(Math.abs(exchangeRateDifference) * 100) / 100,
+        credit_amount: 0,
+        line_description: 'Valutakursförlust',
+      })
+    }
+  } else {
+    // Standard SEK payment or no exchange rate difference
+    lines.push(
+      {
+        account_number: '1930',
+        debit_amount: Math.round(bookedSekAmount * 100) / 100,
+        credit_amount: 0,
+        line_description: desc,
+      },
+      {
+        account_number: '1510',
+        debit_amount: 0,
+        credit_amount: Math.round(bookedSekAmount * 100) / 100,
+        line_description: desc,
+      }
+    )
+  }
 
   const input: CreateJournalEntryInput = {
     fiscal_period_id: fiscalPeriodId,
     entry_date: paymentDate,
-    description: `Betalning faktura ${invoice.invoice_number}`,
+    description: desc,
     source_type: 'invoice_paid',
     source_id: invoice.id,
     lines,
@@ -237,15 +334,19 @@ export async function createCreditNoteJournalEntry(
     return null
   }
 
-  const absTotal = Math.abs(creditNote.total)
   const lines: CreateJournalEntryLineInput[] = []
 
-  // Generate reversed revenue + VAT lines per rate group
+  // Generate reversed revenue + VAT lines per rate group (debit side for credit notes)
+  const debitLines: CreateJournalEntryLineInput[] = []
+
   if (creditNote.items && creditNote.items.length > 0) {
-    const creditLines = generatePerRateLines(creditNote.items, creditNote.vat_treatment, entityType, creditNote.invoice_number)
-    // Swap debit/credit for credit note reversal (make amounts absolute first)
+    // Use absolute items for generatePerRateLines, then swap debit/credit
+    const creditLines = generatePerRateLines(
+      creditNote.items, creditNote.vat_treatment, entityType, creditNote.invoice_number,
+      creditNote.currency, creditNote.exchange_rate
+    )
     for (const line of creditLines) {
-      lines.push({
+      debitLines.push({
         ...line,
         debit_amount: Math.abs(line.credit_amount),
         credit_amount: Math.abs(line.debit_amount),
@@ -255,10 +356,10 @@ export async function createCreditNoteJournalEntry(
   } else {
     // Fallback: invoice-level amounts
     const revenueAccount = getRevenueAccount(creditNote.vat_treatment, entityType)
-    const absSubtotal = Math.abs(creditNote.subtotal)
-    const absVat = Math.abs(creditNote.vat_amount)
+    const absSubtotal = Math.abs(resolveSekAmount(creditNote.subtotal, creditNote.subtotal_sek, creditNote.currency, creditNote.exchange_rate))
+    const absVat = Math.abs(resolveSekAmount(creditNote.vat_amount, creditNote.vat_amount_sek, creditNote.currency, creditNote.exchange_rate))
 
-    lines.push({
+    debitLines.push({
       account_number: revenueAccount,
       debit_amount: absSubtotal,
       credit_amount: 0,
@@ -267,7 +368,7 @@ export async function createCreditNoteJournalEntry(
 
     if (absVat > 0) {
       const vatAccount = getOutputVatAccount(creditNote.vat_treatment)
-      lines.push({
+      debitLines.push({
         account_number: vatAccount,
         debit_amount: absVat,
         credit_amount: 0,
@@ -276,11 +377,14 @@ export async function createCreditNoteJournalEntry(
     }
   }
 
-  // Credit: Kundfordringar (reverse the debit)
+  lines.push(...debitLines)
+
+  // Credit: Kundfordringar — balance guarantee: credit = sum of all debit lines
+  const totalDebits = debitLines.reduce((sum, l) => sum + l.debit_amount, 0)
   lines.push({
     account_number: '1510',
     debit_amount: 0,
-    credit_amount: absTotal,
+    credit_amount: Math.round(totalDebits * 100) / 100,
     line_description: `Kreditfaktura ${creditNote.invoice_number}`,
   })
 
@@ -318,38 +422,50 @@ export async function createInvoiceCashEntry(
   }
 
   const lines: CreateJournalEntryLineInput[] = []
+  const isForeign = invoice.currency !== 'SEK'
 
-  // Debit: Företagskonto (total received)
-  lines.push({
-    account_number: '1930',
-    debit_amount: invoice.total,
-    credit_amount: 0,
-    line_description: `Betalning faktura ${invoice.invoice_number}`,
-  })
+  // Credit lines: revenue + VAT per rate group (compute first to guarantee balance)
+  const creditLines: CreateJournalEntryLineInput[] = []
 
-  // Credit lines: revenue + VAT per rate group
   if (invoice.items && invoice.items.length > 0) {
-    lines.push(...generatePerRateLines(invoice.items, invoice.vat_treatment, entityType, invoice.invoice_number))
+    creditLines.push(...generatePerRateLines(
+      invoice.items, invoice.vat_treatment, entityType, invoice.invoice_number,
+      invoice.currency, invoice.exchange_rate
+    ))
   } else {
     // Fallback: invoice-level amounts
     const revenueAccount = getRevenueAccount(invoice.vat_treatment, entityType)
-    lines.push({
+    const subtotalSek = resolveSekAmount(invoice.subtotal, invoice.subtotal_sek, invoice.currency, invoice.exchange_rate)
+
+    creditLines.push({
       account_number: revenueAccount,
       debit_amount: 0,
-      credit_amount: invoice.subtotal,
+      credit_amount: subtotalSek,
       line_description: `Försäljning faktura ${invoice.invoice_number}`,
     })
 
     if (invoice.vat_amount > 0) {
+      const vatSek = resolveSekAmount(invoice.vat_amount, invoice.vat_amount_sek, invoice.currency, invoice.exchange_rate)
       const vatAccount = getOutputVatAccount(invoice.vat_treatment)
-      lines.push({
+      creditLines.push({
         account_number: vatAccount,
         debit_amount: 0,
-        credit_amount: invoice.vat_amount,
+        credit_amount: vatSek,
         line_description: `Utgående moms faktura ${invoice.invoice_number}`,
       })
     }
   }
+
+  // Debit: Företagskonto — balance guarantee: debit = sum of credit lines
+  const totalCredits = creditLines.reduce((sum, l) => sum + l.credit_amount, 0)
+  lines.push({
+    account_number: '1930',
+    debit_amount: isForeign ? Math.round(totalCredits * 100) / 100 : resolveSekAmount(invoice.total, invoice.total_sek, invoice.currency, invoice.exchange_rate),
+    credit_amount: 0,
+    line_description: `Betalning faktura ${invoice.invoice_number}`,
+  })
+
+  lines.push(...creditLines)
 
   const input: CreateJournalEntryInput = {
     fiscal_period_id: fiscalPeriodId,

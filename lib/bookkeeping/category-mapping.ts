@@ -36,6 +36,42 @@ const PRIVATE_ACCOUNTS: Record<EntityType, string> = {
   aktiebolag: '2893',     // Skuld till aktieägare/delägare
 }
 
+// Single source of truth for category -> expense account mapping
+const EXPENSE_ACCOUNTS: Record<string, string> = {
+  expense_equipment: '5410',           // Förbrukningsinventarier
+  expense_software: '5420',            // Programvaror
+  expense_travel: '5800',              // Resekostnader
+  expense_office: '6110',              // Kontorsförbrukning
+  expense_marketing: '5910',           // Annonsering
+  expense_professional_services: '6530', // Redovisningstjänster
+  expense_representation: '6071',      // Representation, avdragsgill
+  expense_consumables: '5460',         // Förbrukningsvaror
+  expense_vehicle: '5611',             // Drivmedel bil
+  expense_telecom: '6200',             // Telefon och internet
+  expense_bank_fees: '6570',           // Bankavgifter
+  expense_card_fees: '6570',           // Kortavgifter
+  expense_currency_exchange: '7960',   // Valutakursförluster
+  expense_other: '6991',              // Övriga avdragsgilla kostnader
+}
+
+// Income account mapping
+const INCOME_ACCOUNTS: Record<string, string> = {
+  income_services: '3001',  // Försäljning tjänster 25%
+  income_products: '3001',  // Försäljning varor 25% moms
+  income_other: '3900',     // Övriga rörelseintäkter
+}
+
+/**
+ * Get the expense account for a category, with entity-specific overrides.
+ * Education (expense_education) differs: AB uses 7610, EF uses 6991.
+ */
+function getExpenseAccount(category: string, entityType: EntityType = 'enskild_firma'): string {
+  if (category === 'expense_education') {
+    return entityType === 'aktiebolag' ? '7610' : '6991'
+  }
+  return EXPENSE_ACCOUNTS[category] || '6991'
+}
+
 /**
  * Get account mapping for a transaction category
  *
@@ -61,36 +97,9 @@ export function getCategoryAccountMapping(
     }
   }
 
-  // Business expense categories
-  const educationAccount = entityType === 'aktiebolag' ? '7610' : '6991' // Utbildning (AB) / Övriga avdragsgilla kostnader (EF)
-  const expenseMapping: Record<string, string> = {
-    expense_equipment: '5410', // Förbrukningsinventarier
-    expense_software: '5420', // Programvaror
-    expense_travel: '5800', // Resekostnader
-    expense_office: '5010', // Lokalhyra
-    expense_marketing: '5910', // Annonsering
-    expense_professional_services: '6530', // Redovisningstjänster
-    expense_education: educationAccount,
-    expense_representation: '6071', // Representation, avdragsgill
-    expense_consumables: '5460', // Förbrukningsvaror
-    expense_vehicle: '5611', // Drivmedel bil
-    expense_telecom: '6200', // Telefon och internet
-    expense_bank_fees: '6570', // Bankavgifter
-    expense_card_fees: '6570', // Kortavgifter
-    expense_currency_exchange: '7960', // Valutakursförluster
-    expense_other: '6991', // Övriga avdragsgilla kostnader
-  }
-
-  // Business income categories
-  const incomeMapping: Record<string, string> = {
-    income_services: '3001', // Försäljning tjänster 25%
-    income_products: '3001', // Försäljning varor 25% moms
-    income_other: '3900', // Övriga rörelseintäkter
-  }
-
   // Check if it's an expense category
   if (category.startsWith('expense_')) {
-    const expenseAccount = expenseMapping[category] || '6991'
+    const expenseAccount = getExpenseAccount(category, entityType)
 
     // Bank fees, card fees, and currency exchange are VAT-exempt in Sweden
     const vatExemptCategories = ['expense_bank_fees', 'expense_card_fees', 'expense_currency_exchange']
@@ -110,7 +119,7 @@ export function getCategoryAccountMapping(
 
   // Check if it's an income category
   if (category.startsWith('income_')) {
-    const incomeAccount = incomeMapping[category] || '3900'
+    const incomeAccount = INCOME_ACCOUNTS[category] || '3900'
 
     // Use provided vatTreatment, or default to standard_25
     const resolvedVat = vatTreatment ?? 'standard_25'
@@ -262,24 +271,8 @@ export function buildMappingResultFromCategory(
  * Useful for creating mapping rules
  */
 export function getExpenseAccountForCategory(category: TransactionCategory): string | null {
-  const mapping: Record<string, string> = {
-    expense_equipment: '5410',
-    expense_software: '5420',
-    expense_travel: '5800',
-    expense_office: '5010',
-    expense_marketing: '5910',
-    expense_professional_services: '6530',
-    expense_education: '6991',
-    expense_representation: '6071',
-    expense_consumables: '5460',
-    expense_vehicle: '5611',
-    expense_telecom: '6200',
-    expense_bank_fees: '6570',
-    expense_card_fees: '6570',
-    expense_currency_exchange: '7960',
-    expense_other: '6991',
-  }
-  return mapping[category] || null
+  if (category === 'expense_education') return '6991'
+  return EXPENSE_ACCOUNTS[category] || null
 }
 
 /**
@@ -296,36 +289,12 @@ export function getDefaultAccountForCategory(
     return PRIVATE_ACCOUNTS[entityType] || PRIVATE_ACCOUNTS.enskild_firma
   }
 
-  const expenseMapping: Record<string, string> = {
-    expense_equipment: '5410',
-    expense_software: '5420',
-    expense_travel: '5800',
-    expense_office: '5010',
-    expense_marketing: '5910',
-    expense_professional_services: '6530',
-    expense_education: entityType === 'aktiebolag' ? '7610' : '6991',
-    expense_representation: '6071',
-    expense_consumables: '5460',
-    expense_vehicle: '5611',
-    expense_telecom: '6200',
-    expense_bank_fees: '6570',
-    expense_card_fees: '6570',
-    expense_currency_exchange: '7960',
-    expense_other: '6991',
-  }
-
   if (category.startsWith('expense_')) {
-    return expenseMapping[category] || '6991'
-  }
-
-  const incomeMapping: Record<string, string> = {
-    income_services: '3001',
-    income_products: '3001',
-    income_other: '3900',
+    return getExpenseAccount(category, entityType)
   }
 
   if (category.startsWith('income_')) {
-    return incomeMapping[category] || '3900'
+    return INCOME_ACCOUNTS[category] || '3900'
   }
 
   // uncategorized
