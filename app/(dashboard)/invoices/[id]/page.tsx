@@ -406,16 +406,16 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 Skicka via e-post
               </Button>
             ) : (
-              <Button onClick={() => updateStatus('sent')} disabled={isUpdating}>
+              <Button variant="secondary" onClick={() => updateStatus('sent')} disabled={isUpdating}>
                 <Send className="mr-2 h-4 w-4" />
-                Markera som skickad
+                Skickad manuellt
               </Button>
             )
           )}
           {isDeliveryNote && invoice.status === 'draft' && (
-            <Button onClick={() => updateStatus('sent')} disabled={isUpdating}>
+            <Button variant="secondary" onClick={() => updateStatus('sent')} disabled={isUpdating}>
               <Send className="mr-2 h-4 w-4" />
-              Markera som skickad
+              Skickad manuellt
             </Button>
           )}
           {(invoice.status === 'sent' || invoice.status === 'overdue') && isRealInvoice && (
@@ -824,24 +824,38 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 {!isProforma && invoice.status === 'draft' && (
                   <>
                     {!isDeliveryNote && customerHasEmail ? (
-                      <Button
-                        className="w-full"
-                        onClick={sendInvoiceEmail}
-                        disabled={isSendingEmail}
-                      >
-                        {isSendingEmail ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <Mail className="mr-2 h-4 w-4" />
-                        )}
-                        Skicka via e-post
-                      </Button>
+                      <>
+                        <Button
+                          className="w-full"
+                          onClick={sendInvoiceEmail}
+                          disabled={isSendingEmail}
+                        >
+                          {isSendingEmail ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Mail className="mr-2 h-4 w-4" />
+                          )}
+                          Skicka via e-post
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="w-full text-muted-foreground"
+                          onClick={() => updateStatus('sent')}
+                          disabled={isUpdating}
+                        >
+                          <Send className="mr-2 h-4 w-4" />
+                          Skickad manuellt
+                        </Button>
+                        <p className="text-[11px] text-muted-foreground/60 px-1 -mt-1">
+                          Använd om du redan skickat fakturan på annat sätt (post, annat system)
+                        </p>
+                      </>
                     ) : (
                       <>
                         {!isDeliveryNote && (
-                          <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-2">
-                            <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
-                            <p className="text-xs text-yellow-700">
+                          <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-2 dark:bg-yellow-950/30 dark:border-yellow-800">
+                            <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-500 mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-yellow-700 dark:text-yellow-400">
                               Kunden saknar e-postadress. Lägg till e-post för att kunna skicka fakturan digitalt.
                             </p>
                           </div>
@@ -852,8 +866,11 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                           disabled={isUpdating}
                         >
                           <Send className="mr-2 h-4 w-4" />
-                          Markera som skickad
+                          Skickad manuellt
                         </Button>
+                        <p className="text-[11px] text-muted-foreground/60 px-1 -mt-1">
+                          Markerar fakturan som skickad och skapar bokföringsverifikation
+                        </p>
                       </>
                     )}
                     <Button

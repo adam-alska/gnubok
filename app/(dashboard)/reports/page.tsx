@@ -103,54 +103,89 @@ export default function ReportsPage() {
 
       {selectedPeriod ? (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="h-auto w-full flex-wrap justify-start gap-1 p-1">
-            <TabsTrigger value="trial-balance">
-              <Scale className="h-4 w-4 mr-1" />
-              Saldobalans
-            </TabsTrigger>
-            <TabsTrigger value="income-statement">
-              <TrendingUp className="h-4 w-4 mr-1" />
-              Resultaträkning
-            </TabsTrigger>
-            <TabsTrigger value="balance-sheet">
-              <FileText className="h-4 w-4 mr-1" />
-              Balansräkning
-            </TabsTrigger>
-            <TabsTrigger value="vat-declaration">
-              <Receipt className="h-4 w-4 mr-1" />
-              Momsdeklaration
-            </TabsTrigger>
-            {isEnskildFirma && (
-              <TabsTrigger value="ne-declaration">
-                <Briefcase className="h-4 w-4 mr-1" />
-                NE-bilaga
-              </TabsTrigger>
-            )}
-            <TabsTrigger value="sru-export">
-              <FileDown className="h-4 w-4 mr-1" />
-              SRU-export
-            </TabsTrigger>
-            <TabsTrigger value="huvudbok">
-              <BookOpen className="h-4 w-4 mr-1" />
-              Huvudbok
-            </TabsTrigger>
-            <TabsTrigger value="grundbok">
-              <List className="h-4 w-4 mr-1" />
-              Grundbok
-            </TabsTrigger>
-            <TabsTrigger value="kundreskontra">
-              <Users className="h-4 w-4 mr-1" />
-              Kundreskontra
-            </TabsTrigger>
-            <TabsTrigger value="supplier-ledger">
-              <Building2 className="h-4 w-4 mr-1" />
-              Lev.reskontra
-            </TabsTrigger>
-            <TabsTrigger value="bank-reconciliation">
-              <ArrowLeftRight className="h-4 w-4 mr-1" />
-              Bankavstämning
-            </TabsTrigger>
-          </TabsList>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
+            {/* Bokslut (Financial Statements) */}
+            <div className="space-y-1">
+              <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-[0.08em] px-1">
+                Bokslut
+              </p>
+              <TabsList className="flex flex-col h-auto w-full gap-0.5 p-1">
+                <TabsTrigger value="trial-balance" className="w-full justify-start">
+                  <Scale className="h-4 w-4 mr-1.5" />
+                  Saldobalans
+                </TabsTrigger>
+                <TabsTrigger value="income-statement" className="w-full justify-start">
+                  <TrendingUp className="h-4 w-4 mr-1.5" />
+                  Resultaträkning
+                </TabsTrigger>
+                <TabsTrigger value="balance-sheet" className="w-full justify-start">
+                  <FileText className="h-4 w-4 mr-1.5" />
+                  Balansräkning
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            {/* Skatt & moms (Tax & VAT) */}
+            <div className="space-y-1">
+              <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-[0.08em] px-1">
+                Skatt & moms
+              </p>
+              <TabsList className="flex flex-col h-auto w-full gap-0.5 p-1">
+                <TabsTrigger value="vat-declaration" className="w-full justify-start">
+                  <Receipt className="h-4 w-4 mr-1.5" />
+                  Momsdeklaration
+                </TabsTrigger>
+                {isEnskildFirma && (
+                  <TabsTrigger value="ne-declaration" className="w-full justify-start">
+                    <Briefcase className="h-4 w-4 mr-1.5" />
+                    NE-bilaga
+                  </TabsTrigger>
+                )}
+                <TabsTrigger value="sru-export" className="w-full justify-start">
+                  <FileDown className="h-4 w-4 mr-1.5" />
+                  SRU-export
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            {/* Huvudböcker (Ledgers) */}
+            <div className="space-y-1">
+              <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-[0.08em] px-1">
+                Huvudböcker
+              </p>
+              <TabsList className="flex flex-col h-auto w-full gap-0.5 p-1">
+                <TabsTrigger value="huvudbok" className="w-full justify-start">
+                  <BookOpen className="h-4 w-4 mr-1.5" />
+                  Huvudbok
+                </TabsTrigger>
+                <TabsTrigger value="grundbok" className="w-full justify-start">
+                  <List className="h-4 w-4 mr-1.5" />
+                  Grundbok
+                </TabsTrigger>
+                <TabsTrigger value="kundreskontra" className="w-full justify-start">
+                  <Users className="h-4 w-4 mr-1.5" />
+                  Kundreskontra
+                </TabsTrigger>
+                <TabsTrigger value="supplier-ledger" className="w-full justify-start">
+                  <Building2 className="h-4 w-4 mr-1.5" />
+                  Leverantörsreskontra
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            {/* Avstämning (Reconciliation) */}
+            <div className="space-y-1">
+              <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-[0.08em] px-1">
+                Avstämning
+              </p>
+              <TabsList className="flex flex-col h-auto w-full gap-0.5 p-1">
+                <TabsTrigger value="bank-reconciliation" className="w-full justify-start">
+                  <ArrowLeftRight className="h-4 w-4 mr-1.5" />
+                  Bankavstämning
+                </TabsTrigger>
+              </TabsList>
+            </div>
+          </div>
 
           <TabsContent value="trial-balance">
             <TrialBalanceView periodId={selectedPeriod} />

@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/components/ui/use-toast'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import { getVatTreatmentLabel } from '@/lib/invoices/vat-rules'
 import { Loader2, ArrowLeft, AlertTriangle } from 'lucide-react'
 import type { Invoice, InvoiceItem, Customer } from '@/types'
@@ -29,6 +30,7 @@ export default function CreateCreditNotePage({ params }: { params: Promise<{ id:
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [reason, setReason] = useState('')
+  const [confirmText, setConfirmText] = useState('')
 
   useEffect(() => {
     fetchInvoice()
@@ -157,14 +159,14 @@ export default function CreateCreditNotePage({ params }: { params: Promise<{ id:
       </div>
 
       {/* Warning */}
-      <Card className="border-warning/50 bg-warning/5">
+      <Card className="border-destructive/50 bg-destructive/5">
         <CardContent className="flex items-start gap-4 pt-6">
-          <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
+          <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
           <div>
-            <p className="font-medium">Viktigt om kreditfakturor</p>
+            <p className="font-medium text-destructive">Oåterkallelig åtgärd</p>
             <p className="text-sm text-muted-foreground mt-1">
               En kreditfaktura makulerar den ursprungliga fakturan helt.
-              Alla belopp blir negativa och den ursprungliga fakturan markeras som krediterad.
+              Alla belopp blir negativa, en bokföringsverifikation skapas, och den ursprungliga fakturan markeras som krediterad.
               Denna åtgärd kan inte ångras.
             </p>
           </div>
@@ -295,12 +297,36 @@ export default function CreateCreditNotePage({ params }: { params: Promise<{ id:
         </CardContent>
       </Card>
 
+      {/* Confirmation */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Bekräfta</CardTitle>
+          <CardDescription>
+            Skriv fakturanumret <span className="font-mono font-semibold text-foreground">{invoice.invoice_number}</span> för att bekräfta
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Input
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder={invoice.invoice_number}
+            className={cn(
+              confirmText && confirmText !== invoice.invoice_number && 'border-destructive'
+            )}
+          />
+        </CardContent>
+      </Card>
+
       {/* Actions */}
       <div className="flex justify-end gap-4">
         <Button variant="outline" onClick={() => router.back()}>
           Avbryt
         </Button>
-        <Button onClick={handleSubmit} disabled={isSubmitting}>
+        <Button
+          variant="destructive"
+          onClick={handleSubmit}
+          disabled={isSubmitting || confirmText !== invoice.invoice_number}
+        >
           {isSubmitting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
