@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
-import type { ChatMessage, SourceReference, ChatSession } from '@/types/chat'
+import type { ChatMessage, SourceReference, ArtifactSpec } from '@/types/chat'
 
 interface UseChatStreamOptions {
   onError?: (error: string) => void
@@ -13,6 +13,7 @@ interface UseChatStreamReturn {
   isStreaming: boolean
   sessionId: string | null
   error: string | null
+  toolsExecuting: string[]
   sendMessage: (message: string) => Promise<void>
   loadSession: (sessionId: string) => Promise<void>
   clearChat: () => void
@@ -25,6 +26,7 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
   const [isStreaming, setIsStreaming] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [toolsExecuting, setToolsExecuting] = useState<string[]>([])
   const abortControllerRef = useRef<AbortController | null>(null)
 
   const sendMessage = useCallback(async (message: string) => {
@@ -86,6 +88,7 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
       const decoder = new TextDecoder()
       let accumulatedContent = ''
       let sources: SourceReference[] = []
+      let artifact: ArtifactSpec | null = null
       let newSessionId = sessionId
       let messageId: string | null = null
 
@@ -106,6 +109,7 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
                 setSessionId(data.session_id)
               } else if (data.type === 'content') {
                 accumulatedContent += data.content
+                setToolsExecuting([]) // Clear tool indicators when content starts
                 setMessages((prev) => {
                   const newMessages = [...prev]
                   const lastMsg = newMessages[newMessages.length - 1]
@@ -124,8 +128,21 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
                   }
                   return newMessages
                 })
+              } else if (data.type === 'tool_start') {
+                setToolsExecuting((prev) => [...prev, data.toolName])
+              } else if (data.type === 'artifact') {
+                artifact = data.artifact
+                setMessages((prev) => {
+                  const newMessages = [...prev]
+                  const lastMsg = newMessages[newMessages.length - 1]
+                  if (lastMsg.role === 'assistant') {
+                    lastMsg.artifact = artifact
+                  }
+                  return newMessages
+                })
               } else if (data.type === 'done') {
                 messageId = data.message_id
+                setToolsExecuting([])
                 // Update the message IDs with real values
                 setMessages((prev) => {
                   const newMessages = [...prev]
@@ -207,6 +224,7 @@ export function useChatStream(options: UseChatStreamOptions = {}): UseChatStream
     isStreaming,
     sessionId,
     error,
+    toolsExecuting,
     sendMessage,
     loadSession,
     clearChat,

@@ -21,6 +21,7 @@ export function ChatPanel({ className }: ChatPanelProps) {
     isLoading,
     isStreaming,
     error,
+    toolsExecuting,
     sendMessage,
     clearChat,
   } = useChatStream({
@@ -90,22 +91,28 @@ export function ChatPanel({ className }: ChatPanelProps) {
             </p>
             <div className="mt-6 space-y-2 w-full max-w-xs">
               <SuggestionButton
-                onClick={() => sendMessage('Hur fungerar momsen på mina fakturor?')}
+                onClick={() => sendMessage('Hur går det för mitt företag?')}
                 disabled={isLoading}
               >
-                Hur fungerar momsen på mina fakturor?
+                Hur går det för mitt företag?
+              </SuggestionButton>
+              <SuggestionButton
+                onClick={() => sendMessage('Visa mina senaste fakturor')}
+                disabled={isLoading}
+              >
+                Visa mina senaste fakturor
+              </SuggestionButton>
+              <SuggestionButton
+                onClick={() => sendMessage('Hur ser min resultaträkning ut?')}
+                disabled={isLoading}
+              >
+                Hur ser min resultaträkning ut?
               </SuggestionButton>
               <SuggestionButton
                 onClick={() => sendMessage('Vad kan jag dra av som företagare?')}
                 disabled={isLoading}
               >
                 Vad kan jag dra av som företagare?
-              </SuggestionButton>
-              <SuggestionButton
-                onClick={() => sendMessage('När måste jag momsregistrera mig?')}
-                disabled={isLoading}
-              >
-                När måste jag momsregistrera mig?
               </SuggestionButton>
             </div>
           </div>
@@ -119,6 +126,13 @@ export function ChatPanel({ className }: ChatPanelProps) {
                   isStreaming &&
                   index === messages.length - 1 &&
                   message.role === 'assistant'
+                }
+                toolsExecuting={
+                  isStreaming &&
+                  index === messages.length - 1 &&
+                  message.role === 'assistant'
+                    ? toolsExecuting
+                    : undefined
                 }
               />
             ))}
