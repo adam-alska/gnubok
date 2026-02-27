@@ -33,6 +33,7 @@ interface DashboardNavProps {
   companyName: string
   entityType: EntityType
   enabledExtensions?: { sector_slug: string; extension_slug: string }[]
+  uncategorizedTransactionCount?: number
 }
 
 interface NavItem {
@@ -50,11 +51,11 @@ const navItems: NavItem[] = [
   { href: '/invoices', label: 'Fakturor', icon: Receipt, group: 'finans' },
   { href: '/customers', label: 'Kunder', icon: Users, group: 'finans' },
   { href: '/suppliers', label: 'Leverantörer', icon: Building2, group: 'finans' },
-  { href: '/supplier-invoices', label: 'Lev.fakturor', icon: FileInput, group: 'finans' },
+  { href: '/supplier-invoices', label: 'Leverantörsfakturor', icon: FileInput, group: 'finans' },
   { href: '/transactions', label: 'Transaktioner', icon: ArrowLeftRight, group: 'finans' },
   { href: '/bookkeeping', label: 'Bokföring', icon: BookOpen, group: 'finans' },
   { href: '/reports', label: 'Rapporter', icon: BarChart3, group: 'finans' },
-  { href: '/import', label: 'Importera', icon: Upload, group: 'övrigt' },
+  { href: '/import', label: 'Importera', icon: Upload, group: 'finans' },
   { href: '/help', label: 'Hjälp', icon: HelpCircle, group: 'övrigt' },
   { href: '/settings', label: 'Inställningar', icon: Settings, group: 'övrigt' },
 ]
@@ -65,17 +66,17 @@ const groupLabels: Record<string, string> = {
   övrigt: 'Övrigt',
 }
 
-export default function DashboardNav({ companyName, entityType, enabledExtensions }: DashboardNavProps) {
+export default function DashboardNav({ companyName, entityType, enabledExtensions, uncategorizedTransactionCount = 0 }: DashboardNavProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   // Auto-expand Övrigt when the user is on one of its pages, or when manually toggled
-  const isOnOvrigtPage = ['/import', '/help', '/settings'].some(p => pathname.startsWith(p))
+  const isOnOvrigtPage = ['/help', '/settings'].some(p => pathname.startsWith(p))
   const [manualOvrigtExpanded, setManualOvrigtExpanded] = useState(false)
   const isOvrigtExpanded = isOnOvrigtPage || manualOvrigtExpanded
-  // Auto-expand Tillägg when on an extension page, or when manually toggled (persisted)
-  const isOnExtensionPage = pathname.startsWith('/e/')
+  // Auto-expand Tillägg when on an extension page or marketplace, or when manually toggled (persisted)
+  const isOnExtensionPage = pathname.startsWith('/e/') || pathname.startsWith('/extensions')
   const [manualTillaggExpanded, setManualTillaggExpanded] = useState(false)
   const isTillaggExpanded = isOnExtensionPage || manualTillaggExpanded
 
@@ -200,6 +201,9 @@ export default function DashboardNav({ companyName, entityType, enabledExtension
                   {finansItems.map((item) => {
                     const Icon = item.icon
                     const active = isActive(item.href)
+                    const badge = item.href === '/transactions' && uncategorizedTransactionCount > 0
+                      ? uncategorizedTransactionCount
+                      : null
                     return (
                       <Link
                         key={item.href}
@@ -215,35 +219,19 @@ export default function DashboardNav({ companyName, entityType, enabledExtension
                           "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
                           active ? "text-primary" : "text-muted-foreground/70 group-hover:text-muted-foreground"
                         )} />
-                        {item.label}
+                        <span className="flex-1">{item.label}</span>
+                        {badge !== null && (
+                          <span className="ml-auto min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-primary/15 text-primary text-[10px] font-semibold px-1">
+                            {badge > 99 ? '99+' : badge}
+                          </span>
+                        )}
                       </Link>
                     )
                   })}
                 </div>
               </div>
 
-              {/* Marketplace - standalone link */}
-              <div className="mb-4">
-                <div className="space-y-px">
-                  <Link
-                    href="/extensions"
-                    className={cn(
-                      'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
-                      isActive('/extensions')
-                        ? 'bg-primary/8 text-foreground font-medium'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-                    )}
-                  >
-                    <Store className={cn(
-                      "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
-                      isActive('/extensions') ? "text-primary" : "text-muted-foreground/70 group-hover:text-muted-foreground"
-                    )} />
-                    Marketplace
-                  </Link>
-                </div>
-              </div>
-
-              {/* Tillägg - collapsible */}
+              {/* Tillägg - collapsible, with marketplace link */}
               <div className="mb-4">
                 <button
                   onClick={toggleTillagg}
@@ -286,6 +274,21 @@ export default function DashboardNav({ companyName, entityType, enabledExtension
                         Inga tillägg aktiverade
                       </p>
                     )}
+                    <Link
+                      href="/extensions"
+                      className={cn(
+                        'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
+                        isActive('/extensions')
+                          ? 'bg-primary/8 text-foreground font-medium'
+                          : 'text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/40'
+                      )}
+                    >
+                      <Store className={cn(
+                        "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
+                        isActive('/extensions') ? "text-primary" : "text-muted-foreground/50 group-hover:text-muted-foreground"
+                      )} />
+                      Utforska fler...
+                    </Link>
                   </div>
                 )}
               </div>
@@ -352,22 +355,32 @@ export default function DashboardNav({ companyName, entityType, enabledExtension
           {mobileNavItems.map((item) => {
             const Icon = item.icon
             const active = isActive(item.href)
+            const badge = item.href === '/transactions' && uncategorizedTransactionCount > 0
+              ? uncategorizedTransactionCount
+              : null
 
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex flex-col items-center justify-center flex-1 h-full text-xs transition-colors duration-200',
+                  'relative flex flex-col items-center justify-center flex-1 h-full text-xs transition-colors duration-200',
                   active
                     ? 'text-primary'
                     : 'text-muted-foreground'
                 )}
               >
-                <Icon className={cn(
-                  "h-5 w-5 mb-1",
-                  active && "text-primary"
-                )} />
+                <div className="relative">
+                  <Icon className={cn(
+                    "h-5 w-5 mb-1",
+                    active && "text-primary"
+                  )} />
+                  {badge !== null && (
+                    <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-[16px] flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[9px] font-semibold px-0.5">
+                      {badge > 99 ? '99+' : badge}
+                    </span>
+                  )}
+                </div>
                 <span className={cn(
                   "truncate",
                   active && "font-medium"
@@ -473,23 +486,6 @@ export default function DashboardNav({ companyName, entityType, enabledExtension
                 })}
               </div>
 
-              {/* Marketplace */}
-              <div className="mb-4">
-                <Link
-                  href="/extensions"
-                  onClick={closeMobileMenu}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
-                    isActive('/extensions')
-                      ? 'bg-primary/10 text-primary font-medium'
-                      : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
-                  )}
-                >
-                  <Store className="h-5 w-5" />
-                  Marketplace
-                </Link>
-              </div>
-
               {/* Tillägg */}
               <div className="mb-4">
                 <p className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -522,6 +518,19 @@ export default function DashboardNav({ companyName, entityType, enabledExtension
                     Inga tillägg aktiverade
                   </p>
                 )}
+                <Link
+                  href="/extensions"
+                  onClick={closeMobileMenu}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
+                    isActive('/extensions')
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : 'text-muted-foreground/60 hover:bg-secondary/50 hover:text-foreground'
+                  )}
+                >
+                  <Store className="h-5 w-5" />
+                  Utforska fler...
+                </Link>
               </div>
 
               {/* Other section */}
