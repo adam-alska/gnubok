@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { ApiRouteDefinition, ExtensionContext } from '@/lib/extensions/types'
 import type { InvoiceExtractionResult } from './types'
 import type { InvoiceInboxItem, SupplierInvoice } from '@/types'
-import { analyzeInvoice } from './lib/invoice-analyzer'
+import { analyzeDocument } from '@/lib/ai/document-analyzer'
 import { matchSupplier } from './lib/supplier-matcher'
 import { getSettings, saveSettings } from './index'
 import { eventBus } from '@/lib/events/bus'
@@ -190,96 +190,33 @@ async function processInboxItem(
   const supabase = await getSupabase()
 
   try {
-    console.log(`[invoice-inbox] Processing item=${itemId}: starting AI extraction (${mimeType})`)
-    const extraction = await analyzeInvoice(base64, mimeType)
+    console.log(`[invoice-inbox] Processing item=${itemId}: starting AI analysis (${mimeType})`)
+    const result = await analyzeDocument(base64, mimeType)
 
-    console.log(`[invoice-inbox] item=${itemId} extraction complete:`, {
-      confidence: extraction.confidence,
-      suggestedTemplateId: extraction.suggestedTemplateId || null,
-      supplier: extraction.supplier?.name || null,
-      total: extraction.totals?.total || null,
-      invoiceDate: extraction.invoice?.invoiceDate || null,
-      dueDate: extraction.invoice?.dueDate || null,
-      paymentRef: extraction.invoice?.paymentReference || null,
-    })
+    const { classification } = result
+    console.log(`[invoice-inbox] item=${itemId} classified as: ${classification.type} (confidence=${classification.confidence}, reasoning=${classification.reasoning})`)
 
-    // Supplier matching
-    const settings = await getSettings(userId)
-    let matchedSupplierId: string | null = null
-
-    if (settings.autoMatchSupplierEnabled) {
-      const { data: suppliers } = await supabase
-        .from('suppliers')
-        .select('*')
-        .eq('user_id', userId)
-
-      if (suppliers && suppliers.length > 0) {
-        const match = matchSupplier(extraction, suppliers)
-        if (match && match.confidence >= settings.supplierMatchThreshold) {
-          matchedSupplierId = match.supplierId
-          console.log(`[invoice-inbox] item=${itemId} supplier matched: id=${match.supplierId} confidence=${match.confidence}`)
-        }
-      }
-    }
-
-    // Store extraction result with template suggestion
-    const updateData: Record<string, unknown> = {
-      status: 'ready',
-      extracted_data: extraction as unknown as Record<string, unknown>,
-      confidence: extraction.confidence,
-      matched_supplier_id: matchedSupplierId,
-    }
-
-    if (extraction.suggestedTemplateId) {
-      updateData.suggested_template_id = extraction.suggestedTemplateId
-      updateData.suggested_template_confidence = extraction.confidence
-      console.log(`[invoice-inbox] item=${itemId} template suggestion: ${extraction.suggestedTemplateId} (confidence=${extraction.confidence})`)
-    }
-
-    await supabase
-      .from('invoice_inbox_items')
-      .update(updateData)
-      .eq('id', itemId)
-
-    // Fetch the updated item for event emission and matching
-    const { data: updatedItem } = await supabase
-      .from('invoice_inbox_items')
-      .select('*')
-      .eq('id', itemId)
-      .single()
-
-    if (updatedItem) {
-      await eventBus.emit({
-        type: 'supplier_invoice.extracted',
-        payload: {
-          inboxItem: updatedItem,
-          confidence: extraction.confidence,
-          userId,
-        },
-      })
-
-      // Document-to-transaction matching
-      try {
-        const matchResult = await matchDocumentToTransactions(
-          supabase,
-          userId,
-          updatedItem as InvoiceInboxItem
-        )
-
-        if (matchResult) {
-          await supabase
-            .from('invoice_inbox_items')
-            .update({
-              matched_transaction_id: matchResult.transactionId,
-              match_confidence: matchResult.confidence,
-              match_method: matchResult.method,
-            })
-            .eq('id', itemId)
-        }
-      } catch (matchError) {
-        // Non-blocking: log but don't fail the item
-        console.error('[invoice-inbox] Transaction matching failed:', matchError)
-      }
+    // Handle based on document type
+    if (classification.type === 'receipt' && result.receipt) {
+      await processAsReceipt(supabase, itemId, userId, result.receipt)
+    } else if (classification.type === 'supplier_invoice' && result.invoice) {
+      await processAsInvoice(supabase, itemId, userId, result.invoice)
+    } else if (classification.type === 'government_letter' || classification.type === 'unknown') {
+      // Store classification but no extraction — user must review manually
+      await supabase
+        .from('invoice_inbox_items')
+        .update({
+          status: 'ready',
+          document_type: classification.type,
+          confidence: classification.confidence,
+        })
+        .eq('id', itemId)
+    } else {
+      // Classification gave a type but extraction failed — fall back to supplier_invoice extraction
+      console.warn(`[invoice-inbox] item=${itemId}: classified as ${classification.type} but no extraction data, falling back`)
+      const { extractInvoice } = await import('@/lib/ai/document-analyzer')
+      const fallbackExtraction = await extractInvoice(base64, mimeType)
+      await processAsInvoice(supabase, itemId, userId, fallbackExtraction)
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
@@ -287,6 +224,235 @@ async function processInboxItem(
       .from('invoice_inbox_items')
       .update({ status: 'error', error_message: message })
       .eq('id', itemId)
+  }
+}
+
+async function processAsReceipt(
+  supabase: Awaited<ReturnType<typeof getSupabase>>,
+  itemId: string,
+  userId: string,
+  extraction: import('@/types').ReceiptExtractionResult
+): Promise<void> {
+  console.log(`[invoice-inbox] item=${itemId} processing as receipt: merchant=${extraction.merchant?.name}, total=${extraction.totals?.total}`)
+
+  // Fetch the inbox item to get document_id for the receipt image_url
+  const { data: inboxItem } = await supabase
+    .from('invoice_inbox_items')
+    .select('document_id, document:document_attachments(storage_path)')
+    .eq('id', itemId)
+    .single()
+
+  let imageUrl: string | null = null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const document = inboxItem?.document as any
+  if (document?.storage_path) {
+    const { data: urlData } = supabase.storage
+      .from('documents')
+      .getPublicUrl(document.storage_path)
+    imageUrl = urlData?.publicUrl || null
+  }
+
+  // Create receipt record
+  const { data: receipt, error: receiptError } = await supabase
+    .from('receipts')
+    .insert({
+      user_id: userId,
+      image_url: imageUrl,
+      status: 'extracted',
+      extraction_confidence: extraction.confidence,
+      merchant_name: extraction.merchant?.name || null,
+      merchant_org_number: extraction.merchant?.orgNumber || null,
+      merchant_vat_number: extraction.merchant?.vatNumber || null,
+      receipt_date: extraction.receipt?.date || null,
+      receipt_time: extraction.receipt?.time || null,
+      total_amount: extraction.totals?.total || null,
+      currency: extraction.receipt?.currency || 'SEK',
+      vat_amount: extraction.totals?.vatAmount || null,
+      is_restaurant: extraction.flags?.isRestaurant || false,
+      is_systembolaget: extraction.flags?.isSystembolaget || false,
+      is_foreign_merchant: extraction.flags?.isForeignMerchant || false,
+      raw_extraction: extraction,
+    })
+    .select()
+    .single()
+
+  if (receiptError || !receipt) {
+    console.error(`[invoice-inbox] item=${itemId} receipt creation failed:`, receiptError)
+    // Fall back: store as receipt type without linked receipt
+    await supabase
+      .from('invoice_inbox_items')
+      .update({
+        status: 'ready',
+        document_type: 'receipt',
+        extracted_data: extraction as unknown as Record<string, unknown>,
+        confidence: extraction.confidence,
+      })
+      .eq('id', itemId)
+    return
+  }
+
+  // Insert receipt line items
+  if (extraction.lineItems?.length > 0) {
+    const lineItemsToInsert = extraction.lineItems.map((item, index) => ({
+      receipt_id: receipt.id,
+      description: item.description || '',
+      quantity: item.quantity || 1,
+      unit_price: item.unitPrice,
+      line_total: item.lineTotal || 0,
+      vat_rate: item.vatRate,
+      vat_amount:
+        item.vatRate && item.lineTotal
+          ? Math.round((item.lineTotal * item.vatRate) / (100 + item.vatRate) * 100) / 100
+          : null,
+      suggested_category: item.suggestedCategory || null,
+      sort_order: index,
+    }))
+
+    await supabase.from('receipt_line_items').insert(lineItemsToInsert)
+  }
+
+  // Update inbox item: mark as receipt with linked receipt
+  await supabase
+    .from('invoice_inbox_items')
+    .update({
+      status: 'ready',
+      document_type: 'receipt',
+      extracted_data: extraction as unknown as Record<string, unknown>,
+      confidence: extraction.confidence,
+      linked_receipt_id: receipt.id,
+    })
+    .eq('id', itemId)
+
+  // Emit receipt.extracted event (non-blocking)
+  try {
+    await eventBus.emit({
+      type: 'receipt.extracted',
+      payload: {
+        receipt,
+        documentId: inboxItem?.document_id || null,
+        confidence: extraction.confidence,
+        userId,
+      },
+    })
+  } catch {
+    // Non-blocking
+  }
+
+  // Try to match receipt to a transaction
+  try {
+    const { data: updatedItem } = await supabase
+      .from('invoice_inbox_items')
+      .select('*')
+      .eq('id', itemId)
+      .single()
+
+    if (updatedItem) {
+      const matchResult = await matchDocumentToTransactions(
+        supabase,
+        userId,
+        updatedItem as InvoiceInboxItem
+      )
+      if (matchResult) {
+        await supabase
+          .from('invoice_inbox_items')
+          .update({
+            matched_transaction_id: matchResult.transactionId,
+            match_confidence: matchResult.confidence,
+            match_method: matchResult.method,
+          })
+          .eq('id', itemId)
+      }
+    }
+  } catch (matchError) {
+    console.error('[invoice-inbox] Receipt transaction matching failed:', matchError)
+  }
+}
+
+async function processAsInvoice(
+  supabase: Awaited<ReturnType<typeof getSupabase>>,
+  itemId: string,
+  userId: string,
+  extraction: InvoiceExtractionResult
+): Promise<void> {
+  console.log(`[invoice-inbox] item=${itemId} processing as supplier_invoice: supplier=${extraction.supplier?.name}, total=${extraction.totals?.total}`)
+
+  // Supplier matching
+  const settings = await getSettings(userId)
+  let matchedSupplierId: string | null = null
+
+  if (settings.autoMatchSupplierEnabled) {
+    const { data: suppliers } = await supabase
+      .from('suppliers')
+      .select('*')
+      .eq('user_id', userId)
+
+    if (suppliers && suppliers.length > 0) {
+      const match = matchSupplier(extraction, suppliers)
+      if (match && match.confidence >= settings.supplierMatchThreshold) {
+        matchedSupplierId = match.supplierId
+        console.log(`[invoice-inbox] item=${itemId} supplier matched: id=${match.supplierId} confidence=${match.confidence}`)
+      }
+    }
+  }
+
+  // Store extraction result with template suggestion
+  const updateData: Record<string, unknown> = {
+    status: 'ready',
+    document_type: 'supplier_invoice',
+    extracted_data: extraction as unknown as Record<string, unknown>,
+    confidence: extraction.confidence,
+    matched_supplier_id: matchedSupplierId,
+  }
+
+  if (extraction.suggestedTemplateId) {
+    updateData.suggested_template_id = extraction.suggestedTemplateId
+    updateData.suggested_template_confidence = extraction.confidence
+    console.log(`[invoice-inbox] item=${itemId} template suggestion: ${extraction.suggestedTemplateId} (confidence=${extraction.confidence})`)
+  }
+
+  await supabase
+    .from('invoice_inbox_items')
+    .update(updateData)
+    .eq('id', itemId)
+
+  // Fetch the updated item for event emission and matching
+  const { data: updatedItem } = await supabase
+    .from('invoice_inbox_items')
+    .select('*')
+    .eq('id', itemId)
+    .single()
+
+  if (updatedItem) {
+    await eventBus.emit({
+      type: 'supplier_invoice.extracted',
+      payload: {
+        inboxItem: updatedItem,
+        confidence: extraction.confidence,
+        userId,
+      },
+    })
+
+    // Document-to-transaction matching
+    try {
+      const matchResult = await matchDocumentToTransactions(
+        supabase,
+        userId,
+        updatedItem as InvoiceInboxItem
+      )
+
+      if (matchResult) {
+        await supabase
+          .from('invoice_inbox_items')
+          .update({
+            matched_transaction_id: matchResult.transactionId,
+            match_confidence: matchResult.confidence,
+            match_method: matchResult.method,
+          })
+          .eq('id', itemId)
+      }
+    } catch (matchError) {
+      console.error('[invoice-inbox] Transaction matching failed:', matchError)
+    }
   }
 }
 
@@ -470,87 +636,53 @@ async function handleProcessInboxItem(
     const arrayBuffer = await fileData.arrayBuffer()
     const base64 = Buffer.from(arrayBuffer).toString('base64')
 
-    // Analyze
-    const extraction = await analyzeInvoice(base64, document.mime_type)
+    // Reset previous classification on re-process
+    await supabase
+      .from('invoice_inbox_items')
+      .update({
+        matched_transaction_id: null,
+        match_confidence: null,
+        match_method: null,
+        linked_receipt_id: null,
+      })
+      .eq('id', id)
 
-    // Supplier matching
-    const settings = await getSettings(userId)
-    let matchedSupplierId: string | null = null
+    // Analyze with classification
+    const result = await analyzeDocument(base64, document.mime_type)
+    const { classification } = result
 
-    if (settings.autoMatchSupplierEnabled) {
-      const { data: suppliers } = await supabase
-        .from('suppliers')
-        .select('*')
-        .eq('user_id', userId)
+    console.log(`[invoice-inbox] Re-process item=${id} classified as: ${classification.type} (confidence=${classification.confidence})`)
 
-      if (suppliers && suppliers.length > 0) {
-        const match = matchSupplier(extraction, suppliers)
-        if (match && match.confidence >= settings.supplierMatchThreshold) {
-          matchedSupplierId = match.supplierId
-        }
-      }
+    if (classification.type === 'receipt' && result.receipt) {
+      await processAsReceipt(supabase, id, userId, result.receipt)
+    } else if (classification.type === 'supplier_invoice' && result.invoice) {
+      await processAsInvoice(supabase, id, userId, result.invoice)
+    } else if (classification.type === 'government_letter' || classification.type === 'unknown') {
+      await supabase
+        .from('invoice_inbox_items')
+        .update({
+          status: 'ready',
+          document_type: classification.type,
+          confidence: classification.confidence,
+          error_message: null,
+        })
+        .eq('id', id)
+    } else {
+      // Fallback: extract as invoice
+      const { extractInvoice } = await import('@/lib/ai/document-analyzer')
+      const fallbackExtraction = await extractInvoice(base64, document.mime_type)
+      await processAsInvoice(supabase, id, userId, fallbackExtraction)
     }
 
-    // Update inbox item with extraction + template suggestion
-    const updateData: Record<string, unknown> = {
-      status: 'ready',
-      extracted_data: extraction as unknown as Record<string, unknown>,
-      confidence: extraction.confidence,
-      matched_supplier_id: matchedSupplierId,
-      error_message: null,
-      // Reset previous match on re-process
-      matched_transaction_id: null,
-      match_confidence: null,
-      match_method: null,
-    }
-
-    if (extraction.suggestedTemplateId) {
-      updateData.suggested_template_id = extraction.suggestedTemplateId
-      updateData.suggested_template_confidence = extraction.confidence
-    }
-
+    // Fetch final state
     const { data: updatedItem, error: updateError } = await supabase
       .from('invoice_inbox_items')
-      .update(updateData)
+      .select('*')
       .eq('id', id)
-      .select()
       .single()
 
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500 })
-    }
-
-    if (updatedItem) {
-      await eventBus.emit({
-        type: 'supplier_invoice.extracted',
-        payload: {
-          inboxItem: updatedItem,
-          confidence: extraction.confidence,
-          userId,
-        },
-      })
-
-      // Document-to-transaction matching (non-blocking)
-      try {
-        const matchResult = await matchDocumentToTransactions(
-          supabase,
-          userId,
-          updatedItem as InvoiceInboxItem
-        )
-
-        if (matchResult) {
-          await supabase
-            .from('invoice_inbox_items')
-            .update({
-              matched_transaction_id: matchResult.transactionId,
-              match_confidence: matchResult.confidence,
-              match_method: matchResult.method,
-            })
-            .eq('id', id)
-        }
-      } catch (matchError) {
-        console.error('[invoice-inbox] Transaction matching failed:', matchError)
-      }
     }
 
     return NextResponse.json({ data: updatedItem })

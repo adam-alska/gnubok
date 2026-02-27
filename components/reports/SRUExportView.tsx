@@ -8,10 +8,7 @@ import { Download, AlertCircle } from 'lucide-react'
 import { AccountNumber } from '@/components/ui/account-number'
 import type { SRUExportResult } from '@/lib/reports/sru-export/types'
 import type { SRUCoverageStats } from '@/lib/reports/sru-export/sru-engine'
-
-function formatAmount(amount: number): string {
-  return amount.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+import { formatCurrency } from '@/lib/utils'
 
 export function SRUExportView({ periodId }: { periodId: string }) {
   const [data, setData] = useState<SRUExportResult | null>(null)
@@ -221,7 +218,7 @@ function SRUBalanceRow({
             </span>
           )}
         </td>
-        <td className="py-2 text-right">{formatAmount(balance.amount)} kr</td>
+        <td className="py-2 text-right">{formatCurrency(balance.amount)}</td>
       </tr>
       {expanded && balance.accounts.length > 0 && (
         <tr>
@@ -232,7 +229,7 @@ function SRUBalanceRow({
                   <tr key={acc.accountNumber}>
                     <td className="py-1 w-16"><AccountNumber number={acc.accountNumber} name={acc.accountName} size="sm" /></td>
                     <td className="py-1">{acc.accountName}</td>
-                    <td className="py-1 text-right">{formatAmount(acc.amount)} kr</td>
+                    <td className="py-1 text-right">{formatCurrency(acc.amount)}</td>
                   </tr>
                 ))}
               </tbody>

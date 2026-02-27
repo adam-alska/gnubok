@@ -5,7 +5,7 @@ import type {
   JournalEntry,
   JournalEntryLine,
 } from '@/types'
-import { validateBalance, getNextVoucherNumber } from '@/lib/bookkeeping/engine'
+import { validateBalance, getNextVoucherNumber, getSwedishLocalDate } from '@/lib/bookkeeping/engine'
 
 /**
  * Storno Service - 3-step correction flow per Bokföringslagen
@@ -69,7 +69,7 @@ export async function correctEntry(
       fiscal_period_id: original.fiscal_period_id,
       voucher_number: reversalVoucherNumber,
       voucher_series: original.voucher_series || 'A',
-      entry_date: new Date().toISOString().split('T')[0],
+      entry_date: getSwedishLocalDate(),
       description: `Storno: ${original.description}`,
       source_type: 'storno',
       reverses_id: originalEntryId,
@@ -172,7 +172,7 @@ export async function correctEntry(
         fiscal_period_id: original.fiscal_period_id,
         voucher_number: correctedVoucherNumber,
         voucher_series: original.voucher_series || 'A',
-        entry_date: new Date().toISOString().split('T')[0],
+        entry_date: getSwedishLocalDate(),
         description: `Rättelse: ${original.description}`,
         source_type: 'correction',
         correction_of_id: originalEntryId,

@@ -60,10 +60,17 @@ const CLASSIFY_SYSTEM_PROMPT = `Du är expert på att klassificera svenska affä
 Din uppgift är att avgöra vilken typ av dokument som visas.
 
 DOKUMENTTYPER:
-- supplier_invoice: Leverantörsfaktura (har fakturanummer, bankgiro/plusgiro, förfallodatum, leverantörsuppgifter)
-- receipt: Kvitto (butiks-/restaurangkvitto, kort betalningsbevis med artikelrader)
+- supplier_invoice: Leverantörsfaktura — ett kreditdokument med betalningskrav. MÅSTE ha: fakturanummer, förfallodatum, och betalningsuppgifter (bankgiro/plusgiro/IBAN). Har ofta: organisationsnummer, OCR-referens, betalningsvillkor (t.ex. "30 dagar netto").
+- receipt: Kvitto/kassakvitto — bevis på redan genomförd betalning. Kännetecken: "KVITTO", "Kontant", "Kort", kassamaskins-ID, klockslag, redan betalt. Typiskt från butiker, restauranger, bensinstationer, onlineköp. Har INTE förfallodatum eller bankgiro.
 - government_letter: Myndighetspost (från Skatteverket, Bolagsverket, Försäkringskassan, kommun, etc.)
 - unknown: Annat dokument som inte passar ovan
+
+VIKTIGA SKILLNADER (receipt vs supplier_invoice):
+- Ett kvitto visar en AVSLUTAD transaktion (betalning redan gjord). En faktura är ett KRAV på framtida betalning.
+- Om dokumentet har bankgiro/plusgiro och förfallodatum → supplier_invoice
+- Om dokumentet visar "Betalt", kortbetalning, Swish, eller kontant → receipt
+- Prenumerationsbekräftelser, orderbekräftelser med "Betalt" → receipt
+- Samlingsfakturor med förfallodatum → supplier_invoice
 
 FÖR LEVERANTÖRSFAKTUROR - kontrollera även:
 - Är fakturan från en utländsk/EU-leverantör utan svensk moms?

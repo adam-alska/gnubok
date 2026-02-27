@@ -23,6 +23,7 @@ import {
   CreateInvoiceItemSchema,
   CreateInvoiceSchema,
   CreateCreditNoteSchema,
+  MarkInvoicePaidSchema,
   // Customer schemas
   CreateCustomerSchema,
   // Supplier schemas
@@ -419,6 +420,47 @@ describe('CreateCreditNoteSchema', () => {
 
   it('rejects non-UUID credited_invoice_id', () => {
     const result = CreateCreditNoteSchema.safeParse({ credited_invoice_id: 'INV-001' })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('MarkInvoicePaidSchema', () => {
+  it('accepts empty object (all fields optional)', () => {
+    const result = MarkInvoicePaidSchema.safeParse({})
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts payment_date', () => {
+    const result = MarkInvoicePaidSchema.safeParse({ payment_date: '2024-07-15' })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts exchange_rate_difference (positive gain)', () => {
+    const result = MarkInvoicePaidSchema.safeParse({ exchange_rate_difference: 200 })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts exchange_rate_difference (negative loss)', () => {
+    const result = MarkInvoicePaidSchema.safeParse({ exchange_rate_difference: -300 })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts all fields together', () => {
+    const result = MarkInvoicePaidSchema.safeParse({
+      payment_date: '2024-07-15',
+      exchange_rate_difference: 150.50,
+      notes: 'Paid via Wise',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects invalid payment_date format', () => {
+    const result = MarkInvoicePaidSchema.safeParse({ payment_date: '15/07/2024' })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects non-number exchange_rate_difference', () => {
+    const result = MarkInvoicePaidSchema.safeParse({ exchange_rate_difference: 'big gain' })
     expect(result.success).toBe(false)
   })
 })

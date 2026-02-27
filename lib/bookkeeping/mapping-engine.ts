@@ -14,9 +14,24 @@ import type {
   EntityType,
   VatJournalLine,
 } from '@/types'
+import { createLogger } from '@/lib/logger'
 
-// Capitalization threshold in SEK (half-year rule: 29,400 for 2024)
-const CAPITALIZATION_THRESHOLD = 29400
+const log = createLogger('mapping-engine')
+
+// Half of prisbasbelopp per year (used for capitalization threshold)
+const PRISBASBELOPP_HALVES: Record<number, number> = {
+  2024: 28650,  // PBB 57,300
+  2025: 29400,  // PBB 58,800
+  2026: 29600,  // PBB 59,200
+}
+const LATEST_KNOWN_YEAR = 2026
+
+function getCapitalizationThreshold(year: number): number {
+  const threshold = PRISBASBELOPP_HALVES[year]
+  if (threshold) return threshold
+  log.warn(`No prisbasbelopp for ${year}, using ${LATEST_KNOWN_YEAR} value`)
+  return PRISBASBELOPP_HALVES[LATEST_KNOWN_YEAR]
+}
 
 /**
  * Evaluate all mapping rules against a transaction and return the best match
@@ -52,7 +67,7 @@ export async function evaluateMappingRules(
   // Evaluate each rule in priority order
   for (const rule of rules as MappingRule[]) {
     if (matchesRule(rule, transaction)) {
-      return buildResult(rule, transaction)
+      return buildResult(rule, transaction, entityType)
     }
   }
 
@@ -141,25 +156,23 @@ function matchesRule(rule: MappingRule, transaction: Transaction): boolean {
 /**
  * Build a MappingResult from a matched rule
  */
-function buildResult(rule: MappingRule, transaction: Transaction): MappingResult {
+function buildResult(rule: MappingRule, transaction: Transaction, entityType?: EntityType): MappingResult {
   const absAmount = Math.abs(transaction.amount)
   const isExpense = transaction.amount < 0
 
   let debitAccount = rule.debit_account || (isExpense ? '6991' : '1930')
-  let creditAccount = rule.credit_account || (isExpense ? '1930' : '3001')
+  const creditAccount = rule.credit_account || (isExpense ? '1930' : '3900')
 
   // Check capitalization threshold for equipment
-  if (
-    rule.capitalization_threshold &&
-    absAmount > rule.capitalization_threshold &&
-    rule.capitalized_debit_account
-  ) {
+  const year = new Date(transaction.date).getFullYear()
+  const threshold = rule.capitalization_threshold ?? getCapitalizationThreshold(year)
+  if (absAmount > threshold && rule.capitalized_debit_account) {
     debitAccount = rule.capitalized_debit_account
   }
 
-  // If default_private, override to 2013
+  // If default_private, use entity-specific private account
   if (rule.default_private && isExpense) {
-    debitAccount = '2013'
+    debitAccount = entityType === 'aktiebolag' ? '2893' : '2013'
   }
 
   // Generate VAT lines if applicable
@@ -215,7 +228,7 @@ function getDefaultResult(transaction: Transaction): MappingResult {
   return {
     rule: null,
     debit_account: isExpense ? '6991' : '1930',
-    credit_account: isExpense ? '1930' : '3001',
+    credit_account: isExpense ? '1930' : '3900',
     risk_level: 'MEDIUM',
     confidence: 0.1,
     requires_review: true,

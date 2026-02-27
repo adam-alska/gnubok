@@ -1,4 +1,5 @@
 import { createJournalEntry, findFiscalPeriod } from './engine'
+import { resolveSekAmount, buildCurrencyMetadata } from './currency-utils'
 import { generateInputVatLine, generateReverseChargeLines, extractNetAmount, extractVatAmount } from './vat-entries'
 import { createLogger } from '@/lib/logger'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -56,8 +57,17 @@ export async function createTransactionJournalEntry(
     return null
   }
 
-  const absAmount = Math.abs(transaction.amount)
+  const absAmountSek = Math.abs(resolveSekAmount(
+    transaction.amount, transaction.amount_sek, transaction.currency, transaction.exchange_rate
+  ))
+  const absAmount = absAmountSek
   const isExpense = transaction.amount < 0
+  const isForeign = transaction.currency !== 'SEK'
+  const currencyMeta = buildCurrencyMetadata(
+    transaction.currency,
+    isForeign ? Math.abs(transaction.amount) : undefined,
+    transaction.exchange_rate
+  )
   const lines: CreateJournalEntryLineInput[] = []
 
   if (mappingResult.default_private) {
@@ -121,6 +131,7 @@ export async function createTransactionJournalEntry(
       debit_amount: 0,
       credit_amount: absAmount,
       line_description: transaction.description,
+      ...(creditAccount === '1930' ? currencyMeta : {}),
     })
   } else {
     // Income

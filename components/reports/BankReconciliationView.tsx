@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { AccountNumber } from '@/components/ui/account-number'
 import { AlertCircle, ChevronDown, ChevronRight, Link2, Unlink, Play, Eye } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils'
 
 function formatAmount(amount: number): string {
   return amount.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -291,16 +292,16 @@ export function BankReconciliationView() {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span>Banktransaktioner (summa)</span>
-                <span className="font-mono">{formatAmount(status.bank_transaction_total)} kr</span>
+                <span className="font-mono">{formatCurrency(status.bank_transaction_total)}</span>
               </div>
               <div className="flex justify-between">
                 <span><AccountNumber number="1930" /> saldo (huvudbok)</span>
-                <span className="font-mono">{formatAmount(status.gl_1930_balance)} kr</span>
+                <span className="font-mono">{formatCurrency(status.gl_1930_balance)}</span>
               </div>
               <div className="flex justify-between pt-2 border-t font-semibold">
                 <span>Differens</span>
                 <span className={status.is_reconciled ? 'text-green-600' : 'text-red-600'}>
-                  {formatAmount(status.difference)} kr
+                  {formatCurrency(status.difference)}
                 </span>
               </div>
               <div className="flex gap-4 pt-2 text-xs text-muted-foreground">
@@ -433,7 +434,7 @@ export function BankReconciliationView() {
                     <td className="py-2">{tx.date}</td>
                     <td className="py-2 truncate max-w-[200px]">{tx.description}</td>
                     <td className={`py-2 text-right font-mono ${tx.amount >= 0 ? 'text-green-600' : ''}`}>
-                      {formatAmount(tx.amount)} kr
+                      {formatCurrency(tx.amount)}
                     </td>
                     <td className="py-2 text-xs text-muted-foreground">{tx.reference || '—'}</td>
                     <td className="py-2">
@@ -449,7 +450,7 @@ export function BankReconciliationView() {
                           const lineAmount = line.debit_amount > 0 ? line.debit_amount : -line.credit_amount
                           return (
                             <option key={line.line_id} value={line.journal_entry_id}>
-                              {line.voucher_series}{line.voucher_number} | {line.entry_date} | {formatAmount(lineAmount)} kr | {line.entry_description}
+                              {line.voucher_series}{line.voucher_number} | {line.entry_date} | {formatCurrency(lineAmount)} | {line.entry_description}
                             </option>
                           )
                         })}
@@ -506,7 +507,7 @@ export function BankReconciliationView() {
                         {line.line_description || line.entry_description}
                       </td>
                       <td className={`py-2 text-right font-mono ${amount >= 0 ? 'text-green-600' : ''}`}>
-                        {formatAmount(amount)} kr
+                        {formatCurrency(amount)}
                       </td>
                       <td className="py-2 text-xs text-muted-foreground">{line.source_type}</td>
                     </tr>
@@ -554,7 +555,7 @@ export function BankReconciliationView() {
                       <td className="py-2">{tx.date}</td>
                       <td className="py-2 truncate max-w-[300px]">{tx.description}</td>
                       <td className={`py-2 text-right font-mono ${tx.amount >= 0 ? 'text-green-600' : ''}`}>
-                        {formatAmount(tx.amount)} kr
+                        {formatCurrency(tx.amount)}
                       </td>
                       <td className="py-2">
                         {tx.reconciliation_method && (

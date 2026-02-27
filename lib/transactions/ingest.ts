@@ -4,8 +4,9 @@ import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-ent
 import { getBestInvoiceMatch } from '@/lib/invoices/invoice-matching'
 import { findSupplierInvoiceMatch } from '@/lib/invoices/supplier-invoice-matching'
 import { tryReconcileTransaction, fetchUnlinkedGLLines } from '@/lib/reconciliation/bank-reconciliation'
+import { fetchMultipleRates } from '@/lib/currency/riksbanken'
 import type { UnlinkedGLLine } from '@/lib/reconciliation/bank-reconciliation'
-import type { Transaction, RawTransaction, IngestResult, SupplierInvoice } from '@/types'
+import type { Transaction, RawTransaction, IngestResult, SupplierInvoice, Currency, ExchangeRate } from '@/types'
 
 // Re-export types for backward compatibility
 export type { RawTransaction, IngestResult } from '@/types'
@@ -108,6 +109,21 @@ export async function ingestTransactions(
     // Non-critical — supplier invoice matching will be skipped
   }
 
+  // Pre-fetch exchange rates for non-SEK currencies (non-critical)
+  let exchangeRates = new Map<Currency, ExchangeRate>()
+  try {
+    const uniqueCurrencies = [...new Set(
+      rawTransactions
+        .map(t => t.currency)
+        .filter((c): c is Currency => c != null && c !== 'SEK')
+    )]
+    if (uniqueCurrencies.length > 0) {
+      exchangeRates = await fetchMultipleRates(uniqueCurrencies)
+    }
+  } catch {
+    // Non-critical — amount_sek fields will stay null
+  }
+
   for (const raw of rawTransactions) {
     // 1. Check for duplicates via external_id
     const { data: existing } = await supabase
@@ -132,7 +148,14 @@ export async function ingestTransactions(
       continue
     }
 
-    // 2. Insert new transaction
+    // 2. Insert new transaction (with SEK conversion for foreign currencies)
+    const rateInfo = raw.currency && raw.currency !== 'SEK'
+      ? exchangeRates.get(raw.currency as Currency)
+      : undefined
+    const amountSek = rateInfo
+      ? Math.round(raw.amount * rateInfo.rate * 100) / 100
+      : null
+
     const { data: newTransaction, error: insertError } = await supabase
       .from('transactions')
       .insert({
@@ -143,6 +166,9 @@ export async function ingestTransactions(
         description: raw.description,
         amount: raw.amount,
         currency: raw.currency,
+        amount_sek: amountSek,
+        exchange_rate: rateInfo?.rate ?? null,
+        exchange_rate_date: rateInfo?.date ?? null,
         category: 'uncategorized',
         is_business: null,
         mcc_code: raw.mcc_code || null,

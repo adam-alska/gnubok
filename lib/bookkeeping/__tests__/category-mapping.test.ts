@@ -23,6 +23,13 @@ describe('getCategoryAccountMapping', () => {
     })
   })
 
+  describe('expense_office maps to 6110 (Kontorsförbrukning)', () => {
+    it('maps expense_office to 6110 (not 5010 Lokalhyra)', () => {
+      const result = getCategoryAccountMapping('expense_office', -500, true)
+      expect(result.debitAccount).toBe('6110')
+    })
+  })
+
   describe('expense_education entity-type-aware', () => {
     it('defaults to 6991 for enskild_firma', () => {
       const result = getCategoryAccountMapping('expense_education', -500, true, 'enskild_firma')
@@ -48,6 +55,7 @@ describe('getExpenseAccountForCategory', () => {
 
   it('returns correct accounts for expense categories', () => {
     expect(getExpenseAccountForCategory('expense_equipment')).toBe('5410')
+    expect(getExpenseAccountForCategory('expense_office')).toBe('6110')
     expect(getExpenseAccountForCategory('expense_bank_fees')).toBe('6570')
   })
 })
@@ -57,6 +65,7 @@ describe('getDefaultAccountForCategory', () => {
     expect(getDefaultAccountForCategory('expense_equipment')).toBe('5410')
     expect(getDefaultAccountForCategory('expense_software')).toBe('5420')
     expect(getDefaultAccountForCategory('expense_travel')).toBe('5800')
+    expect(getDefaultAccountForCategory('expense_office')).toBe('6110')
     expect(getDefaultAccountForCategory('expense_bank_fees')).toBe('6570')
   })
 

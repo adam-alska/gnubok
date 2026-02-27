@@ -1,6 +1,7 @@
 'use client'
 
 import type { AgingBucketsArtifact } from '@/types/chat'
+import { formatCurrency } from '@/lib/utils'
 
 const BUCKET_COLORS = [
   'bg-green-500',
@@ -14,10 +15,6 @@ interface ChatAgingBucketsProps {
   artifact: AgingBucketsArtifact
 }
 
-function formatAmount(amount: number): string {
-  return new Intl.NumberFormat('sv-SE').format(Math.round(amount))
-}
-
 export function ChatAgingBuckets({ artifact }: ChatAgingBucketsProps) {
   const { title, buckets, total } = artifact
 
@@ -28,7 +25,7 @@ export function ChatAgingBuckets({ artifact }: ChatAgingBucketsProps) {
       <div className="flex items-baseline justify-between mb-3">
         <h4 className="text-sm font-semibold">{title}</h4>
         <span className="text-sm font-bold tabular-nums">
-          {formatAmount(total)} kr
+          {formatCurrency(total)}
         </span>
       </div>
 
@@ -43,7 +40,7 @@ export function ChatAgingBuckets({ artifact }: ChatAgingBucketsProps) {
                 key={i}
                 className={`${BUCKET_COLORS[i % BUCKET_COLORS.length]} transition-all`}
                 style={{ width: `${widthPercent}%` }}
-                title={`${bucket.label}: ${formatAmount(bucket.amount)} kr`}
+                title={`${bucket.label}: ${formatCurrency(bucket.amount)}`}
               />
             )
           })}
@@ -65,7 +62,7 @@ export function ChatAgingBuckets({ artifact }: ChatAgingBucketsProps) {
                 {bucket.count} st
               </span>
               <span className="font-medium tabular-nums">
-                {formatAmount(bucket.amount)} kr
+                {formatCurrency(bucket.amount)}
               </span>
             </div>
           </div>

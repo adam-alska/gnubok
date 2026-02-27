@@ -172,6 +172,12 @@ export const CreateCreditNoteSchema = z.object({
   reason: z.string().optional(),
 })
 
+export const MarkInvoicePaidSchema = z.object({
+  payment_date: isoDate.optional(),
+  exchange_rate_difference: z.number().optional(),
+  notes: z.string().optional(),
+})
+
 // ============================================================
 // Customer schemas
 // ============================================================

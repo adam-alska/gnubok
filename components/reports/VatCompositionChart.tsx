@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatCurrency } from '@/lib/utils'
 import type { VatDeclarationRutor } from '@/types'
 
 interface VatCompositionChartProps {
@@ -52,7 +53,7 @@ export function VatCompositionChart({ rutor }: VatCompositionChartProps) {
             </Pie>
             <Tooltip
               formatter={(value) => [
-                new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value)) + ' kr',
+                formatCurrency(Number(value)),
               ]}
             />
             <Legend />

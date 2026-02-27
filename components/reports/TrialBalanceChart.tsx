@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatCurrency } from '@/lib/utils'
 import type { TrialBalanceRow } from '@/types'
 
 interface TrialBalanceChartProps {
@@ -48,7 +49,7 @@ export function TrialBalanceChart({ rows }: TrialBalanceChartProps) {
             />
             <Tooltip
               formatter={(value) => [
-                new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value)) + ' kr',
+                formatCurrency(Number(value)),
                 'Netto',
               ]}
               labelFormatter={(label) => chartData.find((d) => d.account === String(label))?.name || String(label)}
