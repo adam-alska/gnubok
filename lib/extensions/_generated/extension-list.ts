@@ -8,7 +8,6 @@ import { invoiceInboxExtension } from '@/extensions/general/invoice-inbox'
 import { calendarExtension } from '@/extensions/general/calendar'
 import { enableBankingExtension } from '@/extensions/general/enable-banking'
 import { emailExtension } from '@/extensions/general/email'
-import { userDescriptionMatchExtension } from '@/extensions/general/user-description-match'
 
 export const FIRST_PARTY_EXTENSIONS: Extension[] = [
   receiptOcrExtension,
@@ -19,5 +18,4 @@ export const FIRST_PARTY_EXTENSIONS: Extension[] = [
   calendarExtension,
   enableBankingExtension,
   emailExtension,
-  userDescriptionMatchExtension,
 ]

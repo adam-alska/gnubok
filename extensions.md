@@ -64,7 +64,6 @@ extensions/
     invoice-inbox/
     calendar/
     email/
-    user-description-match/
   restaurant/                 ← Restaurant sector extensions
     food-cost/
     earnings-per-liter/
@@ -332,9 +331,6 @@ extensions/                           ← Extension source code (opt-in via conf
       manifest.json
       index.ts
     calendar/
-      manifest.json
-      index.ts
-    user-description-match/
       manifest.json
       index.ts
   restaurant/                         ← Restaurant sector
