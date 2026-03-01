@@ -11,5 +11,4 @@ export const WORKSPACES: Record<string, ComponentType<WorkspaceComponentProps>> 
   'general/invoice-inbox': dynamic(() => import('@/components/extensions/general/DocumentInboxWorkspace')),
   'general/calendar': dynamic(() => import('@/components/extensions/general/CalendarWorkspace')),
   'general/enable-banking': dynamic(() => import('@/components/extensions/general/EnableBankingWorkspace')),
-  'general/user-description-match': dynamic(() => import('@/components/extensions/general/UserDescriptionMatchWorkspace')),
 }

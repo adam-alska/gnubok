@@ -6,8 +6,47 @@ import { DescribeTransactionSchema } from '@/lib/api/schemas'
 import { extensionRegistry } from '@/lib/extensions/registry'
 import { findMatchingTemplates, type TemplateMatch } from '@/lib/bookkeeping/booking-templates'
 import type { Transaction, EntityType } from '@/types'
+import type { Extension } from '@/lib/extensions/types'
+import type { DescriptionAnalysisInput, DescriptionAnalysisResult } from '@/extensions/general/ai-categorization/lib/description-analyzer'
 
 ensureInitialized()
+
+async function getTemplateMatches(
+  aiExt: Extension | undefined,
+  transaction: Transaction,
+  entityType: EntityType,
+  description: string
+): Promise<TemplateMatch[]> {
+  if (aiExt?.services?.findSimilarTemplates) {
+    return aiExt.services.findSimilarTemplates(transaction, entityType, 10, description)
+  }
+  return findMatchingTemplates(transaction, entityType)
+}
+
+async function getAiAnalysis(
+  aiExt: Extension | undefined,
+  transaction: Transaction,
+  entityType: EntityType,
+  description: string
+): Promise<DescriptionAnalysisResult | null> {
+  if (!aiExt?.services?.analyzeDescription) return null
+
+  try {
+    const input: DescriptionAnalysisInput = {
+      description,
+      transactionAmount: transaction.amount,
+      transactionDate: transaction.date,
+      transactionDescription: transaction.description,
+      merchantName: transaction.merchant_name,
+      currency: transaction.currency,
+      entityType,
+    }
+    return await aiExt.services.analyzeDescription(input)
+  } catch (error) {
+    console.error('[describe] AI analysis failed, continuing with templates only:', error)
+    return null
+  }
+}
 
 export async function POST(
   request: Request,
@@ -47,23 +86,18 @@ export async function POST(
 
   const entityType: EntityType = (settings?.entity_type as EntityType) || 'enskild_firma'
 
-  // Run embedding search with user description dominating the query
-  let templates: TemplateMatch[]
   const aiExt = extensionRegistry.get('ai-categorization')
-  if (aiExt?.services?.findSimilarTemplates) {
-    templates = await aiExt.services.findSimilarTemplates(
-      transaction as Transaction,
-      entityType,
-      10,
-      description
-    )
-  } else {
-    // Fallback to keyword matching when AI extension not loaded
-    templates = findMatchingTemplates(transaction as Transaction, entityType)
-  }
 
-  // Flag if top confidence is too low
-  const needsMoreDetail = templates.length === 0 || templates[0].confidence < 0.55
+  // Run template matching and AI analysis in parallel
+  const [templates, aiSuggestion] = await Promise.all([
+    getTemplateMatches(aiExt, transaction as Transaction, entityType, description),
+    getAiAnalysis(aiExt, transaction as Transaction, entityType, description),
+  ])
+
+  // AI rescues weak templates: needs_more_detail is false when AI provided a suggestion
+  const needsMoreDetail = aiSuggestion
+    ? false
+    : templates.length === 0 || templates[0].confidence < 0.55
 
   // Count uncategorized sibling transactions from same merchant
   let batchCandidateCount = 0
@@ -97,6 +131,16 @@ export async function POST(
         special_rules_sv: m.template.special_rules_sv || null,
         risk_level: m.template.risk_level,
       })),
+      ai_suggestion: aiSuggestion ? {
+        debit_account: aiSuggestion.debitAccount,
+        credit_account: aiSuggestion.creditAccount,
+        vat_treatment: aiSuggestion.vatTreatment,
+        category: aiSuggestion.category,
+        confidence: aiSuggestion.confidence,
+        reasoning: aiSuggestion.reasoning,
+        warnings: aiSuggestion.warnings,
+        template_id: aiSuggestion.templateId,
+      } : null,
       needs_more_detail: needsMoreDetail,
       user_description: description,
       batch_candidate_count: batchCandidateCount,

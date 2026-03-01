@@ -172,14 +172,13 @@ Extensions are opt-in plugins controlled by `extensions.config.json`. Core build
 | Extension | Category | Env Vars Required |
 |-----------|----------|-------------------|
 | `receipt-ocr` | import | `ANTHROPIC_API_KEY` |
-| `ai-categorization` | operations | `OPENAI_API_KEY` |
+| `ai-categorization` | operations | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` |
 | `ai-chat` | operations | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` |
 | `push-notifications` | operations | VAPID keys |
 | `invoice-inbox` | import | `ANTHROPIC_API_KEY` |
 | `calendar` | operations | — |
 | `enable-banking` | import | Enable Banking keys |
 | `email` | operations | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` |
-| `user-description-match` | operations | — |
 
 ### Creating Extensions
 

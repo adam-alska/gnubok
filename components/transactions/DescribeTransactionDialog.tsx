@@ -23,6 +23,7 @@ import {
   Check,
   CheckCircle2,
   AlertTriangle,
+  Sparkles,
 } from 'lucide-react'
 import JournalEntryPreview from './JournalEntryPreview'
 import { formatAccountWithName } from '@/lib/bookkeeping/client-account-names'
@@ -45,8 +46,20 @@ interface TemplateMatch {
   risk_level: string
 }
 
+interface AiSuggestion {
+  debit_account: string
+  credit_account: string
+  vat_treatment: string | null
+  category: string
+  confidence: number
+  reasoning: string
+  warnings: string[]
+  template_id: string | null
+}
+
 interface DescribeResult {
   templates: TemplateMatch[]
+  ai_suggestion: AiSuggestion | null
   needs_more_detail: boolean
   user_description: string
   batch_candidate_count: number
@@ -62,6 +75,7 @@ interface DescribeTransactionDialogProps {
 }
 
 type Step = 'describe' | 'pick' | 'batch'
+type Selection = { type: 'template'; templateId: string } | { type: 'ai' }
 
 function getExamplePrompts(transaction: TransactionWithInvoice): string[] {
   const desc = (transaction.description || '').toLowerCase()
@@ -71,7 +85,6 @@ function getExamplePrompts(transaction: TransactionWithInvoice): string[] {
     return ['Konsultarvode', 'Forsaljning av varor', 'Aterbetalning']
   }
 
-  // Contextual suggestions based on description keywords
   if (desc.includes('restaurang') || desc.includes('lunch') || desc.includes('middag') || desc.includes('mat')) {
     return ['Lunch med kund', 'Personalmiddag', 'Fika till kontoret']
   }
@@ -88,8 +101,16 @@ function getExamplePrompts(transaction: TransactionWithInvoice): string[] {
     return ['Serverhosting', 'SaaS-prenumeration', 'Kontorsmaterial']
   }
 
-  // Generic expense suggestions
   return ['Kontorsmaterial', 'SaaS-prenumeration', 'Konsulttjanst', 'Reklam']
+}
+
+function getVatRateFromTreatment(treatment: string | null): number {
+  switch (treatment) {
+    case 'standard_25': return 0.25
+    case 'reduced_12': return 0.12
+    case 'reduced_6': return 0.06
+    default: return 0
+  }
 }
 
 export default function DescribeTransactionDialog({
@@ -106,7 +127,10 @@ export default function DescribeTransactionDialog({
   const [isBooking, setIsBooking] = useState(false)
   const [isBatchApplying, setIsBatchApplying] = useState(false)
   const [describeResult, setDescribeResult] = useState<DescribeResult | null>(null)
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
+  const [selection, setSelection] = useState<Selection | null>(null)
+
+  const selectedTemplateId = selection?.type === 'template' ? selection.templateId : null
+  const isAiSelected = selection?.type === 'ai'
 
   function resetState() {
     setStep('describe')
@@ -115,7 +139,7 @@ export default function DescribeTransactionDialog({
     setIsBooking(false)
     setIsBatchApplying(false)
     setDescribeResult(null)
-    setSelectedTemplateId(null)
+    setSelection(null)
   }
 
   function handleOpenChange(isOpen: boolean) {
@@ -147,7 +171,7 @@ export default function DescribeTransactionDialog({
       }
 
       setDescribeResult(result.data)
-      setSelectedTemplateId(null)
+      setSelection(null)
       setStep('pick')
     } catch {
       toast({
@@ -160,18 +184,44 @@ export default function DescribeTransactionDialog({
   }
 
   async function handleBook() {
-    if (!transaction || !selectedTemplateId || !describeResult) return
+    if (!transaction || !describeResult || !selection) return
 
     setIsBooking(true)
     try {
+      // Build categorize request based on selection type
+      let body: Record<string, unknown>
+
+      if (selection.type === 'template') {
+        body = {
+          is_business: true,
+          template_id: selection.templateId,
+          user_description: describeResult.user_description,
+        }
+      } else {
+        // AI suggestion selected
+        const ai = describeResult.ai_suggestion!
+        if (ai.template_id) {
+          // AI matched a template — use template-based booking
+          body = {
+            is_business: true,
+            template_id: ai.template_id,
+            user_description: describeResult.user_description,
+          }
+        } else {
+          // AI category-based booking — category maps to the correct account
+          body = {
+            is_business: true,
+            category: ai.category,
+            vat_treatment: ai.vat_treatment || undefined,
+            user_description: describeResult.user_description,
+          }
+        }
+      }
+
       const response = await fetch(`/api/transactions/${transaction.id}/categorize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          is_business: true,
-          template_id: selectedTemplateId,
-          user_description: describeResult.user_description,
-        }),
+        body: JSON.stringify(body),
       })
       const result = await response.json()
       if (!response.ok) {
@@ -204,7 +254,17 @@ export default function DescribeTransactionDialog({
   }
 
   async function handleBatchApply() {
-    if (!describeResult || !selectedTemplateId) return
+    if (!describeResult) return
+
+    // For batch apply, we need a template_id
+    let templateId: string | null = null
+    if (selection?.type === 'template') {
+      templateId = selection.templateId
+    } else if (selection?.type === 'ai' && describeResult.ai_suggestion?.template_id) {
+      templateId = describeResult.ai_suggestion.template_id
+    }
+
+    if (!templateId) return
 
     setIsBatchApplying(true)
     try {
@@ -213,7 +273,7 @@ export default function DescribeTransactionDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           merchant_name: describeResult.merchant_name,
-          template_id: selectedTemplateId,
+          template_id: templateId,
           is_business: true,
           user_description: describeResult.user_description,
         }),
@@ -263,6 +323,13 @@ export default function DescribeTransactionDialog({
   if (!transaction) return null
 
   const isIncome = transaction.amount > 0
+  const aiSuggestion = describeResult?.ai_suggestion
+  // Check if AI agrees with top template
+  const topTemplate = describeResult?.templates[0]
+  const aiAgreesWithTop = aiSuggestion && topTemplate && aiSuggestion.debit_account === topTemplate.debit_account
+
+  // Determine if batch apply is available (requires a template_id)
+  const canBatchApply = selection?.type === 'template' || (selection?.type === 'ai' && !!describeResult?.ai_suggestion?.template_id)
 
   return (
     <Dialog open={open} onOpenChange={(isBooking || isBatchApplying) ? undefined : handleOpenChange}>
@@ -361,7 +428,72 @@ export default function DescribeTransactionDialog({
             )}
 
             <div className="overflow-y-auto max-h-[40vh] space-y-2 pr-1">
-              {describeResult.templates.length === 0 ? (
+              {/* AI Suggestion Card */}
+              {aiSuggestion && (
+                <Card
+                  className={`cursor-pointer transition-colors hover:border-primary/50 ${
+                    isAiSelected ? 'border-primary bg-primary/5' : ''
+                  }`}
+                  onClick={() => setSelection({ type: 'ai' })}
+                >
+                  <CardContent className="py-3 px-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Sparkles className="h-3.5 w-3.5 text-violet-500" />
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                            AI-forslag
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {aiSuggestion.reasoning}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                            D: {formatAccountWithName(aiSuggestion.debit_account)}
+                          </Badge>
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                            K: {formatAccountWithName(aiSuggestion.credit_account)}
+                          </Badge>
+                          {aiSuggestion.vat_treatment && aiSuggestion.vat_treatment !== 'exempt' && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                              Moms {Math.round(getVatRateFromTreatment(aiSuggestion.vat_treatment) * 100)}%
+                            </Badge>
+                          )}
+                          {aiSuggestion.vat_treatment === 'exempt' && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                              Momsfritt
+                            </Badge>
+                          )}
+                        </div>
+                        {aiSuggestion.warnings.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {aiSuggestion.warnings.map((warning, i) => (
+                              <Badge key={i} variant="outline" className="text-[10px] px-1.5 py-0 text-amber-600 border-amber-300">
+                                {warning}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Badge
+                          variant={aiSuggestion.confidence >= 0.7 ? 'default' : 'outline'}
+                          className="text-[10px] px-1.5 py-0"
+                        >
+                          {Math.round(aiSuggestion.confidence * 100)}%
+                        </Badge>
+                        {isAiSelected && (
+                          <Check className="h-4 w-4 text-primary" />
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Template cards */}
+              {describeResult.templates.length === 0 && !aiSuggestion ? (
                 <p className="text-sm text-muted-foreground text-center py-4">
                   Inga matchande mallar hittades. Forsok med en annan beskrivning.
                 </p>
@@ -374,12 +506,19 @@ export default function DescribeTransactionDialog({
                         ? 'border-primary bg-primary/5'
                         : ''
                     }`}
-                    onClick={() => setSelectedTemplateId(template.template_id)}
+                    onClick={() => setSelection({ type: 'template', templateId: template.template_id })}
                   >
                     <CardContent className="py-3 px-4">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
-                          <p className="font-medium text-sm">{template.name_sv}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-medium text-sm">{template.name_sv}</p>
+                            {aiAgreesWithTop && template.template_id === topTemplate.template_id && (
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                                AI bekraftar
+                              </Badge>
+                            )}
+                          </div>
                           {template.description_sv && (
                             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
                               {template.description_sv}
@@ -446,19 +585,33 @@ export default function DescribeTransactionDialog({
               )}
             </div>
 
-            {/* Journal entry preview for selected template */}
-            {selectedTemplateId && (() => {
-              const tmpl = describeResult.templates.find(t => t.template_id === selectedTemplateId)
-              if (!tmpl) return null
-              return (
-                <JournalEntryPreview
-                  amount={transaction.amount}
-                  currency={transaction.currency}
-                  templateDebitAccount={tmpl.debit_account}
-                  templateCreditAccount={tmpl.credit_account}
-                  templateVatRate={tmpl.vat_rate}
-                />
-              )
+            {/* Journal entry preview for selected template or AI suggestion */}
+            {selection && (() => {
+              if (selection.type === 'ai' && aiSuggestion) {
+                return (
+                  <JournalEntryPreview
+                    amount={transaction.amount}
+                    currency={transaction.currency}
+                    templateDebitAccount={aiSuggestion.debit_account}
+                    templateCreditAccount={aiSuggestion.credit_account}
+                    templateVatRate={getVatRateFromTreatment(aiSuggestion.vat_treatment)}
+                  />
+                )
+              }
+              if (selection.type === 'template') {
+                const tmpl = describeResult.templates.find(t => t.template_id === selection.templateId)
+                if (!tmpl) return null
+                return (
+                  <JournalEntryPreview
+                    amount={transaction.amount}
+                    currency={transaction.currency}
+                    templateDebitAccount={tmpl.debit_account}
+                    templateCreditAccount={tmpl.credit_account}
+                    templateVatRate={tmpl.vat_rate}
+                  />
+                )
+              }
+              return null
             })()}
 
             <div className="flex gap-2 pt-2">
@@ -467,7 +620,7 @@ export default function DescribeTransactionDialog({
                 className="flex-shrink-0"
                 onClick={() => {
                   setStep('describe')
-                  setSelectedTemplateId(null)
+                  setSelection(null)
                 }}
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
@@ -475,7 +628,7 @@ export default function DescribeTransactionDialog({
               </Button>
               <Button
                 className="flex-1"
-                disabled={!selectedTemplateId || isBooking}
+                disabled={!selection || isBooking}
                 onClick={handleBook}
               >
                 {isBooking ? (
@@ -497,17 +650,19 @@ export default function DescribeTransactionDialog({
               <p className="text-sm font-medium">Transaktionen ar bokford!</p>
             </div>
 
-            <p className="text-sm text-muted-foreground">
-              Det finns ytterligare{' '}
-              <span className="font-medium text-foreground">
-                {describeResult.batch_candidate_count}
-              </span>{' '}
-              obokforda transaktioner fran{' '}
-              <span className="font-medium text-foreground">
-                {describeResult.merchant_name}
-              </span>
-              . Anvand samma mall?
-            </p>
+            {canBatchApply && (
+              <p className="text-sm text-muted-foreground">
+                Det finns ytterligare{' '}
+                <span className="font-medium text-foreground">
+                  {describeResult.batch_candidate_count}
+                </span>{' '}
+                obokforda transaktioner fran{' '}
+                <span className="font-medium text-foreground">
+                  {describeResult.merchant_name}
+                </span>
+                . Anvand samma mall?
+              </p>
+            )}
 
             <div className="flex gap-2">
               <Button
@@ -516,20 +671,22 @@ export default function DescribeTransactionDialog({
                 onClick={handleSkipBatch}
                 disabled={isBatchApplying}
               >
-                Nej, bara den har
+                {canBatchApply ? 'Nej, bara den har' : 'Stang'}
               </Button>
-              <Button
-                className="flex-1"
-                onClick={handleBatchApply}
-                disabled={isBatchApplying}
-              >
-                {isBatchApplying ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                {isBatchApplying
-                  ? 'Bokfor...'
-                  : `Ja, bokfor alla ${describeResult.batch_candidate_count} st`}
-              </Button>
+              {canBatchApply && (
+                <Button
+                  className="flex-1"
+                  onClick={handleBatchApply}
+                  disabled={isBatchApplying}
+                >
+                  {isBatchApplying ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  {isBatchApplying
+                    ? 'Bokfor...'
+                    : `Ja, bokfor alla ${describeResult.batch_candidate_count} st`}
+                </Button>
+              )}
             </div>
           </div>
         )}
