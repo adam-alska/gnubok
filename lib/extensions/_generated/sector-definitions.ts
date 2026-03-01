@@ -136,19 +136,5 @@ export const EXTENSION_DEFINITIONS: Record<string, ExtensionDefinition[]> = {
                 "company_settings"
           ]
     },
-    {
-          "slug": "user-description-match",
-          "name": "Beskrivningsmatchning",
-          "sector": "general",
-          "category": "operations",
-          "icon": "TextSearch",
-          "dataPattern": "core",
-          "description": "Matcha transaktioner med egna beskrivningar",
-          "longDescription": "Beskriv vad en transaktion gäller med egna ord och få smarta bokföringsförslag. Systemet lär sig av dina beskrivningar och applicerar automatiskt på framtida transaktioner från samma leverantör.",
-          "readsCoreTables": [
-                "transactions",
-                "mapping_rules"
-          ]
-    },
   ],
 }

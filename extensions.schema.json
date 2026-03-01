@@ -23,8 +23,7 @@
           "invoice-inbox",
           "calendar",
           "enable-banking",
-          "email",
-          "user-description-match"
+          "email"
         ]
       },
       "description": "Extension IDs to enable. Each ID must match a manifest.json in the extensions/ directory."

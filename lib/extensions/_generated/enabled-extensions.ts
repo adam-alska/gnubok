@@ -9,5 +9,4 @@ export const ENABLED_EXTENSION_IDS: ReadonlySet<string> = new Set([
   'calendar',
   'enable-banking',
   'email',
-  'user-description-match',
 ])

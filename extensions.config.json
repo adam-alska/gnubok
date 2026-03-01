@@ -1,1 +1,1 @@
-{"$schema":"./extensions.schema.json","extensions":["receipt-ocr","ai-categorization","ai-chat","push-notifications","invoice-inbox","calendar","enable-banking","email","user-description-match"]}
+{"$schema":"./extensions.schema.json","extensions":["receipt-ocr","ai-categorization","ai-chat","push-notifications","invoice-inbox","calendar","enable-banking","email"]}

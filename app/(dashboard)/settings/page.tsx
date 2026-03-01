@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -22,6 +23,7 @@ import {
   Moon,
   Monitor,
   Palette,
+  ExternalLink,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import type { CompanySettings } from '@/types'
@@ -41,6 +43,7 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [settings, setSettings] = useState<CompanySettings | null>(null)
   const [hasBankingExtension, setHasBankingExtension] = useState(false)
+  const [hasNotificationExtension, setHasNotificationExtension] = useState(false)
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
@@ -93,23 +96,29 @@ export default function SettingsPage() {
 
     setSettings(settingsData)
 
-    // Check if Enable Banking extension is enabled
-    try {
-      const toggleRes = await fetch('/api/extensions/toggles/general/enable-banking')
-      if (toggleRes.ok) {
-        const { data } = await toggleRes.json()
-        setHasBankingExtension(data?.enabled || false)
-      }
-    } catch {
-      // If toggle check fails, also check for existing connections
+    // Check extension toggles in parallel
+    const [bankingToggleRes, notificationToggleRes] = await Promise.all([
+      fetch('/api/extensions/toggles/general/enable-banking').catch(() => null),
+      fetch('/api/extensions/toggles/general/push-notifications').catch(() => null),
+    ])
+
+    if (bankingToggleRes?.ok) {
+      const { data } = await bankingToggleRes.json()
+      setHasBankingExtension(data?.enabled || false)
+    } else {
+      // Fallback: check for existing bank connections
       const { data: connections } = await supabase
         .from('bank_connections')
         .select('id')
         .eq('user_id', user.id)
         .eq('status', 'active')
         .limit(1)
-
       setHasBankingExtension((connections && connections.length > 0) || false)
+    }
+
+    if (notificationToggleRes?.ok) {
+      const { data } = await notificationToggleRes.json()
+      setHasNotificationExtension(data?.enabled || false)
     }
 
     setIsLoading(false)
@@ -197,18 +206,14 @@ export default function SettingsPage() {
             <Building className="mr-2 h-4 w-4" />
             Företag
           </TabsTrigger>
-          {hasBankingExtension && BankingPanel && (
-            <TabsTrigger value="banking">
-              <CreditCard className="mr-2 h-4 w-4" />
-              Bank (PSD2)
-            </TabsTrigger>
-          )}
-          {NotificationPanel && (
-            <TabsTrigger value="notifications">
-              <Bell className="mr-2 h-4 w-4" />
-              Aviseringar
-            </TabsTrigger>
-          )}
+          <TabsTrigger value="banking">
+            <CreditCard className="mr-2 h-4 w-4" />
+            Bank (PSD2)
+          </TabsTrigger>
+          <TabsTrigger value="notifications">
+            <Bell className="mr-2 h-4 w-4" />
+            Aviseringar
+          </TabsTrigger>
           <TabsTrigger value="calendar">
             <Calendar className="mr-2 h-4 w-4" />
             Kalender
@@ -436,18 +441,50 @@ export default function SettingsPage() {
         </TabsContent>
 
         {/* Banking settings — loaded dynamically from extension */}
-        {hasBankingExtension && BankingPanel && (
-          <TabsContent value="banking" className="space-y-6">
+        <TabsContent value="banking" className="space-y-6">
+          {hasBankingExtension && BankingPanel ? (
             <BankingPanel />
-          </TabsContent>
-        )}
+          ) : (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <CreditCard className="h-10 w-10 text-muted-foreground/40 mb-4" />
+                <p className="font-medium mb-1">Bankintegration (PSD2) är inte aktiverad</p>
+                <p className="text-sm text-muted-foreground mb-4 max-w-md">
+                  Aktivera tillägget Enable Banking för att koppla ditt bankkonto och automatiskt hämta transaktioner.
+                </p>
+                <Button variant="outline" asChild>
+                  <Link href="/extensions">
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Gå till Tillägg
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
 
         {/* Notification settings — loaded dynamically from extension */}
-        {NotificationPanel && (
-          <TabsContent value="notifications">
+        <TabsContent value="notifications">
+          {hasNotificationExtension && NotificationPanel ? (
             <NotificationPanel />
-          </TabsContent>
-        )}
+          ) : (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <Bell className="h-10 w-10 text-muted-foreground/40 mb-4" />
+                <p className="font-medium mb-1">Push-notiser är inte aktiverade</p>
+                <p className="text-sm text-muted-foreground mb-4 max-w-md">
+                  Aktivera tillägget Push-notiser för att få aviseringar om förfallna fakturor, deadlines och andra händelser.
+                </p>
+                <Button variant="outline" asChild>
+                  <Link href="/extensions">
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Gå till Tillägg
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
 
         {/* Calendar feed settings */}
         <TabsContent value="calendar">

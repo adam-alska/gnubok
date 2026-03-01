@@ -387,6 +387,12 @@ export const aiCategorizationExtension: Extension = {
     categorizeTransactions: async (...args: unknown[]) => {
       return categorizeTransactions(args[0] as string, args[1] as string[])
     },
+    analyzeDescription: async (...args: unknown[]) => {
+      const { analyzeDescription } = await import('./lib/description-analyzer')
+      return analyzeDescription(
+        args[0] as import('./lib/description-analyzer').DescriptionAnalysisInput
+      )
+    },
   },
   async onInstall(ctx) {
     await ctx.settings.set('settings', DEFAULT_SETTINGS)
