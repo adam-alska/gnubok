@@ -17,13 +17,17 @@ export default function LoginPage() {
   const { toast } = useToast()
   const supabase = createClient()
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
 
+    // Read from DOM to handle browser autofill (which may not trigger onChange)
+    const formData = new FormData(e.currentTarget)
+    const emailValue = (formData.get('email') as string) || email
+
     try {
       const { error } = await supabase.auth.signInWithOtp({
-        email,
+        email: emailValue,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
@@ -38,6 +42,7 @@ export default function LoginPage() {
         return
       }
 
+      setEmail(emailValue)
       setIsEmailSent(true)
       toast({
         title: 'E-post skickad!',
@@ -101,7 +106,9 @@ export default function LoginPage() {
               <Label htmlFor="email">E-postadress</Label>
               <Input
                 id="email"
+                name="email"
                 type="email"
+                autoComplete="email"
                 placeholder="namn@exempel.se"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -112,7 +119,7 @@ export default function LoginPage() {
             <Button
               type="submit"
               className="w-full"
-              disabled={isLoading || !email}
+              disabled={isLoading}
             >
               {isLoading ? (
                 <>

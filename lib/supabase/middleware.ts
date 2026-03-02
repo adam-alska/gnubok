@@ -35,10 +35,18 @@ export async function updateSession(request: NextRequest) {
 
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser()
 
   // Get the pathname
   const pathname = request.nextUrl.pathname
+
+  // If the refresh token is stale/invalid, clear the session cookies
+  // so the browser stops sending them on every request.
+  // Skip on auth routes — the callback needs PKCE cookies intact.
+  if (authError && !user && !pathname.startsWith('/auth')) {
+    await supabase.auth.signOut()
+  }
 
   // Auth routes - allow access
   if (pathname.startsWith('/login') || pathname.startsWith('/auth')) {

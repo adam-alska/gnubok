@@ -7,10 +7,10 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
 const cspDirectives = [
   "default-src 'self'",
-  `connect-src 'self' ${supabaseUrl} https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io`,
-  `style-src 'self' 'unsafe-inline'`,
-  `script-src 'self'${isDev ? " 'unsafe-eval'" : ""}`,
-  "img-src 'self' data: blob:",
+  `connect-src 'self' ${supabaseUrl} https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.enablebanking.com`,
+  `style-src 'self' 'unsafe-inline' https://*.enablebanking.com`,
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://*.enablebanking.com`,
+  "img-src 'self' data: blob: https:",
   "font-src 'self'",
   "frame-ancestors 'none'",
 ].join("; ");
