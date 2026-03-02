@@ -177,6 +177,7 @@ export interface BankAccount {
   name: string | null
   currency: Currency
   balance: number | null
+  balance_updated_at?: string | null
 }
 
 // Import source identifiers

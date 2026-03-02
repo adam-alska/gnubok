@@ -49,6 +49,7 @@ interface DashboardContentProps {
     unpaidVatTotal: number
     overdueInvoicesCount: number
     bankBalance: number | null
+    expiringBankConnections?: { id: string; bank_name: string; days_left: number }[]
     deadlines: Deadline[]
     receiptQueue: ReceiptQueueSummary | null
     missingUnderlagCount: number
@@ -213,6 +214,30 @@ export default function DashboardContent({ firstName, settings, summary, onboard
                   <p className="font-medium text-sm">Saknade underlag</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {summary.missingUnderlagCount} verifikationer utan underlag
+                  </p>
+                </div>
+              </div>
+              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground group-hover:translate-x-0.5 transition-all" />
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
+    )
+  }
+
+  if (summary.expiringBankConnections && summary.expiringBankConnections.length > 0) {
+    const conn = summary.expiringBankConnections[0]
+    alertItems.push(
+      <Link key="bank-expiry" href="/settings?tab=banking" className="group">
+        <Card className="h-full border-l-2 border-l-warning hover:bg-muted/20 transition-colors">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Landmark className="h-4 w-4 text-warning-foreground flex-shrink-0" />
+                <div>
+                  <p className="font-medium text-sm">Banksamtycke löper ut</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {conn.bank_name} — {conn.days_left} {conn.days_left === 1 ? 'dag' : 'dagar'} kvar
                   </p>
                 </div>
               </div>

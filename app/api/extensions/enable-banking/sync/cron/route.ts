@@ -37,12 +37,25 @@ export async function GET(request: Request) {
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+  // Clean up stale pending connections (older than 1 hour)
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+  const { data: stalePending } = await supabase
+    .from('bank_connections')
+    .delete()
+    .eq('status', 'pending')
+    .lt('created_at', oneHourAgo)
+    .select('id')
+
+  if (stalePending?.length) {
+    console.log(`[bank-sync-cron] Cleaned up ${stalePending.length} stale pending connections`)
+  }
+
   const { data: connections, error: connError } = await supabase
     .from('bank_connections')
     .select('*')
     .eq('status', 'active')
     .order('last_synced_at', { ascending: true, nullsFirst: true })
-    .limit(10)
+    .limit(50)
 
   if (connError) {
     console.error('Failed to fetch bank connections:', connError)
@@ -52,6 +65,9 @@ export async function GET(request: Request) {
   if (!connections || connections.length === 0) {
     return NextResponse.json({ message: 'No active connections to sync', processed: 0 })
   }
+
+  const startTime = Date.now()
+  const TIME_BUDGET_MS = 50_000 // 50s — leave 10s margin for Vercel timeout
 
   const results: {
     connectionId: string
@@ -65,6 +81,11 @@ export async function GET(request: Request) {
   }[] = []
 
   for (const connection of connections) {
+    if (Date.now() - startTime > TIME_BUDGET_MS) {
+      console.log(`[bank-sync-cron] Time budget reached after ${results.length} connections`)
+      break
+    }
+
     try {
       const daysLeft = getDaysUntilExpiry(connection.consent_expires)
       const isExpired = daysLeft !== null && daysLeft <= 0
@@ -97,24 +118,20 @@ export async function GET(request: Request) {
 
       const accounts = (connection.accounts_data as StoredAccount[] || []).map(a => ({ ...a }))
 
-      let totalImported = 0
-      let totalDuplicates = 0
-      let totalErrors = 0
-
-      for (const account of accounts) {
-        const result = await syncAccountTransactions(
+      const syncResults = await Promise.all(
+        accounts.map(account => syncAccountTransactions(
           supabase,
           connection.user_id,
           connection.id,
           account,
           fromDate,
           toDate
-        )
+        ))
+      )
 
-        totalImported += result.imported
-        totalDuplicates += result.duplicates
-        totalErrors += result.errors
-      }
+      const totalImported = syncResults.reduce((sum, r) => sum + r.imported, 0)
+      const totalDuplicates = syncResults.reduce((sum, r) => sum + r.duplicates, 0)
+      const totalErrors = syncResults.reduce((sum, r) => sum + r.errors, 0)
 
       await supabase
         .from('bank_connections')

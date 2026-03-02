@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'
 import { getDaysUntilExpiry, isConsentExpiringSoon } from '../lib/api-client'
@@ -67,7 +68,18 @@ export function BankConnectionStatus({
     name?: string
     currency: string
     balance?: number
+    balance_updated_at?: string
   }>) || []
+
+  const [now] = useState(() => Date.now())
+
+  function formatBalanceAge(updatedAt: string): string {
+    const hoursAgo = Math.floor((now - new Date(updatedAt).getTime()) / (1000 * 60 * 60))
+    if (hoursAgo < 1) return 'Nyss uppdaterat'
+    if (hoursAgo < 24) return `${hoursAgo}h sedan`
+    const daysAgo = Math.floor(hoursAgo / 24)
+    return `${daysAgo}d sedan`
+  }
 
   return (
     <div className="border rounded-lg p-4 space-y-4">
@@ -155,6 +167,11 @@ export function BankConnectionStatus({
                         currency: account.currency,
                       }).format(account.balance)}
                     </p>
+                    {account.balance_updated_at && (
+                      <p className="text-[10px] text-muted-foreground">
+                        {formatBalanceAge(account.balance_updated_at)}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

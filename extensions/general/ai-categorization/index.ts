@@ -10,6 +10,7 @@ import {
   type CategorizationSuggestion,
   type AccountUsageEntry,
   type MerchantHistoryEntry,
+  type TrackingContext,
 } from './categorizer'
 import type { BookingTemplate } from '@/lib/bookkeeping/booking-templates'
 
@@ -124,7 +125,7 @@ export async function categorizeTransactions(
   const context = await buildEnrichedContext(userId, supabase, batch)
 
   const aiProvider = getProvider(settings.providerModel)
-  const suggestions = await aiProvider.categorize(batch, context)
+  const suggestions = await aiProvider.categorize(batch, context, { supabase, userId })
 
   // Store suggestions
   await storeSuggestions(userId, suggestions, supabase)
@@ -174,7 +175,7 @@ async function handleTransactionSynced(
 
     const context = await buildEnrichedContext(userId, supabase, batch)
     const aiProvider = getProvider(settings.providerModel)
-    const suggestions = await aiProvider.categorize(batch, context)
+    const suggestions = await aiProvider.categorize(batch, context, { supabase, userId })
 
     // Store only suggestions above confidence threshold
     const qualifiedSuggestions = suggestions.filter(

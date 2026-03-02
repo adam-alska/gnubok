@@ -72,9 +72,11 @@ export async function GET(request: Request) {
       .limit(1)
       .single()
 
+    let connectionId: string
+
     if (findError || !pendingConnection) {
       console.error('Could not find pending connection:', findError)
-      const { error: insertError } = await supabase
+      const { data: inserted, error: insertError } = await supabase
         .from('bank_connections')
         .insert({
           user_id: state,
@@ -86,11 +88,14 @@ export async function GET(request: Request) {
           consent_expires: consentExpiresAt,
           last_synced_at: new Date().toISOString(),
         })
+        .select('id')
+        .single()
 
-      if (insertError) {
+      if (insertError || !inserted) {
         console.error('Insert error:', insertError)
         throw new Error('Failed to create connection')
       }
+      connectionId = inserted.id
     } else {
       const { error: updateError } = await supabase
         .from('bank_connections')
@@ -106,6 +111,7 @@ export async function GET(request: Request) {
       if (updateError) {
         throw new Error('Failed to update connection')
       }
+      connectionId = pendingConnection.id
     }
 
     const { data: userSettings } = await supabase
@@ -115,8 +121,8 @@ export async function GET(request: Request) {
       .single()
 
     const redirectTarget = userSettings?.onboarding_complete
-      ? '/settings?bank_connected=true'
-      : '/onboarding?bank_connected=true'
+      ? `/settings?bank_connected=true&connection_id=${connectionId}`
+      : `/onboarding?bank_connected=true&connection_id=${connectionId}`
 
     return NextResponse.redirect(`${baseUrl}${redirectTarget}`)
   } catch (error) {

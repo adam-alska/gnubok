@@ -140,21 +140,41 @@ export default async function DashboardPage() {
     (inv) => inv.status === 'overdue'
   ).length
 
-  // Fetch bank balance (if connected)
+  // Fetch bank balance and consent info (if connected)
   const { data: bankConnections } = await supabase
     .from('bank_connections')
-    .select('accounts, status')
+    .select('id, accounts_data, status, consent_expires, bank_name')
     .eq('user_id', user.id)
     .eq('status', 'active')
-    .limit(1)
 
   let bankBalance: number | null = null
   if (bankConnections && bankConnections.length > 0) {
-    const accounts = bankConnections[0].accounts as { balance: number }[] | null
-    if (accounts && accounts.length > 0) {
-      bankBalance = accounts.reduce((sum, acc) => sum + (acc.balance || 0), 0)
+    const allBalances = bankConnections.flatMap(conn => {
+      const accounts = conn.accounts_data as { balance: number }[] | null
+      return accounts || []
+    })
+    if (allBalances.length > 0) {
+      bankBalance = allBalances.reduce((sum, acc) => sum + (acc.balance || 0), 0)
     }
   }
+
+  // Compute expiring bank connections (consent expires within 14 days)
+  const nowMs = new Date().getTime()
+  const expiringBankConnections = (bankConnections || [])
+    .filter(conn => {
+      if (!conn.consent_expires) return false
+      const daysLeft = Math.ceil(
+        (new Date(conn.consent_expires).getTime() - nowMs) / (1000 * 60 * 60 * 24)
+      )
+      return daysLeft > 0 && daysLeft <= 14
+    })
+    .map(conn => ({
+      id: conn.id as string,
+      bank_name: conn.bank_name as string,
+      days_left: Math.ceil(
+        (new Date(conn.consent_expires!).getTime() - nowMs) / (1000 * 60 * 60 * 24)
+      ),
+    }))
 
   // Fetch upcoming deadlines (next 7 days + overdue)
   const today = new Date().toISOString().split('T')[0]
@@ -274,6 +294,7 @@ export default async function DashboardPage() {
         unpaidVatTotal,
         overdueInvoicesCount: overdueCount,
         bankBalance,
+        expiringBankConnections,
         deadlines: (deadlines || []) as Deadline[],
         receiptQueue,
         missingUnderlagCount,

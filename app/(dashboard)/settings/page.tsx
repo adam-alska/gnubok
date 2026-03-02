@@ -63,9 +63,30 @@ export default function SettingsPage() {
     if (bankConnected === 'true') {
       toast({
         title: 'Bank ansluten!',
-        description: 'Din bank är nu kopplad och transaktioner kan hämtas.',
+        description: 'Din bank är nu kopplad. Transaktioner hämtas...',
       })
-      router.replace('/settings')
+
+      // Auto-sync transactions after connection
+      const connectionId = searchParams.get('connection_id')
+      if (connectionId) {
+        fetch('/api/extensions/ext/enable-banking/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ connection_id: connectionId, days_back: 90 }),
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.imported > 0) {
+              toast({
+                title: 'Transaktioner hämtade',
+                description: `${data.imported} transaktioner importerade`,
+              })
+            }
+          })
+          .catch(() => {})
+      }
+
+      router.replace('/settings?tab=banking')
     }
 
     if (bankError) {

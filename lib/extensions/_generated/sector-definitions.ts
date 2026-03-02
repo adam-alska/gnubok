@@ -4,21 +4,16 @@ import type { ExtensionDefinition } from '../types'
 export const EXTENSION_DEFINITIONS: Record<string, ExtensionDefinition[]> = {
   'general': [
     {
-          "slug": "receipt-ocr",
-          "name": "Kvittoscanning",
+          "slug": "enable-banking",
+          "name": "Bankintegration (PSD2)",
           "sector": "general",
           "category": "import",
-          "icon": "Camera",
+          "icon": "Landmark",
           "dataPattern": "manual",
-          "description": "Skanna kvitton och extrahera data automatiskt",
-          "longDescription": "Ladda upp kvittofoton och låt systemet automatiskt extrahera leverantör, belopp, moms och datum. Sparar tid och minskar manuell inmatning.",
+          "description": "Automatisk banktransaktionssynk via PSD2",
+          "longDescription": "Koppla ditt bankkonto direkt och synka transaktioner automatiskt via säker PSD2-bankintegration. Stöder de flesta svenska banker.",
           "hasOwnData": true,
-          "quickAction": {
-                "label": "Skanna kvitto",
-                "description": "Fotografera & spara",
-                "icon": "Camera",
-                "href": "/receipts/scan"
-          }
+          "subscriptionNotice": "Denna integration kräver ett aktivt Enable Banking-abonnemang. Utan abonnemang kommer bankintegration inte att fungera."
     },
     {
           "slug": "ai-categorization",
@@ -61,80 +56,6 @@ export const EXTENSION_DEFINITIONS: Record<string, ExtensionDefinition[]> = {
                 "icon": "MessageSquare",
                 "event": "open-ai-chat"
           }
-    },
-    {
-          "slug": "push-notifications",
-          "name": "Push-notiser",
-          "sector": "general",
-          "category": "operations",
-          "icon": "Bell",
-          "dataPattern": "core",
-          "description": "Händelsenotiser för bokföringsaktiviteter",
-          "longDescription": "Få push-notiser direkt i webbläsaren när viktiga händelser sker — nya fakturor, förfallna betalningar, slutförda bokföringar med mera.",
-          "readsCoreTables": [
-                "journal_entries",
-                "invoices",
-                "receipts"
-          ]
-    },
-    {
-          "slug": "invoice-inbox",
-          "name": "Dokumentinkorg",
-          "sector": "general",
-          "category": "import",
-          "icon": "Inbox",
-          "dataPattern": "manual",
-          "description": "Ta emot alla dokument via e-post — fakturor, kvitton och myndighetspost",
-          "longDescription": "Skicka alla affärsdokument till en dedikerad e-postadress. AI klassificerar automatiskt dokumenttyp (faktura, kvitto, myndighetspost), extraherar data och matchar mot transaktioner. En inkorg för alla dokument.",
-          "hasOwnData": true,
-          "quickAction": {
-                "label": "Dokumentinkorg",
-                "description": "Granska inkommande dokument",
-                "icon": "Inbox",
-                "href": "/e/general/invoice-inbox"
-          }
-    },
-    {
-          "slug": "calendar",
-          "name": "Kalender",
-          "sector": "general",
-          "category": "operations",
-          "icon": "Calendar",
-          "dataPattern": "core",
-          "description": "Fullständig kalendervy med månads-, vecko- och dagsvisning",
-          "longDescription": "Se alla fakturadatum och deadlines i en interaktiv kalender med månads-, vecko- och dagsvy.",
-          "readsCoreTables": [
-                "invoices",
-                "deadlines",
-                "customers"
-          ]
-    },
-    {
-          "slug": "enable-banking",
-          "name": "Bankintegration (PSD2)",
-          "sector": "general",
-          "category": "import",
-          "icon": "Landmark",
-          "dataPattern": "manual",
-          "description": "Automatisk banktransaktionssynk via PSD2",
-          "longDescription": "Koppla ditt bankkonto direkt och synka transaktioner automatiskt via säker PSD2-bankintegration. Stöder de flesta svenska banker.",
-          "hasOwnData": true,
-          "subscriptionNotice": "Denna integration kräver ett aktivt Enable Banking-abonnemang. Utan abonnemang kommer bankintegration inte att fungera."
-    },
-    {
-          "slug": "email",
-          "name": "E-post (Resend)",
-          "sector": "general",
-          "category": "operations",
-          "icon": "Mail",
-          "dataPattern": "core",
-          "description": "Skicka fakturor och påminnelser via e-post",
-          "longDescription": "Aktiverar e-postfunktioner: skicka fakturor till kunder, automatiska betalningspåminnelser (15/30/45 dagar), och e-postmeddelanden. Kräver ett Resend-konto med verifierad domän.",
-          "readsCoreTables": [
-                "invoices",
-                "customers",
-                "company_settings"
-          ]
     },
   ],
 }

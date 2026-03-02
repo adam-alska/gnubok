@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
+import { DestructiveConfirmDialog, useDestructiveConfirm } from '@/components/ui/destructive-confirm-dialog'
 import { Loader2, Landmark } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { BankSelector, type Bank } from './BankSelector'
@@ -18,8 +19,10 @@ export default function BankingSettingsPanel() {
   const { toast } = useToast()
   const supabase = createClient()
 
+  const { dialogProps, confirm } = useDestructiveConfirm()
+
   const [bankConnections, setBankConnections] = useState<BankConnection[]>([])
-  const [isSyncing, setIsSyncing] = useState(false)
+  const [syncingConnectionId, setSyncingConnectionId] = useState<string | null>(null)
   const [isConnecting, setIsConnecting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [selectedBank, setSelectedBank] = useState<Bank | null>(null)
@@ -71,7 +74,7 @@ export default function BankingSettingsPanel() {
   }
 
   async function handleSyncTransactions(connectionId: string) {
-    setIsSyncing(true)
+    setSyncingConnectionId(connectionId)
 
     try {
       const response = await fetch('/api/extensions/ext/enable-banking/sync', {
@@ -100,27 +103,41 @@ export default function BankingSettingsPanel() {
       })
     }
 
-    setIsSyncing(false)
+    setSyncingConnectionId(null)
   }
 
   async function handleDisconnectBank(connectionId: string) {
-    const { error } = await supabase
-      .from('bank_connections')
-      .update({ status: 'revoked' })
-      .eq('id', connectionId)
+    const ok = await confirm({
+      title: 'Koppla bort bank?',
+      description: 'PSD2-samtycket kommer återkallas. Befintliga transaktioner påverkas inte.',
+      confirmLabel: 'Koppla bort',
+      variant: 'warning',
+    })
+    if (!ok) return
 
-    if (error) {
-      toast({
-        title: 'Fel',
-        description: 'Kunde inte koppla bort bank',
-        variant: 'destructive',
+    try {
+      const response = await fetch('/api/extensions/ext/enable-banking/disconnect', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connection_id: connectionId }),
       })
-    } else {
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Disconnect failed')
+      }
+
       toast({
         title: 'Bank bortkopplad',
-        description: 'Bankanslutningen har tagits bort',
+        description: 'Bankanslutningen och PSD2-samtycket har återkallats',
       })
       fetchConnections()
+    } catch (error) {
+      toast({
+        title: 'Fel',
+        description: error instanceof Error ? error.message : 'Kunde inte koppla bort bank',
+        variant: 'destructive',
+      })
     }
   }
 
@@ -136,6 +153,8 @@ export default function BankingSettingsPanel() {
 
   return (
     <div className="space-y-6">
+      <DestructiveConfirmDialog {...dialogProps} />
+
       {/* Connected banks */}
       {activeConnections.length > 0 && (
         <Card>
@@ -149,7 +168,7 @@ export default function BankingSettingsPanel() {
                 connection={connection}
                 onSync={handleSyncTransactions}
                 onDisconnect={handleDisconnectBank}
-                isSyncing={isSyncing}
+                isSyncing={syncingConnectionId === connection.id}
               />
             ))}
           </CardContent>

@@ -17,6 +17,7 @@ import { streamAgentResponse, type ToolResultEntry } from './agent'
 import { generateArtifact, type ArtifactSpec } from './artifacts'
 import type { ChatMessage, SourceReference } from '@/types/chat'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { trackTokenUsage } from '@/lib/ai/usage-tracker'
 
 // Initialize the LLM
 function getChatModel() {
@@ -35,7 +36,8 @@ export interface ChatResult {
 
 export async function generateChatResponse(
   userMessage: string,
-  conversationHistory: ChatMessage[]
+  conversationHistory: ChatMessage[],
+  tracking?: { supabase: SupabaseClient; userId: string }
 ): Promise<ChatResult> {
   // 1. Retrieve relevant documents
   const relevantDocs = await retrieveRelevantDocuments(userMessage)
@@ -74,7 +76,16 @@ export async function generateChatResponse(
     new HumanMessage(userMessage),
   ])
 
-  // 6. Extract content and sources
+  // 6. Track token usage
+  if (tracking && response.usage_metadata) {
+    trackTokenUsage(tracking.supabase, tracking.userId, 'ai-chat', {
+      inputTokens: response.usage_metadata.input_tokens ?? 0,
+      outputTokens: response.usage_metadata.output_tokens ?? 0,
+      model: CHATBOT_CONFIG.model,
+    })
+  }
+
+  // 7. Extract content and sources
   const content =
     typeof response.content === 'string'
       ? response.content

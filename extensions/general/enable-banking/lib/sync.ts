@@ -63,8 +63,9 @@ export async function syncAccountTransactions(
   try {
     const balance = await getAccountBalance(account.uid)
     account.balance = balance.amount
+    account.balance_updated_at = new Date().toISOString()
   } catch {
-    // Ignore balance fetch errors
+    // Keep previous balance, don't update timestamp
   }
 
   return {

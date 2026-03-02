@@ -6,6 +6,7 @@ export interface StoredAccount {
   name?: string
   currency: string
   balance?: number
+  balance_updated_at?: string
 }
 
 // Re-export API types from the client

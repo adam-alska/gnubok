@@ -14,6 +14,7 @@ import 'server-only'
 import Anthropic from '@anthropic-ai/sdk'
 import { BOOKING_TEMPLATES, type BookingTemplate } from '@/lib/bookkeeping/booking-templates'
 import type { TransactionCategory, EntityType } from '@/types'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // ============================================================
 // Types
@@ -72,10 +73,16 @@ export interface CategorizationSuggestion {
   templateId?: string
 }
 
+export interface TrackingContext {
+  supabase: SupabaseClient
+  userId: string
+}
+
 export interface CategorizationProvider {
   categorize(
     transactions: TransactionForCategorization[],
-    context: CategorizationContext | EnrichedCategorizationContext
+    context: CategorizationContext | EnrichedCategorizationContext,
+    tracking?: TrackingContext
   ): Promise<CategorizationSuggestion[]>
 }
 
@@ -198,7 +205,8 @@ export class AnthropicCategorizationProvider implements CategorizationProvider {
 
   async categorize(
     transactions: TransactionForCategorization[],
-    context: CategorizationContext | EnrichedCategorizationContext
+    context: CategorizationContext | EnrichedCategorizationContext,
+    tracking?: TrackingContext
   ): Promise<CategorizationSuggestion[]> {
     // Cap batch size
     const batch = transactions.slice(0, MAX_BATCH_SIZE)
@@ -317,6 +325,16 @@ ${transactionList}`
             },
           ],
         })
+
+        // Track token usage (fire-and-forget)
+        if (tracking && message.usage) {
+          const { trackTokenUsage } = await import('@/lib/ai/usage-tracker')
+          trackTokenUsage(tracking.supabase, tracking.userId, 'ai-categorization', {
+            inputTokens: message.usage.input_tokens,
+            outputTokens: message.usage.output_tokens,
+            model: this.model,
+          })
+        }
 
         // Extract tool_use block from response
         const toolUseBlock = message.content.find(

@@ -116,8 +116,21 @@ export async function generateSIEExport(
   }
 
   // === Opening balances (IB) ===
-  // For now, all zeros unless we have data from previous periods
-  // #IB 0 accountNumber amount
+  if (period.opening_balance_entry_id) {
+    const { data: obEntry } = await supabase
+      .from('journal_entries')
+      .select('*, lines:journal_entry_lines(*)')
+      .eq('id', period.opening_balance_entry_id)
+      .eq('user_id', userId)
+      .single()
+
+    if (obEntry?.lines) {
+      for (const line of (obEntry.lines as JournalEntryLine[])) {
+        const amount = (Number(line.debit_amount) || 0) - (Number(line.credit_amount) || 0)
+        lines.push(`#IB 0 ${line.account_number} ${formatAmount(amount)}`)
+      }
+    }
+  }
 
   // === Journal entries (VER + TRANS) ===
   for (const entry of (entries as JournalEntry[]) || []) {

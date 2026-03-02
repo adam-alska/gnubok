@@ -4,26 +4,56 @@ import { generateChatResponse, streamChatResponse, streamRoutedResponse } from '
 import { CHATBOT_CONFIG } from '@/extensions/general/ai-chat/chatbot/config'
 import type { ChatMessage, ChatRequest, SourceReference, ArtifactSpec } from '@/types/chat'
 
-// Simple in-memory rate limiting (per user)
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
+// Distributed rate limiting backed by Supabase extension_data table
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-function checkRateLimit(userId: string): boolean {
+interface RateLimitState {
+  count: number
+  window_start: number
+}
+
+async function checkRateLimitDB(supabase: SupabaseClient, userId: string): Promise<boolean> {
   const now = Date.now()
-  const limit = rateLimitMap.get(userId)
+  const WINDOW_MS = 60000
 
-  if (!limit || now > limit.resetTime) {
-    rateLimitMap.set(userId, {
-      count: 1,
-      resetTime: now + 60000, // 1 minute window
-    })
+  const { data } = await supabase
+    .from('extension_data')
+    .select('value')
+    .eq('user_id', userId)
+    .eq('extension_id', 'ai-chat')
+    .eq('key', 'rate_limit')
+    .single()
+
+  const state = data?.value as RateLimitState | null
+
+  if (!state || now - state.window_start > WINDOW_MS) {
+    // New window
+    await supabase.from('extension_data').upsert(
+      {
+        user_id: userId,
+        extension_id: 'ai-chat',
+        key: 'rate_limit',
+        value: { count: 1, window_start: now },
+      },
+      { onConflict: 'user_id,extension_id,key' }
+    )
     return true
   }
 
-  if (limit.count >= CHATBOT_CONFIG.rateLimitPerMinute) {
+  if (state.count >= CHATBOT_CONFIG.rateLimitPerMinute) {
     return false
   }
 
-  limit.count++
+  // Increment count
+  await supabase.from('extension_data').upsert(
+    {
+      user_id: userId,
+      extension_id: 'ai-chat',
+      key: 'rate_limit',
+      value: { count: state.count + 1, window_start: state.window_start },
+    },
+    { onConflict: 'user_id,extension_id,key' }
+  )
   return true
 }
 
@@ -40,7 +70,7 @@ async function handlePostChat(
   const supabase = await createClient()
 
   // Rate limiting
-  if (!checkRateLimit(userId)) {
+  if (!await checkRateLimitDB(supabase, userId)) {
     return NextResponse.json(
       { error: 'Rate limit exceeded. Please wait a moment.' },
       { status: 429 }
@@ -129,7 +159,7 @@ async function handlePostChat(
     const conversationHistory = (history || []) as ChatMessage[]
 
     // Generate AI response
-    const result = await generateChatResponse(message.trim(), conversationHistory)
+    const result = await generateChatResponse(message.trim(), conversationHistory, { supabase, userId })
 
     // Save assistant message
     const { data: assistantMessage, error: assistantMsgError } = await supabase
@@ -177,7 +207,7 @@ async function handlePostStream(
   const { createClient } = await import('@/lib/supabase/server')
   const supabase = await createClient()
 
-  if (!checkRateLimit(userId)) {
+  if (!await checkRateLimitDB(supabase, userId)) {
     return new Response(
       JSON.stringify({ error: 'Rate limit exceeded' }),
       { status: 429, headers: { 'Content-Type': 'application/json' } }

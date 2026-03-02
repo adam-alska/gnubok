@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import {
   startAuthorization,
   getASPSPs,
+  deleteSession,
   type ASPSP,
 } from './lib/api-client'
 import { syncAccountTransactions } from './lib/sync'
@@ -80,6 +81,15 @@ export const enableBankingExtension: Extension = {
         }
 
         try {
+          // Determine PSU type from entity type
+          const { data: companySettings } = await supabase
+            .from('company_settings')
+            .select('entity_type')
+            .eq('user_id', user.id)
+            .single()
+
+          const psuType = companySettings?.entity_type === 'aktiebolag' ? 'business' : 'personal'
+
           const redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/extensions/enable-banking/callback`
 
           const { url, authorization_id } = await startAuthorization(
@@ -87,7 +97,7 @@ export const enableBankingExtension: Extension = {
             aspsp_country,
             redirectUrl,
             user.id,
-            'personal'
+            psuType
           )
 
           const { data: connection, error } = await supabase
@@ -160,11 +170,8 @@ export const enableBankingExtension: Extension = {
           // Use ctx.services.ingestTransactions when available
           const ingestFn = ctx?.services.ingestTransactions
 
-          let totalImported = 0
-          let totalDuplicates = 0
-
-          for (const account of accounts) {
-            const result = await syncAccountTransactions(
+          const results = await Promise.all(
+            accounts.map(account => syncAccountTransactions(
               supabase,
               user.id,
               connection.id,
@@ -172,11 +179,11 @@ export const enableBankingExtension: Extension = {
               fromDate,
               toDate,
               ingestFn
-            )
+            ))
+          )
 
-            totalImported += result.imported
-            totalDuplicates += result.duplicates
-          }
+          const totalImported = results.reduce((sum, r) => sum + r.imported, 0)
+          const totalDuplicates = results.reduce((sum, r) => sum + r.duplicates, 0)
 
           const syncedAt = new Date().toISOString()
           await supabase
@@ -218,6 +225,57 @@ export const enableBankingExtension: Extension = {
             { status: 500 }
           )
         }
+      },
+    },
+    {
+      method: 'DELETE',
+      path: '/disconnect',
+      handler: async (request: Request, ctx?: ExtensionContext) => {
+        const log = ctx?.log ?? console
+        const supabase = ctx?.supabase ?? await (await import('@/lib/supabase/server')).createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (!user) {
+          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        const { connection_id } = await request.json()
+
+        if (!connection_id) {
+          return NextResponse.json({ error: 'connection_id is required' }, { status: 400 })
+        }
+
+        const { data: connection, error: findError } = await supabase
+          .from('bank_connections')
+          .select('id, session_id, status')
+          .eq('id', connection_id)
+          .eq('user_id', user.id)
+          .single()
+
+        if (findError || !connection) {
+          return NextResponse.json({ error: 'Connection not found' }, { status: 404 })
+        }
+
+        // Revoke PSD2 consent if session exists
+        if (connection.session_id) {
+          try {
+            await deleteSession(connection.session_id)
+          } catch (error) {
+            // Consent may already be expired — log and continue
+            log.error('Failed to revoke PSD2 session (may be expired):', error)
+          }
+        }
+
+        const { error: updateError } = await supabase
+          .from('bank_connections')
+          .update({ status: 'revoked', session_id: null })
+          .eq('id', connection.id)
+
+        if (updateError) {
+          return NextResponse.json({ error: 'Failed to disconnect' }, { status: 500 })
+        }
+
+        return NextResponse.json({ success: true })
       },
     },
   ],
