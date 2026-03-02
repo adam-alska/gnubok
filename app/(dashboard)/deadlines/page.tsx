@@ -10,13 +10,14 @@ import { Badge } from '@/components/ui/badge'
 import { AlertTriangle, ArrowRight } from 'lucide-react'
 import type { Deadline } from '@/types'
 
+const supabase = createClient()
+
 export default function DeadlinesPage() {
   const [deadlines, setDeadlines] = useState<Deadline[]>([])
   const [customers, setCustomers] = useState<{ id: string; name: string }[]>([])
   const [overdueInvoices, setOverdueInvoices] = useState<{ count: number; total: number }>({ count: 0, total: 0 })
   const [isLoading, setIsLoading] = useState(true)
   const { toast } = useToast()
-  const supabase = createClient()
 
   const fetchData = useCallback(async () => {
     setIsLoading(true)
@@ -66,7 +67,7 @@ export default function DeadlinesPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [supabase, toast])
+  }, [toast])
 
   useEffect(() => {
     fetchData()

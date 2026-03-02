@@ -1,6 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { reverseEntry } from '@/lib/bookkeeping/engine'
+import { ensureInitialized } from '@/lib/init'
+
+ensureInitialized()
 
 export async function POST(
   request: Request,

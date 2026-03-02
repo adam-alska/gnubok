@@ -1,7 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { createInvoiceJournalEntry } from '@/lib/bookkeeping/invoice-entries'
+import { ensureInitialized } from '@/lib/init'
 import type { EntityType, Invoice } from '@/types'
+
+ensureInitialized()
 
 /**
  * POST /api/invoices/[id]/mark-sent

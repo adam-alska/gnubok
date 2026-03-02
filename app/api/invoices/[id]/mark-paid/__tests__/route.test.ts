@@ -13,6 +13,10 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: () => Promise.resolve(mockSupabase),
 }))
 
+vi.mock('@/lib/init', () => ({
+  ensureInitialized: vi.fn(),
+}))
+
 const mockCreateInvoicePaymentJournalEntry = vi.fn()
 const mockCreateInvoiceCashEntry = vi.fn()
 vi.mock('@/lib/bookkeeping/invoice-entries', () => ({

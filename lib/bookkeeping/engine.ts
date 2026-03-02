@@ -394,14 +394,23 @@ export async function reverseEntry(
     throw new Error(`Failed to post reversal entry: ${postError.message}`)
   }
 
-  // Mark original as reversed with reversed_by_id link
-  await supabase
+  // Mark original as reversed with reversed_by_id link (CAS guard: only if still 'posted')
+  const { data: updatedOriginal, error: casError } = await supabase
     .from('journal_entries')
     .update({
       status: 'reversed',
       reversed_by_id: reversalEntry.id,
     })
     .eq('id', entryId)
+    .eq('status', 'posted')
+    .select('id')
+
+  if (casError || !updatedOriginal || updatedOriginal.length === 0) {
+    // Another concurrent reversal already changed the status — roll back our reversal
+    await supabase.from('journal_entry_lines').delete().eq('journal_entry_id', reversalEntry.id)
+    await supabase.from('journal_entries').delete().eq('id', reversalEntry.id)
+    throw new Error('Entry was already reversed by a concurrent operation')
+  }
 
   // Fetch complete reversal entry with lines
   const { data: completeEntry } = await supabase

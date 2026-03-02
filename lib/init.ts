@@ -46,7 +46,7 @@ function validateEnvironment(): void {
   }
 
   if (missingExt.length > 0) {
-    throw new Error(`Missing required extension environment variables: ${missingExt.join(', ')}`)
+    log.warn(`Missing extension environment variables (extensions needing them may not work): ${missingExt.join(', ')}`)
   }
 
   for (const v of OPTIONAL_VARS) {
@@ -64,10 +64,11 @@ function validateEnvironment(): void {
  */
 export function ensureInitialized(): void {
   if (initialized) return
-  initialized = true
 
   validateEnvironment()
   setContextFactory(createExtensionContext)
   registerSupplierInvoiceHandler()
   loadExtensions()
+
+  initialized = true
 }

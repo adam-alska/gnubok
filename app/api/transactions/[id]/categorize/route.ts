@@ -201,7 +201,7 @@ export async function POST(
   if (is_business && body.account_override) {
     // Validate the account exists in the user's chart of accounts
     const { data: accountExists } = await supabase
-      .from('accounts')
+      .from('chart_of_accounts')
       .select('account_number, account_class')
       .eq('user_id', user.id)
       .eq('account_number', body.account_override)

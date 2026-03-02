@@ -12,6 +12,10 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: () => mockCreateClient(),
 }))
 
+vi.mock('@/lib/init', () => ({
+  ensureInitialized: vi.fn(),
+}))
+
 const mockReverseEntry = vi.fn()
 vi.mock('@/lib/bookkeeping/engine', () => ({
   reverseEntry: (...args: unknown[]) => mockReverseEntry(...args),

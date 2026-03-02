@@ -5,7 +5,10 @@ import {
   createInvoiceCashEntry,
 } from '@/lib/bookkeeping/invoice-entries'
 import { MarkInvoicePaidSchema } from '@/lib/api/schemas'
+import { ensureInitialized } from '@/lib/init'
 import type { EntityType, Invoice } from '@/types'
+
+ensureInitialized()
 
 /**
  * POST /api/invoices/[id]/mark-paid
