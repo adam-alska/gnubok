@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import { withSentryConfig } from "@sentry/nextjs";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -51,9 +50,7 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, {
-  silent: !process.env.SENTRY_AUTH_TOKEN,
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-  ...(process.env.SENTRY_AUTH_TOKEN ? {} : { sourcemaps: { disable: true } }),
-});
+// Sentry runtime error capture works via instrumentation.ts — no build-time
+// wrapper needed. Add withSentryConfig() here once SENTRY_ORG, SENTRY_PROJECT,
+// and SENTRY_AUTH_TOKEN are configured on Vercel for source map uploads.
+export default nextConfig;
