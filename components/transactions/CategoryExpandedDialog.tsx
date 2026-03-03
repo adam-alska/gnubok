@@ -96,11 +96,14 @@ export default function CategoryExpandedDialog({
                   key={cat.value}
                   variant="outline"
                   size="sm"
-                  className="justify-start text-xs"
+                  className="justify-start text-xs h-auto py-1.5"
                   onClick={() => handleSelectCategory(cat.value)}
                   disabled={isProcessing}
                 >
-                  {cat.label}
+                  <div className="flex flex-col items-start">
+                    <span>{cat.label}</span>
+                    {cat.account && <span className="text-[10px] text-muted-foreground">{cat.account}</span>}
+                  </div>
                 </Button>
               ))}
             </div>
@@ -113,11 +116,14 @@ export default function CategoryExpandedDialog({
                   key={cat.value}
                   variant="outline"
                   size="sm"
-                  className="justify-start text-xs"
+                  className="justify-start text-xs h-auto py-1.5"
                   onClick={() => handleSelectCategory(cat.value)}
                   disabled={isProcessing}
                 >
-                  {cat.label}
+                  <div className="flex flex-col items-start">
+                    <span>{cat.label}</span>
+                    {cat.account && <span className="text-[10px] text-muted-foreground">{cat.account}</span>}
+                  </div>
                 </Button>
               ))}
             </div>

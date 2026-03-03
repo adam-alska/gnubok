@@ -53,9 +53,9 @@ const warningPatterns: {
     pattern: /restaurang|lunch|middag|dinner|café|fika/i,
     warning: {
       category: 'Representation',
-      warningLevel: 'info',
-      message: 'Måltider kan vara avdragsgilla som representation med max 300 kr per person (exkl. moms)',
-      legalBasis: 'IL 16 kap 2§',
+      warningLevel: 'warning',
+      message: 'Måltider kan vara avdragsgilla som representation med max 300 kr per person (exkl. moms). Momsen är inte avdragsgill sedan 2017.',
+      legalBasis: 'IL 16 kap 2§, ML 8:9',
     },
   },
   {

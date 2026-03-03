@@ -56,6 +56,11 @@ export type CoreEvent =
       privateTotal: number;
       userId: string;
     }}
+  // Supplier Invoice Lifecycle
+  | { type: 'supplier_invoice.registered'; payload: { supplierInvoice: SupplierInvoice; userId: string } }
+  | { type: 'supplier_invoice.approved'; payload: { supplierInvoice: SupplierInvoice; userId: string } }
+  | { type: 'supplier_invoice.paid'; payload: { supplierInvoice: SupplierInvoice; paymentAmount: number; userId: string } }
+  | { type: 'supplier_invoice.credited'; payload: { supplierInvoice: SupplierInvoice; creditNote: SupplierInvoice; userId: string } }
   // Supplier Invoice Inbox
   | { type: 'supplier_invoice.received'; payload: { inboxItem: InvoiceInboxItem; userId: string } }
   | { type: 'supplier_invoice.extracted'; payload: { inboxItem: InvoiceInboxItem; confidence: number; userId: string } }

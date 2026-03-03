@@ -18,14 +18,17 @@ const log = createLogger('supplier-invoice-entries')
  *
  * Swedish domestic (25% VAT):
  *   Debit  5xxx/6xxx (per item's account_number)   [item line_total]
- *   Debit  2641 Ingående moms                      [total VAT]
+ *   Debit  2641 Ingående moms (per rate)            [VAT per rate group]
  *   Credit 2440 Leverantörsskulder                  [total incl VAT]
  *
- * EU reverse charge (supplier_type = 'eu_business'):
+ * EU/non-EU reverse charge (services):
  *   Debit  5xxx/6xxx (per item)                     [total]
- *   Debit  2645 Beräknad ingående moms              [fiktiv VAT]
- *   Credit 2614 Utgående moms omvänd                [fiktiv VAT]
+ *   Debit  2645 Beräknad ingående moms (per rate)   [fiktiv VAT per rate]
+ *   Credit 26x4 Utgående moms omvänd (per rate)     [fiktiv VAT per rate]
  *   Credit 2440 Leverantörsskulder                  [total]
+ *
+ * Note: Goods imports via Tullverket (customs) use a different accounting path
+ * (2615/2645) and are not handled here — only services use reverse charge.
  */
 export async function createSupplierInvoiceRegistrationEntry(
   supabase: SupabaseClient,
@@ -64,29 +67,40 @@ export async function createSupplierInvoiceRegistrationEntry(
   }
   lines.push(...debitLines)
 
-  if (supplierType === 'eu_business' && invoice.reverse_charge) {
-    // EU reverse charge: fiktiv moms entries (computed on SEK subtotal)
-    const vatRate = getDefaultVatRate(invoice.vat_treatment)
-    const subtotalSek = resolveSekAmount(invoice.subtotal, invoice.subtotal_sek, invoice.currency, invoice.exchange_rate)
-    const reverseChargeLines = generateReverseChargeLines(subtotalSek, vatRate)
-    lines.push(...reverseChargeLines)
+  const isReverseCharge = (supplierType === 'eu_business' || supplierType === 'non_eu_business') && invoice.reverse_charge
+
+  if (isReverseCharge) {
+    // EU/non-EU reverse charge: fiktiv moms entries per rate group
+    const vatByRate = groupVatByRate(items, invoice.currency, invoice.exchange_rate)
+    for (const [rate, amount] of vatByRate) {
+      if (rate > 0 && amount > 0) {
+        const rcLines = generateReverseChargeLines(amount / rate, rate)
+        lines.push(...rcLines)
+      }
+    }
   } else if (invoice.vat_amount > 0) {
-    // Domestic: Debit ingående moms (in SEK)
-    const vatSek = resolveSekAmount(invoice.vat_amount, invoice.vat_amount_sek, invoice.currency, invoice.exchange_rate)
-    lines.push({
-      account_number: '2641',
-      debit_amount: Math.round(vatSek * 100) / 100,
-      credit_amount: 0,
-      line_description: `Ingående moms ${desc}`,
-    })
+    // Domestic: Debit ingående moms per rate group
+    const vatByRate = groupVatByRate(items, invoice.currency, invoice.exchange_rate)
+    for (const [rate, amount] of vatByRate) {
+      if (amount > 0) {
+        lines.push({
+          account_number: '2641',
+          debit_amount: Math.round(amount * 100) / 100,
+          credit_amount: 0,
+          line_description: `Ingående moms ${Math.round(rate * 100)}% ${desc}`,
+        })
+      }
+    }
   }
 
-  // Credit: Leverantörsskulder — balance guarantee: credit = sum of all debit lines
+  // Credit: Leverantörsskulder — balance guarantee: ensures sum(debits) === sum(credits)
+  // For reverse charge, intermediate credits (2614/2624/2634) already exist, so we subtract them
   const totalDebits = lines.reduce((sum, l) => sum + l.debit_amount, 0)
+  const totalCredits = lines.reduce((sum, l) => sum + l.credit_amount, 0)
   lines.push({
     account_number: '2440',
     debit_amount: 0,
-    credit_amount: Math.round(totalDebits * 100) / 100,
+    credit_amount: Math.round((totalDebits - totalCredits) * 100) / 100,
     line_description: desc,
     ...buildCurrencyMetadata(invoice.currency, isForeign ? invoice.total : undefined, invoice.exchange_rate),
   })
@@ -242,29 +256,40 @@ export async function createSupplierInvoiceCashEntry(
     })
   }
 
-  if (supplierType === 'eu_business' && invoice.reverse_charge) {
-    // EU reverse charge: fiktiv moms entries (computed on SEK subtotal)
-    const vatRate = getDefaultVatRate(invoice.vat_treatment)
-    const subtotalSek = resolveSekAmount(invoice.subtotal, invoice.subtotal_sek, invoice.currency, invoice.exchange_rate)
-    const reverseChargeLines = generateReverseChargeLines(subtotalSek, vatRate)
-    lines.push(...reverseChargeLines)
+  const isReverseCharge = (supplierType === 'eu_business' || supplierType === 'non_eu_business') && invoice.reverse_charge
+
+  if (isReverseCharge) {
+    // EU/non-EU reverse charge: fiktiv moms entries per rate group
+    const vatByRate = groupVatByRate(items, invoice.currency, invoice.exchange_rate)
+    for (const [rate, amount] of vatByRate) {
+      if (rate > 0 && amount > 0) {
+        const rcLines = generateReverseChargeLines(amount / rate, rate)
+        lines.push(...rcLines)
+      }
+    }
   } else if (invoice.vat_amount > 0) {
-    // Domestic: Debit ingående moms (in SEK)
-    const vatSek = resolveSekAmount(invoice.vat_amount, invoice.vat_amount_sek, invoice.currency, invoice.exchange_rate)
-    lines.push({
-      account_number: '2641',
-      debit_amount: Math.round(vatSek * 100) / 100,
-      credit_amount: 0,
-      line_description: `Ingående moms ${desc}`,
-    })
+    // Domestic: Debit ingående moms per rate group
+    const vatByRate = groupVatByRate(items, invoice.currency, invoice.exchange_rate)
+    for (const [rate, amount] of vatByRate) {
+      if (amount > 0) {
+        lines.push({
+          account_number: '2641',
+          debit_amount: Math.round(amount * 100) / 100,
+          credit_amount: 0,
+          line_description: `Ingående moms ${Math.round(rate * 100)}% ${desc}`,
+        })
+      }
+    }
   }
 
-  // Credit: Företagskonto — balance guarantee: credit = sum of all debit lines
+  // Credit: Företagskonto — balance guarantee: ensures sum(debits) === sum(credits)
+  // For reverse charge, intermediate credits (2614/2624/2634) already exist, so we subtract them
   const totalDebits = lines.reduce((sum, l) => sum + l.debit_amount, 0)
+  const totalCredits = lines.reduce((sum, l) => sum + l.credit_amount, 0)
   lines.push({
     account_number: '1930',
     debit_amount: 0,
-    credit_amount: Math.round(totalDebits * 100) / 100,
+    credit_amount: Math.round((totalDebits - totalCredits) * 100) / 100,
     line_description: desc,
   })
 
@@ -321,34 +346,46 @@ export async function createSupplierCreditNoteEntry(
     })
   }
 
-  if (supplierType === 'eu_business' && creditNote.reverse_charge) {
-    // Reverse the fiktiv moms (swap debit/credit from registration)
-    const vatRate = getDefaultVatRate(creditNote.vat_treatment)
-    const absSubtotalSek = Math.abs(resolveSekAmount(creditNote.subtotal, creditNote.subtotal_sek, creditNote.currency, creditNote.exchange_rate))
-    const vatAmount = Math.round(absSubtotalSek * vatRate * 100) / 100
-    creditLines.push({
-      account_number: '2645',
-      debit_amount: 0,
-      credit_amount: vatAmount,
-      line_description: `Omvänd fiktiv ingående moms ${desc}`,
-    })
-    // 2614 is a debit (reversal of the output VAT credit)
-    lines.push({
-      account_number: '2614',
-      debit_amount: vatAmount,
-      credit_amount: 0,
-      line_description: `Omvänd fiktiv utgående moms ${desc}`,
-    })
+  const isReverseCharge = (supplierType === 'eu_business' || supplierType === 'non_eu_business') && creditNote.reverse_charge
+
+  if (isReverseCharge) {
+    // Reverse the fiktiv moms per rate group (swap debit/credit from registration)
+    const vatByRate = groupVatByRate(items, creditNote.currency, creditNote.exchange_rate, true)
+    for (const [rate, amount] of vatByRate) {
+      if (rate > 0 && amount > 0) {
+        // Determine the output account for this rate
+        let outputAccount: string
+        switch (rate) {
+          case 0.12: outputAccount = '2624'; break
+          case 0.06: outputAccount = '2634'; break
+          default: outputAccount = '2614'; break
+        }
+        creditLines.push({
+          account_number: '2645',
+          debit_amount: 0,
+          credit_amount: amount,
+          line_description: `Omvänd fiktiv ingående moms ${Math.round(rate * 100)}% ${desc}`,
+        })
+        lines.push({
+          account_number: outputAccount,
+          debit_amount: amount,
+          credit_amount: 0,
+          line_description: `Omvänd fiktiv utgående moms ${Math.round(rate * 100)}% ${desc}`,
+        })
+      }
+    }
   } else {
-    const absVat = Math.abs(resolveSekAmount(creditNote.vat_amount, creditNote.vat_amount_sek, creditNote.currency, creditNote.exchange_rate))
-    if (absVat > 0) {
-      // Credit: Ingående moms (reverse)
-      creditLines.push({
-        account_number: '2641',
-        debit_amount: 0,
-        credit_amount: Math.round(absVat * 100) / 100,
-        line_description: `Ingående moms ${desc}`,
-      })
+    // Domestic: Credit ingående moms per rate group (reverse)
+    const vatByRate = groupVatByRate(items, creditNote.currency, creditNote.exchange_rate, true)
+    for (const [rate, amount] of vatByRate) {
+      if (amount > 0) {
+        creditLines.push({
+          account_number: '2641',
+          debit_amount: 0,
+          credit_amount: amount,
+          line_description: `Ingående moms ${Math.round(rate * 100)}% ${desc}`,
+        })
+      }
     }
   }
 
@@ -377,13 +414,22 @@ export async function createSupplierCreditNoteEntry(
 }
 
 /**
- * Get default VAT rate from treatment string
+ * Group items by VAT rate and sum the VAT amount per rate.
+ * Returns a Map<rate, totalVatAmount> for generating per-rate journal lines.
  */
-function getDefaultVatRate(vatTreatment: string): number {
-  switch (vatTreatment) {
-    case 'standard_25': return 0.25
-    case 'reduced_12': return 0.12
-    case 'reduced_6': return 0.06
-    default: return 0.25
+function groupVatByRate(
+  items: SupplierInvoiceItem[],
+  currency: string,
+  exchangeRate: number | null,
+  useAbsoluteValues = false
+): Map<number, number> {
+  const vatByRate = new Map<number, number>()
+  for (const item of items) {
+    const rate = item.vat_rate ?? 0.25
+    let itemSek = resolveSekAmount(item.line_total, null, currency, exchangeRate)
+    if (useAbsoluteValues) itemSek = Math.abs(itemSek)
+    const itemVat = Math.round(itemSek * rate * 100) / 100
+    vatByRate.set(rate, (vatByRate.get(rate) || 0) + itemVat)
   }
+  return vatByRate
 }

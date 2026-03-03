@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { eventBus } from '@/lib/events'
 import { createSupplierInvoiceRegistrationEntry } from '@/lib/bookkeeping/supplier-invoice-entries'
 import { ensureInitialized } from '@/lib/init'
 import { validateBody } from '@/lib/api/validate'
@@ -183,6 +184,15 @@ export async function POST(request: Request) {
     } catch (err) {
       console.error('Failed to create registration journal entry:', err)
     }
+  }
+
+  try {
+    await eventBus.emit({
+      type: 'supplier_invoice.registered',
+      payload: { supplierInvoice: invoice as SupplierInvoice, userId: user.id },
+    })
+  } catch {
+    // Non-blocking — event emission failure should not affect the response
   }
 
   return NextResponse.json({

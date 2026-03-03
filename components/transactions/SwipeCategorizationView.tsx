@@ -18,7 +18,7 @@ import type { UploadedFile } from '@/components/bookkeeping/DocumentUploadZone'
 import { X, ArrowLeft, ArrowRight, Building, AlertTriangle, Check, FileText, Link2, Receipt as ReceiptIcon, SkipForward, Paperclip, ChevronDown, ChevronUp, MessageSquareText } from 'lucide-react'
 import DescribeTransactionDialog from './DescribeTransactionDialog'
 import { formatAccountWithName } from '@/lib/bookkeeping/client-account-names'
-import type { TransactionCategory, VatTreatment, BASAccount } from '@/types'
+import type { TransactionCategory, VatTreatment, BASAccount, EntityType } from '@/types'
 import type { SuggestedCategory, SuggestedTemplate } from '@/lib/transactions/category-suggestions'
 import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
 import type { TransactionWithInvoice, CategorizeHandler, MatchInvoiceHandler } from './transaction-types'
@@ -31,6 +31,7 @@ interface SwipeCategorizationViewProps {
   onCategorize: CategorizeHandler
   onMatchInvoice?: MatchInvoiceHandler
   onClose: () => void
+  entityType?: EntityType
 }
 
 const expenseCategories = EXPENSE_CATEGORIES
@@ -43,6 +44,7 @@ export default function SwipeCategorizationView({
   onCategorize,
   onMatchInvoice,
   onClose,
+  entityType,
 }: SwipeCategorizationViewProps) {
   const { toast } = useToast()
   const [showAllCategories, setShowAllCategories] = useState(false)
@@ -337,7 +339,10 @@ export default function SwipeCategorizationView({
                 onClick={() => handleCategorySelect(cat.value)}
                 disabled={isProcessing}
               >
-                {cat.label}
+                <div className="flex items-baseline gap-2">
+                  <span>{cat.label}</span>
+                  {cat.account && <span className="text-xs text-muted-foreground">{cat.account}</span>}
+                </div>
               </Button>
             ))}
           </div>
@@ -408,6 +413,7 @@ export default function SwipeCategorizationView({
             category={pendingCategory}
             vatTreatment={isLiabilityAccount ? 'none' : vatTreatment}
             accountOverride={accountOverride}
+            entityType={entityType}
           />
 
           {/* Account override */}
@@ -444,7 +450,7 @@ export default function SwipeCategorizationView({
                     className="text-xs text-primary hover:underline"
                     onClick={() => setShowVatDropdown(true)}
                   >
-                    Andra
+                    Ändra
                   </button>
                 </p>
               )}

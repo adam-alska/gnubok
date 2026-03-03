@@ -73,6 +73,30 @@ function getExpenseAccount(category: string, entityType: EntityType = 'enskild_f
 }
 
 /**
+ * Get the income account for a category, resolving by VAT treatment.
+ * BAS mandates revenue account segregation by VAT rate:
+ * 3001=25%, 3002=12%, 3003=6%, 3305=Export, 3308=EU services, 3004=Exempt.
+ */
+function getIncomeAccount(category: string, vatTreatment?: VatTreatment): string {
+  // income_other always maps to 3900 regardless of VAT treatment
+  if (category === 'income_other') return '3900'
+
+  if (vatTreatment) {
+    switch (vatTreatment) {
+      case 'standard_25': return '3001'
+      case 'reduced_12': return '3002'
+      case 'reduced_6': return '3003'
+      case 'export': return '3305'
+      case 'reverse_charge': return '3308'
+      case 'exempt': return '3004'
+    }
+  }
+
+  // No vatTreatment provided — fall back to static mapping
+  return INCOME_ACCOUNTS[category] || '3900'
+}
+
+/**
  * Get account mapping for a transaction category
  *
  * For expenses: Debit expense account, Credit bank (or private for non-business)
@@ -86,8 +110,15 @@ export function getCategoryAccountMapping(
   vatTreatment?: VatTreatment
 ): CategoryAccountMapping {
   // Private/owner transactions use entity-specific accounts
+  // EF: 2013 for withdrawals (uttag), 2018 for deposits (insättningar)
+  // AB: 2893 for both directions
   if (!isBusiness) {
-    const privateAccount = PRIVATE_ACCOUNTS[entityType] || PRIVATE_ACCOUNTS.enskild_firma
+    let privateAccount: string
+    if (entityType === 'enskild_firma') {
+      privateAccount = amount < 0 ? '2013' : '2018'
+    } else {
+      privateAccount = PRIVATE_ACCOUNTS[entityType] || PRIVATE_ACCOUNTS.enskild_firma
+    }
     return {
       debitAccount: amount < 0 ? privateAccount : BANK_ACCOUNT,
       creditAccount: amount < 0 ? BANK_ACCOUNT : privateAccount,
@@ -101,8 +132,9 @@ export function getCategoryAccountMapping(
   if (category.startsWith('expense_')) {
     const expenseAccount = getExpenseAccount(category, entityType)
 
-    // Bank fees, card fees, and currency exchange are VAT-exempt in Sweden
-    const vatExemptCategories = ['expense_bank_fees', 'expense_card_fees', 'expense_currency_exchange']
+    // Bank fees, card fees, currency exchange, and representation are VAT-exempt in Sweden
+    // Representation has zero input VAT deduction since 2017-01-01 (ML 8:9)
+    const vatExemptCategories = ['expense_bank_fees', 'expense_card_fees', 'expense_currency_exchange', 'expense_representation']
     const isVatExempt = vatExemptCategories.includes(category)
 
     // Use provided vatTreatment, or default based on category
@@ -119,7 +151,7 @@ export function getCategoryAccountMapping(
 
   // Check if it's an income category
   if (category.startsWith('income_')) {
-    const incomeAccount = INCOME_ACCOUNTS[category] || '3900'
+    const incomeAccount = getIncomeAccount(category, vatTreatment)
 
     // Use provided vatTreatment, or default to standard_25
     const resolvedVat = vatTreatment ?? 'standard_25'
@@ -313,7 +345,8 @@ export function getDefaultVatTreatmentForCategory(
     return null
   }
 
-  const vatExemptCategories = ['expense_bank_fees', 'expense_card_fees', 'expense_currency_exchange']
+  // Representation has zero input VAT deduction since 2017-01-01 (ML 8:9)
+  const vatExemptCategories = ['expense_bank_fees', 'expense_card_fees', 'expense_currency_exchange', 'expense_representation']
   if (vatExemptCategories.includes(category)) {
     return null
   }

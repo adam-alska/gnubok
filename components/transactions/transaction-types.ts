@@ -32,31 +32,32 @@ export type MatchInvoiceHandler = (
 export interface CategoryOption {
   value: TransactionCategory
   label: string
+  account?: string
 }
 
 // Shared category arrays
 export const EXPENSE_CATEGORIES: CategoryOption[] = [
-  { value: 'expense_representation', label: 'Representation' },
-  { value: 'expense_equipment', label: 'Utrustning' },
-  { value: 'expense_software', label: 'Programvara' },
-  { value: 'expense_consumables', label: 'Material' },
-  { value: 'expense_travel', label: 'Resor' },
-  { value: 'expense_office', label: 'Kontor' },
-  { value: 'expense_vehicle', label: 'Bil & drivmedel' },
-  { value: 'expense_telecom', label: 'Telefon & internet' },
-  { value: 'expense_marketing', label: 'Marknadsföring' },
-  { value: 'expense_professional_services', label: 'Konsulter' },
-  { value: 'expense_education', label: 'Utbildning' },
-  { value: 'expense_bank_fees', label: 'Bankavgift' },
-  { value: 'expense_card_fees', label: 'Kortavgift' },
-  { value: 'expense_currency_exchange', label: 'Valutaväxling' },
-  { value: 'expense_other', label: 'Övrigt' },
+  { value: 'expense_representation', label: 'Representation', account: '6071' },
+  { value: 'expense_equipment', label: 'Utrustning', account: '5410' },
+  { value: 'expense_software', label: 'Programvara', account: '5420' },
+  { value: 'expense_consumables', label: 'Material', account: '5460' },
+  { value: 'expense_travel', label: 'Resor', account: '5800' },
+  { value: 'expense_office', label: 'Kontor', account: '6110' },
+  { value: 'expense_vehicle', label: 'Bil & drivmedel', account: '5611' },
+  { value: 'expense_telecom', label: 'Telefon & internet', account: '6200' },
+  { value: 'expense_marketing', label: 'Marknadsföring', account: '5910' },
+  { value: 'expense_professional_services', label: 'Konsulter', account: '6530' },
+  { value: 'expense_education', label: 'Utbildning', account: '6991' },
+  { value: 'expense_bank_fees', label: 'Bankavgift', account: '6570' },
+  { value: 'expense_card_fees', label: 'Kortavgift', account: '6570' },
+  { value: 'expense_currency_exchange', label: 'Valutaväxling', account: '7960' },
+  { value: 'expense_other', label: 'Övrigt', account: '6991' },
 ]
 
 export const INCOME_CATEGORIES: CategoryOption[] = [
-  { value: 'income_services', label: 'Tjänster' },
-  { value: 'income_products', label: 'Produkter' },
-  { value: 'income_other', label: 'Övrigt' },
+  { value: 'income_services', label: 'Tjänster', account: '3001' },
+  { value: 'income_products', label: 'Produkter', account: '3001' },
+  { value: 'income_other', label: 'Övrigt', account: '3900' },
 ]
 
 export interface VatTreatmentOption {

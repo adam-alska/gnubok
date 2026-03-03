@@ -15,7 +15,7 @@ import type { UploadedFile } from '@/components/bookkeeping/DocumentUploadZone'
 import VatTreatmentSelect from './VatTreatmentSelect'
 import { VAT_TREATMENT_OPTIONS } from './transaction-types'
 import type { TransactionWithInvoice } from './transaction-types'
-import type { TransactionCategory, VatTreatment, BASAccount } from '@/types'
+import type { TransactionCategory, VatTreatment, BASAccount, EntityType } from '@/types'
 
 interface QuickReviewDialogProps {
   open: boolean
@@ -25,6 +25,7 @@ interface QuickReviewDialogProps {
   categoryLabel: string
   defaultAccount: string
   defaultVat: VatTreatment | 'none'
+  entityType?: EntityType
   onConfirm: (
     id: string,
     category: TransactionCategory,
@@ -41,6 +42,7 @@ export default function QuickReviewDialog({
   categoryLabel,
   defaultAccount,
   defaultVat,
+  entityType,
   onConfirm,
 }: QuickReviewDialogProps) {
   const { toast } = useToast()
@@ -184,6 +186,7 @@ export default function QuickReviewDialog({
           category={category}
           vatTreatment={isLiabilityAccount ? 'none' : vatTreatment}
           accountOverride={accountOverride}
+          entityType={entityType}
         />
 
         {/* Account */}
@@ -220,7 +223,7 @@ export default function QuickReviewDialog({
                   className="text-xs text-primary hover:underline"
                   onClick={() => setShowVatDropdown(true)}
                 >
-                  Andra
+                  Ändra
                 </button>
               </p>
             )}

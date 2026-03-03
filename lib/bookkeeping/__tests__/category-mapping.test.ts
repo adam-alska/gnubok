@@ -7,7 +7,7 @@ import {
   buildMappingResultFromCategory,
 } from '../category-mapping'
 import { makeTransaction } from '@/tests/helpers'
-import type { TransactionCategory } from '@/types'
+import type { TransactionCategory, VatTreatment } from '@/types'
 
 describe('getCategoryAccountMapping', () => {
   describe('income_products uses correct account', () => {
@@ -182,6 +182,7 @@ describe('getDefaultVatTreatmentForCategory', () => {
     expect(getDefaultVatTreatmentForCategory('expense_bank_fees')).toBeNull()
     expect(getDefaultVatTreatmentForCategory('expense_card_fees')).toBeNull()
     expect(getDefaultVatTreatmentForCategory('expense_currency_exchange')).toBeNull()
+    expect(getDefaultVatTreatmentForCategory('expense_representation')).toBeNull()
   })
 
   it('returns null for private transactions', () => {
@@ -190,5 +191,82 @@ describe('getDefaultVatTreatmentForCategory', () => {
 
   it('returns null for uncategorized', () => {
     expect(getDefaultVatTreatmentForCategory('uncategorized')).toBeNull()
+  })
+})
+
+describe('representation VAT (ML 8:9 — illegal since 2017)', () => {
+  it('getDefaultVatTreatmentForCategory returns null for representation', () => {
+    expect(getDefaultVatTreatmentForCategory('expense_representation')).toBeNull()
+  })
+
+  it('getCategoryAccountMapping has vatTreatment: null for representation', () => {
+    const result = getCategoryAccountMapping('expense_representation', -500, true)
+    expect(result.vatTreatment).toBeNull()
+    expect(result.vatDebitAccount).toBeNull()
+  })
+
+  it('buildMappingResultFromCategory generates no VAT lines for representation', () => {
+    const tx = makeTransaction({ amount: -500 })
+    const result = buildMappingResultFromCategory('expense_representation', tx, true)
+    expect(result.vat_lines).toHaveLength(0)
+  })
+})
+
+describe('income account resolves by VAT treatment', () => {
+  const cases: [VatTreatment, string][] = [
+    ['standard_25', '3001'],
+    ['reduced_12', '3002'],
+    ['reduced_6', '3003'],
+    ['export', '3305'],
+    ['reverse_charge', '3308'],
+    ['exempt', '3004'],
+  ]
+
+  it.each(cases)('income_services with %s maps to %s', (vat, expectedAccount) => {
+    const result = getCategoryAccountMapping('income_services', 1000, true, 'enskild_firma', vat)
+    expect(result.creditAccount).toBe(expectedAccount)
+  })
+
+  it.each(cases)('income_products with %s maps to %s', (vat, expectedAccount) => {
+    const result = getCategoryAccountMapping('income_products', 1000, true, 'enskild_firma', vat)
+    expect(result.creditAccount).toBe(expectedAccount)
+  })
+
+  it('income_other always returns 3900 regardless of VAT treatment', () => {
+    for (const vat of ['standard_25', 'reduced_12', 'reduced_6', 'export', 'reverse_charge', 'exempt'] as VatTreatment[]) {
+      const result = getCategoryAccountMapping('income_other', 1000, true, 'enskild_firma', vat)
+      expect(result.creditAccount).toBe('3900')
+    }
+  })
+
+  it('defaults to 3001 when no vatTreatment provided', () => {
+    const result = getCategoryAccountMapping('income_services', 1000, true)
+    expect(result.creditAccount).toBe('3001')
+  })
+})
+
+describe('private transaction accounts by entity type and direction', () => {
+  it('EF withdrawal (amount < 0) uses 2013', () => {
+    const result = getCategoryAccountMapping('private', -500, false, 'enskild_firma')
+    expect(result.debitAccount).toBe('2013')
+    expect(result.creditAccount).toBe('1930')
+  })
+
+  it('EF deposit (amount > 0) uses 2018', () => {
+    const result = getCategoryAccountMapping('private', 500, false, 'enskild_firma')
+    expect(result.debitAccount).toBe('1930')
+    expect(result.creditAccount).toBe('2018')
+  })
+
+  it('AB uses 2893 for both withdrawal and deposit', () => {
+    const withdrawal = getCategoryAccountMapping('private', -500, false, 'aktiebolag')
+    expect(withdrawal.debitAccount).toBe('2893')
+
+    const deposit = getCategoryAccountMapping('private', 500, false, 'aktiebolag')
+    expect(deposit.creditAccount).toBe('2893')
+  })
+
+  it('getDefaultAccountForCategory still returns 2013 for EF (default/withdrawal account)', () => {
+    expect(getDefaultAccountForCategory('private', 'enskild_firma')).toBe('2013')
   })
 })

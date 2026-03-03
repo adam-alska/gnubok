@@ -1,7 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { eventBus } from '@/lib/events'
+import { ensureInitialized } from '@/lib/init'
 import { createSupplierCreditNoteEntry } from '@/lib/bookkeeping/supplier-invoice-entries'
 import type { SupplierInvoice, SupplierInvoiceItem, AccountingMethod } from '@/types'
+
+ensureInitialized()
 
 export async function POST(
   _request: Request,
@@ -132,6 +136,19 @@ export async function POST(
       remaining_amount: newRemaining,
     })
     .eq('id', id)
+
+  try {
+    await eventBus.emit({
+      type: 'supplier_invoice.credited',
+      payload: {
+        supplierInvoice: original as SupplierInvoice,
+        creditNote: creditNote as SupplierInvoice,
+        userId: user.id,
+      },
+    })
+  } catch {
+    // Non-blocking
+  }
 
   return NextResponse.json({
     data: creditNote,

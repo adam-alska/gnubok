@@ -1,5 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { eventBus } from '@/lib/events'
+import { ensureInitialized } from '@/lib/init'
+import type { SupplierInvoice } from '@/types'
+
+ensureInitialized()
 
 export async function POST(
   _request: Request,
@@ -16,7 +21,7 @@ export async function POST(
 
   const { data: invoice } = await supabase
     .from('supplier_invoices')
-    .select('status')
+    .select('*')
     .eq('id', id)
     .eq('user_id', user.id)
     .single()
@@ -42,6 +47,15 @@ export async function POST(
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  try {
+    await eventBus.emit({
+      type: 'supplier_invoice.approved',
+      payload: { supplierInvoice: data as SupplierInvoice, userId: user.id },
+    })
+  } catch {
+    // Non-blocking
   }
 
   return NextResponse.json({ data })

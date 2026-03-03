@@ -13,6 +13,10 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: () => Promise.resolve(mockSupabase),
 }))
 
+vi.mock('@/lib/init', () => ({
+  ensureInitialized: vi.fn(),
+}))
+
 const mockCreateSupplierInvoicePaymentEntry = vi.fn()
 const mockCreateSupplierInvoiceCashEntry = vi.fn()
 vi.mock('@/lib/bookkeeping/supplier-invoice-entries', () => ({
@@ -22,6 +26,8 @@ vi.mock('@/lib/bookkeeping/supplier-invoice-entries', () => ({
     mockCreateSupplierInvoiceCashEntry(...args),
 }))
 
+import { eventBus } from '@/lib/events'
+
 import { POST } from '../route'
 
 describe('POST /api/supplier-invoices/[id]/mark-paid', () => {
@@ -30,6 +36,7 @@ describe('POST /api/supplier-invoices/[id]/mark-paid', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     reset()
+    eventBus.clear()
     mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
   })
 
@@ -251,5 +258,44 @@ describe('POST /api/supplier-invoices/[id]/mark-paid', () => {
     expect(status).toBe(200)
     expect(body.success).toBe(true)
     expect(body.journal_entry_id).toBeNull()
+  })
+
+  it('emits supplier_invoice.paid event', async () => {
+    const supplier = makeSupplier()
+    const invoice = makeSupplierInvoice({
+      id: 'si-1',
+      status: 'approved',
+      total: 10000,
+      remaining_amount: 10000,
+      paid_amount: 0,
+      supplier,
+      items: [],
+    })
+
+    enqueue({ data: invoice, error: null })
+    enqueue({ data: { accounting_method: 'accrual' }, error: null })
+    mockCreateSupplierInvoicePaymentEntry.mockResolvedValue({ id: 'je-1' })
+    enqueue({ data: null, error: null })
+    enqueue({ data: null, error: null })
+
+    const emitSpy = vi.spyOn(eventBus, 'emit')
+
+    const request = createMockRequest('/api/supplier-invoices/si-1/mark-paid', {
+      method: 'POST',
+      body: {},
+    })
+    const response = await POST(request, createMockRouteParams({ id: 'si-1' }))
+    const { status } = await parseJsonResponse(response)
+
+    expect(status).toBe(200)
+    expect(emitSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'supplier_invoice.paid',
+        payload: expect.objectContaining({
+          userId: 'user-1',
+          paymentAmount: 10000,
+        }),
+      })
+    )
   })
 })

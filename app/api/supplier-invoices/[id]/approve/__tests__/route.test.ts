@@ -12,6 +12,12 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: () => Promise.resolve(mockSupabase),
 }))
 
+vi.mock('@/lib/init', () => ({
+  ensureInitialized: vi.fn(),
+}))
+
+import { eventBus } from '@/lib/events'
+
 import { POST } from '../route'
 
 describe('POST /api/supplier-invoices/[id]/approve', () => {
@@ -20,6 +26,7 @@ describe('POST /api/supplier-invoices/[id]/approve', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     reset()
+    eventBus.clear()
     mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
   })
 
@@ -46,7 +53,7 @@ describe('POST /api/supplier-invoices/[id]/approve', () => {
   })
 
   it('returns 400 when invoice is not in registered status', async () => {
-    enqueue({ data: { status: 'approved' }, error: null })
+    enqueue({ data: makeSupplierInvoice({ status: 'approved' }), error: null })
 
     const request = createMockRequest('/api/supplier-invoices/inv-1/approve', { method: 'POST' })
     const response = await POST(request, createMockRouteParams({ id: 'inv-1' }))
@@ -60,8 +67,8 @@ describe('POST /api/supplier-invoices/[id]/approve', () => {
     const invoice = makeSupplierInvoice({ id: 'inv-1', status: 'registered' })
     const approvedInvoice = { ...invoice, status: 'approved' }
 
-    // First call: fetch invoice status
-    enqueue({ data: { status: 'registered' }, error: null })
+    // First call: fetch full invoice
+    enqueue({ data: invoice, error: null })
     // Second call: update + select
     enqueue({ data: approvedInvoice, error: null })
 
@@ -71,5 +78,27 @@ describe('POST /api/supplier-invoices/[id]/approve', () => {
 
     expect(status).toBe(200)
     expect(body.data).toEqual(approvedInvoice)
+  })
+
+  it('emits supplier_invoice.approved event', async () => {
+    const invoice = makeSupplierInvoice({ id: 'inv-1', status: 'registered' })
+    const approvedInvoice = { ...invoice, status: 'approved' }
+
+    enqueue({ data: invoice, error: null })
+    enqueue({ data: approvedInvoice, error: null })
+
+    const emitSpy = vi.spyOn(eventBus, 'emit')
+
+    const request = createMockRequest('/api/supplier-invoices/inv-1/approve', { method: 'POST' })
+    const response = await POST(request, createMockRouteParams({ id: 'inv-1' }))
+    const { status } = await parseJsonResponse(response)
+
+    expect(status).toBe(200)
+    expect(emitSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'supplier_invoice.approved',
+        payload: expect.objectContaining({ userId: 'user-1' }),
+      })
+    )
   })
 })

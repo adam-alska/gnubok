@@ -27,6 +27,8 @@ vi.mock('@/lib/bookkeeping/supplier-invoice-entries', () => ({
     mockCreateSupplierInvoiceRegistrationEntry(...args),
 }))
 
+import { eventBus } from '@/lib/events'
+
 import { GET, POST } from '../route'
 
 describe('GET /api/supplier-invoices', () => {
@@ -107,6 +109,7 @@ describe('POST /api/supplier-invoices', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     reset()
+    eventBus.clear()
     mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
   })
 
@@ -190,6 +193,45 @@ describe('POST /api/supplier-invoices', () => {
     expect(body.data).toBeTruthy()
     expect(body.data.registration_journal_entry_id).toBe('je-1')
     expect(mockCreateSupplierInvoiceRegistrationEntry).toHaveBeenCalled()
+  })
+
+  it('emits supplier_invoice.registered event', async () => {
+    const supplier = makeSupplier({ id: VALID_UUID })
+    const createdInvoice = makeSupplierInvoice({ id: 'si-1' })
+
+    enqueue({ data: supplier, error: null })
+    enqueue({ data: 5 })
+    enqueue({ data: createdInvoice, error: null })
+    enqueue({ data: null, error: null })
+    enqueue({ data: { accounting_method: 'accrual' }, error: null })
+
+    mockCreateSupplierInvoiceRegistrationEntry.mockResolvedValue({ id: 'je-1' })
+    enqueue({ data: null, error: null })
+
+    const emitSpy = vi.spyOn(eventBus, 'emit')
+
+    const request = createMockRequest('/api/supplier-invoices', {
+      method: 'POST',
+      body: {
+        supplier_id: VALID_UUID,
+        supplier_invoice_number: 'LF-001',
+        invoice_date: '2024-06-01',
+        due_date: '2024-07-01',
+        items: [
+          { description: 'Material', quantity: 10, unit_price: 800, account_number: '4010', vat_rate: 0.25 },
+        ],
+      },
+    })
+    const response = await POST(request)
+    const { status } = await parseJsonResponse(response)
+
+    expect(status).toBe(200)
+    expect(emitSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'supplier_invoice.registered',
+        payload: expect.objectContaining({ userId: 'user-1' }),
+      })
+    )
   })
 
   it('skips registration entry for cash method', async () => {

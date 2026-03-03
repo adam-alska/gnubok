@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { eventBus } from '@/lib/events'
+import { ensureInitialized } from '@/lib/init'
 import {
   createSupplierInvoicePaymentEntry,
   createSupplierInvoiceCashEntry,
@@ -7,6 +9,8 @@ import {
 import { validateBody } from '@/lib/api/validate'
 import { MarkSupplierInvoicePaidSchema } from '@/lib/api/schemas'
 import type { SupplierInvoice, SupplierInvoiceItem } from '@/types'
+
+ensureInitialized()
 
 export async function POST(
   request: Request,
@@ -123,6 +127,15 @@ export async function POST(
 
   if (paymentError) {
     console.error('Failed to record payment:', paymentError)
+  }
+
+  try {
+    await eventBus.emit({
+      type: 'supplier_invoice.paid',
+      payload: { supplierInvoice: invoice as SupplierInvoice, paymentAmount, userId: user.id },
+    })
+  } catch {
+    // Non-blocking
   }
 
   return NextResponse.json({

@@ -567,6 +567,7 @@ export default function TransactionsPage() {
         onCategorize={handleCategorize}
         onMatchInvoice={handleMatchInvoice}
         onClose={() => setShowSwipeView(false)}
+        entityType={entityType as import('@/types').EntityType}
       />
     )
   }
@@ -692,6 +693,7 @@ export default function TransactionsPage() {
         categoryLabel={quickReviewLabel}
         defaultAccount={quickReviewCategory ? getDefaultAccountForCategory(quickReviewCategory) : ''}
         defaultVat={quickReviewCategory ? (getDefaultVatTreatmentForCategory(quickReviewCategory) ?? 'none') : 'none'}
+        entityType={entityType as import('@/types').EntityType}
         onConfirm={handleQuickReviewConfirm}
       />
 

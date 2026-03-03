@@ -5,7 +5,7 @@ import { formatCurrency } from '@/lib/utils'
 import { formatAccountWithName } from '@/lib/bookkeeping/client-account-names'
 import { getVatRate, extractVatAmount, extractNetAmount } from '@/lib/bookkeeping/vat-entries'
 import { getCategoryAccountMapping } from '@/lib/bookkeeping/category-mapping'
-import type { TransactionCategory, VatTreatment } from '@/types'
+import type { TransactionCategory, VatTreatment, EntityType } from '@/types'
 
 interface PreviewLine {
   side: 'debet' | 'kredit'
@@ -19,6 +19,7 @@ interface JournalEntryPreviewProps {
   category?: TransactionCategory
   vatTreatment?: VatTreatment | 'none'
   accountOverride?: string
+  entityType?: EntityType
   /** For template-based bookings — overrides category mapping */
   templateDebitAccount?: string
   templateCreditAccount?: string
@@ -31,6 +32,7 @@ export default function JournalEntryPreview({
   category,
   vatTreatment,
   accountOverride,
+  entityType = 'enskild_firma',
   templateDebitAccount,
   templateCreditAccount,
   templateVatRate,
@@ -57,7 +59,7 @@ export default function JournalEntryPreview({
     if (!category) return result
 
     const resolvedVat = vatTreatment === 'none' ? undefined : vatTreatment
-    const mapping = getCategoryAccountMapping(category, amount, category !== 'private', 'enskild_firma', resolvedVat)
+    const mapping = getCategoryAccountMapping(category, amount, category !== 'private', entityType, resolvedVat)
 
     const debitAccount = accountOverride && amount < 0 ? accountOverride : mapping.debitAccount
     const creditAccount = accountOverride && amount > 0 ? accountOverride : mapping.creditAccount
@@ -91,7 +93,7 @@ export default function JournalEntryPreview({
     }
 
     return result
-  }, [amount, category, vatTreatment, accountOverride, templateDebitAccount, templateCreditAccount, templateVatRate])
+  }, [amount, category, vatTreatment, accountOverride, entityType, templateDebitAccount, templateCreditAccount, templateVatRate])
 
   if (lines.length === 0) return null
 

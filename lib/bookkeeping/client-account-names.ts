@@ -11,6 +11,7 @@ const ACCOUNT_NAMES: Record<string, string> = {
 
   // Equity & Liabilities (2xxx)
   '2013': 'Ovriga egna uttag',
+  '2018': 'Egna insattningar',
   '2440': 'Leverantorsskulder',
   '2611': 'Utg. moms 25%',
   '2621': 'Utg. moms 12%',
@@ -24,6 +25,7 @@ const ACCOUNT_NAMES: Record<string, string> = {
   '3001': 'Forsaljning 25%',
   '3002': 'Forsaljning 12%',
   '3003': 'Forsaljning 6%',
+  '3004': 'Momsfri forsaljning',
   '3305': 'Exportforsaljning',
   '3308': 'EU-tjanster',
   '3900': 'Ovriga rorelseintakter',
