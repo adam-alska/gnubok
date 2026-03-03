@@ -29,6 +29,7 @@ import {
   Bell,
   AlertTriangle,
   MessageSquare,
+  Trash2,
 } from 'lucide-react'
 import type { Invoice, InvoiceItem, Customer, InvoiceStatus, InvoiceReminder, InvoiceDocumentType } from '@/types'
 
@@ -875,12 +876,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     )}
                     <Button
                       variant="outline"
-                      className="w-full"
+                      className="w-full text-destructive hover:text-destructive"
                       onClick={() => updateStatus('cancelled')}
                       disabled={isUpdating}
                     >
-                      <XCircle className="mr-2 h-4 w-4" />
-                      Makulera
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Ta bort utkast
                     </Button>
                   </>
                 )}

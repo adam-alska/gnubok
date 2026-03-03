@@ -42,6 +42,7 @@ interface NavItem {
   icon: typeof LayoutDashboard
   group: string
   modes?: EntityType[] // If set, only visible for these entity types. If not set, visible to all.
+  hidden?: boolean // Temporarily hide from sidebar
 }
 
 // All nav items for sidebar and mobile drawer
@@ -50,8 +51,9 @@ const navItems: NavItem[] = [
   { href: '/deadlines', label: 'Deadlines', icon: Calendar, group: 'main' },
   { href: '/invoices', label: 'Fakturor', icon: Receipt, group: 'finans' },
   { href: '/customers', label: 'Kunder', icon: Users, group: 'finans' },
-  { href: '/suppliers', label: 'Leverantörer', icon: Building2, group: 'finans' },
-  { href: '/supplier-invoices', label: 'Leverantörsfakturor', icon: FileInput, group: 'finans' },
+  // Temporarily hidden pending module rework (see feedback #49)
+  { href: '/suppliers', label: 'Leverantörer', icon: Building2, group: 'finans', hidden: true },
+  { href: '/supplier-invoices', label: 'Leverantörsfakturor', icon: FileInput, group: 'finans', hidden: true },
   { href: '/transactions', label: 'Transaktioner', icon: ArrowLeftRight, group: 'finans' },
   { href: '/bookkeeping', label: 'Bokföring', icon: BookOpen, group: 'finans' },
   { href: '/reports', label: 'Rapporter', icon: BarChart3, group: 'finans' },
@@ -131,9 +133,9 @@ export default function DashboardNav({ companyName, entityType, enabledExtension
 
   const closeMobileMenu = () => setIsMobileMenuOpen(false)
 
-  // Filter nav items by entity type
+  // Filter nav items by entity type and hidden flag
   const filteredItems = navItems.filter(item =>
-    !item.modes || item.modes.includes(entityType)
+    !item.hidden && (!item.modes || item.modes.includes(entityType))
   )
 
   const mainItems = filteredItems.filter(i => i.group === 'main')

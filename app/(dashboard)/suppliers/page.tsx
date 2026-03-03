@@ -69,9 +69,10 @@ export default function SuppliersPage() {
     const result = await response.json()
 
     if (!response.ok) {
+      const fieldErrors = result.errors?.map((e: { field: string; message: string }) => `${e.field}: ${e.message}`).join(', ')
       toast({
         title: 'Fel',
-        description: result.error || 'Kunde inte skapa leverantör',
+        description: fieldErrors || result.error || 'Kunde inte skapa leverantör',
         variant: 'destructive',
       })
     } else {

@@ -49,7 +49,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 const currencies: Currency[] = ['SEK', 'EUR', 'USD', 'GBP', 'NOK', 'DKK']
-const units = ['st', 'tim', 'dag', 'mån', 'km', 'kg']
+const units = ['st', 'tim', 'dag', 'månad', 'km', 'kg']
 
 export default function NewInvoicePage() {
   const router = useRouter()

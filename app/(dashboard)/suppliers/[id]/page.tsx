@@ -68,7 +68,8 @@ export default function SupplierDetailPage() {
     })
     const result = await res.json()
     if (!res.ok) {
-      toast({ title: 'Fel', description: result.error, variant: 'destructive' })
+      const fieldErrors = result.errors?.map((e: { field: string; message: string }) => `${e.field}: ${e.message}`).join(', ')
+      toast({ title: 'Fel', description: fieldErrors || result.error || 'Kunde inte uppdatera leverantör', variant: 'destructive' })
     } else {
       toast({ title: 'Sparat', description: 'Leverantören har uppdaterats' })
       setSupplier({ ...result.data, stats: supplier?.stats })

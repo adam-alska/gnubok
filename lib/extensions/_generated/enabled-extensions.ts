@@ -4,4 +4,5 @@ export const ENABLED_EXTENSION_IDS: ReadonlySet<string> = new Set([
   'enable-banking',
   'ai-categorization',
   'ai-chat',
+  'email',
 ])

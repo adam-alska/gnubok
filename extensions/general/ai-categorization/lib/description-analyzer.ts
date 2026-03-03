@@ -106,7 +106,8 @@ VANLIGA BAS-KONTON:
 Utgifter: 5010 Lokalhyra | 5410 Forbrukningsinventarier | 5420 Programvara | 5460 Forbrukningsvaror | 5611 Bil/drivmedel | 5800 Resekostnader | 5910 Annonsering | 6071 Representation mat | 6200 Telefon/internet | 6530 Redovisning/konsult | 6570 Bankavgifter | 6991 Ovriga kostnader | ${entityType === 'aktiebolag' ? '7610' : '6991'} Utbildning
 Intakter: 3001 Forsaljning 25% | 3002 Forsaljning 12% | 3003 Forsaljning 6% | 3305 Export | 3308 EU-tjanster | 3900 Ovriga intakter
 Moms: 2611 Utg moms 25% | 2621 Utg moms 12% | 2631 Utg moms 6% | 2641 Ing moms | 2645 Beraknad ing moms
-Ovrigt: 1510 Kundfordringar | 1930 Foretagskonto | 2440 Leverantorsskulder | ${privateAccount} Privat
+Skulder: 2350 Skulder till kreditinstitut (banklan, Almi) | 2440 Leverantorsskulder (ENBART for leverantorsfakturor)
+Ovrigt: 1510 Kundfordringar | 1930 Foretagskonto | 8410 Rantekostnader | ${privateAccount} Privat
 
 MOMSREGLER:
 - standard_25: Normala varor/tjanster (25%)

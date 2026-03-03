@@ -57,5 +57,20 @@ export const EXTENSION_DEFINITIONS: Record<string, ExtensionDefinition[]> = {
                 "event": "open-ai-chat"
           }
     },
+    {
+          "slug": "email",
+          "name": "E-post (Resend)",
+          "sector": "general",
+          "category": "operations",
+          "icon": "Mail",
+          "dataPattern": "core",
+          "description": "Skicka fakturor och påminnelser via e-post",
+          "longDescription": "Aktiverar e-postfunktioner: skicka fakturor till kunder, automatiska betalningspåminnelser (15/30/45 dagar), och e-postmeddelanden. Kräver ett Resend-konto med verifierad domän.",
+          "readsCoreTables": [
+                "invoices",
+                "customers",
+                "company_settings"
+          ]
+    },
   ],
 }

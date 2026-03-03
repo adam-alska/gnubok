@@ -110,6 +110,8 @@ function getCategoryAccountMap(entityType: EntityType): Record<string, { account
     expense_bank_fees: { account: '6570', label: 'Bankavgifter' },
     expense_card_fees: { account: '6570', label: 'Kortavgifter' },
     expense_currency_exchange: { account: '7960', label: 'Valutakursförluster' },
+    expense_interest: { account: '8410', label: 'Räntekostnader' },
+    financial_loan_repayment: { account: '2350', label: 'Amortering lån (kreditinstitut)' },
     expense_other: { account: '6991', label: 'Övriga kostnader' },
   }
 }
@@ -275,7 +277,8 @@ REGLER:
 6. taxCode: "MPI" för avdragsgilla affärskostnader med moms, "MP1" för intäkter med moms, null för momsfria
 7. templateId är OBLIGATORISKT — välj alltid den mest passande mallen från listan ovan, även för alternativa förslag
 8. isPrivate ska ALLTID vara false — användaren avgör själv vad som är privat
-9. Ange TVÅ förslag per transaktion: ett primärt (mest troligt) och ett alternativt (näst mest troligt, annan kategori, lägre confidence). Båda ska vara affärskategorier.`
+9. Ange TVÅ förslag per transaktion: ett primärt (mest troligt) och ett alternativt (näst mest troligt, annan kategori, lägre confidence). Båda ska vara affärskategorier.
+10. SKULDER: Konto 2440 (leverantörsskulder) ska BARA användas för leverantörsfakturor. Lån/amorteringar från banker eller kreditinstitut (Almi, Nordea, SEB, Handelsbanken, Swedbank, etc.) ska använda 2350 (skulder till kreditinstitut) via mallen financial_loan_repayment. Räntebetalningar ska använda 8410 (räntekostnader).`
 
     const historyContext =
       context.recentHistory.length > 0
