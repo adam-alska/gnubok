@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/gnubok/gnubok:latest
+    image: ghcr.io/erp-mafia/erp-base:latest
     env_file: .env
     ports:
       - "${PORT:-3000}:3000"
