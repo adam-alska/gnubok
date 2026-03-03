@@ -1,12 +1,20 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
+// During Docker builds, NEXT_PUBLIC_* vars are placeholder sentinels
+// replaced at runtime by docker-entrypoint.sh.
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const isBuildPlaceholder = url?.startsWith('__')
+const safeUrl = isBuildPlaceholder ? 'https://placeholder.supabase.co' : url
+const safeKey = isBuildPlaceholder ? 'placeholder' : key
+
 export async function createClient() {
   const cookieStore = await cookies()
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    safeUrl,
+    safeKey,
     {
       cookies: {
         getAll() {
@@ -32,7 +40,7 @@ export async function createServiceClient() {
   const cookieStore = await cookies()
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    safeUrl,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {
       cookies: {

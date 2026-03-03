@@ -18,7 +18,11 @@ const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY
 const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:support@erp-base.se'
 
-if (vapidPublicKey && vapidPrivateKey) {
+if (
+  vapidPublicKey &&
+  vapidPrivateKey &&
+  !vapidPublicKey.startsWith('__')
+) {
   webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey)
 }
 
