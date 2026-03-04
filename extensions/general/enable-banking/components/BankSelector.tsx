@@ -26,7 +26,7 @@ export function BankSelector({
   isLoading = false,
   className,
   country = 'SE',
-  sandbox = true, // Default to sandbox for development
+  sandbox = process.env.NEXT_PUBLIC_ENABLE_BANKING_SANDBOX === 'true',
 }: BankSelectorProps) {
   const widgetRef = useRef<HTMLElement | null>(null)
   const [scriptReady, setScriptReady] = useState(false)
