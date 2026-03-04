@@ -7,8 +7,9 @@
 
 import * as crypto from 'crypto'
 
-const APP_ID = process.env.ENABLE_BANKING_APP_ID
-const PRIVATE_KEY_BASE64 = process.env.ENABLE_BANKING_PRIVATE_KEY
+// Prefer _PRODUCTION variants when available (Vercel production deploys)
+const APP_ID = process.env.ENABLE_BANKING_APP_ID_PRODUCTION || process.env.ENABLE_BANKING_APP_ID
+const PRIVATE_KEY_RAW = process.env.ENABLE_BANKING_PRIVATE_KEY_PRODUCTION || process.env.ENABLE_BANKING_PRIVATE_KEY
 
 interface JWTHeader {
   typ: string
@@ -29,13 +30,19 @@ function base64UrlEncode(data: Buffer | string): string {
 }
 
 function getPrivateKey(): string {
-  if (!PRIVATE_KEY_BASE64) {
+  if (!PRIVATE_KEY_RAW) {
     throw new Error('ENABLE_BANKING_PRIVATE_KEY environment variable is not set')
   }
 
-  // Decode base64 to get PEM format private key
-  const privateKeyPem = Buffer.from(PRIVATE_KEY_BASE64, 'base64').toString('utf-8')
-  return privateKeyPem
+  // Try decoding as base64-encoded PEM (sandbox format: base64 wrapping a PEM string)
+  const decoded = Buffer.from(PRIVATE_KEY_RAW, 'base64').toString('utf-8')
+  if (decoded.startsWith('-----BEGIN')) {
+    return decoded
+  }
+
+  // Otherwise treat as raw base64 DER key material — wrap in PEM headers
+  const lines = PRIVATE_KEY_RAW.match(/.{1,64}/g) || []
+  return `-----BEGIN PRIVATE KEY-----\n${lines.join('\n')}\n-----END PRIVATE KEY-----`
 }
 
 /**

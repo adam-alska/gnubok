@@ -14,7 +14,11 @@
 
 import { getAuthorizationHeader } from './jwt'
 
-const ENABLE_BANKING_API_URL = 'https://api.enablebanking.com'
+// Prefer _PRODUCTION variant; sandbox uses api.tilisy.com, production uses api.enablebanking.com
+const ENABLE_BANKING_API_URL =
+  process.env.ENABLE_BANKING_API_URL_PRODUCTION ||
+  process.env.ENABLE_BANKING_API_URL ||
+  'https://api.enablebanking.com'
 
 // Types
 
