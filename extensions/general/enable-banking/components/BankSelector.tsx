@@ -1,10 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { Loader2, Search, RefreshCw } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import Script from 'next/script'
 
 export interface Bank {
   name: string
@@ -20,14 +19,18 @@ interface BankSelectorProps {
   className?: string
 }
 
-const POPULAR_BANK_NAMES = [
-  'Nordea',
-  'SEB',
-  'Swedbank',
-  'Handelsbanken',
-  'Länsförsäkringar',
-  'Skandia',
-  'Danske Bank',
+/**
+ * Popular Swedish banks shown as quick-access buttons above the full widget.
+ * Country is always 'SE' since we only support Swedish banks.
+ */
+const POPULAR_BANKS: Bank[] = [
+  { name: 'Nordea', country: 'SE' },
+  { name: 'SEB', country: 'SE' },
+  { name: 'Swedbank', country: 'SE' },
+  { name: 'Handelsbanken', country: 'SE' },
+  { name: 'Länsförsäkringar', country: 'SE' },
+  { name: 'Skandia', country: 'SE' },
+  { name: 'Danske Bank', country: 'SE' },
 ]
 
 export function BankSelector({
@@ -36,95 +39,47 @@ export function BankSelector({
   connectingBankName = null,
   className,
 }: BankSelectorProps) {
-  const [banks, setBanks] = useState<Bank[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
+  const widgetRef = useRef<HTMLElement | null>(null)
+  const [scriptReady, setScriptReady] = useState(false)
 
-  const fetchBanks = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/extensions/ext/enable-banking/banks')
-      if (!res.ok) throw new Error('Kunde inte hämta banklistan')
-      const data = await res.json()
-      setBanks(data.banks || [])
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Något gick fel')
-    } finally {
-      setLoading(false)
+  // Stable ref so the event listener never goes stale
+  const onConnectRef = useRef(onConnect)
+  useEffect(() => {
+    onConnectRef.current = onConnect
+  }, [onConnect])
+
+  const handleSelected = useCallback((e: Event) => {
+    const detail = (e as CustomEvent).detail as {
+      name: string
+      country: string
+      psuType: string
+      sandbox: boolean
     }
+    onConnectRef.current({
+      name: detail.name,
+      country: detail.country,
+    })
   }, [])
 
+  // Attach event listener once the script is ready and the widget is in the DOM
   useEffect(() => {
-    fetchBanks()
-  }, [fetchBanks])
+    if (!scriptReady) return
+    const widget = widgetRef.current
+    if (!widget) return
 
-  const popularBanks = useMemo(
-    () =>
-      POPULAR_BANK_NAMES.map((name) =>
-        banks.find((b) => b.name === name)
-      ).filter((b): b is Bank => b !== undefined),
-    [banks]
-  )
-
-  const filteredBanks = useMemo(() => {
-    if (!searchQuery.trim()) {
-      // Show all banks except popular ones
-      const popularSet = new Set(POPULAR_BANK_NAMES)
-      return banks
-        .filter((b) => !popularSet.has(b.name))
-        .sort((a, b) => a.name.localeCompare(b.name, 'sv'))
+    widget.addEventListener('selected', handleSelected)
+    return () => {
+      widget.removeEventListener('selected', handleSelected)
     }
-    const q = searchQuery.toLowerCase()
-    return banks
-      .filter((b) => b.name.toLowerCase().includes(q))
-      .sort((a, b) => a.name.localeCompare(b.name, 'sv'))
-  }, [banks, searchQuery])
-
-  if (loading) {
-    return (
-      <div className={cn('space-y-3', className)}>
-        {/* Popular banks skeleton */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-          {Array.from({ length: 7 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-11 rounded-lg bg-muted animate-pulse"
-            />
-          ))}
-        </div>
-        <div className="h-9 rounded-md bg-muted animate-pulse" />
-        <div className="space-y-1.5">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-10 rounded-lg bg-muted animate-pulse"
-            />
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className={cn('flex flex-col items-center gap-3 py-8', className)}>
-        <p className="text-sm text-muted-foreground">{error}</p>
-        <Button variant="outline" size="sm" onClick={fetchBanks}>
-          <RefreshCw className="mr-2 h-3.5 w-3.5" />
-          Försök igen
-        </Button>
-      </div>
-    )
-  }
+  }, [scriptReady, handleSelected])
 
   return (
-    <div className={cn('space-y-3', className)}>
-      {/* Popular banks grid */}
-      {popularBanks.length > 0 && !searchQuery.trim() && (
+    <div className={cn('space-y-4', className)}>
+      {/* Popular banks — one-click connect */}
+      <div>
+        <p className="text-xs font-medium text-muted-foreground mb-2">Populära banker</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-          {popularBanks.map((bank) => {
+          {POPULAR_BANKS.map((bank) => {
             const connecting = isConnecting && connectingBankName === bank.name
             return (
               <button
@@ -139,72 +94,58 @@ export function BankSelector({
                   isConnecting && !connecting && 'opacity-50 cursor-not-allowed'
                 )}
               >
-                {connecting ? (
+                {connecting && (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : bank.logo ? (
-                  <img
-                    src={bank.logo}
-                    alt=""
-                    className="h-4 w-4 object-contain"
-                  />
-                ) : null}
+                )}
                 <span className="truncate">{bank.name}</span>
               </button>
             )
           })}
         </div>
-      )}
-
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Sök bland alla banker..."
-          className="pl-9 h-9"
-        />
       </div>
 
-      {/* Bank list */}
-      <div className="max-h-[280px] overflow-auto space-y-1 rounded-lg border p-1">
-        {filteredBanks.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-6">
-            {searchQuery.trim() ? 'Inga banker matchar sökningen' : 'Inga banker tillgängliga'}
-          </p>
+      {/* Full bank list via Enable Banking widget — includes logos and search */}
+      <div>
+        <p className="text-xs font-medium text-muted-foreground mb-2">Alla banker</p>
+        <Script
+          src="https://tilisy.enablebanking.com/lib/widgets.umd.min.js"
+          onReady={() => setScriptReady(true)}
+          strategy="afterInteractive"
+        />
+        <link
+          href="https://tilisy.enablebanking.com/lib/widgets.css"
+          rel="stylesheet"
+        />
+
+        {scriptReady ? (
+          <div className={cn(
+            'rounded-lg border overflow-hidden',
+            isConnecting && 'pointer-events-none opacity-50'
+          )}>
+            {/* @ts-expect-error - Enable Banking custom element */}
+            <enablebanking-aspsp-list
+              ref={widgetRef}
+              country="SE"
+              psu-type="business"
+              service="AIS"
+              style={{ minHeight: '200px' }}
+            />
+          </div>
         ) : (
-          filteredBanks.map((bank) => {
-            const connecting = isConnecting && connectingBankName === bank.name
-            return (
-              <button
-                key={bank.name}
-                type="button"
-                disabled={isConnecting}
-                onClick={() => onConnect(bank)}
-                className={cn(
-                  'flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors text-left',
-                  'hover:bg-muted/50',
-                  connecting && 'bg-primary/5',
-                  isConnecting && !connecting && 'opacity-50 cursor-not-allowed'
-                )}
-              >
-                {connecting ? (
-                  <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
-                ) : bank.logo ? (
-                  <img
-                    src={bank.logo}
-                    alt=""
-                    className="h-4 w-4 object-contain flex-shrink-0"
-                  />
-                ) : (
-                  <div className="h-4 w-4 flex-shrink-0" />
-                )}
-                <span>{bank.name}</span>
-              </button>
-            )
-          })
+          <div className="flex items-center justify-center rounded-lg border" style={{ minHeight: '200px' }}>
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <span className="ml-2 text-sm text-muted-foreground">Laddar banker...</span>
+          </div>
         )}
       </div>
+
+      {/* Connecting overlay */}
+      {isConnecting && connectingBankName && (
+        <div className="flex items-center justify-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          <span className="text-sm font-medium">Ansluter till {connectingBankName}...</span>
+        </div>
+      )}
     </div>
   )
 }
