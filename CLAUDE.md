@@ -251,7 +251,7 @@ Path params extracted as `_paramName` search params (e.g., `/:id` → `searchPar
 ## Database & Migrations
 
 **Location**: `supabase/migrations/` — 45 files, numbered `20240101000001`–`20240101000045`.
-**Next migration**: `20240101000049_*.sql`
+**Next migration**: `20240101000052_*.sql`
 
 ### Placeholder Migrations
 
@@ -288,6 +288,7 @@ Some migrations are no-op placeholders to preserve the numbering sequence:
 - **Migration 043 (`enforce_fiscal_period_month_boundaries`)** — Ensures fiscal periods start/end on month boundaries.
 - **Migration 044 (`full_bas_2026`)** — Full BAS 2026 account catalog, K2-excluded flag, and SRU code backfill.
 - **Migration 045 (`expand_account_type_untaxed_reserves`)** — Adds `untaxed_reserves` to `chart_of_accounts.account_type` CHECK constraint for BAS 21xx accounts (obeskattade reserver).
+- **Migration 051 (`set_search_path_on_functions`)** — Pins `search_path = public` on all 24 custom functions to prevent search_path injection.
 
 ---
 

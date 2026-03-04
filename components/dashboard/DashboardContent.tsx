@@ -261,24 +261,6 @@ export default function DashboardContent({ firstName, settings, summary, onboard
             return 'God kväll'
           })()}{firstName ? `, ${firstName}` : ''}
         </h1>
-        <p className="text-muted-foreground mt-1">
-          {(() => {
-            if (summary.overdueInvoicesCount > 0)
-              return `${summary.overdueInvoicesCount} förfallna fakturor kräver åtgärd`
-            const passedDeadlines = summary.deadlines.filter(d => !d.is_completed && new Date(d.due_date) <= new Date()).length
-            if (passedDeadlines > 0)
-              return `${passedDeadlines} passerade deadlines`
-            if (summary.uncategorizedCount > 0)
-              return `${summary.uncategorizedCount} obokförda transaktioner`
-            if (summary.receiptQueue && summary.receiptQueue.pending_review_count > 0)
-              return `${summary.receiptQueue.pending_review_count} kvitton att granska`
-            if (summary.missingUnderlagCount > 0)
-              return `${summary.missingUnderlagCount} verifikationer saknar underlag`
-            if (summary.unpaidInvoicesCount > 0)
-              return `${summary.unpaidInvoicesCount} obetalda fakturor`
-            return 'Allt är som det ska'
-          })()}
-        </p>
       </header>
 
       {/* New user checklist */}
