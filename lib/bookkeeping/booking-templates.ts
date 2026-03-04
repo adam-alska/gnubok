@@ -57,6 +57,8 @@ export interface BookingTemplate {
   default_private: boolean
   fallback_category: TransactionCategory
   description_sv: string
+  common: boolean
+  requires_vat_registration_data?: boolean
 }
 
 export interface TemplateGroupInfo {
@@ -96,7 +98,7 @@ const GROUP_LABELS: Record<TemplateGroup, { sv: string; en: string }> = {
 }
 
 // ============================================================
-// Template Data (48 templates)
+// Template Data
 // ============================================================
 
 export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
@@ -123,6 +125,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_office',
     description_sv: 'Månadshyra för kontors- eller affärslokal',
+    common: true,
   },
   {
     id: 'premises_rent_vat',
@@ -146,6 +149,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_office',
     description_sv: 'Lokalhyra med moms (frivilligt momsregistrerad hyresvärd)',
+    common: false,
   },
   {
     id: 'premises_electricity',
@@ -168,6 +172,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_office',
     description_sv: 'El, uppvärmning och vatten för kontors- eller affärslokal',
+    common: true,
   },
 
   // --- VEHICLE (4) ---
@@ -193,6 +198,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_travel',
     description_sv: 'Drivmedel (bensin/diesel) eller laddning (elbil) för tjänstefordon',
+    common: true,
   },
   {
     id: 'vehicle_leasing',
@@ -217,6 +223,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_travel',
     description_sv: 'Leasingavgift för tjänstefordon',
+    common: false,
   },
   {
     id: 'vehicle_repairs',
@@ -239,6 +246,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_travel',
     description_sv: 'Reparation, service och underhåll av fordon',
+    common: false,
   },
   {
     id: 'vehicle_parking',
@@ -261,6 +269,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_travel',
     description_sv: 'Parkeringsavgift och trängselskatt vid tjänsteärende',
+    common: false,
   },
 
   // --- IT & SOFTWARE (3) ---
@@ -285,6 +294,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_software',
     description_sv: 'Programvarulicens eller SaaS-prenumeration (svensk leverantör med moms)',
+    common: false,
   },
   {
     id: 'it_saas_eu',
@@ -308,6 +318,8 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_software',
     description_sv: 'Programvara från utländsk leverantör med omvänd skattskyldighet',
+    common: true,
+    requires_vat_registration_data: true,
   },
   {
     id: 'it_cloud_hosting',
@@ -331,6 +343,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_software',
     description_sv: 'Molnbaserade tjänster, webbhotell, serverhosting och domännamn',
+    common: true,
   },
 
   // --- OFFICE SUPPLIES (2) ---
@@ -355,6 +368,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_office',
     description_sv: 'Kontorsmaterial, trycksaker och förbrukningsvaror',
+    common: true,
   },
   {
     id: 'office_postage',
@@ -378,13 +392,14 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_office',
     description_sv: 'Porto och fraktkostnader',
+    common: true,
   },
 
-  // --- MARKETING (2) ---
+  // --- MARKETING (3) ---
   {
-    id: 'marketing_online_ads',
-    name_sv: 'Annonsering & Marknadsföring',
-    name_en: 'Advertising & Marketing',
+    id: 'marketing_online_ads_eu',
+    name_sv: 'Annonsering EU (omvänd moms)',
+    name_en: 'Online ads EU (reverse charge)',
     group: 'marketing',
     direction: 'expense',
     entity_applicability: 'all',
@@ -402,7 +417,33 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     auto_match_confidence: 0.90,
     default_private: false,
     fallback_category: 'expense_marketing',
-    description_sv: 'Digital annonsering och marknadsföring',
+    description_sv: 'Digital annonsering från EU-leverantör (Google/Meta från Irland)',
+    common: true,
+    requires_vat_registration_data: true,
+  },
+  {
+    id: 'marketing_online_ads_domestic',
+    name_sv: 'Annonsering (svensk moms)',
+    name_en: 'Online ads (domestic VAT)',
+    group: 'marketing',
+    direction: 'expense',
+    entity_applicability: 'all',
+    debit_account: '5910',
+    credit_account: '1930',
+    vat_treatment: 'standard_25',
+    vat_rate: 0.25,
+    deductibility: 'full',
+    special_rules_sv: 'Svensk leverantör med momsregistrering',
+    mcc_codes: [7311],
+    keywords: ['annons', 'reklam', 'advertising', 'kampanj', 'blocket', 'eniro'],
+    risk_level: 'NONE',
+    requires_review: false,
+    impact_score: 7,
+    auto_match_confidence: 0.80,
+    default_private: false,
+    fallback_category: 'expense_marketing',
+    description_sv: 'Digital annonsering från svensk leverantör med 25% moms',
+    common: false,
   },
   {
     id: 'marketing_design',
@@ -425,6 +466,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_marketing',
     description_sv: 'Grafisk design, reklam, foto/video och marknadsföringsverktyg',
+    common: false,
   },
 
   // --- TRAVEL (3) ---
@@ -450,6 +492,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_travel',
     description_sv: 'Resor i tjänsten: flyg, tåg, taxi, hyrbil (6% moms)',
+    common: true,
   },
   {
     id: 'travel_international',
@@ -473,6 +516,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_travel',
     description_sv: 'Utrikesresor i tjänsten (momsfritt)',
+    common: false,
   },
   {
     id: 'travel_hotel',
@@ -496,9 +540,10 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_travel',
     description_sv: 'Hotellövernattning i tjänsten (12% moms)',
+    common: true,
   },
 
-  // --- REPRESENTATION (2) ---
+  // --- REPRESENTATION (3) ---
   {
     id: 'representation_external',
     name_sv: 'Extern representation',
@@ -511,7 +556,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     vat_treatment: 'reduced_12',
     vat_rate: 0.12,
     deductibility: 'conditional',
-    deductibility_note_sv: 'Max 300 kr/person exkl moms (IL 16 kap 2§)',
+    deductibility_note_sv: 'Avdragsgill moms max 46 kr/person. Representationskostnad max 300 kr/person exkl moms (IL 16 kap 2§)',
     special_rules_sv: 'Dokumentera: syfte, deltagare, företag. Momsavdrag max 300 kr/person.',
     mcc_codes: [5812, 5813, 5814],
     keywords: ['representation', 'lunch', 'middag', 'restaurang', 'restaurant', 'kund', 'kundmöte', 'gåva', 'present', 'representationsgåva'],
@@ -522,6 +567,32 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_other',
     description_sv: 'Representation med kund/affärspartner (dokumentera noggrant)',
+    common: true,
+  },
+  {
+    id: 'representation_internal',
+    name_sv: 'Intern representation',
+    name_en: 'Internal representation',
+    group: 'representation',
+    direction: 'expense',
+    entity_applicability: 'all',
+    debit_account: '7622',
+    credit_account: '1930',
+    vat_treatment: null,
+    vat_rate: 0,
+    deductibility: 'conditional',
+    deductibility_note_sv: 'Max 60 kr/person',
+    special_rules_sv: 'Personalfest, intern lunch etc. Momsfritt. Max 60 kr/person för avdragsrätt.',
+    mcc_codes: [5812, 5813, 5814],
+    keywords: ['personalfest', 'intern representation', 'teamlunch', 'personallunch', 'fika', 'julfest', 'after work', 'intern lunch'],
+    risk_level: 'LOW',
+    requires_review: false,
+    impact_score: 5,
+    auto_match_confidence: 0.70,
+    default_private: false,
+    fallback_category: 'expense_representation',
+    description_sv: 'Intern representation (personalfest, teamlunch)',
+    common: true,
   },
   {
     id: 'representation_conference',
@@ -544,6 +615,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_education',
     description_sv: 'Avgifter för konferenser och mässor',
+    common: false,
   },
 
   // --- INSURANCE (3) ---
@@ -569,6 +641,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_other',
     description_sv: 'Företags-, ansvars- och fordonsförsäkring (momsfritt)',
+    common: true,
   },
   {
     id: 'insurance_pension_ef',
@@ -593,6 +666,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_other',
     description_sv: 'Pensionssparande för enskild firma (granska avdragsregel)',
+    common: false,
   },
   {
     id: 'insurance_pension_ab',
@@ -616,6 +690,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_other',
     description_sv: 'Tjänstepension för anställda i aktiebolag',
+    common: false,
   },
 
   // --- PROFESSIONAL SERVICES (2) ---
@@ -640,6 +715,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_professional_services',
     description_sv: 'Redovisning, bokföring, revision och juridiska tjänster',
+    common: true,
   },
   {
     id: 'prof_consulting',
@@ -662,6 +738,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_professional_services',
     description_sv: 'Konsultarvoden och rådgivningstjänster',
+    common: true,
   },
 
   // --- BANK & FINANCE (5) ---
@@ -687,6 +764,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_bank_fees',
     description_sv: 'Bankavgifter, kontoavgifter och kortavgifter',
+    common: true,
   },
   {
     id: 'bank_interest_income',
@@ -709,6 +787,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'income_other',
     description_sv: 'Ränteintäkter på bankkonto eller placeringar',
+    common: false,
   },
   {
     id: 'bank_interest_expense',
@@ -731,6 +810,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_other',
     description_sv: 'Räntekostnad på lån eller kredit',
+    common: false,
   },
   {
     id: 'bank_currency_loss',
@@ -753,6 +833,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_currency_exchange',
     description_sv: 'Valutakursförluster vid betalning i utländsk valuta',
+    common: false,
   },
   {
     id: 'bank_currency_gain',
@@ -775,6 +856,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'income_other',
     description_sv: 'Valutakursvinster vid betalning i utländsk valuta',
+    common: false,
   },
 
   // --- TELECOM (2) ---
@@ -800,6 +882,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_other',
     description_sv: 'Telefon och mobilabonnemang (granska yrkesmässig andel)',
+    common: true,
   },
   {
     id: 'telecom_internet',
@@ -822,6 +905,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_other',
     description_sv: 'Internetanslutning för kontor',
+    common: false,
   },
 
   // --- EDUCATION (2) ---
@@ -848,6 +932,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_education',
     description_sv: 'Yrkesrelaterade kurser och utbildningar',
+    common: false,
   },
   {
     id: 'education_membership',
@@ -871,6 +956,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_education',
     description_sv: 'Medlemsavgift i branschorganisation eller yrkesförening',
+    common: false,
   },
 
   // --- PERSONNEL (3) ---
@@ -886,6 +972,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     vat_treatment: null,
     vat_rate: 0,
     deductibility: 'full',
+    special_rules_sv: 'OBS: Denna mall bokför nettolön. Personalskatt (2710) och arbetsgivaravgifter (2731) måste bokföras separat.',
     mcc_codes: [],
     keywords: ['lön', 'salary', 'nettolön', 'löneutbetalning'],
     risk_level: 'NONE',
@@ -895,6 +982,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_other',
     description_sv: 'Nettolön till anställd',
+    common: true,
   },
   {
     id: 'personnel_employer_tax',
@@ -903,11 +991,12 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     group: 'personnel',
     direction: 'expense',
     entity_applicability: 'aktiebolag',
-    debit_account: '7510',
+    debit_account: '2731',
     credit_account: '1930',
     vat_treatment: null,
     vat_rate: 0,
     deductibility: 'full',
+    special_rules_sv: 'Betalning av arbetsgivaravgift-skuld. Kostnad (D: 7510 / K: 2731) bokförs vid lönekörning.',
     mcc_codes: [],
     keywords: ['arbetsgivaravgift', 'sociala avgifter', 'employer tax', 'skattekonto'],
     risk_level: 'NONE',
@@ -916,7 +1005,8 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     auto_match_confidence: 0.75,
     default_private: false,
     fallback_category: 'expense_other',
-    description_sv: 'Arbetsgivaravgifter (31.42%)',
+    description_sv: 'Betalning av arbetsgivaravgifter',
+    common: true,
   },
   {
     id: 'personnel_preliminary_tax',
@@ -939,6 +1029,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_other',
     description_sv: 'Preliminärskatt till Skatteverket',
+    common: false,
   },
 
   // --- REVENUE (4) ---
@@ -963,6 +1054,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'income_services',
     description_sv: 'Intäkter från tjänste- eller varuförsäljning med 25% moms',
+    common: true,
   },
   {
     id: 'revenue_reduced_12',
@@ -985,6 +1077,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'income_products',
     description_sv: 'Intäkter från livsmedelsförsäljning eller logi med 12% moms',
+    common: true,
   },
   {
     id: 'revenue_eu_services',
@@ -1008,6 +1101,8 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'income_services',
     description_sv: 'Tjänsteförsäljning till EU-företag (momsfritt, ruta 39)',
+    common: true,
+    requires_vat_registration_data: true,
   },
   {
     id: 'revenue_export',
@@ -1031,6 +1126,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'income_services',
     description_sv: 'Export av varor/tjänster utanför EU (momsfritt, ruta 40)',
+    common: true,
   },
 
   // --- FINANCIAL (2) ---
@@ -1055,6 +1151,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_other',
     description_sv: 'Amortering av banklån',
+    common: false,
   },
   {
     id: 'financial_tax_account',
@@ -1077,9 +1174,10 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_other',
     description_sv: 'Insättning på skattekonto hos Skatteverket',
+    common: true,
   },
 
-  // --- PRIVATE TRANSFERS (4) ---
+  // --- PRIVATE TRANSFERS (5) ---
   {
     id: 'private_withdrawal_ef',
     name_sv: 'Eget uttag (EF)',
@@ -1101,6 +1199,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: true,
     fallback_category: 'private',
     description_sv: 'Privat uttag från företagskonto (enskild firma)',
+    common: true,
   },
   {
     id: 'private_deposit_ef',
@@ -1123,28 +1222,53 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: true,
     fallback_category: 'private',
     description_sv: 'Egen insättning till företagskonto (enskild firma)',
+    common: true,
   },
   {
-    id: 'private_shareholder_loan',
-    name_sv: 'Skuld till aktieägare (AB)',
-    name_en: 'Shareholder loan (AB)',
+    id: 'shareholder_loan_received',
+    name_sv: 'Lån från ägare (AB)',
+    name_en: 'Shareholder loan received (AB)',
     group: 'private_transfers',
     direction: 'transfer',
     entity_applicability: 'aktiebolag',
-    debit_account: '2893',
+    debit_account: '1930',
+    credit_account: '2393',
+    vat_treatment: null,
+    vat_rate: 0,
+    deductibility: 'non_deductible',
+    mcc_codes: [],
+    keywords: ['aktieägare', 'lån', 'shareholder', 'skuld till ägare', 'insättning', 'tillskott'],
+    risk_level: 'LOW',
+    requires_review: true,
+    impact_score: 6,
+    auto_match_confidence: 0.75,
+    default_private: false,
+    fallback_category: 'income_other',
+    description_sv: 'Ägare lånar pengar till bolaget (skuld till ägare)',
+    common: true,
+  },
+  {
+    id: 'shareholder_loan_disbursed',
+    name_sv: 'Fordran på ägare (AB)',
+    name_en: 'Shareholder loan disbursed (AB)',
+    group: 'private_transfers',
+    direction: 'transfer',
+    entity_applicability: 'aktiebolag',
+    debit_account: '1680',
     credit_account: '1930',
     vat_treatment: null,
     vat_rate: 0,
     deductibility: 'non_deductible',
     mcc_codes: [],
-    keywords: ['aktieägare', 'lån', 'shareholder', 'skuld till ägare'],
-    risk_level: 'LOW',
+    keywords: ['aktieägare', 'lån till ägare', 'shareholder loan', 'fordran ägare'],
+    risk_level: 'HIGH',
     requires_review: true,
     impact_score: 6,
-    auto_match_confidence: 0.75,
+    auto_match_confidence: 0.70,
     default_private: true,
     fallback_category: 'private',
-    description_sv: 'Utbetalning bokförd som skuld till aktieägare',
+    description_sv: 'Bolaget betalar ut till ägare (fordran på ägare)',
+    common: false,
   },
   {
     id: 'private_expense',
@@ -1168,6 +1292,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: true,
     fallback_category: 'private',
     description_sv: 'Privat kostnad betald från företagskonto',
+    common: false,
   },
 
   // --- EQUIPMENT (2) ---
@@ -1193,6 +1318,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_equipment',
     description_sv: 'Inventarier under halva prisbasbeloppet (IT-utrustning, möbler, verktyg)',
+    common: true,
   },
   {
     id: 'equipment_capital',
@@ -1216,6 +1342,7 @@ export const BOOKING_TEMPLATES: readonly BookingTemplate[] = [
     default_private: false,
     fallback_category: 'expense_equipment',
     description_sv: 'Inventarie som ska aktiveras och skrivas av',
+    common: false,
   },
 ]
 
@@ -1299,6 +1426,51 @@ export function searchTemplates(query: string, entityType?: EntityType): Booking
       t.id.includes(token)
     )
   })
+}
+
+/**
+ * Get common templates, filtered by entity type and direction.
+ */
+export function getCommonTemplates(
+  entityType?: EntityType,
+  direction?: 'expense' | 'income' | 'transfer'
+): BookingTemplate[] {
+  return BOOKING_TEMPLATES.filter((t) => {
+    if (!t.common) return false
+    if (entityType && t.entity_applicability !== 'all' && t.entity_applicability !== entityType) return false
+    if (direction && t.direction !== direction) return false
+    return true
+  })
+}
+
+/**
+ * Get advanced (non-common) templates, filtered by entity type and direction.
+ */
+export function getAdvancedTemplates(
+  entityType?: EntityType,
+  direction?: 'expense' | 'income' | 'transfer'
+): BookingTemplate[] {
+  return BOOKING_TEMPLATES.filter((t) => {
+    if (t.common) return false
+    if (entityType && t.entity_applicability !== 'all' && t.entity_applicability !== entityType) return false
+    if (direction && t.direction !== direction) return false
+    return true
+  })
+}
+
+/**
+ * Validate that a template is valid for the given entity type.
+ */
+export function validateTemplateForEntity(
+  template: BookingTemplate,
+  entityType: EntityType
+): { valid: boolean; error?: string } {
+  if (template.entity_applicability === 'all') return { valid: true }
+  if (template.entity_applicability === entityType) return { valid: true }
+  return {
+    valid: false,
+    error: `Template "${template.name_sv}" is only valid for ${template.entity_applicability}. Your entity type is ${entityType}.`,
+  }
 }
 
 /**

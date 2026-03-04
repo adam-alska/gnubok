@@ -5,7 +5,7 @@ import {
   generateSRUFile,
   sruFileToString,
   getSRUFilename,
-} from '@/lib/reports/sru-export/sru-generator'
+} from '@/lib/reports/ne-bilaga/sru-generator'
 
 /**
  * GET /api/reports/ne-bilaga

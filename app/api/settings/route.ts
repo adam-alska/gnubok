@@ -38,13 +38,19 @@ export async function PUT(request: Request) {
   // Fetch current settings to check for tax-relevant changes
   const { data: oldSettings } = await supabase
     .from('company_settings')
-    .select('entity_type, moms_period, f_skatt, vat_registered, pays_salaries, fiscal_year_start_month')
+    .select('entity_type, moms_period, f_skatt, vat_registered, pays_salaries, fiscal_year_start_month, onboarding_complete')
     .eq('user_id', user.id)
     .single()
 
   const validation = await validateBody(request, UpdateSettingsSchema)
   if (!validation.success) return validation.response
   const body = validation.data
+
+  // Lock company_name and org_number after onboarding is complete
+  if (oldSettings && (oldSettings as Record<string, unknown>).onboarding_complete === true) {
+    delete (body as Record<string, unknown>).company_name
+    delete (body as Record<string, unknown>).org_number
+  }
 
   // Validate: enskild firma must use calendar year (BFL 3 kap.)
   const effectiveEntityType = body.entity_type || oldSettings?.entity_type

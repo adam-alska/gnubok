@@ -161,12 +161,6 @@ export default function AccountCombobox({ value, accounts, onChange }: AccountCo
     }, 150)
   }
 
-  // Find matching account for helper text
-  const matchedAccount = useMemo(() => {
-    if (!value || value.length !== 4) return null
-    return accounts.find((a) => a.account_number === value) || null
-  }, [value, accounts])
-
   return (
     <div ref={containerRef} className="relative">
       <Input
@@ -181,12 +175,6 @@ export default function AccountCombobox({ value, accounts, onChange }: AccountCo
         autoComplete="off"
       />
 
-      {/* Account name helper text */}
-      {matchedAccount && (
-        <p className="text-[11px] text-muted-foreground truncate mt-0.5 leading-tight">
-          {matchedAccount.account_name}
-        </p>
-      )}
 
       {/* Dropdown */}
       {isOpen && flatList.length > 0 && (
@@ -223,6 +211,18 @@ export default function AccountCombobox({ value, accounts, onChange }: AccountCo
               })}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Empty state */}
+      {isOpen && search.trim() && flatList.length === 0 && (
+        <div className="absolute z-50 top-full left-0 mt-1 w-64 rounded-md border border-input bg-card shadow-md p-3">
+          <p className="text-sm text-muted-foreground">
+            Hittade inget konto som matchar.
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Kontot kan behöva aktiveras i din kontoplan.
+          </p>
         </div>
       )}
     </div>

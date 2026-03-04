@@ -40,18 +40,18 @@ interface ReferenceAccount extends BASReferenceAccount {
 // ---------------------------------------------------------------------------
 
 const CLASS_LABELS: Record<number, string> = {
-  1: 'Tillgangar',
+  1: 'Tillgångar',
   2: 'Eget kapital och skulder',
-  3: 'Rorelseintatker',
-  4: 'Varuinkop och material',
-  5: 'Ovriga externa kostnader',
-  6: 'Ovriga externa kostnader',
+  3: 'Rörelseintäkter',
+  4: 'Varuinköp och material',
+  5: 'Övriga externa kostnader',
+  6: 'Övriga externa kostnader',
   7: 'Personalkostnader och avskrivningar',
   8: 'Finansiella poster och resultat',
 }
 
 const TYPE_LABELS: Record<string, string> = {
-  asset: 'Tillgang',
+  asset: 'Tillgång',
   liability: 'Skuld',
   equity: 'EK',
   revenue: 'Intakt',
@@ -315,7 +315,7 @@ export default function ChartOfAccountsManager() {
               onCheckedChange={setHideK2Excluded}
               className="scale-75"
             />
-            <span className="text-muted-foreground">Dolj K2-undantagna</span>
+            <span className="text-muted-foreground">Dölj K2-undantagna</span>
           </label>
         )}
       </div>
@@ -324,7 +324,7 @@ export default function ChartOfAccountsManager() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Sok konto (nummer eller namn)..."
+          placeholder="Sök konto (nummer eller namn)..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-9"
@@ -454,7 +454,7 @@ export default function ChartOfAccountsManager() {
           {filteredAccounts.length === 0 && (
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">
-                {searchQuery ? 'Inga konton matchar sokningen' : 'Inga konton i kontoplanen'}
+                {searchQuery ? 'Inga konton matchar sökningen' : 'Inga konton i kontoplanen'}
               </CardContent>
             </Card>
           )}
@@ -554,7 +554,7 @@ export default function ChartOfAccountsManager() {
                                     ) : (
                                       <Plus className="mr-1 h-3 w-3" />
                                     )}
-                                    Lagg till
+                                    Lägg till
                                   </Button>
                                 )}
                               </td>
@@ -571,7 +571,7 @@ export default function ChartOfAccountsManager() {
           {filteredReference.length === 0 && (
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">
-                Inga konton matchar sokningen
+                Inga konton matchar sökningen
               </CardContent>
             </Card>
           )}

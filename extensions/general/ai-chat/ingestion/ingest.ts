@@ -17,6 +17,8 @@ import * as path from 'path'
 import * as crypto from 'crypto'
 
 // Configuration
+// NOTE: The ai_knowledge_base directory must be created and populated before running ingestion.
+// Create dev_docs/ai_knowledge_base/ and add markdown files to ingest.
 const DOCS_DIR = path.join(process.cwd(), 'dev_docs', 'ai_knowledge_base')
 const CHUNK_SIZE = 1000
 const CHUNK_OVERLAP = 200
@@ -254,6 +256,12 @@ function processFile(filePath: string): DocumentChunk[] {
 async function ingest() {
   console.log('Starting knowledge base ingestion...')
   console.log(`Reading files from: ${DOCS_DIR}`)
+
+  if (!fs.existsSync(DOCS_DIR)) {
+    console.error(`Error: Knowledge base directory not found: ${DOCS_DIR}`)
+    console.error('Create dev_docs/ai_knowledge_base/ and add markdown files before running ingestion.')
+    process.exit(1)
+  }
 
   // Get all markdown files
   const files = fs

@@ -102,6 +102,7 @@ export const JournalEntrySourceTypeSchema = z.enum([
   'supplier_invoice_paid',
   'supplier_invoice_cash_payment',
   'supplier_credit_note',
+  'currency_revaluation',
 ])
 
 export const AccountTypeSchema = z.enum([

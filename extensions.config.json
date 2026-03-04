@@ -1,1 +1,1 @@
-{"$schema":"./extensions.schema.json","extensions":["enable-banking","ai-categorization","ai-chat","email"]}
+{"$schema":"./extensions.schema.json","extensions":["enable-banking","ai-chat","email"]}

@@ -11,7 +11,7 @@ let results: Array<{ data?: unknown; error?: unknown; count?: number | null }>
 
 function makeBuilder() {
   const b: Record<string, unknown> = {}
-  for (const m of ['select', 'eq', 'insert', 'update', 'delete', 'lte', 'gte', 'in', 'not', 'or', 'order', 'limit', 'is']) {
+  for (const m of ['select', 'eq', 'insert', 'update', 'delete', 'lte', 'gte', 'in', 'neq', 'not', 'or', 'order', 'limit', 'is']) {
     b[m] = vi.fn().mockReturnValue(b)
   }
   b.single = vi.fn().mockImplementation(async () => results[resultIdx++] ?? { data: null, error: null })
@@ -37,6 +37,18 @@ vi.mock('@/lib/reports/income-statement', () => ({
 
 vi.mock('@/lib/bookkeeping/engine', () => ({
   createJournalEntry: vi.fn(),
+}))
+
+vi.mock('@/lib/bookkeeping/currency-revaluation', () => ({
+  previewCurrencyRevaluation: vi.fn().mockResolvedValue({
+    items: [],
+    lines: [],
+    closingRates: {},
+    totalGain: 0,
+    totalLoss: 0,
+    netEffect: 0,
+  }),
+  executeCurrencyRevaluation: vi.fn().mockResolvedValue(null),
 }))
 
 vi.mock('../period-service', () => ({
@@ -67,6 +79,12 @@ describe('validateYearEndReadiness', () => {
       { data: null, error: null, count: 3 },
       // 2: count posted entries (thenable chain) — count: 10
       { data: null, error: null, count: 10 },
+      // 3: count revaluation entries — count: 0
+      { data: null, error: null, count: 0 },
+      // 4: count fx receivables — count: 0
+      { data: null, error: null, count: 0 },
+      // 5: count fx payables — count: 0
+      { data: null, error: null, count: 0 },
     ]
 
     vi.mocked(generateTrialBalance).mockResolvedValue({
@@ -89,6 +107,9 @@ describe('validateYearEndReadiness', () => {
       { data: period, error: null },
       { data: null, error: null, count: 0 },   // no drafts
       { data: null, error: null, count: 5 },    // some posted
+      { data: null, error: null, count: 0 },   // no revaluation
+      { data: null, error: null, count: 0 },   // no fx receivables
+      { data: null, error: null, count: 0 },   // no fx payables
     ]
 
     vi.mocked(generateTrialBalance).mockResolvedValue({
@@ -121,8 +142,11 @@ describe('validateYearEndReadiness', () => {
     resultIdx = 0
     results = [
       { data: period, error: null },
-      { data: null, error: null, count: 0 },
-      { data: null, error: null, count: 5 },
+      { data: null, error: null, count: 0 },   // no drafts
+      { data: null, error: null, count: 5 },    // some posted
+      { data: null, error: null, count: 0 },   // no revaluation
+      { data: null, error: null, count: 0 },   // no fx receivables
+      { data: null, error: null, count: 0 },   // no fx payables
     ]
 
     vi.mocked(generateTrialBalance).mockResolvedValue({
@@ -143,6 +167,8 @@ describe('previewYearEndClosing', () => {
     results = [
       // 0: fetch company_settings (.single)
       { data: { entity_type: 'aktiebolag' }, error: null },
+      // 1: fetch fiscal period for closing date (.single)
+      { data: { period_end: '2024-12-31' }, error: null },
     ]
 
     vi.mocked(generateIncomeStatement).mockResolvedValue({
@@ -173,6 +199,8 @@ describe('previewYearEndClosing', () => {
   it('uses 2010 for EF entity type', async () => {
     results = [
       { data: { entity_type: 'enskild_firma' }, error: null },
+      // fetch fiscal period for closing date (.single)
+      { data: { period_end: '2024-12-31' }, error: null },
     ]
 
     vi.mocked(generateIncomeStatement).mockResolvedValue({ net_result: 50000 } as never)

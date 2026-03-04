@@ -9,6 +9,9 @@ import {
   searchTemplates,
   findMatchingTemplates,
   buildMappingResultFromTemplate,
+  getCommonTemplates,
+  getAdvancedTemplates,
+  validateTemplateForEntity,
   type BookingTemplate,
 } from '../booking-templates'
 
@@ -17,8 +20,8 @@ import {
 // ============================================================
 
 describe('BOOKING_TEMPLATES data integrity', () => {
-  it('has exactly 48 templates', () => {
-    expect(BOOKING_TEMPLATES).toHaveLength(48)
+  it('has exactly 51 templates', () => {
+    expect(BOOKING_TEMPLATES).toHaveLength(51)
   })
 
   it('all template IDs are unique', () => {
@@ -46,6 +49,7 @@ describe('BOOKING_TEMPLATES data integrity', () => {
       expect(typeof t.default_private).toBe('boolean')
       expect(t.fallback_category).toBeTruthy()
       expect(t.description_sv).toBeTruthy()
+      expect(typeof t.common).toBe('boolean')
       expect(Array.isArray(t.mcc_codes)).toBe(true)
       expect(Array.isArray(t.keywords)).toBe(true)
       expect(t.keywords.length).toBeGreaterThan(0)
@@ -136,7 +140,7 @@ describe('getTemplateGroups', () => {
   it('every template is in exactly one group', () => {
     const groups = getTemplateGroups()
     const allTemplates = groups.flatMap((g) => g.templates)
-    expect(allTemplates).toHaveLength(48)
+    expect(allTemplates).toHaveLength(51)
   })
 })
 
@@ -175,8 +179,8 @@ describe('searchTemplates', () => {
   })
 
   it('supports multi-token search', () => {
-    const results = searchTemplates('annonsering marknadsföring')
-    expect(results.some((t) => t.id === 'marketing_online_ads')).toBe(true)
+    const results = searchTemplates('annonsering EU')
+    expect(results.some((t) => t.id === 'marketing_online_ads_eu')).toBe(true)
   })
 })
 
@@ -205,7 +209,7 @@ describe('findMatchingTemplates', () => {
       merchant_name: 'Google',
     })
     const matches = findMatchingTemplates(tx)
-    expect(matches.some((m) => m.template.id === 'marketing_online_ads')).toBe(true)
+    expect(matches.some((m) => m.template.id === 'marketing_online_ads_eu')).toBe(true)
   })
 
   it('returns empty for a transaction with no signals', () => {
@@ -402,5 +406,143 @@ describe('buildMappingResultFromTemplate', () => {
     const result = buildMappingResultFromTemplate(template, tx, 'enskild_firma')
 
     expect(result.description).toBe('Drivmedel & Laddning: OKQ8 tankstation')
+  })
+})
+
+// ============================================================
+// Template Curation Helpers
+// ============================================================
+
+describe('getCommonTemplates', () => {
+  it('returns only templates with common: true', () => {
+    const common = getCommonTemplates()
+    expect(common.length).toBeGreaterThan(0)
+    for (const t of common) {
+      expect(t.common).toBe(true)
+    }
+  })
+
+  it('filters by entity type', () => {
+    const efCommon = getCommonTemplates('enskild_firma')
+    for (const t of efCommon) {
+      expect(t.entity_applicability).not.toBe('aktiebolag')
+    }
+  })
+
+  it('filters by direction', () => {
+    const expenses = getCommonTemplates(undefined, 'expense')
+    for (const t of expenses) {
+      expect(t.direction).toBe('expense')
+    }
+  })
+})
+
+describe('getAdvancedTemplates', () => {
+  it('returns only templates with common: false', () => {
+    const advanced = getAdvancedTemplates()
+    expect(advanced.length).toBeGreaterThan(0)
+    for (const t of advanced) {
+      expect(t.common).toBe(false)
+    }
+  })
+
+  it('common + advanced = all templates (for a given entity/direction)', () => {
+    const common = getCommonTemplates()
+    const advanced = getAdvancedTemplates()
+    expect(common.length + advanced.length).toBe(BOOKING_TEMPLATES.length)
+  })
+})
+
+describe('validateTemplateForEntity', () => {
+  it('accepts template with entity_applicability "all"', () => {
+    const template = getTemplateById('premises_rent')!
+    const result = validateTemplateForEntity(template, 'aktiebolag')
+    expect(result.valid).toBe(true)
+  })
+
+  it('accepts EF template for EF entity', () => {
+    const template = getTemplateById('private_withdrawal_ef')!
+    const result = validateTemplateForEntity(template, 'enskild_firma')
+    expect(result.valid).toBe(true)
+  })
+
+  it('rejects EF template for AB entity', () => {
+    const template = getTemplateById('private_withdrawal_ef')!
+    const result = validateTemplateForEntity(template, 'aktiebolag')
+    expect(result.valid).toBe(false)
+    expect(result.error).toContain('enskild_firma')
+  })
+
+  it('rejects AB template for EF entity', () => {
+    const template = getTemplateById('personnel_salary')!
+    const result = validateTemplateForEntity(template, 'enskild_firma')
+    expect(result.valid).toBe(false)
+    expect(result.error).toContain('aktiebolag')
+  })
+})
+
+// ============================================================
+// New/Split Templates
+// ============================================================
+
+describe('new and split templates', () => {
+  it('has marketing_online_ads_eu with reverse_charge', () => {
+    const t = getTemplateById('marketing_online_ads_eu')
+    expect(t).toBeDefined()
+    expect(t!.vat_treatment).toBe('reverse_charge')
+    expect(t!.common).toBe(true)
+    expect(t!.requires_vat_registration_data).toBe(true)
+  })
+
+  it('has marketing_online_ads_domestic with standard_25', () => {
+    const t = getTemplateById('marketing_online_ads_domestic')
+    expect(t).toBeDefined()
+    expect(t!.vat_treatment).toBe('standard_25')
+    expect(t!.common).toBe(false)
+  })
+
+  it('has representation_internal with account 7622', () => {
+    const t = getTemplateById('representation_internal')
+    expect(t).toBeDefined()
+    expect(t!.debit_account).toBe('7622')
+    expect(t!.vat_treatment).toBeNull()
+    expect(t!.common).toBe(true)
+  })
+
+  it('has shareholder_loan_received (AB, D:1930 K:2393)', () => {
+    const t = getTemplateById('shareholder_loan_received')
+    expect(t).toBeDefined()
+    expect(t!.debit_account).toBe('1930')
+    expect(t!.credit_account).toBe('2393')
+    expect(t!.entity_applicability).toBe('aktiebolag')
+    expect(t!.common).toBe(true)
+  })
+
+  it('has shareholder_loan_disbursed (AB, D:1680 K:1930)', () => {
+    const t = getTemplateById('shareholder_loan_disbursed')
+    expect(t).toBeDefined()
+    expect(t!.debit_account).toBe('1680')
+    expect(t!.credit_account).toBe('1930')
+    expect(t!.entity_applicability).toBe('aktiebolag')
+    expect(t!.common).toBe(false)
+  })
+
+  it('personnel_employer_tax uses debit account 2731 (liability clearing)', () => {
+    const t = getTemplateById('personnel_employer_tax')
+    expect(t).toBeDefined()
+    expect(t!.debit_account).toBe('2731')
+  })
+
+  it('personnel_salary has special_rules_sv warning', () => {
+    const t = getTemplateById('personnel_salary')
+    expect(t).toBeDefined()
+    expect(t!.special_rules_sv).toContain('nettolön')
+    expect(t!.requires_review).toBe(true)
+  })
+
+  it('representation_external has updated deductibility note with VAT cap', () => {
+    const t = getTemplateById('representation_external')
+    expect(t).toBeDefined()
+    expect(t!.deductibility_note_sv).toContain('46 kr/person')
   })
 })

@@ -8,13 +8,8 @@ import { Progress } from '@/components/ui/progress'
 import {
   Check,
   Circle,
-  Users,
-  Receipt,
-  Building2,
-  Camera,
   Sparkles,
   X,
-  ChevronRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -23,7 +18,6 @@ interface ChecklistItem {
   label: string
   description: string
   href: string
-  icon: React.ComponentType<{ className?: string }>
   completed: boolean
 }
 
@@ -61,7 +55,6 @@ export default function NewUserChecklist({
       label: 'Skapa konto',
       description: 'Du har ett konto!',
       href: '#',
-      icon: Check,
       completed: true, // Always completed if they're seeing this
     },
     {
@@ -69,7 +62,6 @@ export default function NewUserChecklist({
       label: 'Lägg till din första kund',
       description: 'Spara kunduppgifter för enkel fakturering',
       href: '/customers/new',
-      icon: Users,
       completed: hasCustomers,
     },
     {
@@ -77,7 +69,6 @@ export default function NewUserChecklist({
       label: 'Skicka din första faktura',
       description: 'Skapa en professionell faktura på 60 sekunder',
       href: '/invoices/new',
-      icon: Receipt,
       completed: hasInvoices,
     },
     {
@@ -85,7 +76,6 @@ export default function NewUserChecklist({
       label: 'Importera transaktioner',
       description: 'Importera kontoutdrag från din bank',
       href: '/import',
-      icon: Building2,
       completed: hasBankConnected,
     },
     {
@@ -93,7 +83,6 @@ export default function NewUserChecklist({
       label: 'Skanna ditt första kvitto',
       description: 'Fotografera för automatisk bokföring',
       href: '/receipts/scan',
-      icon: Camera,
       completed: hasReceipts,
     },
   ]
@@ -150,16 +139,11 @@ export default function NewUserChecklist({
     >
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Sparkles className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <CardTitle className="text-base">Kom igång</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {completedCount} av {items.length} steg klara
-              </p>
-            </div>
+          <div>
+            <CardTitle className="text-base">Kom igång</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {completedCount} av {items.length} steg klara
+            </p>
           </div>
           <Button
             variant="ghost"
@@ -175,9 +159,7 @@ export default function NewUserChecklist({
       </CardHeader>
       <CardContent className="pt-0">
         <ul className="space-y-1">
-          {items.map((item) => {
-            const Icon = item.icon
-            return (
+          {items.map((item) => (
               <li key={item.id}>
                 {item.completed ? (
                   <div className="flex items-center gap-3 p-2 rounded-lg">
@@ -204,12 +186,10 @@ export default function NewUserChecklist({
                         {item.description}
                       </p>
                     </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
                   </Link>
                 )}
               </li>
-            )
-          })}
+            ))}
         </ul>
       </CardContent>
     </Card>

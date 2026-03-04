@@ -1,26 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getSuggestedCategories, mergeAiSuggestions, getSuggestedTemplates, type SuggestedCategory, type SuggestedTemplate } from '@/lib/transactions/category-suggestions'
-import { extensionRegistry } from '@/lib/extensions/registry'
 import type { Transaction, TransactionCategory, EntityType } from '@/types'
-
-// Minimum confidence threshold — below this, suggestions are considered weak
-// and we trigger on-demand AI categorization to get better results.
-const WEAK_SUGGESTION_THRESHOLD = 0.55
-
-/**
- * Check if suggestions are "weak" — only history-based fallbacks
- * with no strong rule/pattern/AI match.
- */
-function hasWeakSuggestions(result: SuggestedCategory[]): boolean {
-  if (result.length === 0) return true
-  // Weak if the best suggestion is below threshold
-  const bestConfidence = Math.max(...result.map((s) => s.confidence))
-  if (bestConfidence < WEAK_SUGGESTION_THRESHOLD) return true
-  // Weak if all suggestions are from history only (no rule/pattern/ai match)
-  if (result.every((s) => s.source === 'history')) return true
-  return false
-}
 
 /**
  * POST /api/transactions/suggest-categories
@@ -115,7 +96,6 @@ export async function POST(request: Request) {
   // Generate initial suggestions for each transaction
   const suggestions: Record<string, SuggestedCategory[]> = {}
   const template_suggestions: Record<string, SuggestedTemplate[]> = {}
-  const needsAiIds: string[] = []
 
   for (const tx of transactions) {
     let result = getSuggestedCategories(
@@ -128,14 +108,10 @@ export async function POST(request: Request) {
     const aiSuggestions = aiSuggestionsMap[tx.id]
     if (aiSuggestions && aiSuggestions.length > 0) {
       result = mergeAiSuggestions(result, aiSuggestions, tx.amount)
-    } else if (hasWeakSuggestions(result)) {
-      // No pre-computed AI suggestion AND rule-based suggestions are weak —
-      // mark this transaction for on-demand AI categorization
-      needsAiIds.push(tx.id)
     }
 
     suggestions[tx.id] = result
-    template_suggestions[tx.id] = await getSuggestedTemplates(tx as Transaction, entityType)
+    template_suggestions[tx.id] = await getSuggestedTemplates(tx as Transaction, entityType, mappingRules || undefined)
   }
 
   // Inject document template suggestions from matched inbox items
@@ -181,64 +157,6 @@ export async function POST(request: Request) {
     }
   } catch {
     // Non-blocking
-  }
-
-  // Trigger on-demand AI categorization for transactions with weak suggestions
-  if (needsAiIds.length > 0) {
-    console.log(
-      `[suggest-categories] ${needsAiIds.length} transactions have weak suggestions, triggering on-demand AI:`,
-      needsAiIds.map((id) => {
-        const tx = transactions.find((t) => t.id === id)
-        return tx
-          ? { id, description: tx.description, merchant_name: tx.merchant_name, amount: tx.amount }
-          : { id }
-      })
-    )
-
-    try {
-      const aiExt = extensionRegistry.get('ai-categorization')
-      if (!aiExt?.services?.categorizeTransactions) {
-        console.log('[suggest-categories] AI categorization extension not loaded, skipping on-demand AI')
-        return NextResponse.json({ suggestions, template_suggestions })
-      }
-      const aiResults: Array<{ transactionId: string; category: string; basAccount: string; confidence: number; reasoning: string; isPrivate?: boolean; templateId?: string }> = await aiExt.services.categorizeTransactions(user.id, needsAiIds)
-
-      console.log(
-        '[suggest-categories] AI categorization results:',
-        aiResults.map((r) => ({
-          id: r.transactionId,
-          category: r.category,
-          basAccount: r.basAccount,
-          confidence: r.confidence,
-          reasoning: r.reasoning,
-          isPrivate: r.isPrivate,
-          templateId: r.templateId,
-        }))
-      )
-
-      // Group AI results by transactionId (AI now returns 2 per transaction)
-      const groupedAi: Record<string, { category: string; basAccount: string; confidence: number; reasoning: string }[]> = {}
-      for (const aiResult of aiResults) {
-        if (!groupedAi[aiResult.transactionId]) {
-          groupedAi[aiResult.transactionId] = []
-        }
-        groupedAi[aiResult.transactionId].push({
-          category: aiResult.category,
-          basAccount: aiResult.basAccount,
-          confidence: aiResult.confidence,
-          reasoning: aiResult.reasoning,
-        })
-      }
-
-      for (const [txId, aiSuggestions] of Object.entries(groupedAi)) {
-        const existing = suggestions[txId] || []
-        const tx = transactions.find((t) => t.id === txId)
-        suggestions[txId] = mergeAiSuggestions(existing, aiSuggestions, tx?.amount)
-      }
-    } catch (err) {
-      // AI categorization is non-blocking — log and continue with existing suggestions
-      console.error('[suggest-categories] On-demand AI categorization failed:', err)
-    }
   }
 
   return NextResponse.json({ suggestions, template_suggestions })

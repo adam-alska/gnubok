@@ -126,7 +126,7 @@ const CATEGORY_DEFAULT_TEMPLATES: Record<string, string> = {
   expense_consumables: 'office_supplies_general',
   expense_vehicle: 'vehicle_fuel',
   expense_telecom: 'telecom_mobile',
-  expense_marketing: 'marketing_online_ads',
+  expense_marketing: 'marketing_online_ads_eu',
   expense_education: 'education_course',
   expense_professional_services: 'prof_accounting',
 }

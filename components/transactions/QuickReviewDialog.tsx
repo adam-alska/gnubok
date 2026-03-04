@@ -6,8 +6,9 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { ArrowUpRight, ArrowDownRight, Check, Paperclip, ChevronDown, ChevronUp } from 'lucide-react'
+import { ArrowUpRight, ArrowDownRight, Check, Paperclip, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
 import { getDefaultAccountForCategory } from '@/lib/bookkeeping/category-mapping'
+import type { BookingTemplate } from '@/lib/bookkeeping/booking-templates'
 import JournalEntryPreview from './JournalEntryPreview'
 import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
 import DocumentUploadZone from '@/components/bookkeeping/DocumentUploadZone'
@@ -26,12 +27,16 @@ interface QuickReviewDialogProps {
   defaultAccount: string
   defaultVat: VatTreatment | 'none'
   entityType?: EntityType
+  template?: BookingTemplate | null
+  templateId?: string
   onConfirm: (
     id: string,
     category: TransactionCategory,
     vatTreatment: VatTreatment | undefined,
-    accountOverride: string | undefined
+    accountOverride: string | undefined,
+    templateId?: string
   ) => Promise<string | null>
+  onChangeTemplate?: () => void
 }
 
 export default function QuickReviewDialog({
@@ -43,7 +48,10 @@ export default function QuickReviewDialog({
   defaultAccount,
   defaultVat,
   entityType,
+  template,
+  templateId,
   onConfirm,
+  onChangeTemplate,
 }: QuickReviewDialogProps) {
   const { toast } = useToast()
   const [accountOverride, setAccountOverride] = useState(defaultAccount)
@@ -96,7 +104,7 @@ export default function QuickReviewDialog({
         ? accountOverride
         : undefined
 
-      const journalEntryId = await onConfirm(transaction.id, category, resolvedVat, override)
+      const journalEntryId = await onConfirm(transaction.id, category, resolvedVat, override, templateId)
 
       // Link uploaded documents to the journal entry
       if (journalEntryId && uploadedFiles.length > 0) {
@@ -116,7 +124,7 @@ export default function QuickReviewDialog({
         if (linkFailCount > 0) {
           toast({
             title: 'Underlag kunde inte bifogas',
-            description: `${linkFailCount} fil(er) kunde inte lankas till verifikationen.`,
+            description: `${linkFailCount} fil(er) kunde inte länkas till verifikationen.`,
             variant: 'destructive',
           })
         }
@@ -171,13 +179,56 @@ export default function QuickReviewDialog({
           </p>
         </div>
 
-        {/* Category (read-only) */}
+        {/* Template or Category */}
         <div>
-          <label className="text-sm font-medium text-muted-foreground">Kategori</label>
-          <div className="mt-1">
-            <Badge variant="outline" className="text-sm py-1 px-3">{categoryLabel}</Badge>
+          <label className="text-sm font-medium text-muted-foreground">
+            {template ? 'Mall' : 'Kategori'}
+          </label>
+          <div className="mt-1 flex items-center gap-2">
+            <Badge variant="outline" className="text-sm py-1 px-3">
+              {template ? template.name_sv : categoryLabel}
+            </Badge>
+            {onChangeTemplate && (
+              <button
+                type="button"
+                className="text-xs text-primary hover:underline"
+                onClick={onChangeTemplate}
+              >
+                Byt mall
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Template special rules */}
+        {template?.special_rules_sv && (
+          <div className="rounded-lg border border-amber-300/50 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2">
+            <p className="text-xs text-amber-800 dark:text-amber-300 leading-snug">
+              {template.special_rules_sv}
+            </p>
+          </div>
+        )}
+
+        {/* Deductibility note */}
+        {template?.deductibility_note_sv && (
+          <div className="rounded-lg border border-blue-300/50 bg-blue-50/50 dark:bg-blue-950/20 px-3 py-2">
+            <p className="text-xs text-blue-800 dark:text-blue-300 leading-snug">
+              {template.deductibility_note_sv}
+            </p>
+          </div>
+        )}
+
+        {/* Reverse charge warning */}
+        {template?.requires_vat_registration_data && (
+          <div className="rounded-lg border border-amber-400/50 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-800 dark:text-amber-300 leading-snug">
+                Omvänd skattskyldighet kräver leverantörens momsregistreringsnummer och land.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Journal entry preview */}
         <JournalEntryPreview
@@ -207,7 +258,7 @@ export default function QuickReviewDialog({
           <div className="mt-1">
             {isLiabilityAccount ? (
               <p className="text-sm text-muted-foreground">
-                Ingen moms for skuld-/eget kapital-konton
+                Ingen moms för skuld-/eget kapital-konton
               </p>
             ) : showVatDropdown ? (
               <VatTreatmentSelect

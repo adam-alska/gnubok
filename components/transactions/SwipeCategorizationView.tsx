@@ -10,7 +10,8 @@ import VatTreatmentSelect from './VatTreatmentSelect'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { checkExpenseWarnings } from '@/lib/tax/expense-warnings'
 import { getDefaultAccountForCategory, getDefaultVatTreatmentForCategory } from '@/lib/bookkeeping/category-mapping'
-import { getTemplateById } from '@/lib/bookkeeping/booking-templates'
+import { getTemplateById, type BookingTemplate } from '@/lib/bookkeeping/booking-templates'
+import TemplatePicker from './TemplatePicker'
 import JournalEntryPreview from './JournalEntryPreview'
 import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
 import DocumentUploadZone from '@/components/bookkeeping/DocumentUploadZone'
@@ -47,7 +48,6 @@ export default function SwipeCategorizationView({
   entityType,
 }: SwipeCategorizationViewProps) {
   const { toast } = useToast()
-  const [showAllCategories, setShowAllCategories] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [showCategorySelect, setShowCategorySelect] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -127,6 +127,18 @@ export default function SwipeCategorizationView({
     setAccountOverride(defaultAccount)
     setVatTreatment(defaultVat ?? 'none')
     setPendingTemplateId(null)
+    setPendingInboxItemId(null)
+    setShowVatDropdown(false)
+    setShowCategorySelect(false)
+    setShowReviewStep(true)
+    setError(null)
+  }, [])
+
+  const handlePickerTemplateSelect = useCallback((template: BookingTemplate) => {
+    setPendingCategory(template.fallback_category)
+    setAccountOverride(template.debit_account)
+    setVatTreatment(template.vat_treatment ?? 'none')
+    setPendingTemplateId(template.id)
     setPendingInboxItemId(null)
     setShowVatDropdown(false)
     setShowCategorySelect(false)
@@ -226,7 +238,7 @@ export default function SwipeCategorizationView({
           if (linkFailCount > 0) {
             toast({
               title: 'Underlag kunde inte bifogas',
-              description: `${linkFailCount} fil(er) kunde inte lankas till verifikationen.`,
+              description: `${linkFailCount} fil(er) kunde inte länkas till verifikationen.`,
               variant: 'destructive',
             })
           }
@@ -301,8 +313,8 @@ export default function SwipeCategorizationView({
   }
 
   if (showCategorySelect) {
-    const categories =
-      currentTransaction.amount > 0 ? incomeCategories : expenseCategories
+    const direction = currentTransaction.amount > 0 ? 'income' : 'expense'
+    const txSuggestions = templateSuggestions?.[currentTransaction.id]
 
     return (
       <div className="fixed inset-0 bg-background z-50 flex flex-col">
@@ -310,46 +322,39 @@ export default function SwipeCategorizationView({
           <Button variant="ghost" size="icon" onClick={() => setShowCategorySelect(false)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="font-semibold">Välj kategori</h1>
+          <h1 className="font-semibold">Välj mall</h1>
           <div className="w-10" />
         </div>
 
-        <div className="flex-1 overflow-auto p-4">
-          <Card className="mb-4">
-            <CardContent className="pt-4">
-              <p className="font-medium">{currentTransaction.description}</p>
-              <p className="text-2xl font-bold mt-2">
-                {formatCurrency(Math.abs(currentTransaction.amount), currentTransaction.currency)}
-              </p>
-            </CardContent>
-          </Card>
+        <Card className="mx-4 mt-3">
+          <CardContent className="pt-4">
+            <p className="font-medium">{currentTransaction.description}</p>
+            <p className="text-2xl font-bold mt-2">
+              {formatCurrency(Math.abs(currentTransaction.amount), currentTransaction.currency)}
+            </p>
+          </CardContent>
+        </Card>
 
-          {error && (
-            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm mb-4">
-              {error}
-            </div>
-          )}
-
-          <div className="space-y-2">
-            {categories.map((cat) => (
-              <Button
-                key={cat.value}
-                variant="outline"
-                className="w-full justify-start h-auto py-3"
-                onClick={() => handleCategorySelect(cat.value)}
-                disabled={isProcessing}
-              >
-                <div className="flex items-baseline gap-2">
-                  <span>{cat.label}</span>
-                  {cat.account && <span className="text-xs text-muted-foreground">{cat.account}</span>}
-                </div>
-              </Button>
-            ))}
+        {error && (
+          <div className="mx-4 mt-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+            {error}
           </div>
+        )}
 
+        <div className="flex-1 overflow-hidden mt-2">
+          <TemplatePicker
+            direction={direction}
+            entityType={entityType}
+            suggestedTemplates={txSuggestions}
+            onSelect={handlePickerTemplateSelect}
+            selectedTemplateId={pendingTemplateId ?? undefined}
+          />
+        </div>
+
+        <div className="p-4 border-t">
           <Button
             variant="ghost"
-            className="w-full mt-4 text-muted-foreground"
+            className="w-full text-muted-foreground"
             onClick={handleSkip}
           >
             <SkipForward className="mr-2 h-4 w-4" />
@@ -364,6 +369,7 @@ export default function SwipeCategorizationView({
     const categoryLabel = [...expenseCategories, ...incomeCategories].find(
       (c) => c.value === pendingCategory
     )?.label || pendingCategory
+    const selectedTemplate = pendingTemplateId ? getTemplateById(pendingTemplateId) : null
 
     // Auto-clear VAT when a class 2 (liability/equity) account is selected
     const isLiabilityAccount = accountOverride.startsWith('2')
@@ -398,13 +404,57 @@ export default function SwipeCategorizationView({
             </CardContent>
           </Card>
 
-          {/* Selected category */}
+          {/* Selected template or category */}
           <div>
-            <label className="text-sm font-medium text-muted-foreground">Kategori</label>
-            <div className="mt-1">
-              <Badge variant="outline" className="text-sm py-1 px-3">{categoryLabel}</Badge>
+            <label className="text-sm font-medium text-muted-foreground">
+              {selectedTemplate ? 'Mall' : 'Kategori'}
+            </label>
+            <div className="mt-1 flex items-center gap-2">
+              <Badge variant="outline" className="text-sm py-1 px-3">
+                {selectedTemplate ? selectedTemplate.name_sv : categoryLabel}
+              </Badge>
+              <button
+                type="button"
+                className="text-xs text-primary hover:underline"
+                onClick={() => {
+                  setShowReviewStep(false)
+                  setShowCategorySelect(true)
+                }}
+              >
+                Byt mall
+              </button>
             </div>
           </div>
+
+          {/* Template special rules warning */}
+          {selectedTemplate?.special_rules_sv && (
+            <div className="rounded-lg border border-amber-300/50 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2.5">
+              <p className="text-xs text-amber-800 dark:text-amber-300 leading-snug">
+                {selectedTemplate.special_rules_sv}
+              </p>
+            </div>
+          )}
+
+          {/* Deductibility note */}
+          {selectedTemplate?.deductibility_note_sv && (
+            <div className="rounded-lg border border-blue-300/50 bg-blue-50/50 dark:bg-blue-950/20 px-3 py-2.5">
+              <p className="text-xs text-blue-800 dark:text-blue-300 leading-snug">
+                {selectedTemplate.deductibility_note_sv}
+              </p>
+            </div>
+          )}
+
+          {/* Reverse charge VAT registration warning */}
+          {selectedTemplate?.requires_vat_registration_data && (
+            <div className="rounded-lg border border-amber-400/50 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2.5">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-800 dark:text-amber-300 leading-snug">
+                  Omvänd skattskyldighet kräver leverantörens momsregistreringsnummer och land.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Journal entry preview */}
           <JournalEntryPreview
@@ -434,7 +484,7 @@ export default function SwipeCategorizationView({
             <div className="mt-1">
               {isLiabilityAccount ? (
                 <p className="text-sm text-muted-foreground">
-                  Ingen moms for skuld-/eget kapital-konton
+                  Ingen moms för skuld-/eget kapital-konton
                 </p>
               ) : showVatDropdown ? (
                 <VatTreatmentSelect
@@ -518,7 +568,7 @@ export default function SwipeCategorizationView({
             disabled={isProcessing || !accountOverride}
           >
             <Check className="mr-2 h-4 w-4" />
-            {isProcessing ? 'Bokfor...' : 'Bokfor'}
+            {isProcessing ? 'Bokför...' : 'Bokför'}
           </Button>
           <Button
             variant="ghost"

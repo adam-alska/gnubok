@@ -19,6 +19,8 @@ interface JournalEntryReviewContentProps {
   totalDebit: number
   totalCredit: number
   attachmentCount?: number
+  showBalanceBadge?: boolean
+  hideDate?: boolean
 }
 
 function formatAmount(amount: number): string {
@@ -33,6 +35,8 @@ export function JournalEntryReviewContent({
   totalDebit,
   totalCredit,
   attachmentCount,
+  showBalanceBadge = true,
+  hideDate = false,
 }: JournalEntryReviewContentProps) {
   const activeLines = lines.filter(
     (l) => l.account_number && (l.debit_amount || l.credit_amount)
@@ -42,15 +46,17 @@ export function JournalEntryReviewContent({
     <div className="space-y-4">
       {/* Header info */}
       <div className="bg-muted rounded-lg p-4 space-y-2">
-        <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className={`grid gap-4 text-sm ${hideDate ? 'grid-cols-1' : 'grid-cols-2'}`}>
           <div>
             <span className="text-muted-foreground">Räkenskapsår</span>
             <p className="font-medium">{periodName}</p>
           </div>
-          <div>
-            <span className="text-muted-foreground">Datum</span>
-            <p className="font-medium">{entryDate}</p>
-          </div>
+          {!hideDate && (
+            <div>
+              <span className="text-muted-foreground">Datum</span>
+              <p className="font-medium">{entryDate}</p>
+            </div>
+          )}
         </div>
         <div className="text-sm">
           <span className="text-muted-foreground">Beskrivning</span>
@@ -59,18 +65,22 @@ export function JournalEntryReviewContent({
       </div>
 
       {/* Balance status */}
-      <div className="flex items-center gap-2">
-        <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-          <CheckCircle2 className="h-3 w-3 mr-1" />
-          Debet = Kredit
-        </Badge>
-        {attachmentCount != null && attachmentCount > 0 && (
-          <Badge variant="outline">
-            <Paperclip className="h-3 w-3 mr-1" />
-            {attachmentCount} {attachmentCount === 1 ? 'underlag' : 'underlag'}
-          </Badge>
-        )}
-      </div>
+      {(showBalanceBadge || (attachmentCount != null && attachmentCount > 0)) && (
+        <div className="flex items-center gap-2">
+          {showBalanceBadge && (
+            <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+              <CheckCircle2 className="h-3 w-3 mr-1" />
+              Debet = Kredit
+            </Badge>
+          )}
+          {attachmentCount != null && attachmentCount > 0 && (
+            <Badge variant="outline">
+              <Paperclip className="h-3 w-3 mr-1" />
+              {attachmentCount} {attachmentCount === 1 ? 'underlag' : 'underlag'}
+            </Badge>
+          )}
+        </div>
+      )}
 
       {/* Debit/Credit table */}
       <table className="w-full text-sm">

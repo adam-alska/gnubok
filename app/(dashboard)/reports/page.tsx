@@ -6,10 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Download, FileText, FileDown, TrendingUp, Scale, AlertCircle, Receipt, Briefcase, Building2, BookOpen, List, Users, ChevronDown, ChevronRight, ArrowLeftRight } from 'lucide-react'
+import { Download, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react'
 import { AccountNumber } from '@/components/ui/account-number'
 import { NEDeclarationView } from '@/components/reports/NEDeclarationView'
-import { SRUExportView } from '@/components/reports/SRUExportView'
 import { BankReconciliationView } from '@/components/reports/BankReconciliationView'
 import { TrialBalanceChart } from '@/components/reports/TrialBalanceChart'
 import { VatCompositionChart } from '@/components/reports/VatCompositionChart'
@@ -111,15 +110,12 @@ export default function ReportsPage() {
               </p>
               <TabsList className="flex flex-col h-auto w-full gap-0.5 p-1">
                 <TabsTrigger value="trial-balance" className="w-full justify-start">
-                  <Scale className="h-4 w-4 mr-1.5" />
                   Saldobalans
                 </TabsTrigger>
                 <TabsTrigger value="income-statement" className="w-full justify-start">
-                  <TrendingUp className="h-4 w-4 mr-1.5" />
                   Resultaträkning
                 </TabsTrigger>
                 <TabsTrigger value="balance-sheet" className="w-full justify-start">
-                  <FileText className="h-4 w-4 mr-1.5" />
                   Balansräkning
                 </TabsTrigger>
               </TabsList>
@@ -132,19 +128,13 @@ export default function ReportsPage() {
               </p>
               <TabsList className="flex flex-col h-auto w-full gap-0.5 p-1">
                 <TabsTrigger value="vat-declaration" className="w-full justify-start">
-                  <Receipt className="h-4 w-4 mr-1.5" />
                   Momsdeklaration
                 </TabsTrigger>
                 {isEnskildFirma && (
                   <TabsTrigger value="ne-declaration" className="w-full justify-start">
-                    <Briefcase className="h-4 w-4 mr-1.5" />
                     NE-bilaga
                   </TabsTrigger>
                 )}
-                <TabsTrigger value="sru-export" className="w-full justify-start">
-                  <FileDown className="h-4 w-4 mr-1.5" />
-                  SRU-export
-                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -155,19 +145,15 @@ export default function ReportsPage() {
               </p>
               <TabsList className="flex flex-col h-auto w-full gap-0.5 p-1">
                 <TabsTrigger value="huvudbok" className="w-full justify-start">
-                  <BookOpen className="h-4 w-4 mr-1.5" />
                   Huvudbok
                 </TabsTrigger>
                 <TabsTrigger value="grundbok" className="w-full justify-start">
-                  <List className="h-4 w-4 mr-1.5" />
                   Grundbok
                 </TabsTrigger>
                 <TabsTrigger value="kundreskontra" className="w-full justify-start">
-                  <Users className="h-4 w-4 mr-1.5" />
                   Kundreskontra
                 </TabsTrigger>
                 <TabsTrigger value="supplier-ledger" className="w-full justify-start">
-                  <Building2 className="h-4 w-4 mr-1.5" />
                   Leverantörsreskontra
                 </TabsTrigger>
               </TabsList>
@@ -180,7 +166,6 @@ export default function ReportsPage() {
               </p>
               <TabsList className="flex flex-col h-auto w-full gap-0.5 p-1">
                 <TabsTrigger value="bank-reconciliation" className="w-full justify-start">
-                  <ArrowLeftRight className="h-4 w-4 mr-1.5" />
                   Bankavstämning
                 </TabsTrigger>
               </TabsList>
@@ -204,9 +189,6 @@ export default function ReportsPage() {
               <NEDeclarationView periodId={selectedPeriod} />
             </TabsContent>
           )}
-          <TabsContent value="sru-export">
-            <SRUExportView periodId={selectedPeriod} />
-          </TabsContent>
           <TabsContent value="huvudbok">
             <GeneralLedgerView periodId={selectedPeriod} />
           </TabsContent>

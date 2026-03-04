@@ -20,10 +20,12 @@ import InvoiceMatchDialog from '@/components/transactions/InvoiceMatchDialog'
 import TransactionBookingDialog from '@/components/transactions/TransactionBookingDialog'
 import QuickReviewDialog from '@/components/transactions/QuickReviewDialog'
 import DescribeTransactionDialog from '@/components/transactions/DescribeTransactionDialog'
+import TemplatePicker from '@/components/transactions/TemplatePicker'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/components/transactions/transaction-types'
 import { getDefaultAccountForCategory, getDefaultVatTreatmentForCategory } from '@/lib/bookkeeping/category-mapping'
+import { getTemplateById, type BookingTemplate } from '@/lib/bookkeeping/booking-templates'
 import type { TransactionWithInvoice, ViewMode, CategorizeHandler } from '@/components/transactions/transaction-types'
-import type { TransactionCategory, CreateTransactionInput, Invoice, Customer, VatTreatment, InvoiceInboxItem } from '@/types'
+import type { TransactionCategory, CreateTransactionInput, Invoice, Customer, VatTreatment, InvoiceInboxItem, EntityType } from '@/types'
 import type { SuggestedCategory, SuggestedTemplate } from '@/lib/transactions/category-suggestions'
 import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
 
@@ -54,11 +56,17 @@ export default function TransactionsPage() {
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false)
   const [bookingDialogTransaction, setBookingDialogTransaction] = useState<TransactionWithInvoice | null>(null)
 
+  // Template picker dialog
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false)
+  const [templatePickerTransaction, setTemplatePickerTransaction] = useState<TransactionWithInvoice | null>(null)
+
   // Quick review dialog (suggestion review before booking)
   const [quickReviewOpen, setQuickReviewOpen] = useState(false)
   const [quickReviewTransaction, setQuickReviewTransaction] = useState<TransactionWithInvoice | null>(null)
   const [quickReviewCategory, setQuickReviewCategory] = useState<TransactionCategory | null>(null)
   const [quickReviewLabel, setQuickReviewLabel] = useState('')
+  const [quickReviewTemplate, setQuickReviewTemplate] = useState<BookingTemplate | null>(null)
+  const [quickReviewTemplateId, setQuickReviewTemplateId] = useState<string | undefined>(undefined)
 
   // Describe dialog
   const [describeDialogOpen, setDescribeDialogOpen] = useState(false)
@@ -502,8 +510,8 @@ export default function TransactionsPage() {
   }
 
   function openCategoryDialog(transaction: TransactionWithInvoice) {
-    setBookingDialogTransaction(transaction)
-    setBookingDialogOpen(true)
+    setTemplatePickerTransaction(transaction)
+    setTemplatePickerOpen(true)
   }
 
   function handleOpenQuickReview(transaction: TransactionWithInvoice, suggestion: SuggestedCategory) {
@@ -515,17 +523,59 @@ export default function TransactionsPage() {
     setQuickReviewOpen(true)
   }
 
+  function handleTemplateSelected(template: BookingTemplate) {
+    setTemplatePickerOpen(false)
+    const tx = templatePickerTransaction
+    if (!tx) return
+    setQuickReviewTransaction(tx)
+    setQuickReviewCategory(template.fallback_category)
+    setQuickReviewLabel(template.name_sv)
+    setQuickReviewTemplate(template)
+    setQuickReviewTemplateId(template.id)
+    setQuickReviewOpen(true)
+  }
+
+  function handleOpenTemplateReview(transaction: TransactionWithInvoice, templateId: string) {
+    const template = getTemplateById(templateId)
+    if (!template) return
+    setQuickReviewTransaction(transaction)
+    setQuickReviewCategory(template.fallback_category)
+    setQuickReviewLabel(template.name_sv)
+    setQuickReviewTemplate(template)
+    setQuickReviewTemplateId(template.id)
+    setQuickReviewOpen(true)
+  }
+
+  function handleChangeTemplate() {
+    setQuickReviewOpen(false)
+    if (quickReviewTransaction) {
+      setTemplatePickerTransaction(quickReviewTransaction)
+      setTemplatePickerOpen(true)
+    }
+  }
+
+  function handleManualBooking() {
+    setTemplatePickerOpen(false)
+    if (templatePickerTransaction) {
+      setBookingDialogTransaction(templatePickerTransaction)
+      setBookingDialogOpen(true)
+    }
+  }
+
   async function handleQuickReviewConfirm(
     id: string,
     category: TransactionCategory,
     vatTreatment: VatTreatment | undefined,
-    accountOverride: string | undefined
+    accountOverride: string | undefined,
+    templateId?: string
   ): Promise<string | null> {
-    const journalEntryId = await handleCategorize(id, true, category, vatTreatment, accountOverride)
+    const journalEntryId = await handleCategorize(id, true, category, vatTreatment, accountOverride, templateId)
     if (journalEntryId) {
       setQuickReviewOpen(false)
       setQuickReviewTransaction(null)
       setQuickReviewCategory(null)
+      setQuickReviewTemplate(null)
+      setQuickReviewTemplateId(undefined)
     }
     return journalEntryId
   }
@@ -567,7 +617,7 @@ export default function TransactionsPage() {
         onCategorize={handleCategorize}
         onMatchInvoice={handleMatchInvoice}
         onClose={() => setShowSwipeView(false)}
-        entityType={entityType as import('@/types').EntityType}
+        entityType={entityType as EntityType}
       />
     )
   }
@@ -629,6 +679,7 @@ export default function TransactionsPage() {
                   onOpenCategoryDialog={openCategoryDialog}
                   onOpenDescribe={ENABLED_EXTENSION_IDS.has('ai-categorization') ? openDescribeDialog : undefined}
                   onOpenQuickReview={handleOpenQuickReview}
+                  onOpenTemplateReview={handleOpenTemplateReview}
                   onToggleSelect={toggleBatchSelect}
                 />
               ))}
@@ -684,8 +735,27 @@ export default function TransactionsPage() {
         onBooked={handleTransactionBooked}
       />
 
+      <Dialog open={templatePickerOpen} onOpenChange={setTemplatePickerOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Välj mall</DialogTitle>
+          </DialogHeader>
+          <TemplatePicker
+            direction={templatePickerTransaction && templatePickerTransaction.amount < 0 ? 'expense' : 'income'}
+            entityType={entityType as EntityType}
+            suggestedTemplates={templatePickerTransaction ? templateSuggestions[templatePickerTransaction.id] : undefined}
+            onSelect={handleTemplateSelected}
+          />
+          <div className="pt-2 border-t">
+            <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={handleManualBooking}>
+              Bokför manuellt utan mall...
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <QuickReviewDialog
-        key={quickReviewTransaction?.id ?? '' + String(quickReviewCategory)}
+        key={quickReviewTransaction?.id ?? '' + String(quickReviewCategory) + String(quickReviewTemplateId)}
         open={quickReviewOpen}
         onOpenChange={setQuickReviewOpen}
         transaction={quickReviewTransaction}
@@ -693,8 +763,11 @@ export default function TransactionsPage() {
         categoryLabel={quickReviewLabel}
         defaultAccount={quickReviewCategory ? getDefaultAccountForCategory(quickReviewCategory) : ''}
         defaultVat={quickReviewCategory ? (getDefaultVatTreatmentForCategory(quickReviewCategory) ?? 'none') : 'none'}
-        entityType={entityType as import('@/types').EntityType}
+        entityType={entityType as EntityType}
+        template={quickReviewTemplate}
+        templateId={quickReviewTemplateId}
         onConfirm={handleQuickReviewConfirm}
+        onChangeTemplate={handleChangeTemplate}
       />
 
       <DescribeTransactionDialog

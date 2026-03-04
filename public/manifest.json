@@ -1,6 +1,6 @@
 {
-  "name": "ERP Base",
-  "short_name": "ERPBase",
+  "name": "Gnubok",
+  "short_name": "Gnubok",
   "description": "Ekonomihantering",
   "start_url": "/",
   "display": "standalone",

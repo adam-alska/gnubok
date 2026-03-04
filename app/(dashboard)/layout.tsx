@@ -29,18 +29,11 @@ export default async function DashboardLayout({
 
   const entityType = (settings.entity_type as EntityType) || 'enskild_firma'
 
-  const [{ data: enabledToggles }, { count: uncategorizedCount }] = await Promise.all([
-    supabase
-      .from('extension_toggles')
-      .select('sector_slug, extension_slug')
-      .eq('user_id', user.id)
-      .eq('enabled', true),
-    supabase
-      .from('transactions')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .is('is_business', null),
-  ])
+  const { count: uncategorizedCount } = await supabase
+    .from('transactions')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .is('is_business', null)
 
   return (
     <div className="min-h-screen bg-background">
@@ -54,7 +47,6 @@ export default async function DashboardLayout({
       <DashboardNav
         companyName={settings.company_name || 'Min verksamhet'}
         entityType={entityType}
-        enabledExtensions={enabledToggles || []}
         uncategorizedTransactionCount={uncategorizedCount ?? 0}
       />
       <main id="main-content" className="pb-20 md:pb-0 md:pl-[232px]" role="main">

@@ -3,9 +3,9 @@
 import { useState, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
-import { ArrowLeftRight, FileText } from 'lucide-react'
+import { ArrowLeftRight, FileText, ArrowLeft } from 'lucide-react'
 
 // Bank file import components
 import BankFileUploadStep from '@/components/import/BankFileUploadStep'
@@ -64,7 +64,6 @@ function BankFileImportWizard() {
   const [detectedFormatName, setDetectedFormatName] = useState<string | null>(null)
   const [fileHash, setFileHash] = useState<string>('')
   const [filename, setFilename] = useState<string>('')
-  const [existingTxCount, setExistingTxCount] = useState(0)
   const [rawFileContent, setRawFileContent] = useState<string>('')
 
   // Column mapping for generic CSV
@@ -110,8 +109,6 @@ function BankFileImportWizard() {
       setDetectedFormatName(data.data.detected_format_name)
       setFileHash(data.data.file_hash)
       setFilename(data.data.filename)
-      setExistingTxCount(data.data.existing_transaction_count)
-
       // Store headers for generic CSV mapping
       if (data.data.headers) {
         setCsvHeaders(data.data.headers)
@@ -200,7 +197,6 @@ function BankFileImportWizard() {
     setDetectedFormatName(null)
     setFileHash('')
     setFilename('')
-    setExistingTxCount(0)
     setIngestResult(null)
     setBankError(null)
     setCsvHeaders([])
@@ -245,7 +241,6 @@ function BankFileImportWizard() {
       {bankStep === 'preview' && parseResult && (
         <BankFilePreviewStep
           parseResult={parseResult}
-          existingTransactionCount={existingTxCount}
           onContinue={() => {
             if (parseResult.format === 'generic_csv') {
               setBankStep('column_mapping')
@@ -541,10 +536,14 @@ function SIEImportWizard() {
 }
 
 // ============================================================
-// Import Page with Tabs
+// Import Page with Selection Cards
 // ============================================================
 
+type ImportMode = null | 'bank' | 'sie'
+
 export default function ImportPage() {
+  const [mode, setMode] = useState<ImportMode>(null)
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -555,27 +554,59 @@ export default function ImportPage() {
         </p>
       </div>
 
-      {/* Tabbed layout */}
-      <Tabs defaultValue="bank" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="bank">
-            <ArrowLeftRight className="mr-2 h-4 w-4" />
-            Banktransaktioner
-          </TabsTrigger>
-          <TabsTrigger value="sie">
-            <FileText className="mr-2 h-4 w-4" />
-            Bokföringsdata (SIE)
-          </TabsTrigger>
-        </TabsList>
+      {mode === null && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card
+            className="cursor-pointer hover:border-primary/50 transition-colors"
+            onClick={() => setMode('bank')}
+          >
+            <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
+              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                <ArrowLeftRight className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Banktransaktioner</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Importera kontoutdrag från din bank. Stöder CSV, OFX och de flesta svenska banker.
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                CSV, OFX, SEB, Swedbank, Handelsbanken, Nordea m.fl.
+              </p>
+            </CardContent>
+          </Card>
 
-        <TabsContent value="bank">
-          <BankFileImportWizard />
-        </TabsContent>
+          <Card
+            className="cursor-pointer hover:border-primary/50 transition-colors"
+            onClick={() => setMode('sie')}
+          >
+            <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
+              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                <FileText className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Bokföringsdata (SIE)</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Importera verifikationer och kontoplan från ett annat bokföringsprogram via SIE-filer.
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                SIE4-format (.se, .si)
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-        <TabsContent value="sie">
-          <SIEImportWizard />
-        </TabsContent>
-      </Tabs>
+      {mode !== null && (
+        <Button variant="ghost" size="sm" onClick={() => setMode(null)}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Tillbaka till val
+        </Button>
+      )}
+
+      {mode === 'bank' && <BankFileImportWizard />}
+      {mode === 'sie' && <SIEImportWizard />}
     </div>
   )
 }

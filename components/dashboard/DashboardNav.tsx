@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -23,16 +23,13 @@ import {
   ChevronDown,
   Building2,
   FileInput,
-  Store,
+  Wallet,
 } from 'lucide-react'
-import { getExtensionDefinition } from '@/lib/extensions/sectors'
-import { resolveIcon } from '@/lib/extensions/icon-resolver'
 import type { EntityType } from '@/types'
 
 interface DashboardNavProps {
   companyName: string
   entityType: EntityType
-  enabledExtensions?: { sector_slug: string; extension_slug: string }[]
   uncategorizedTransactionCount?: number
 }
 
@@ -51,6 +48,7 @@ const navItems: NavItem[] = [
   { href: '/deadlines', label: 'Deadlines', icon: Calendar, group: 'main' },
   { href: '/invoices', label: 'Fakturor', icon: Receipt, group: 'finans' },
   { href: '/customers', label: 'Kunder', icon: Users, group: 'finans' },
+  { href: '/expenses', label: 'Utgifter', icon: Wallet, group: 'finans' },
   // Temporarily hidden pending module rework (see feedback #49)
   { href: '/suppliers', label: 'Leverantörer', icon: Building2, group: 'finans', hidden: true },
   { href: '/supplier-invoices', label: 'Leverantörsfakturor', icon: FileInput, group: 'finans', hidden: true },
@@ -68,7 +66,7 @@ const groupLabels: Record<string, string> = {
   övrigt: 'Övrigt',
 }
 
-export default function DashboardNav({ companyName, entityType, enabledExtensions, uncategorizedTransactionCount = 0 }: DashboardNavProps) {
+export default function DashboardNav({ companyName, entityType, uncategorizedTransactionCount = 0 }: DashboardNavProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -77,46 +75,8 @@ export default function DashboardNav({ companyName, entityType, enabledExtension
   const isOnOvrigtPage = ['/help', '/settings'].some(p => pathname.startsWith(p))
   const [manualOvrigtExpanded, setManualOvrigtExpanded] = useState(false)
   const isOvrigtExpanded = isOnOvrigtPage || manualOvrigtExpanded
-  // Auto-expand Tillägg when on an extension page or marketplace, or when manually toggled (persisted)
-  const isOnExtensionPage = pathname.startsWith('/e/') || pathname.startsWith('/extensions')
-  const [manualTillaggExpanded, setManualTillaggExpanded] = useState(false)
-  const isTillaggExpanded = isOnExtensionPage || manualTillaggExpanded
-
-  // Restore persisted state after hydration to avoid SSR mismatch
-  useEffect(() => {
-    const stored = localStorage.getItem('tillagg-expanded') === 'true'
-    if (stored) setManualTillaggExpanded(true)
-  }, [])
-  const [liveExtensions, setLiveExtensions] = useState(enabledExtensions ?? [])
-
-  const fetchExtensions = useCallback(async () => {
-    try {
-      const res = await fetch('/api/extensions/toggles')
-      if (res.ok) {
-        const { data } = await res.json()
-        if (data) setLiveExtensions(data)
-      }
-    } catch {
-      // keep current state on error
-    }
-  }, [])
-
-  // Fetch extensions on mount if Tillägg starts expanded
-  useEffect(() => {
-    if (isTillaggExpanded) fetchExtensions()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const toggleTillagg = () => {
-    const next = !isTillaggExpanded
-    setManualTillaggExpanded(next)
-    localStorage.setItem('tillagg-expanded', String(next))
-    if (next) fetchExtensions()
-  }
-
   const openMobileMenu = () => {
     setIsMobileMenuOpen(true)
-    fetchExtensions()
   }
 
   const handleLogout = async () => {
@@ -231,68 +191,6 @@ export default function DashboardNav({ companyName, entityType, enabledExtension
                     )
                   })}
                 </div>
-              </div>
-
-              {/* Tillägg - collapsible, with marketplace link */}
-              <div className="mb-4">
-                <button
-                  onClick={toggleTillagg}
-                  className="w-full flex items-center justify-between px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-[0.08em] hover:text-muted-foreground transition-colors"
-                >
-                  <span>Tillägg</span>
-                  <ChevronDown className={cn(
-                    "h-3 w-3 transition-transform duration-200",
-                    isTillaggExpanded && "rotate-180"
-                  )} />
-                </button>
-                {isTillaggExpanded && (
-                  <div className="space-y-px animate-fade-in">
-                    {liveExtensions.length > 0 ? liveExtensions.map((toggle) => {
-                      const def = getExtensionDefinition(toggle.sector_slug, toggle.extension_slug)
-                      if (!def) return null
-                      const ExtIcon = resolveIcon(def.icon)
-                      const href = `/e/${toggle.sector_slug}/${toggle.extension_slug}`
-                      const active = isActive(href)
-                      return (
-                        <Link
-                          key={`${toggle.sector_slug}/${toggle.extension_slug}`}
-                          href={href}
-                          className={cn(
-                            'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
-                            active
-                              ? 'bg-primary/8 text-foreground font-medium'
-                              : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-                          )}
-                        >
-                          <ExtIcon className={cn(
-                            "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
-                            active ? "text-primary" : "text-muted-foreground/70 group-hover:text-muted-foreground"
-                          )} />
-                          {def.name}
-                        </Link>
-                      )
-                    }) : (
-                      <p className="px-3 py-2 text-[12px] text-muted-foreground/60">
-                        Inga tillägg aktiverade
-                      </p>
-                    )}
-                    <Link
-                      href="/extensions"
-                      className={cn(
-                        'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
-                        isActive('/extensions')
-                          ? 'bg-primary/8 text-foreground font-medium'
-                          : 'text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/40'
-                      )}
-                    >
-                      <Store className={cn(
-                        "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
-                        isActive('/extensions') ? "text-primary" : "text-muted-foreground/50 group-hover:text-muted-foreground"
-                      )} />
-                      Utforska fler...
-                    </Link>
-                  </div>
-                )}
               </div>
 
               {/* Övrigt group - collapsible */}
@@ -486,53 +384,6 @@ export default function DashboardNav({ companyName, entityType, enabledExtension
                     </Link>
                   )
                 })}
-              </div>
-
-              {/* Tillägg */}
-              <div className="mb-4">
-                <p className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Tillägg
-                </p>
-                {liveExtensions.length > 0 ? liveExtensions.map((toggle) => {
-                  const def = getExtensionDefinition(toggle.sector_slug, toggle.extension_slug)
-                  if (!def) return null
-                  const ExtIcon = resolveIcon(def.icon)
-                  const href = `/e/${toggle.sector_slug}/${toggle.extension_slug}`
-                  const active = isActive(href)
-                  return (
-                    <Link
-                      key={`${toggle.sector_slug}/${toggle.extension_slug}`}
-                      href={href}
-                      onClick={closeMobileMenu}
-                      className={cn(
-                        'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
-                        active
-                          ? 'bg-primary/10 text-primary font-medium'
-                          : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
-                      )}
-                    >
-                      <ExtIcon className="h-5 w-5" />
-                      {def.name}
-                    </Link>
-                  )
-                }) : (
-                  <p className="px-3 py-2 text-xs text-muted-foreground/60">
-                    Inga tillägg aktiverade
-                  </p>
-                )}
-                <Link
-                  href="/extensions"
-                  onClick={closeMobileMenu}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
-                    isActive('/extensions')
-                      ? 'bg-primary/10 text-primary font-medium'
-                      : 'text-muted-foreground/60 hover:bg-secondary/50 hover:text-foreground'
-                  )}
-                >
-                  <Store className="h-5 w-5" />
-                  Utforska fler...
-                </Link>
               </div>
 
               {/* Other section */}

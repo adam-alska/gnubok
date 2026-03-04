@@ -157,15 +157,21 @@ export async function POST(request: Request) {
     }
   }
 
-  // Generate invoice number with appropriate prefix
-  const { data: baseNumber } = await supabase.rpc('generate_invoice_number', {
-    p_user_id: user.id,
-  })
-  const invoiceNumber = documentType === 'proforma'
-    ? `PF-${baseNumber}`
-    : documentType === 'delivery_note'
-      ? `FS-${baseNumber}`
+  // Generate document number from the appropriate sequence
+  let invoiceNumber: string
+  if (documentType === 'delivery_note') {
+    const { data: dnNumber } = await supabase.rpc('generate_delivery_note_number', {
+      p_user_id: user.id,
+    })
+    invoiceNumber = dnNumber
+  } else {
+    const { data: baseNumber } = await supabase.rpc('generate_invoice_number', {
+      p_user_id: user.id,
+    })
+    invoiceNumber = documentType === 'proforma'
+      ? `PF-${baseNumber}`
       : baseNumber
+  }
 
   // Create invoice
   const { data: invoice, error: invoiceError } = await supabase

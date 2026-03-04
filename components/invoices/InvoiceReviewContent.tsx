@@ -2,7 +2,6 @@
 
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { getVatSummaryFromItems } from '@/lib/invoices/vat-rules'
 import { formatCurrency } from '@/lib/utils'
 import type { Customer, Currency } from '@/types'
 
@@ -48,9 +47,6 @@ export function InvoiceReviewContent({
     non_eu_business: 'Utanför EU',
   }
 
-  // Derive VAT summary from items
-  const vatSummary = getVatSummaryFromItems(items)
-
   // Calculate per-rate VAT breakdown
   const vatByRate = new Map<number, number>()
   for (const item of items) {
@@ -74,11 +70,6 @@ export function InvoiceReviewContent({
           {customerTypeLabel[customer.customer_type] || customer.customer_type}
         </Badge>
       </div>
-
-      {/* VAT treatment */}
-      <Badge className="text-sm px-3 py-1">
-        {vatSummary.label}
-      </Badge>
 
       {/* Dates */}
       <div className="grid grid-cols-2 gap-4 text-sm">

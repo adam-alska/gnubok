@@ -5,9 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
-import { Loader2, Mail, Sparkles } from 'lucide-react'
+import { Loader2, Mail, ArrowLeft } from 'lucide-react'
 import { getErrorMessage } from '@/lib/errors/get-error-message'
 
 export default function LoginPage() {
@@ -61,47 +60,56 @@ export default function LoginPage() {
 
   if (isEmailSent) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10 p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-              <Mail className="h-6 w-6 text-primary" />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-background to-primary/[0.03] p-4">
+        <div className="w-full max-w-sm animate-slide-up space-y-8">
+          <div className="flex justify-center">
+            <div className="h-14 w-14 rounded-2xl bg-primary/8 flex items-center justify-center">
+              <Mail className="h-7 w-7 text-primary" />
             </div>
-            <CardTitle className="text-2xl">Kolla din e-post</CardTitle>
-            <CardDescription>
-              Vi har skickat en inloggningslänk till <strong>{email}</strong>
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <p className="text-sm text-muted-foreground mb-4">
-              Klicka på länken i e-posten för att logga in. Länken är giltig i 1 timme.
+          </div>
+
+          <div className="text-center space-y-2">
+            <h1 className="text-2xl font-medium tracking-tight">Kolla din e-post</h1>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Vi har skickat en inloggningslänk till{' '}
+              <span className="font-medium text-foreground">{email}</span>
             </p>
-            <Button
-              variant="ghost"
-              onClick={() => setIsEmailSent(false)}
-            >
-              Använd en annan e-post
-            </Button>
-          </CardContent>
-        </Card>
+          </div>
+
+          <div className="rounded-xl border bg-card p-4">
+            <p className="text-sm text-muted-foreground text-center leading-relaxed">
+              Klicka på länken i e-posten för att logga in.
+              Länken är giltig i 1 timme.
+            </p>
+          </div>
+
+          <Button
+            variant="ghost"
+            className="w-full text-muted-foreground"
+            onClick={() => setIsEmailSent(false)}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Använd en annan e-post
+          </Button>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-            <Sparkles className="h-6 w-6 text-primary" />
-          </div>
-          <CardTitle className="text-2xl">ERP Base</CardTitle>
-          <CardDescription>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-background to-primary/[0.03] p-4">
+      <div className="w-full max-w-sm animate-slide-up">
+        <div className="text-center mb-10">
+          <h1 className="font-display text-[2.75rem] leading-none font-medium tracking-tight text-foreground">
+            Gnubok
+          </h1>
+          <p className="text-muted-foreground text-sm mt-3">
             Logga in med din e-post för att hantera din ekonomi
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
+          </p>
+        </div>
+
+        <div className="rounded-xl border bg-card p-6" style={{ boxShadow: 'var(--shadow-md)' }}>
+          <form onSubmit={handleLogin} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="email">E-postadress</Label>
               <Input
@@ -114,11 +122,12 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={isLoading}
+                className="h-11"
               />
             </div>
             <Button
               type="submit"
-              className="w-full"
+              className="w-full h-11"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -127,26 +136,24 @@ export default function LoginPage() {
                   Skickar...
                 </>
               ) : (
-                <>
-                  <Mail className="mr-2 h-4 w-4" />
-                  Skicka inloggningslänk
-                </>
+                'Skicka inloggningslänk'
               )}
             </Button>
           </form>
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            Genom att logga in godkänner du våra{' '}
-            <a href="#" className="underline hover:text-primary">
-              villkor
-            </a>{' '}
-            och{' '}
-            <a href="#" className="underline hover:text-primary">
-              integritetspolicy
-            </a>
-            .
-          </p>
-        </CardContent>
-      </Card>
+        </div>
+
+        <p className="mt-6 text-center text-xs text-muted-foreground leading-relaxed">
+          Genom att logga in godkänner du våra{' '}
+          <a href="#" className="underline underline-offset-2 hover:text-foreground transition-colors">
+            villkor
+          </a>{' '}
+          och{' '}
+          <a href="#" className="underline underline-offset-2 hover:text-foreground transition-colors">
+            integritetspolicy
+          </a>
+          .
+        </p>
+      </div>
     </div>
   )
 }

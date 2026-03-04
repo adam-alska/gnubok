@@ -82,26 +82,26 @@ function getExamplePrompts(transaction: TransactionWithInvoice): string[] {
   const isExpense = transaction.amount < 0
 
   if (!isExpense) {
-    return ['Konsultarvode', 'Forsaljning av varor', 'Aterbetalning']
+    return ['Konsultarvode', 'Försäljning av varor', 'Återbetalning']
   }
 
   if (desc.includes('restaurang') || desc.includes('lunch') || desc.includes('middag') || desc.includes('mat')) {
     return ['Lunch med kund', 'Personalmiddag', 'Fika till kontoret']
   }
   if (desc.includes('hotel') || desc.includes('hotell') || desc.includes('boende') || desc.includes('resa')) {
-    return ['Tjansteresa', 'Hotell konferens', 'Flygbiljett']
+    return ['Tjänsteresa', 'Hotell konferens', 'Flygbiljett']
   }
   if (desc.includes('uber') || desc.includes('taxi') || desc.includes('bolt') || desc.includes('sj ')) {
-    return ['Taxi till kund', 'Tjansteresa', 'Pendling']
+    return ['Taxi till kund', 'Tjänsteresa', 'Pendling']
   }
   if (desc.includes('google') || desc.includes('meta') || desc.includes('facebook') || desc.includes('linkedin')) {
-    return ['Online-annonsering', 'SaaS-prenumeration', 'Marknadsforingskampanj']
+    return ['Online-annonsering', 'SaaS-prenumeration', 'Marknadsföringskampanj']
   }
   if (desc.includes('amazon') || desc.includes('aws') || desc.includes('azure') || desc.includes('cloud')) {
     return ['Serverhosting', 'SaaS-prenumeration', 'Kontorsmaterial']
   }
 
-  return ['Kontorsmaterial', 'SaaS-prenumeration', 'Konsulttjanst', 'Reklam']
+  return ['Kontorsmaterial', 'SaaS-prenumeration', 'Konsulttjänst', 'Reklam']
 }
 
 function getVatRateFromTreatment(treatment: string | null): number {
@@ -163,7 +163,7 @@ export default function DescribeTransactionDialog({
       if (!response.ok) {
         toast({
           title: 'Fel',
-          description: result.error || 'Kunde inte soka mallar',
+          description: result.error || 'Kunde inte söka mallar',
           variant: 'destructive',
         })
         setIsSearching(false)
@@ -176,7 +176,7 @@ export default function DescribeTransactionDialog({
     } catch {
       toast({
         title: 'Fel',
-        description: 'Nagot gick fel vid sokning',
+        description: 'Något gick fel vid sökning',
         variant: 'destructive',
       })
     }
@@ -227,7 +227,7 @@ export default function DescribeTransactionDialog({
       if (!response.ok) {
         toast({
           title: 'Fel',
-          description: result.error || 'Kunde inte bokfora transaktion',
+          description: result.error || 'Kunde inte bokföra transaktion',
           variant: 'destructive',
         })
         setIsBooking(false)
@@ -239,14 +239,14 @@ export default function DescribeTransactionDialog({
         setIsBooking(false)
         onCategorized(transaction.id, result.journal_entry_id || null)
       } else {
-        toast({ title: 'Bokford', description: 'Transaktion bokford och verifikation skapad' })
+        toast({ title: 'Bokförd', description: 'Transaktion bokförd och verifikation skapad' })
         onCategorized(transaction.id, result.journal_entry_id || null)
         handleOpenChange(false)
       }
     } catch {
       toast({
         title: 'Fel',
-        description: 'Nagot gick fel vid bokforing',
+        description: 'Något gick fel vid bokföring',
         variant: 'destructive',
       })
       setIsBooking(false)
@@ -282,7 +282,7 @@ export default function DescribeTransactionDialog({
       if (!response.ok) {
         toast({
           title: 'Fel',
-          description: result.error || 'Kunde inte bokfora batch',
+          description: result.error || 'Kunde inte bokföra batch',
           variant: 'destructive',
         })
         setIsBatchApplying(false)
@@ -300,7 +300,7 @@ export default function DescribeTransactionDialog({
       } else {
         toast({
           title: 'Klart',
-          description: `${applied} transaktioner bokforda`,
+          description: `${applied} transaktioner bokförda`,
         })
       }
       onBatchApplied?.(applied)
@@ -308,7 +308,7 @@ export default function DescribeTransactionDialog({
     } catch {
       toast({
         title: 'Fel',
-        description: 'Nagot gick fel vid batchbokforing',
+        description: 'Något gick fel vid batchbokföring',
         variant: 'destructive',
       })
       setIsBatchApplying(false)
@@ -316,7 +316,7 @@ export default function DescribeTransactionDialog({
   }
 
   function handleSkipBatch() {
-    toast({ title: 'Bokford', description: 'Transaktion bokford och verifikation skapad' })
+    toast({ title: 'Bokförd', description: 'Transaktion bokförd och verifikation skapad' })
     handleOpenChange(false)
   }
 
@@ -337,13 +337,13 @@ export default function DescribeTransactionDialog({
         <DialogHeader>
           <DialogTitle>
             {step === 'describe' && 'Beskriv transaktion'}
-            {step === 'pick' && 'Valj mall'}
-            {step === 'batch' && 'Bokfor liknande'}
+            {step === 'pick' && 'Välj mall'}
+            {step === 'batch' && 'Bokför liknande'}
           </DialogTitle>
           <DialogDescription>
-            {step === 'describe' && 'Beskriv vad transaktionen galler sa hittar vi ratt bokforingsmall'}
-            {step === 'pick' && 'Valj den mall som stammer bast'}
-            {step === 'batch' && 'Transaktion bokford!'}
+            {step === 'describe' && 'Beskriv vad transaktionen gäller så hittar vi rätt bokföringsmall'}
+            {step === 'pick' && 'Välj den mall som stämmer bäst'}
+            {step === 'batch' && 'Transaktion bokförd!'}
           </DialogDescription>
         </DialogHeader>
 
@@ -351,11 +351,7 @@ export default function DescribeTransactionDialog({
         {(step === 'describe' || step === 'pick') && (
           <div className="flex items-center gap-3 rounded-lg border p-3">
             <div
-              className={`h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-                isIncome
-                  ? 'bg-success/10 text-success'
-                  : 'bg-destructive/10 text-destructive'
-              }`}
+              className="h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 bg-muted text-muted-foreground"
             >
               {isIncome ? (
                 <ArrowUpRight className="h-4 w-4" />
@@ -367,7 +363,7 @@ export default function DescribeTransactionDialog({
               <p className="font-medium text-sm truncate">{transaction.description}</p>
               <p className="text-xs text-muted-foreground">{formatDate(transaction.date)}</p>
             </div>
-            <p className={`font-medium text-sm flex-shrink-0 ${isIncome ? 'text-success' : ''}`}>
+            <p className="font-medium text-sm flex-shrink-0">
               {isIncome ? '+' : ''}
               {formatCurrency(transaction.amount, transaction.currency)}
             </p>
@@ -378,7 +374,7 @@ export default function DescribeTransactionDialog({
         {step === 'describe' && (
           <div className="space-y-4">
             <Textarea
-              placeholder="Beskriv vad transaktionen galler, t.ex. 'lunch med kund' eller 'kontorsmaterial'"
+              placeholder="Beskriv vad transaktionen gäller, t.ex. 'lunch med kund' eller 'kontorsmaterial'"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
@@ -412,7 +408,7 @@ export default function DescribeTransactionDialog({
               ) : (
                 <Search className="mr-2 h-4 w-4" />
               )}
-              {isSearching ? 'Soker...' : 'Sok'}
+              {isSearching ? 'Söker...' : 'Sök'}
             </Button>
           </div>
         )}
@@ -423,7 +419,7 @@ export default function DescribeTransactionDialog({
             {describeResult.needs_more_detail && (
               <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm">
                 <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                <p>Resultaten ar osakra. Forsok beskriv mer detaljerat for battre traffar.</p>
+                <p>Resultaten är osäkra. Försök beskriv mer detaljerat för bättre träffar.</p>
               </div>
             )}
 
@@ -442,7 +438,7 @@ export default function DescribeTransactionDialog({
                         <div className="flex items-center gap-1.5 mb-1">
                           <Sparkles className="h-3.5 w-3.5 text-violet-500" />
                           <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
-                            AI-forslag
+                            AI-förslag
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">
@@ -495,7 +491,7 @@ export default function DescribeTransactionDialog({
               {/* Template cards */}
               {describeResult.templates.length === 0 && !aiSuggestion ? (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  Inga matchande mallar hittades. Forsok med en annan beskrivning.
+                  Inga matchande mallar hittades. Försök med en annan beskrivning.
                 </p>
               ) : (
                 describeResult.templates.map((template) => (
@@ -515,7 +511,7 @@ export default function DescribeTransactionDialog({
                             <p className="font-medium text-sm">{template.name_sv}</p>
                             {aiAgreesWithTop && template.template_id === topTemplate.template_id && (
                               <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
-                                AI bekraftar
+                                AI bekräftar
                               </Badge>
                             )}
                           </div>
@@ -636,7 +632,7 @@ export default function DescribeTransactionDialog({
                 ) : (
                   <Check className="mr-2 h-4 w-4" />
                 )}
-                {isBooking ? 'Bokfor...' : 'Bokfor'}
+                {isBooking ? 'Bokför...' : 'Bokför'}
               </Button>
             </div>
           </div>
@@ -647,7 +643,7 @@ export default function DescribeTransactionDialog({
           <div className="space-y-4">
             <div className="flex items-center gap-3 p-4 rounded-lg bg-success/10">
               <CheckCircle2 className="h-6 w-6 text-success flex-shrink-0" />
-              <p className="text-sm font-medium">Transaktionen ar bokford!</p>
+              <p className="text-sm font-medium">Transaktionen är bokförd!</p>
             </div>
 
             {canBatchApply && (
@@ -656,11 +652,11 @@ export default function DescribeTransactionDialog({
                 <span className="font-medium text-foreground">
                   {describeResult.batch_candidate_count}
                 </span>{' '}
-                obokforda transaktioner fran{' '}
+                obokförda transaktioner från{' '}
                 <span className="font-medium text-foreground">
                   {describeResult.merchant_name}
                 </span>
-                . Anvand samma mall?
+                . Använd samma mall?
               </p>
             )}
 
@@ -671,7 +667,7 @@ export default function DescribeTransactionDialog({
                 onClick={handleSkipBatch}
                 disabled={isBatchApplying}
               >
-                {canBatchApply ? 'Nej, bara den har' : 'Stang'}
+                {canBatchApply ? 'Nej, bara den här' : 'Stäng'}
               </Button>
               {canBatchApply && (
                 <Button
@@ -683,8 +679,8 @@ export default function DescribeTransactionDialog({
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : null}
                   {isBatchApplying
-                    ? 'Bokfor...'
-                    : `Ja, bokfor alla ${describeResult.batch_candidate_count} st`}
+                    ? 'Bokför...'
+                    : `Ja, bokför alla ${describeResult.batch_candidate_count} st`}
                 </Button>
               )}
             </div>

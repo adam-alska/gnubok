@@ -16,19 +16,6 @@ export const EXTENSION_DEFINITIONS: Record<string, ExtensionDefinition[]> = {
           "subscriptionNotice": "Denna integration kräver ett aktivt Enable Banking-abonnemang. Utan abonnemang kommer bankintegration inte att fungera."
     },
     {
-          "slug": "ai-categorization",
-          "name": "AI-kategorisering",
-          "sector": "general",
-          "category": "operations",
-          "icon": "Sparkles",
-          "dataPattern": "core",
-          "description": "AI-drivna kategoriförslag för transaktioner",
-          "longDescription": "Använder AI för att automatiskt föreslå BAS-kontokategorier för dina banktransaktioner. Lär sig från dina tidigare bokföringsval.",
-          "readsCoreTables": [
-                "transactions"
-          ]
-    },
-    {
           "slug": "ai-chat",
           "name": "AI-assistent",
           "sector": "general",

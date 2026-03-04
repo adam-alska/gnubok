@@ -7,52 +7,52 @@
 const ACCOUNT_NAMES: Record<string, string> = {
   // Assets (1xxx)
   '1510': 'Kundfordringar',
-  '1930': 'Foretagskonto',
+  '1930': 'Företagskonto',
 
   // Equity & Liabilities (2xxx)
-  '2013': 'Ovriga egna uttag',
-  '2018': 'Egna insattningar',
-  '2440': 'Leverantorsskulder',
+  '2013': 'Övriga egna uttag',
+  '2018': 'Egna insättningar',
+  '2440': 'Leverantörsskulder',
   '2611': 'Utg. moms 25%',
   '2621': 'Utg. moms 12%',
   '2631': 'Utg. moms 6%',
-  '2614': 'Utg. moms omvand',
+  '2614': 'Utg. moms omvänd',
   '2641': 'Ing. moms',
-  '2645': 'Beraknad ing. moms',
-  '2893': 'Skuld till agare',
+  '2645': 'Beräknad ing. moms',
+  '2893': 'Skuld till ägare',
 
   // Revenue (3xxx)
-  '3001': 'Forsaljning 25%',
-  '3002': 'Forsaljning 12%',
-  '3003': 'Forsaljning 6%',
-  '3004': 'Momsfri forsaljning',
-  '3305': 'Exportforsaljning',
-  '3308': 'EU-tjanster',
-  '3900': 'Ovriga rorelseintakter',
+  '3001': 'Försäljning 25%',
+  '3002': 'Försäljning 12%',
+  '3003': 'Försäljning 6%',
+  '3004': 'Momsfri försäljning',
+  '3305': 'Exportförsäljning',
+  '3308': 'EU-tjänster',
+  '3900': 'Övriga rörelseintäkter',
 
   // Cost of goods (4xxx)
-  '4010': 'Varuinkop',
+  '4010': 'Varuinköp',
 
   // External expenses (5xxx)
   '5010': 'Lokalhyra',
-  '5410': 'Forbrukningsinventarier',
+  '5410': 'Förbrukningsinventarier',
   '5420': 'Programvaror',
-  '5460': 'Forbrukningsvaror',
+  '5460': 'Förbrukningsvaror',
   '5611': 'Drivmedel bil',
   '5800': 'Resekostnader',
   '5910': 'Annonsering',
 
   // Other external expenses (6xxx)
   '6071': 'Representation',
-  '6110': 'Kontorsforbrukning',
+  '6110': 'Kontorsförbrukning',
   '6200': 'Telefon & internet',
-  '6530': 'Redovisningstjanster',
+  '6530': 'Redovisningstjänster',
   '6570': 'Bankavgifter',
-  '6991': 'Ovriga kostnader',
+  '6991': 'Övriga kostnader',
 
   // Personnel (7xxx)
   '7610': 'Utbildning',
-  '7960': 'Valutakursforluster',
+  '7960': 'Valutakursförluster',
   '3960': 'Valutakursvinster',
 }
 

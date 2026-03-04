@@ -6,10 +6,6 @@ import { Button } from '@/components/ui/button'
 import {
   CheckCircle,
   XCircle,
-  FileText,
-  Link2,
-  Sparkles,
-  Copy,
   ArrowRight,
   RotateCcw,
   ExternalLink,
@@ -30,12 +26,12 @@ export default function BankFileResultStep({
   return (
     <div className="space-y-6">
       {/* Status header */}
-      <Card className={isSuccess ? 'border-green-300' : 'border-destructive/50'}>
+      <Card className={isSuccess ? 'border-border' : 'border-destructive/50'}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             {isSuccess ? (
               <>
-                <CheckCircle className="h-6 w-6 text-green-600" />
+                <CheckCircle className="h-6 w-6 text-muted-foreground" />
                 Import genomförd
               </>
             ) : (
@@ -52,49 +48,6 @@ export default function BankFileResultStep({
           </CardDescription>
         </CardHeader>
       </Card>
-
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1">
-              <FileText className="h-4 w-4" />
-              <span className="text-sm">Importerade</span>
-            </div>
-            <p className="text-2xl font-bold text-green-600">{result.imported}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1">
-              <Copy className="h-4 w-4" />
-              <span className="text-sm">Dubletter</span>
-            </div>
-            <p className="text-2xl font-bold text-muted-foreground">{result.duplicates}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1">
-              <Sparkles className="h-4 w-4" />
-              <span className="text-sm">Auto-bokförda</span>
-            </div>
-            <p className="text-2xl font-bold">{result.auto_categorized}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1">
-              <Link2 className="h-4 w-4" />
-              <span className="text-sm">Fakturamatchade</span>
-            </div>
-            <p className="text-2xl font-bold">{result.auto_matched_invoices}</p>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Next steps */}
       {isSuccess && (

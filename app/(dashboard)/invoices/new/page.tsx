@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency } from '@/lib/utils'
-import { getVatRules, getAvailableVatRates, getVatSummaryFromItems } from '@/lib/invoices/vat-rules'
+import { getVatRules, getAvailableVatRates } from '@/lib/invoices/vat-rules'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Loader2, Plus, Trash2, ArrowLeft, Send, Eye } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
@@ -413,18 +413,6 @@ export default function NewInvoicePage() {
                   <p className="text-sm text-destructive mt-2">{errors.customer_id.message}</p>
                 )}
 
-                {selectedCustomer && vatRules && (
-                  <div className="mt-4 p-3 bg-muted rounded-lg">
-                    <p className="text-sm">
-                      <strong>Momsbehandling:</strong> {getVatSummaryFromItems(watchItems).label}
-                    </p>
-                    {vatRules.reverseChargeText && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Omvänd skattskyldighet tillämpas
-                      </p>
-                    )}
-                  </div>
-                )}
               </CardContent>
             </Card>
 

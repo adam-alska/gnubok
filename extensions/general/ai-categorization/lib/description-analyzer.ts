@@ -100,37 +100,37 @@ function buildSystemPrompt(entityType: EntityType): string {
   const privateAccount = entityType === 'aktiebolag' ? '2893' : '2013'
   const entityLabel = entityType === 'aktiebolag' ? 'Aktiebolag (AB)' : 'Enskild firma (EF)'
 
-  return `Du ar expert pa svensk bokforing enligt BAS-kontoplanen. Analysera anvandarens beskrivning av en banktransaktion och returnera ett bokforingsforslag.
+  return `Du är expert på svensk bokföring enligt BAS-kontoplanen. Analysera användarens beskrivning av en banktransaktion och returnera ett bokföringsförslag.
 
 VANLIGA BAS-KONTON:
-Utgifter: 5010 Lokalhyra | 5410 Forbrukningsinventarier | 5420 Programvara | 5460 Forbrukningsvaror | 5611 Bil/drivmedel | 5800 Resekostnader | 5910 Annonsering | 6071 Representation mat | 6200 Telefon/internet | 6530 Redovisning/konsult | 6570 Bankavgifter | 6991 Ovriga kostnader | ${entityType === 'aktiebolag' ? '7610' : '6991'} Utbildning
-Intakter: 3001 Forsaljning 25% | 3002 Forsaljning 12% | 3003 Forsaljning 6% | 3305 Export | 3308 EU-tjanster | 3900 Ovriga intakter
-Moms: 2611 Utg moms 25% | 2621 Utg moms 12% | 2631 Utg moms 6% | 2641 Ing moms | 2645 Beraknad ing moms
-Skulder: 2350 Skulder till kreditinstitut (banklan, Almi) | 2440 Leverantorsskulder (ENBART for leverantorsfakturor)
-Ovrigt: 1510 Kundfordringar | 1930 Foretagskonto | 8410 Rantekostnader | ${privateAccount} Privat
+Utgifter: 5010 Lokalhyra | 5410 Förbrukningsinventarier | 5420 Programvara | 5460 Förbrukningsvaror | 5611 Bil/drivmedel | 5800 Resekostnader | 5910 Annonsering | 6071 Representation mat | 6200 Telefon/internet | 6530 Redovisning/konsult | 6570 Bankavgifter | 6991 Övriga kostnader | ${entityType === 'aktiebolag' ? '7610' : '6991'} Utbildning
+Intäkter: 3001 Försäljning 25% | 3002 Försäljning 12% | 3003 Försäljning 6% | 3305 Export | 3308 EU-tjänster | 3900 Övriga intäkter
+Moms: 2611 Utg moms 25% | 2621 Utg moms 12% | 2631 Utg moms 6% | 2641 Ing moms | 2645 Beräknad ing moms
+Skulder: 2350 Skulder till kreditinstitut (banklån, Almi) | 2440 Leverantörsskulder (ENBART för leverantörsfakturor)
+Övrigt: 1510 Kundfordringar | 1930 Företagskonto | 8410 Räntekostnader | ${privateAccount} Privat
 
 MOMSREGLER:
-- standard_25: Normala varor/tjanster (25%)
+- standard_25: Normala varor/tjänster (25%)
 - reduced_12: Livsmedel, hotell, konstverk (12%)
-- reduced_6: Bocker, tidningar, kollektivtrafik, kultur (6%)
-- reverse_charge: Tjanstekop fran utlandet/EU
-- export: Forsaljning utanfor Sverige
-- exempt: Momsfritt (bank, forsakring, sjukvard, utbildning)
+- reduced_6: Böcker, tidningar, kollektivtrafik, kultur (6%)
+- reverse_charge: Tjänsteköp från utlandet/EU
+- export: Försäljning utanför Sverige
+- exempt: Momsfritt (bank, försäkring, sjukvård, utbildning)
 
 VARNINGSREGLER:
-- Representation/maltider: Max 300 kr/person exkl moms for avdragsratt (IL 16 kap 2§)
-- Gavor: Reklamgavor max 300 kr, representationsgavor max 180 kr
-- Blandad anvandning (telefon/dator): Bara yrkesmassig del avdragsgill
-- Bankavgifter, kortavgifter, valutavaxling: MOMSFRIA (exempt)
+- Representation/måltider: Max 300 kr/person exkl moms för avdragsrätt (IL 16 kap 2§)
+- Gåvor: Reklamgåvor max 300 kr, representationsgåvor max 180 kr
+- Blandad användning (telefon/dator): Bara yrkesmässig del avdragsgill
+- Bankavgifter, kortavgifter, valutaväxling: MOMSFRIA (exempt)
 
-Foretagsform: ${entityLabel}
+Företagsform: ${entityLabel}
 Privatkonto: ${privateAccount}
 
 REGLER:
 1. Negativt belopp = utgift: debitera kostnadskonto, kreditera 1930
-2. Positivt belopp = intakt: debitera 1930, kreditera intaktskonto
-3. Ge ett klart reasoning pa svenska som forklarar valet
-4. Lagg till warnings for avdragsbegransningar eller speciella regler
+2. Positivt belopp = intäkt: debitera 1930, kreditera intäktskonto
+3. Ge ett klart reasoning på svenska som förklarar valet
+4. Lägg till warnings för avdragsbegränsningar eller speciella regler
 5. templateId: null (vi matchar mallar separat)`
 }
 
@@ -145,12 +145,12 @@ export async function analyzeDescription(
   const isExpense = input.transactionAmount < 0
 
   const userPrompt = `Transaktion:
-- Anvandarens beskrivning: "${input.description}"
+- Användarens beskrivning: "${input.description}"
 - Banktext: "${input.transactionDescription}"
 - Belopp: ${input.transactionAmount} ${input.currency}
 - Datum: ${input.transactionDate}${input.merchantName ? `\n- Handlare: ${input.merchantName}` : ''}
 
-Analysera och returnera bokforingsforslag med analyze_description-verktyget.`
+Analysera och returnera bokföringsförslag med analyze_description-verktyget.`
 
   let lastError: Error | null = null
 
@@ -248,7 +248,7 @@ function validateResult(
   // Reasoning — must be a non-empty string
   const reasoning = typeof raw.reasoning === 'string' && raw.reasoning.length > 0
     ? raw.reasoning
-    : (isExpense ? 'Utgift bokford pa standardkonto' : 'Intakt bokford pa standardkonto')
+    : (isExpense ? 'Utgift bokförd på standardkonto' : 'Intäkt bokförd på standardkonto')
 
   // Warnings
   const warnings = Array.isArray(raw.warnings)

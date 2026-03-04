@@ -14,8 +14,6 @@ import Step2CompanyDetails from '@/components/onboarding/Step2CompanyDetails'
 import Step3TaxRegistration from '@/components/onboarding/Step3TaxRegistration'
 import Step4PreliminaryTax from '@/components/onboarding/Step4PreliminaryTax'
 import Step5ConnectBank from '@/components/onboarding/Step6ConnectBank'
-import Step6SectorSelection from '@/components/onboarding/Step2SectorSelection'
-import Step7ExtensionSuggestions from '@/components/onboarding/Step3ExtensionSuggestions'
 
 const STEP_TITLES = [
   'Verksamhetsform',
@@ -23,8 +21,6 @@ const STEP_TITLES = [
   'Skatteregistrering',
   'F-skatt',
   'Anslut bank',
-  'Bransch',
-  'Tillägg',
 ]
 
 function translatePeriodError(msg: string): string {
@@ -53,9 +49,8 @@ function OnboardingPageContent() {
   const [isSaving, setIsSaving] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
   const [settings, setSettings] = useState<Partial<CompanySettings>>({})
-  const [sectorSlug, setSectorSlug] = useState<string | null>(null)
 
-  const totalSteps = 7
+  const totalSteps = 5
   const stepTitles = STEP_TITLES
 
   // Load existing settings on mount
@@ -76,10 +71,9 @@ function OnboardingPageContent() {
 
       if (data) {
         setSettings(data)
-        setCurrentStep(data.onboarding_step || 1)
-        if ((data as Record<string, unknown>).sector_slug) {
-          setSectorSlug((data as Record<string, unknown>).sector_slug as string)
-        }
+        const step = data.onboarding_step || 1
+        // Clamp to max steps (handles existing users mid-onboarding from old 7-step flow)
+        setCurrentStep(step > totalSteps ? totalSteps : step)
       }
 
       setIsLoading(false)
@@ -95,9 +89,14 @@ function OnboardingPageContent() {
         title: 'Bank ansluten!',
         description: 'Din bank har kopplats.',
       })
-      saveSettings({}, 6).then((success) => {
+      // Complete onboarding after bank connection
+      saveSettings({ onboarding_complete: true }, totalSteps).then((success) => {
         if (success) {
-          setCurrentStep(6)
+          toast({
+            title: 'Välkommen!',
+            description: 'Din profil är nu redo.',
+          })
+          router.push('/')
         }
       })
     }
@@ -148,6 +147,11 @@ function OnboardingPageContent() {
   }
 
   const handleNext = async (stepData: Partial<CompanySettings>) => {
+    // Fix org number bug: clear dependent fields when entity type changes
+    if (currentStep === 1 && stepData.entity_type && stepData.entity_type !== settings.entity_type) {
+      stepData = { ...stepData, org_number: '', company_name: '' }
+    }
+
     const nextStep = currentStep + 1
     const success = await saveSettings(stepData, nextStep)
 
@@ -275,6 +279,10 @@ function OnboardingPageContent() {
 
       if (nextStep > totalSteps) {
         await saveSettings({ onboarding_complete: true }, totalSteps)
+        toast({
+          title: 'Välkommen!',
+          description: 'Din profil är nu redo.',
+        })
         router.push('/')
       } else {
         setCurrentStep(nextStep)
@@ -307,41 +315,6 @@ function OnboardingPageContent() {
 
   const progressPercent = ((currentStep - 1) / (totalSteps - 1)) * 100
 
-  const handleSectorNext = async (data: { sector_slug: string | null }) => {
-    setSectorSlug(data.sector_slug)
-    const nextStep = currentStep + 1
-    const settingsUpdate: Partial<CompanySettings> = {}
-    if (data.sector_slug) {
-      ;(settingsUpdate as Record<string, unknown>).sector_slug = data.sector_slug
-    }
-    const success = await saveSettings(settingsUpdate, nextStep)
-    if (success) {
-      setCurrentStep(nextStep)
-    }
-  }
-
-  const handleExtensionsNext = async (data: { enabled_extensions: { sector_slug: string; extension_slug: string }[] }) => {
-    // Insert extension toggles if any were selected
-    if (data.enabled_extensions.length > 0) {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          const rows = data.enabled_extensions.map(ext => ({
-            user_id: user.id,
-            sector_slug: ext.sector_slug,
-            extension_slug: ext.extension_slug,
-            enabled: true,
-          }))
-          await supabase.from('extension_toggles').upsert(rows, {
-            onConflict: 'user_id,sector_slug,extension_slug',
-          })
-        }
-      } catch (err) {
-        console.error('Failed to save extension toggles:', err)
-      }
-    }
-  }
-
   const renderSteps = () => (
     <>
       {currentStep === 1 && (
@@ -354,6 +327,7 @@ function OnboardingPageContent() {
 
       {currentStep === 2 && (
         <Step2CompanyDetails
+          key={settings.entity_type}
           initialData={{
             company_name: settings.company_name ?? undefined,
             org_number: settings.org_number ?? undefined,
@@ -379,6 +353,7 @@ function OnboardingPageContent() {
             accounting_method: (settings.accounting_method as 'accrual' | 'cash') ?? undefined,
           }}
           entityType={settings.entity_type as EntityType}
+          orgNumber={settings.org_number ?? undefined}
           onNext={(data) => handleNext(data)}
           onBack={handleBack}
           isSaving={isSaving}
@@ -408,29 +383,8 @@ function OnboardingPageContent() {
           }}
           onComplete={async (data) => {
             if (data) {
-              await saveSettings(data, 6)
+              await saveSettings(data, totalSteps)
             }
-            setCurrentStep(6)
-          }}
-          onBack={handleBack}
-          onSkip={() => setCurrentStep(6)}
-          isSaving={isSaving}
-        />
-      )}
-
-      {currentStep === 6 && (
-        <Step6SectorSelection
-          onNext={handleSectorNext}
-          onBack={handleBack}
-          isSaving={isSaving}
-        />
-      )}
-
-      {currentStep === 7 && (
-        <Step7ExtensionSuggestions
-          sectorSlug={sectorSlug}
-          onNext={async (data) => {
-            await handleExtensionsNext(data)
             await saveSettings({ onboarding_complete: true }, totalSteps)
             toast({
               title: 'Välkommen!',
@@ -439,6 +393,14 @@ function OnboardingPageContent() {
             router.push('/')
           }}
           onBack={handleBack}
+          onSkip={async () => {
+            await saveSettings({ onboarding_complete: true }, totalSteps)
+            toast({
+              title: 'Välkommen!',
+              description: 'Din profil är nu redo.',
+            })
+            router.push('/')
+          }}
           isSaving={isSaving}
         />
       )}

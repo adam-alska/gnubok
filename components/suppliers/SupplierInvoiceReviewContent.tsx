@@ -72,20 +72,20 @@ function buildJournalPreview(
     const fiktivVat = Math.round(subtotal * vatRate * 100) / 100
     lines.push({
       account_number: '2645',
-      description: 'Beraknad ingaende moms',
+      description: 'Beräknad ingående moms',
       debit: fiktivVat,
       credit: 0,
     })
     lines.push({
       account_number: '2614',
-      description: 'Utgaende moms omvand',
+      description: 'Utgående moms omvänd',
       debit: 0,
       credit: fiktivVat,
     })
     // Credit: 2440 at subtotal (no real VAT for reverse charge)
     lines.push({
       account_number: '2440',
-      description: 'Leverantorsskulder',
+      description: 'Leverantörsskulder',
       debit: 0,
       credit: Math.round(subtotal * 100) / 100,
     })
@@ -93,7 +93,7 @@ function buildJournalPreview(
     if (totalVat > 0) {
       lines.push({
         account_number: '2641',
-        description: 'Ingaende moms',
+        description: 'Ingående moms',
         debit: Math.round(totalVat * 100) / 100,
         credit: 0,
       })
@@ -101,7 +101,7 @@ function buildJournalPreview(
     // Credit: 2440 at total incl. VAT
     lines.push({
       account_number: '2440',
-      description: 'Leverantorsskulder',
+      description: 'Leverantörsskulder',
       debit: 0,
       credit: Math.round(total * 100) / 100,
     })

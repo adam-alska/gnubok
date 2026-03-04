@@ -37,8 +37,8 @@ export class ResendEmailService implements EmailService {
     }
 
     const from = fromName
-      ? `${fromName} via ERP Base <${DEFAULT_FROM_EMAIL}>`
-      : `ERP Base <${DEFAULT_FROM_EMAIL}>`
+      ? `${fromName} via Gnubok <${DEFAULT_FROM_EMAIL}>`
+      : `Gnubok <${DEFAULT_FROM_EMAIL}>`
 
     try {
       const resend = getResendClient()
@@ -53,8 +53,8 @@ export class ResendEmailService implements EmailService {
           filename: att.filename,
           content: typeof att.content === 'string'
             ? Buffer.from(att.content, 'base64')
-            : att.content,
-          content_type: att.contentType,
+            : Buffer.from(att.content),
+          contentType: att.contentType,
         })),
       })
 

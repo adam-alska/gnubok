@@ -83,11 +83,7 @@ export default function TransactionHistoryList({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div
-                      className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                        transaction.amount > 0
-                          ? 'bg-success/10 text-success'
-                          : 'bg-destructive/10 text-destructive'
-                      }`}
+                      className="h-10 w-10 rounded-full flex items-center justify-center bg-muted text-muted-foreground"
                     >
                       {transaction.amount > 0 ? (
                         <ArrowUpRight className="h-5 w-5" />
@@ -173,11 +169,7 @@ export default function TransactionHistoryList({
                       </Button>
                     )}
                     <div className="text-right">
-                      <p
-                        className={`font-medium ${
-                          transaction.amount > 0 ? 'text-success' : ''
-                        }`}
-                      >
+                      <p className="font-medium">
                         {transaction.amount > 0 ? '+' : ''}
                         {formatCurrency(transaction.amount, transaction.currency)}
                       </p>

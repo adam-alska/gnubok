@@ -9,6 +9,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { ArrowUpRight, ArrowDownRight, FileText, Loader2, MessageSquareText, Paperclip } from 'lucide-react'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/info-tooltip'
 import { formatAccountWithName } from '@/lib/bookkeeping/client-account-names'
+import { getTemplateById } from '@/lib/bookkeeping/booking-templates'
 import type { TransactionWithInvoice, CategorizeHandler } from './transaction-types'
 import type { SuggestedCategory, SuggestedTemplate } from '@/lib/transactions/category-suggestions'
 
@@ -26,6 +27,7 @@ interface TransactionInboxCardProps {
   onOpenCategoryDialog: (transaction: TransactionWithInvoice) => void
   onOpenDescribe?: (transaction: TransactionWithInvoice) => void
   onOpenQuickReview?: (transaction: TransactionWithInvoice, suggestion: SuggestedCategory) => void
+  onOpenTemplateReview?: (transaction: TransactionWithInvoice, templateId: string) => void
   onToggleSelect: (id: string) => void
   onAnimationComplete?: (id: string) => void
 }
@@ -44,6 +46,7 @@ export default function TransactionInboxCard({
   onOpenCategoryDialog,
   onOpenDescribe,
   onOpenQuickReview,
+  onOpenTemplateReview,
   onToggleSelect,
   onAnimationComplete,
 }: TransactionInboxCardProps) {
@@ -174,6 +177,36 @@ export default function TransactionInboxCard({
                   )}
                   Matcha Leverantörsfaktura {transaction.potential_supplier_invoice!.supplier_invoice_number}
                 </Button>
+              ) : templateSuggestions && templateSuggestions.length > 0 ? (
+                <>
+                  {templateSuggestions.slice(0, 2).map((ts, idx) => {
+                    const tmpl = getTemplateById(ts.template_id)
+                    return (
+                      <Button
+                        key={ts.template_id}
+                        size="sm"
+                        variant={idx === 0 ? 'default' : 'outline'}
+                        className="h-8 text-xs"
+                        onClick={() => {
+                          if (onOpenTemplateReview && tmpl) {
+                            onOpenTemplateReview(transaction, ts.template_id)
+                          } else if (topSuggestion) {
+                            handleSuggestionClick(topSuggestion)
+                          }
+                        }}
+                        disabled={isProcessing || isDisabled}
+                      >
+                        {isProcessing && idx === 0 ? (
+                          <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                        ) : null}
+                        {ts.name_sv}
+                        <span className="ml-1 opacity-70 font-normal">
+                          ({ts.debit_account})
+                        </span>
+                      </Button>
+                    )
+                  })}
+                </>
               ) : topSuggestion ? (
                 <Button
                   size="sm"
@@ -199,24 +232,6 @@ export default function TransactionInboxCard({
                 </Button>
               ) : null}
 
-              {/* Secondary suggestions (up to 1 more) */}
-              {!hasInvoiceMatch && suggestions && suggestions.length > 1 && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 text-xs"
-                  onClick={() => handleSuggestionClick(suggestions[1])}
-                  disabled={isProcessing || isDisabled}
-                >
-                  {suggestions[1].label}
-                  {suggestions[1].account && (
-                    <span className="ml-1 text-muted-foreground font-normal">
-                      ({formatAccountWithName(suggestions[1].account)})
-                    </span>
-                  )}
-                </Button>
-              )}
-
               {/* Describe transaction */}
               {onOpenDescribe && (
                 <Button
@@ -231,15 +246,17 @@ export default function TransactionInboxCard({
                 </Button>
               )}
 
-              {/* Open category dialog */}
+              {/* Open category dialog / template picker */}
               <Button
                 size="sm"
-                variant={!hasInvoiceMatch && !topSuggestion ? 'default' : 'outline'}
+                variant={!hasInvoiceMatch && !hasSupplierInvoiceMatch && !topSuggestion && (!templateSuggestions || templateSuggestions.length === 0) ? 'default' : 'outline'}
                 className="h-8 text-xs"
                 onClick={() => onOpenCategoryDialog(transaction)}
                 disabled={isProcessing || isDisabled}
               >
-                {!hasInvoiceMatch && !topSuggestion ? 'Bokför' : 'Bokför manuellt...'}
+                {!hasInvoiceMatch && !hasSupplierInvoiceMatch && !topSuggestion && (!templateSuggestions || templateSuggestions.length === 0)
+                  ? 'Välj mall...'
+                  : 'Välj mall...'}
               </Button>
             </div>
           )}

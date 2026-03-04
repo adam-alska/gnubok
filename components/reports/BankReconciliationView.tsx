@@ -300,7 +300,7 @@ export function BankReconciliationView() {
               </div>
               <div className="flex justify-between pt-2 border-t font-semibold">
                 <span>Differens</span>
-                <span className={status.is_reconciled ? 'text-green-600' : 'text-red-600'}>
+                <span>
                   {formatCurrency(status.difference)}
                 </span>
               </div>
@@ -433,7 +433,7 @@ export function BankReconciliationView() {
                   <tr key={tx.id} className="border-b last:border-0">
                     <td className="py-2">{tx.date}</td>
                     <td className="py-2 truncate max-w-[200px]">{tx.description}</td>
-                    <td className={`py-2 text-right font-mono ${tx.amount >= 0 ? 'text-green-600' : ''}`}>
+                    <td className="py-2 text-right font-mono">
                       {formatCurrency(tx.amount)}
                     </td>
                     <td className="py-2 text-xs text-muted-foreground">{tx.reference || '—'}</td>
@@ -506,7 +506,7 @@ export function BankReconciliationView() {
                       <td className="py-2 truncate max-w-[300px]">
                         {line.line_description || line.entry_description}
                       </td>
-                      <td className={`py-2 text-right font-mono ${amount >= 0 ? 'text-green-600' : ''}`}>
+                      <td className="py-2 text-right font-mono">
                         {formatCurrency(amount)}
                       </td>
                       <td className="py-2 text-xs text-muted-foreground">{line.source_type}</td>
@@ -554,7 +554,7 @@ export function BankReconciliationView() {
                     <tr key={tx.id} className="border-b last:border-0">
                       <td className="py-2">{tx.date}</td>
                       <td className="py-2 truncate max-w-[300px]">{tx.description}</td>
-                      <td className={`py-2 text-right font-mono ${tx.amount >= 0 ? 'text-green-600' : ''}`}>
+                      <td className="py-2 text-right font-mono">
                         {formatCurrency(tx.amount)}
                       </td>
                       <td className="py-2">

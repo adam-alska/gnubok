@@ -4,6 +4,10 @@ import { createJournalEntry } from '@/lib/bookkeeping/engine'
 import { generateTrialBalance } from '@/lib/reports/trial-balance'
 import { generateIncomeStatement } from '@/lib/reports/income-statement'
 import { lockPeriod, closePeriod, createNextPeriod } from './period-service'
+import {
+  previewCurrencyRevaluation,
+  executeCurrencyRevaluation,
+} from '@/lib/bookkeeping/currency-revaluation'
 import type {
   YearEndValidation,
   YearEndPreview,
@@ -103,6 +107,40 @@ export async function validateYearEndReadiness(
 
   if ((entryCount ?? 0) === 0) {
     warnings.push('No posted journal entries in this period')
+  }
+
+  // Check: foreign currency items exist but haven't been revalued
+  const { count: revalCount } = await supabase
+    .from('journal_entries')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('fiscal_period_id', fiscalPeriodId)
+    .eq('source_type', 'currency_revaluation')
+    .eq('status', 'posted')
+
+  if ((revalCount ?? 0) === 0) {
+    // Check if there are any open foreign currency items
+    const { count: fxReceivables } = await supabase
+      .from('invoices')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .in('status', ['sent', 'overdue'])
+      .neq('currency', 'SEK')
+      .not('exchange_rate', 'is', null)
+
+    const { count: fxPayables } = await supabase
+      .from('supplier_invoices')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .in('status', ['registered', 'approved', 'overdue', 'partially_paid'])
+      .neq('currency', 'SEK')
+      .not('exchange_rate', 'is', null)
+
+    if (((fxReceivables ?? 0) + (fxPayables ?? 0)) > 0) {
+      warnings.push(
+        'Open foreign currency items exist but have not been revalued (ÅRL 4:13)'
+      )
+    }
   }
 
   return {
@@ -212,12 +250,33 @@ export async function previewYearEndClosing(
     }
   }
 
+  // Fetch fiscal period for closing date
+  const { data: periodData } = await supabase
+    .from('fiscal_periods')
+    .select('period_end')
+    .eq('id', fiscalPeriodId)
+    .eq('user_id', userId)
+    .single()
+
+  let currencyRevaluation = null
+  if (periodData) {
+    const revalPreview = await previewCurrencyRevaluation(
+      supabase,
+      userId,
+      periodData.period_end
+    )
+    if (revalPreview.items.length > 0) {
+      currencyRevaluation = revalPreview
+    }
+  }
+
   return {
     netResult,
     closingAccount,
     closingAccountName,
     closingLines,
     resultAccountSummary,
+    currencyRevaluation,
   }
 }
 
@@ -255,14 +314,24 @@ export async function executeYearEndClosing(
     throw new Error('Fiscal period not found')
   }
 
-  // 2. Get closing preview
+  // 2. Execute currency revaluation BEFORE closing entry
+  //    Revaluation posts to 3960/7960 (class 3/7 result accounts) which
+  //    the closing entry then zeros out.
+  const revaluationResult = await executeCurrencyRevaluation(
+    supabase,
+    userId,
+    period.period_end,
+    fiscalPeriodId
+  )
+
+  // 3. Get closing preview (now includes revaluation effects in trial balance)
   const preview = await previewYearEndClosing(supabase, userId, fiscalPeriodId)
 
   if (preview.closingLines.length === 0) {
     throw new Error('No result accounts to close — period has no activity')
   }
 
-  // 3. Create closing entry via the journal engine
+  // 4. Create closing entry via the journal engine
   const closingEntry = await createJournalEntry(supabase, userId, {
     fiscal_period_id: fiscalPeriodId,
     entry_date: period.period_end,
@@ -272,7 +341,7 @@ export async function executeYearEndClosing(
     lines: preview.closingLines,
   })
 
-  // 4. Update fiscal period with closing_entry_id
+  // 5. Update fiscal period with closing_entry_id
   const { error: updateError } = await supabase
     .from('fiscal_periods')
     .update({ closing_entry_id: closingEntry.id })
@@ -283,16 +352,16 @@ export async function executeYearEndClosing(
     throw new Error(`Failed to set closing_entry_id: ${updateError.message}`)
   }
 
-  // 5. Lock the period
+  // 6. Lock the period
   await lockPeriod(supabase, userId, fiscalPeriodId)
 
-  // 6. Close the period
+  // 7. Close the period
   await closePeriod(supabase, userId, fiscalPeriodId)
 
-  // 7. Create next period
+  // 8. Create next period
   const nextPeriod = await createNextPeriod(supabase, userId, fiscalPeriodId)
 
-  // 8. Generate opening balances in next period
+  // 9. Generate opening balances in next period
   const openingBalanceEntry = await generateOpeningBalances(
     supabase,
     userId,
@@ -319,6 +388,7 @@ export async function executeYearEndClosing(
     closingEntry,
     nextPeriod,
     openingBalanceEntry,
+    revaluationEntry: revaluationResult?.entry ?? null,
   }
 }
 

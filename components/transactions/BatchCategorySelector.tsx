@@ -64,7 +64,7 @@ export default function BatchCategorySelector({
             <div className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3">
               <Paperclip className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
               <p className="text-xs text-amber-800 dark:text-amber-300">
-                Underlag behover bifogas separat for varje transaktion efter bokforing.
+                Underlag behöver bifogas separat för varje transaktion efter bokföring.
               </p>
             </div>
 

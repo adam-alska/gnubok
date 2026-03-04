@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -49,6 +49,7 @@ interface Step3Output {
 interface Step3Props {
   initialData: Partial<Step3Output>
   entityType?: EntityType
+  orgNumber?: string
   onNext: (data: Step3Output) => void
   onBack: () => void
   isSaving: boolean
@@ -138,6 +139,7 @@ function getABFirstYearEndDates(
 export default function Step3TaxRegistration({
   initialData,
   entityType,
+  orgNumber,
   onNext,
   onBack,
   isSaving,
@@ -149,6 +151,7 @@ export default function Step3TaxRegistration({
     handleSubmit,
     watch,
     control,
+    setValue,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -173,6 +176,17 @@ export default function Step3TaxRegistration({
   const firstYearEnd = watch('first_year_end')
   const fiscalYearEndMonth = watch('fiscal_year_end_month')
   const accountingMethod = watch('accounting_method')
+
+  // Auto-fill VAT number when vat_registered toggles on
+  const vatNumber = watch('vat_number')
+  useEffect(() => {
+    if (vatRegistered && !vatNumber && orgNumber) {
+      const cleaned = orgNumber.replace(/[-\s]/g, '')
+      if (cleaned.length >= 10) {
+        setValue('vat_number', `SE${cleaned}01`)
+      }
+    }
+  }, [vatRegistered, vatNumber, orgNumber, setValue])
 
   // State for AB first-year end month selector
   const [abEndMonth, setAbEndMonth] = useState<number>(
@@ -361,18 +375,79 @@ export default function Step3TaxRegistration({
               {isFirstYear && (
                 <div className="space-y-4 rounded-lg bg-muted/50 p-4">
                   <div className="space-y-2">
-                    <Label htmlFor="first_year_start">Startdatum</Label>
+                    <Label>Startdatum</Label>
                     <Controller
                       name="first_year_start"
                       control={control}
-                      render={({ field }) => (
-                        <Input
-                          id="first_year_start"
-                          type="date"
-                          value={field.value || ''}
-                          onChange={(e) => field.onChange(e.target.value)}
-                        />
-                      )}
+                      render={({ field }) => {
+                        const parsed = field.value ? (() => {
+                          const d = new Date(field.value)
+                          if (isNaN(d.getTime())) return null
+                          return { day: d.getDate(), month: d.getMonth() + 1, year: d.getFullYear() }
+                        })() : null
+
+                        const selectedDay = parsed?.day ?? 0
+                        const selectedMonth = parsed?.month ?? 0
+                        const selectedYear = parsed?.year ?? 0
+
+                        const currentYear = new Date().getFullYear()
+                        const years = Array.from({ length: 7 }, (_, i) => currentYear - 5 + i)
+
+                        const maxDays = selectedMonth && selectedYear
+                          ? lastDayOfMonth(selectedYear, selectedMonth)
+                          : 31
+
+                        const compose = (day: number, month: number, year: number) => {
+                          if (day && month && year) {
+                            const clamped = Math.min(day, lastDayOfMonth(year, month))
+                            field.onChange(`${year}-${String(month).padStart(2, '0')}-${String(clamped).padStart(2, '0')}`)
+                          }
+                        }
+
+                        return (
+                          <div className="grid grid-cols-3 gap-2">
+                            <Select
+                              value={selectedDay ? selectedDay.toString() : ''}
+                              onValueChange={(v) => compose(parseInt(v), selectedMonth, selectedYear)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Dag" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.from({ length: maxDays }, (_, i) => i + 1).map((d) => (
+                                  <SelectItem key={d} value={d.toString()}>{d}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select
+                              value={selectedMonth ? selectedMonth.toString() : ''}
+                              onValueChange={(v) => compose(selectedDay, parseInt(v), selectedYear)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Månad" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {monthNames.map((name, i) => (
+                                  <SelectItem key={i + 1} value={(i + 1).toString()}>{name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select
+                              value={selectedYear ? selectedYear.toString() : ''}
+                              onValueChange={(v) => compose(selectedDay, selectedMonth, parseInt(v))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="År" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {years.map((y) => (
+                                  <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )
+                      }}
                     />
                     <p className="text-xs text-muted-foreground">
                       Dagen verksamheten startade (bör vara den 1:a i en månad).
@@ -593,7 +668,7 @@ export default function Step3TaxRegistration({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="monthly">Månad</SelectItem>
-                            <SelectItem value="quarterly">Kvartal (rekommenderas)</SelectItem>
+                            <SelectItem value="quarterly">Kvartal</SelectItem>
                             <SelectItem value="yearly">År</SelectItem>
                           </SelectContent>
                         </Select>

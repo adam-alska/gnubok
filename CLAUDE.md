@@ -251,7 +251,7 @@ Path params extracted as `_paramName` search params (e.g., `/:id` → `searchPar
 ## Database & Migrations
 
 **Location**: `supabase/migrations/` — 45 files, numbered `20240101000001`–`20240101000045`.
-**Next migration**: `20240101000046_*.sql`
+**Next migration**: `20240101000049_*.sql`
 
 ### Placeholder Migrations
 

@@ -121,7 +121,7 @@ export function createReceiptMatchedPayload(
 export function createMissingUnderlagPayload(count: number): NotificationPayload {
   return {
     title: 'Saknade underlag',
-    body: `${count} verifikation(er) saknar underlag. Bifoga for att uppfylla bokforingslagen.`,
+    body: `${count} verifikation(er) saknar underlag. Bifoga för att uppfylla bokföringslagen.`,
     icon: '/icons/icon-192.png',
     badge: '/icons/badge-72.png',
     tag: 'missing-underlag-weekly',

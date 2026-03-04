@@ -12,31 +12,31 @@
 
 /** Momsdeklaration box number */
 export type MomsBox =
-  | '05'  // Momspliktig forsaljning (taxable sales)
+  | '05'  // Momspliktig försäljning (taxable sales)
   | '06'  // Momspliktiga uttag (taxable withdrawals)
   | '07'  // Vinstmarginalbeskattning (margin scheme)
   | '08'  // Hyresinkomster frivillig beskattning (rental)
-  | '10'  // Utgaende moms 25%
-  | '11'  // Utgaende moms 12%
-  | '12'  // Utgaende moms 6%
-  | '20'  // Inkop varor fran EU
-  | '21'  // Inkop tjanster fran EU
-  | '22'  // Inkop tjanster utanfor EU
-  | '23'  // Inkop varor Sverige omvand skattskyldighet
-  | '24'  // Inkop tjanster Sverige omvand skattskyldighet
-  | '30'  // Utgaende moms inkop 25%
-  | '31'  // Utgaende moms inkop 12%
-  | '32'  // Utgaende moms inkop 6%
-  | '35'  // Varuforssaljning till annat EU-land
-  | '36'  // Varuforssaljning utanfor EU (export)
-  | '37'  // Mellanmans inkop trepartshandel
-  | '38'  // Mellanmans forsaljning trepartshandel
-  | '39'  // Tjansteforssaljning EU (huvudregeln)
-  | '40'  // Ovrig forsaljning av tjanster utomlands
-  | '41'  // Forsaljning omvand skattskyldighet Sverige
-  | '42'  // Ovrig forsaljning m.m.
-  | '48'  // Ingaende moms att dra av
-  | '49'  // Moms att betala eller fa tillbaka
+  | '10'  // Utgående moms 25%
+  | '11'  // Utgående moms 12%
+  | '12'  // Utgående moms 6%
+  | '20'  // Inköp varor från EU
+  | '21'  // Inköp tjänster från EU
+  | '22'  // Inköp tjänster utanför EU
+  | '23'  // Inköp varor Sverige omvänd skattskyldighet
+  | '24'  // Inköp tjänster Sverige omvänd skattskyldighet
+  | '30'  // Utgående moms inköp 25%
+  | '31'  // Utgående moms inköp 12%
+  | '32'  // Utgående moms inköp 6%
+  | '35'  // Varuförsäljning till annat EU-land
+  | '36'  // Varuförsäljning utanför EU (export)
+  | '37'  // Mellanmans inköp trepartshandel
+  | '38'  // Mellanmans försäljning trepartshandel
+  | '39'  // Tjänsteförsäljning EU (huvudregeln)
+  | '40'  // Övrig försäljning av tjänster utomlands
+  | '41'  // Försäljning omvänd skattskyldighet Sverige
+  | '42'  // Övrig försäljning m.m.
+  | '48'  // Ingående moms att dra av
+  | '49'  // Moms att betala eller få tillbaka
   | '50'  // Importbeskattningsunderlag
   | '60'  // Importmoms 25%
   | '61'  // Importmoms 12%
@@ -45,35 +45,35 @@ export type MomsBox =
 /** Map BAS revenue account to momsdeklaration box */
 export const ACCOUNT_TO_BOX: Record<string, MomsBox> = {
   // Domestic revenue (taxable) → Box 05
-  '3001': '05',  // Forsaljning varor/tjanster 25%
-  '3002': '05',  // Forsaljning varor/tjanster 12%
-  '3003': '05',  // Forsaljning varor/tjanster 6%
+  '3001': '05',  // Försäljning varor/tjänster 25%
+  '3002': '05',  // Försäljning varor/tjänster 12%
+  '3003': '05',  // Försäljning varor/tjänster 6%
 
   // EU goods (reverse charge, VAT-free) → Box 35
-  '3108': '35',  // Forsaljning varor till annat EU-land
+  '3108': '35',  // Försäljning varor till annat EU-land
   '3521': '35',  // Fakturerade frakter EU (follows goods treatment)
 
   // Non-EU goods export (zero-rated) → Box 36
-  '3105': '36',  // Forsaljning varor export utanfor EU
+  '3105': '36',  // Försäljning varor export utanför EU
   '3522': '36',  // Fakturerade frakter export
 
   // Triangular trade → Box 38
-  '3109': '38',  // Mellanmans forsaljning trepartshandel
+  '3109': '38',  // Mellanmans försäljning trepartshandel
 
   // EU services (reverse charge, main rule) → Box 39
-  '3308': '39',  // Forsaljning tjanster EU
+  '3308': '39',  // Försäljning tjänster EU
 
   // Non-EU services → Box 40
-  '3305': '40',  // Forsaljning tjanster export utanfor EU
+  '3305': '40',  // Försäljning tjänster export utanför EU
 
   // Output VAT → Boxes 10, 11, 12
-  '2611': '10',  // Utgaende moms 25%
-  '2621': '11',  // Utgaende moms 12%
-  '2631': '12',  // Utgaende moms 6%
+  '2611': '10',  // Utgående moms 25%
+  '2621': '11',  // Utgående moms 12%
+  '2631': '12',  // Utgående moms 6%
 
   // Input VAT → Box 48
-  '2641': '48',  // Ingaende moms
-  '2645': '48',  // Beraknad ingaende moms (EU forvarv)
+  '2641': '48',  // Ingående moms
+  '2645': '48',  // Beräknad ingående moms (EU förvärv)
 }
 
 /** Swedish labels for each momsdeklaration box */

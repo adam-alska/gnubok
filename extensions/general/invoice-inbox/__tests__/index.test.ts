@@ -15,6 +15,11 @@ vi.mock('../lib/supplier-matcher', () => ({
   matchSupplier: vi.fn(),
 }))
 
+// Mock api-routes to avoid transitive server-only import from document-analyzer
+vi.mock('../api-routes', () => ({
+  invoiceInboxApiRoutes: [],
+}))
+
 import { createClient } from '@/lib/supabase/server'
 import { invoiceInboxExtension, getSettings, saveSettings } from '../index'
 

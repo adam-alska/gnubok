@@ -116,6 +116,19 @@ export default function JournalEntryForm({
       if (account) {
         updated[index].line_description = account.account_name
       }
+
+      // Auto-fill balancing amount when both amount fields are empty
+      if (!updated[index].debit_amount && !updated[index].credit_amount) {
+        const otherLines = updated.filter((_, i) => i !== index)
+        const otherDebit = otherLines.reduce((sum, l) => sum + (parseFloat(l.debit_amount) || 0), 0)
+        const otherCredit = otherLines.reduce((sum, l) => sum + (parseFloat(l.credit_amount) || 0), 0)
+        const diff = Math.round((otherCredit - otherDebit) * 100) / 100
+        if (diff > 0) {
+          updated[index].debit_amount = diff.toFixed(2)
+        } else if (diff < 0) {
+          updated[index].credit_amount = Math.abs(diff).toFixed(2)
+        }
+      }
     }
 
     setLines(updated)
@@ -191,7 +204,7 @@ export default function JournalEntryForm({
         if (linkFailCount > 0) {
           toast({
             title: 'Underlag kunde inte bifogas',
-            description: `${linkFailCount} fil(er) kunde inte lankas till verifikationen. Forsok igen via bokforingssidan.`,
+            description: `${linkFailCount} fil(er) kunde inte länkas till verifikationen. Försök igen via bokföringssidan.`,
             variant: 'destructive',
           })
         }
@@ -217,7 +230,7 @@ export default function JournalEntryForm({
 
   const formContent = (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-4">
+      <div className={`grid gap-4 ${embedded && initialDate ? 'grid-cols-2' : 'grid-cols-3'}`}>
         <div>
           <Label>Räkenskapsår</Label>
           <select
@@ -232,14 +245,16 @@ export default function JournalEntryForm({
             ))}
           </select>
         </div>
-        <div>
-          <Label>Datum</Label>
-          <Input
-            type="date"
-            value={entryDate}
-            onChange={(e) => setEntryDate(e.target.value)}
-          />
-        </div>
+        {!(embedded && initialDate) && (
+          <div>
+            <Label>Datum</Label>
+            <Input
+              type="date"
+              value={entryDate}
+              onChange={(e) => setEntryDate(e.target.value)}
+            />
+          </div>
+        )}
         <div>
           <Label>Beskrivning</Label>
           <Input
@@ -255,24 +270,24 @@ export default function JournalEntryForm({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left text-muted-foreground">
-              <th className="py-2 w-24">Konto</th>
-              <th className="py-2">Beskrivning</th>
-              <th className="py-2 w-32 text-right">Debet</th>
-              <th className="py-2 w-32 text-right">Kredit</th>
+              <th className="py-2 w-28">Konto</th>
+              <th className="py-2 px-1">Beskrivning</th>
+              <th className="py-2 w-32 px-1 text-right">Debet</th>
+              <th className="py-2 w-32 px-1 text-right">Kredit</th>
               <th className="py-2 w-10"></th>
             </tr>
           </thead>
           <tbody>
             {lines.map((line, index) => (
               <tr key={index} className="border-b">
-                <td className="py-1">
+                <td className="py-1.5">
                   <AccountCombobox
                     value={line.account_number}
                     accounts={accounts}
                     onChange={(num) => updateLine(index, 'account_number', num)}
                   />
                 </td>
-                <td className="py-1 px-1">
+                <td className="py-1.5 px-1">
                   <Input
                     value={line.line_description}
                     onChange={(e) => updateLine(index, 'line_description', e.target.value)}
@@ -280,7 +295,7 @@ export default function JournalEntryForm({
                     className="h-8"
                   />
                 </td>
-                <td className="py-1">
+                <td className="py-1.5 px-1">
                   <Input
                     type="number"
                     value={line.debit_amount}
@@ -291,7 +306,7 @@ export default function JournalEntryForm({
                     step="0.01"
                   />
                 </td>
-                <td className="py-1">
+                <td className="py-1.5 px-1">
                   <Input
                     type="number"
                     value={line.credit_amount}
@@ -302,7 +317,7 @@ export default function JournalEntryForm({
                     step="0.01"
                   />
                 </td>
-                <td className="py-1">
+                <td className="py-1.5">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -318,18 +333,18 @@ export default function JournalEntryForm({
           </tbody>
           <tfoot>
             <tr className="font-semibold">
-              <td colSpan={2} className="py-2">
+              <td colSpan={2} className="py-2 px-1">
                 Summa
               </td>
               <td
-                className={`py-2 text-right ${
+                className={`py-2 px-1 text-right ${
                   isBalanced ? 'text-green-600' : 'text-red-600'
                 }`}
               >
                 {totalDebit.toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
               </td>
               <td
-                className={`py-2 text-right ${
+                className={`py-2 px-1 text-right ${
                   isBalanced ? 'text-green-600' : 'text-red-600'
                 }`}
               >
@@ -390,7 +405,7 @@ export default function JournalEntryForm({
         onConfirm={handleConfirm}
         isSubmitting={isSubmitting}
         title="Granska verifikation"
-        warningText="En verifikation skapas och kan inte ändras efteråt. Korrigeringar görs genom storno."
+        warningText={embedded ? '' : 'En verifikation skapas och kan inte ändras efteråt. Korrigeringar görs genom storno.'}
       >
         <JournalEntryReviewContent
           periodName={periods.find((p) => p.id === selectedPeriod)?.name || ''}
@@ -400,6 +415,8 @@ export default function JournalEntryForm({
           totalDebit={totalDebit}
           totalCredit={totalCredit}
           attachmentCount={uploadedFiles.filter((f) => f.status === 'uploaded').length}
+          showBalanceBadge={!embedded}
+          hideDate={!!embedded}
         />
       </ConfirmationDialog>
 
@@ -413,16 +430,16 @@ export default function JournalEntryForm({
         }}
         isSubmitting={false}
         title="Underlag saknas"
-        warningText="Ingen verifikation har bifogats. Enligt bokforingslagen (BFL) kravs underlag for varje bokforingspost."
-        confirmLabel="Fortsatt anda"
+        warningText="Ingen verifikation har bifogats. Enligt bokföringslagen (BFL) krävs underlag för varje bokföringspost."
+        confirmLabel="Fortsätt ändå"
       >
         <div className="flex items-start gap-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4">
           <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
           <div className="text-sm text-amber-800 dark:text-amber-300">
             <p className="font-medium mb-1">Inget underlag bifogat</p>
             <p>
-              Enligt bokforingslagen (BFL 5 kap. 6-7 §§) ska varje bokforingspost ha en verifikation som
-              underlag. Du kan bifoga underlag nu eller fortsatta utan.
+              Enligt bokföringslagen (BFL 5 kap. 6-7 §§) ska varje bokföringspost ha en verifikation som
+              underlag. Du kan bifoga underlag nu eller fortsätta utan.
             </p>
           </div>
         </div>

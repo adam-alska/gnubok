@@ -67,7 +67,7 @@ export function EmptyState({
             </Link>
           )}
           {onAction && actionLabel && (
-            <Button onClick={onAction} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+            <Button onClick={onAction}>
               <Plus className="mr-2 h-4 w-4" />
               {actionLabel}
             </Button>

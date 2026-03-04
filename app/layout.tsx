@@ -23,13 +23,13 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "ERP Base",
+  title: "Gnubok",
   description: "Ekonomihantering",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "ERP Base",
+    title: "Gnubok",
   },
 };
 

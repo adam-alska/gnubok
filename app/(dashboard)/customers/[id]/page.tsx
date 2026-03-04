@@ -28,9 +28,9 @@ import type { Customer, CustomerType, CreateCustomerInput } from '@/types'
 
 const customerTypeLabels: Record<CustomerType, string> = {
   individual: 'Privatperson',
-  swedish_business: 'Svenskt foretag',
-  eu_business: 'EU-foretag',
-  non_eu_business: 'Utanfor EU',
+  swedish_business: 'Svenskt företag',
+  eu_business: 'EU-företag',
+  non_eu_business: 'Utanför EU',
 }
 
 const customerTypeIcons: Record<CustomerType, React.ElementType> = {
@@ -263,7 +263,7 @@ export default function CustomerDetailPage({
         {/* Business details */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Foretagsuppgifter</CardTitle>
+            <CardTitle className="text-base">Företagsuppgifter</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {customer.org_number && (
@@ -286,7 +286,7 @@ export default function CustomerDetailPage({
               {customer.default_payment_terms || 30} dagar
             </div>
             {!customer.org_number && !customer.vat_number && (
-              <p className="text-sm text-muted-foreground">Inga foretagsuppgifter</p>
+              <p className="text-sm text-muted-foreground">Inga företagsuppgifter</p>
             )}
           </CardContent>
         </Card>
@@ -294,7 +294,7 @@ export default function CustomerDetailPage({
         {/* Summary */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Oversikt</CardTitle>
+            <CardTitle className="text-base">Översikt</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center gap-2 text-sm">
@@ -346,7 +346,7 @@ export default function CustomerDetailPage({
                       {formatCurrency(invoice.total, invoice.currency)}
                     </span>
                     <Badge variant={invoice.payment_status === 'paid' ? 'success' : 'secondary'}>
-                      {invoice.payment_status === 'paid' ? 'Betald' : invoice.payment_status === 'overdue' ? 'Forsenad' : 'Obestallt'}
+                      {invoice.payment_status === 'paid' ? 'Betald' : invoice.payment_status === 'overdue' ? 'Försenad' : 'Obetald'}
                     </Badge>
                   </div>
                 </Link>

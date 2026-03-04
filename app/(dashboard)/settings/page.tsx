@@ -11,19 +11,24 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/components/ui/use-toast'
+import { Separator } from '@/components/ui/separator'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   Loader2,
-  Building,
   CreditCard,
-  User,
   LogOut,
-  Bell,
-  Calendar,
   Sun,
   Moon,
   Monitor,
-  Palette,
   ExternalLink,
+  AlertTriangle,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import type { CompanySettings } from '@/types'
@@ -44,6 +49,10 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<CompanySettings | null>(null)
   const [hasBankingExtension, setHasBankingExtension] = useState(false)
   const [hasNotificationExtension, setHasNotificationExtension] = useState(false)
+  const [hasCalendarExtension, setHasCalendarExtension] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [isDeleting, setIsDeleting] = useState(false)
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
@@ -118,9 +127,10 @@ export default function SettingsPage() {
     setSettings(settingsData)
 
     // Check extension toggles in parallel
-    const [bankingToggleRes, notificationToggleRes] = await Promise.all([
+    const [bankingToggleRes, notificationToggleRes, calendarToggleRes] = await Promise.all([
       fetch('/api/extensions/toggles/general/enable-banking').catch(() => null),
       fetch('/api/extensions/toggles/general/push-notifications').catch(() => null),
+      fetch('/api/extensions/toggles/general/calendar').catch(() => null),
     ])
 
     if (bankingToggleRes?.ok) {
@@ -140,6 +150,11 @@ export default function SettingsPage() {
     if (notificationToggleRes?.ok) {
       const { data } = await notificationToggleRes.json()
       setHasNotificationExtension(data?.enabled || false)
+    }
+
+    if (calendarToggleRes?.ok) {
+      const { data } = await calendarToggleRes.json()
+      setHasCalendarExtension(data?.enabled || false)
     }
 
     setIsLoading(false)
@@ -204,6 +219,33 @@ export default function SettingsPage() {
     router.push('/login')
   }
 
+  async function handleDeleteAccount() {
+    if (deleteConfirmText !== 'RADERA') return
+    setIsDeleting(true)
+
+    try {
+      const response = await fetch('/api/account/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: 'RADERA' }),
+      })
+
+      if (!response.ok) {
+        const result = await response.json()
+        throw new Error(result.error || 'Kunde inte radera kontot')
+      }
+
+      router.push('/login')
+    } catch (error) {
+      toast({
+        title: 'Fel',
+        description: error instanceof Error ? error.message : 'Kunde inte radera kontot',
+        variant: 'destructive',
+      })
+      setIsDeleting(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -224,27 +266,25 @@ export default function SettingsPage() {
       <Tabs defaultValue={initialTab} className="space-y-6">
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="company">
-            <Building className="mr-2 h-4 w-4" />
             Företag
           </TabsTrigger>
           <TabsTrigger value="banking">
-            <CreditCard className="mr-2 h-4 w-4" />
             Bank (PSD2)
           </TabsTrigger>
-          <TabsTrigger value="notifications">
-            <Bell className="mr-2 h-4 w-4" />
-            Aviseringar
-          </TabsTrigger>
-          <TabsTrigger value="calendar">
-            <Calendar className="mr-2 h-4 w-4" />
-            Kalender
-          </TabsTrigger>
+          {hasNotificationExtension && (
+            <TabsTrigger value="notifications">
+              Aviseringar
+            </TabsTrigger>
+          )}
+          {hasCalendarExtension && (
+            <TabsTrigger value="calendar">
+              Kalender
+            </TabsTrigger>
+          )}
           <TabsTrigger value="appearance">
-            <Palette className="mr-2 h-4 w-4" />
             Utseende
           </TabsTrigger>
           <TabsTrigger value="account">
-            <User className="mr-2 h-4 w-4" />
             Konto
           </TabsTrigger>
         </TabsList>
@@ -268,7 +308,11 @@ export default function SettingsPage() {
                       id="company_name"
                       name="company_name"
                       defaultValue={settings?.company_name || ''}
+                      disabled={settings?.onboarding_complete === true}
                     />
+                    {settings?.onboarding_complete && (
+                      <p className="text-xs text-muted-foreground">Kan inte ändras efter att kontot skapats</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="org_number">Organisationsnummer</Label>
@@ -276,7 +320,11 @@ export default function SettingsPage() {
                       id="org_number"
                       name="org_number"
                       defaultValue={settings?.org_number || ''}
+                      disabled={settings?.onboarding_complete === true}
                     />
+                    {settings?.onboarding_complete && (
+                      <p className="text-xs text-muted-foreground">Kan inte ändras efter att kontot skapats</p>
+                    )}
                   </div>
                 </div>
 
@@ -485,32 +533,20 @@ export default function SettingsPage() {
         </TabsContent>
 
         {/* Notification settings — loaded dynamically from extension */}
-        <TabsContent value="notifications">
-          {hasNotificationExtension && NotificationPanel ? (
-            <NotificationPanel />
-          ) : (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <Bell className="h-10 w-10 text-muted-foreground/40 mb-4" />
-                <p className="font-medium mb-1">Push-notiser är inte aktiverade</p>
-                <p className="text-sm text-muted-foreground mb-4 max-w-md">
-                  Aktivera tillägget Push-notiser för att få aviseringar om förfallna fakturor, deadlines och andra händelser.
-                </p>
-                <Button variant="outline" asChild>
-                  <Link href="/extensions">
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    Gå till Tillägg
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
+        {hasNotificationExtension && (
+          <TabsContent value="notifications">
+            {NotificationPanel ? (
+              <NotificationPanel />
+            ) : null}
+          </TabsContent>
+        )}
 
         {/* Calendar feed settings */}
-        <TabsContent value="calendar">
-          <CalendarFeedSettings />
-        </TabsContent>
+        {hasCalendarExtension && (
+          <TabsContent value="calendar">
+            <CalendarFeedSettings />
+          </TabsContent>
+        )}
 
         {/* Appearance settings */}
         <TabsContent value="appearance">
@@ -610,7 +646,7 @@ export default function SettingsPage() {
         </TabsContent>
 
         {/* Account settings */}
-        <TabsContent value="account">
+        <TabsContent value="account" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Kontoinställningar</CardTitle>
@@ -630,8 +666,99 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+
+          <Card className="border-destructive/50">
+            <CardHeader>
+              <CardTitle className="text-destructive">Radera konto</CardTitle>
+              <CardDescription>
+                Permanent borttagning av ditt konto och all data
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                <div className="flex gap-3">
+                  <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                  <div className="space-y-2 text-sm">
+                    <p className="font-medium text-destructive">Varning: Denna åtgärd kan inte ångras</p>
+                    <p className="text-muted-foreground">
+                      All din data raderas permanent — bokföring, fakturor, verifikationer, dokument och inställningar.
+                    </p>
+                    <p className="text-muted-foreground">
+                      Enligt bokföringslagen (BFL 7 kap. 2§) ska räkenskapsinformation bevaras i 7 år. Du ansvarar själv för att exportera och arkivera din bokföringsdata innan du raderar kontot.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Button variant="outline" asChild>
+                  <Link href="/reports?type=sie">
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Exportera bokföringsdata (SIE)
+                  </Link>
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  Radera mitt konto
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Delete account confirmation dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={(open) => {
+        setShowDeleteDialog(open)
+        if (!open) setDeleteConfirmText('')
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Radera konto permanent</DialogTitle>
+            <DialogDescription>
+              All din data raderas permanent. Skriv <strong>RADERA</strong> nedan för att bekräfta.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="delete-confirm">Bekräfta genom att skriva RADERA</Label>
+            <Input
+              id="delete-confirm"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="RADERA"
+              autoComplete="off"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDeleteDialog(false)
+                setDeleteConfirmText('')
+              }}
+              disabled={isDeleting}
+            >
+              Avbryt
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteAccount}
+              disabled={deleteConfirmText !== 'RADERA' || isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Raderar...
+                </>
+              ) : (
+                'Radera permanent'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

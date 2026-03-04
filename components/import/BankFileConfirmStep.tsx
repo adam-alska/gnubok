@@ -1,17 +1,13 @@
 'use client'
 
-import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Label } from '@/components/ui/label'
 import {
   ArrowLeft,
   Loader2,
   Play,
   FileText,
-  AlertTriangle,
   Link2,
   Calendar,
 } from 'lucide-react'
@@ -31,10 +27,27 @@ export default function BankFileConfirmStep({
   onBack,
   isLoading,
 }: BankFileConfirmStepProps) {
-  const [skipDuplicates, setSkipDuplicates] = useState(true)
-
-  const { transactions, stats, date_from, date_to, format_name } = parseResult
+  const { transactions, stats, date_from, date_to } = parseResult
   const refsCount = transactions.filter((t) => t.reference).length
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 space-y-6">
+        <div className="relative">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        </div>
+        <div className="text-center space-y-2">
+          <p className="text-lg font-medium">Importerar transaktioner...</p>
+          <p className="text-sm text-muted-foreground">
+            {stats.parsed_rows} transaktioner bearbetas
+          </p>
+        </div>
+        <div className="w-48 h-1 bg-muted rounded-full overflow-hidden">
+          <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: '60%' }} />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -68,65 +81,33 @@ export default function BankFileConfirmStep({
             </div>
 
             <div className="p-4 bg-muted/50 rounded-lg">
-              <div className="flex items-center gap-2 text-green-600 mb-1">
+              <div className="flex items-center gap-2 text-muted-foreground mb-1">
                 <span className="text-xs">Inkomster</span>
               </div>
-              <p className="text-xl font-bold text-green-600">
+              <p className="text-xl font-bold">
                 {formatCurrency(stats.total_income)}
               </p>
             </div>
 
             <div className="p-4 bg-muted/50 rounded-lg">
-              <div className="flex items-center gap-2 text-red-600 mb-1">
+              <div className="flex items-center gap-2 text-muted-foreground mb-1">
                 <span className="text-xs">Utgifter</span>
               </div>
-              <p className="text-xl font-bold text-red-600">
+              <p className="text-xl font-bold">
                 {formatCurrency(stats.total_expenses)}
               </p>
             </div>
           </div>
 
           {/* Additional info */}
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary">Format: {format_name}</Badge>
-            {refsCount > 0 && (
+          {refsCount > 0 && (
+            <div className="flex flex-wrap gap-2">
               <Badge variant="outline" className="text-blue-600 border-blue-300">
                 <Link2 className="mr-1 h-3 w-3" />
                 {refsCount} med OCR/referens
               </Badge>
-            )}
-          </div>
-
-          {/* Options */}
-          <div className="border rounded-lg p-4 space-y-4">
-            <h3 className="text-sm font-medium">Importinställningar</h3>
-
-            <div className="flex items-center space-x-3">
-              <Checkbox
-                id="skip-duplicates"
-                checked={skipDuplicates}
-                onCheckedChange={(checked) => setSkipDuplicates(checked === true)}
-              />
-              <div>
-                <Label htmlFor="skip-duplicates" className="text-sm font-medium cursor-pointer">
-                  Hoppa över dubletter
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Transaktioner som redan finns i systemet importeras inte igen
-                </p>
-              </div>
             </div>
-
-          </div>
-
-          {/* Warning note */}
-          <div className="flex gap-3 p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-            <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-muted-foreground">
-              Importerade transaktioner visas som &quot;obokförda&quot; på
-              transaktionssidan. Du kan bokföra dem manuellt efteråt.
-            </p>
-          </div>
+          )}
         </CardContent>
       </Card>
 
@@ -138,7 +119,7 @@ export default function BankFileConfirmStep({
         </Button>
         <Button
           onClick={() => onExecute({
-            skip_duplicates: skipDuplicates,
+            skip_duplicates: true,
             auto_categorize: false,
           })}
           disabled={isLoading}

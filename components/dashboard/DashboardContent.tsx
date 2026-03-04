@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { cn, formatCurrency } from '@/lib/utils'
 import {
   calculateEFTax,
@@ -16,18 +15,14 @@ import { UpcomingDeadlinesWidget } from '@/components/deadlines/UpcomingDeadline
 import { TaxTodoWidget } from '@/components/deadlines/TaxTodoWidget'
 import NewUserChecklist from '@/components/onboarding/NewUserChecklist'
 import {
-  TrendingUp,
-  TrendingDown,
   Receipt,
   ArrowLeftRight,
   ChevronDown,
   ChevronUp,
-  ArrowRight,
   Camera,
   Users,
   Landmark,
   CheckCircle2,
-  ClipboardList,
   FileWarning,
 } from 'lucide-react'
 import { getExtensionDefinition } from '@/lib/extensions/sectors'
@@ -113,17 +108,14 @@ export default function DashboardContent({ firstName, settings, summary, onboard
       <Link key="overdue" href="/invoices?status=unpaid" className="group">
         <Card className="h-full border-l-2 border-l-destructive hover:bg-muted/20 transition-colors">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Receipt className="h-4 w-4 text-destructive flex-shrink-0" />
-                <div>
-                  <p className="font-medium text-sm">Förfallna fakturor</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {summary.overdueInvoicesCount} st
-                  </p>
-                </div>
+            <div className="flex items-center gap-3">
+              <Receipt className="h-4 w-4 text-destructive flex-shrink-0" />
+              <div>
+                <p className="font-medium text-sm">Förfallna fakturor</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {summary.overdueInvoicesCount} st
+                </p>
               </div>
-              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground group-hover:translate-x-0.5 transition-all" />
             </div>
           </CardContent>
         </Card>
@@ -136,17 +128,14 @@ export default function DashboardContent({ firstName, settings, summary, onboard
       <Link key="unpaid" href="/invoices?status=unpaid" className="group">
         <Card className="h-full border-l-2 border-l-warning hover:bg-muted/20 transition-colors">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Receipt className="h-4 w-4 text-warning-foreground flex-shrink-0" />
-                <div>
-                  <p className="font-medium text-sm">Obetalda fakturor</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {summary.unpaidInvoicesCount - summary.overdueInvoicesCount} st · {formatCurrency(summary.unpaidInvoicesTotal)}
-                  </p>
-                </div>
+            <div className="flex items-center gap-3">
+              <Receipt className="h-4 w-4 text-warning-foreground flex-shrink-0" />
+              <div>
+                <p className="font-medium text-sm">Obetalda fakturor</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {summary.unpaidInvoicesCount - summary.overdueInvoicesCount} st · {formatCurrency(summary.unpaidInvoicesTotal)}
+                </p>
               </div>
-              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground group-hover:translate-x-0.5 transition-all" />
             </div>
           </CardContent>
         </Card>
@@ -159,17 +148,14 @@ export default function DashboardContent({ firstName, settings, summary, onboard
       <Link key="transactions" href="/transactions" className="group">
         <Card className="h-full border-l-2 border-l-warning hover:bg-muted/20 transition-colors">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <ArrowLeftRight className="h-4 w-4 text-warning-foreground flex-shrink-0" />
-                <div>
-                  <p className="font-medium text-sm">Transaktioner</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {summary.uncategorizedCount} obokförda
-                  </p>
-                </div>
+            <div className="flex items-center gap-3">
+              <ArrowLeftRight className="h-4 w-4 text-warning-foreground flex-shrink-0" />
+              <div>
+                <p className="font-medium text-sm">Transaktioner</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {summary.uncategorizedCount} obokförda
+                </p>
               </div>
-              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground group-hover:translate-x-0.5 transition-all" />
             </div>
           </CardContent>
         </Card>
@@ -182,19 +168,16 @@ export default function DashboardContent({ firstName, settings, summary, onboard
       <Link key="receipts" href="/receipts" className="group">
         <Card className="h-full border-l-2 border-l-primary hover:bg-muted/20 transition-colors">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Camera className="h-4 w-4 text-primary flex-shrink-0" />
-                <div>
-                  <p className="font-medium text-sm">Kvitton</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {summary.receiptQueue.pending_review_count > 0
-                      ? `${summary.receiptQueue.pending_review_count} att granska`
-                      : `${summary.receiptQueue.unmatched_receipts_count} omatchade`}
-                  </p>
-                </div>
+            <div className="flex items-center gap-3">
+              <Camera className="h-4 w-4 text-primary flex-shrink-0" />
+              <div>
+                <p className="font-medium text-sm">Kvitton</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {summary.receiptQueue.pending_review_count > 0
+                    ? `${summary.receiptQueue.pending_review_count} att granska`
+                    : `${summary.receiptQueue.unmatched_receipts_count} omatchade`}
+                </p>
               </div>
-              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground group-hover:translate-x-0.5 transition-all" />
             </div>
           </CardContent>
         </Card>
@@ -207,17 +190,14 @@ export default function DashboardContent({ firstName, settings, summary, onboard
       <Link key="missing-underlag" href="/bookkeeping?missingUnderlag=true" className="group">
         <Card className="h-full border-l-2 border-l-warning hover:bg-muted/20 transition-colors">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <FileWarning className="h-4 w-4 text-warning-foreground flex-shrink-0" />
-                <div>
-                  <p className="font-medium text-sm">Saknade underlag</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {summary.missingUnderlagCount} verifikationer utan underlag
-                  </p>
-                </div>
+            <div className="flex items-center gap-3">
+              <FileWarning className="h-4 w-4 text-warning-foreground flex-shrink-0" />
+              <div>
+                <p className="font-medium text-sm">Saknade underlag</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {summary.missingUnderlagCount} verifikationer utan underlag
+                </p>
               </div>
-              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground group-hover:translate-x-0.5 transition-all" />
             </div>
           </CardContent>
         </Card>
@@ -231,17 +211,14 @@ export default function DashboardContent({ firstName, settings, summary, onboard
       <Link key="bank-expiry" href="/settings?tab=banking" className="group">
         <Card className="h-full border-l-2 border-l-warning hover:bg-muted/20 transition-colors">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Landmark className="h-4 w-4 text-warning-foreground flex-shrink-0" />
-                <div>
-                  <p className="font-medium text-sm">Banksamtycke löper ut</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {conn.bank_name} — {conn.days_left} {conn.days_left === 1 ? 'dag' : 'dagar'} kvar
-                  </p>
-                </div>
+            <div className="flex items-center gap-3">
+              <Landmark className="h-4 w-4 text-warning-foreground flex-shrink-0" />
+              <div>
+                <p className="font-medium text-sm">Banksamtycke löper ut</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {conn.bank_name} — {conn.days_left} {conn.days_left === 1 ? 'dag' : 'dagar'} kvar
+                </p>
               </div>
-              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground group-hover:translate-x-0.5 transition-all" />
             </div>
           </CardContent>
         </Card>
@@ -277,60 +254,32 @@ export default function DashboardContent({ firstName, settings, summary, onboard
         <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">
           {(() => {
             const hour = new Date().getHours()
-            if (hour < 12) return 'Godmorgon'
+            if (hour < 5) return 'God natt'
+            if (hour < 10) return 'Godmorgon'
+            if (hour < 14) return 'Hej'
             if (hour < 18) return 'God eftermiddag'
             return 'God kväll'
           })()}{firstName ? `, ${firstName}` : ''}
         </h1>
         <p className="text-muted-foreground mt-1">
-          {summary.overdueInvoicesCount > 0
-            ? `${summary.overdueInvoicesCount} förfallna fakturor kräver åtgärd`
-            : summary.deadlines.filter(d => !d.is_completed && new Date(d.due_date) <= new Date()).length > 0
-              ? `${summary.deadlines.filter(d => !d.is_completed && new Date(d.due_date) <= new Date()).length} passerade deadlines`
-              : 'Allt är som det ska'}
+          {(() => {
+            if (summary.overdueInvoicesCount > 0)
+              return `${summary.overdueInvoicesCount} förfallna fakturor kräver åtgärd`
+            const passedDeadlines = summary.deadlines.filter(d => !d.is_completed && new Date(d.due_date) <= new Date()).length
+            if (passedDeadlines > 0)
+              return `${passedDeadlines} passerade deadlines`
+            if (summary.uncategorizedCount > 0)
+              return `${summary.uncategorizedCount} obokförda transaktioner`
+            if (summary.receiptQueue && summary.receiptQueue.pending_review_count > 0)
+              return `${summary.receiptQueue.pending_review_count} kvitton att granska`
+            if (summary.missingUnderlagCount > 0)
+              return `${summary.missingUnderlagCount} verifikationer saknar underlag`
+            if (summary.unpaidInvoicesCount > 0)
+              return `${summary.unpaidInvoicesCount} obetalda fakturor`
+            return 'Allt är som det ska'
+          })()}
         </p>
       </header>
-
-      {/* Status pills */}
-      {(() => {
-        const passedDeadlines = summary.deadlines.filter(d => !d.is_completed && new Date(d.due_date) <= new Date())
-        const todoItems: { label: string; href: string; count: number; variant: 'destructive' | 'warning' | 'default' }[] = []
-
-        if (passedDeadlines.length > 0) {
-          todoItems.push({ label: 'passerade deadlines', href: '/deadlines', count: passedDeadlines.length, variant: 'destructive' })
-        }
-        if (summary.overdueInvoicesCount > 0) {
-          todoItems.push({ label: 'förfallna fakturor', href: '/invoices?status=unpaid', count: summary.overdueInvoicesCount, variant: 'destructive' })
-        }
-        if (summary.uncategorizedCount > 0) {
-          todoItems.push({ label: 'obokförda', href: '/transactions', count: summary.uncategorizedCount, variant: 'warning' })
-        }
-        if (summary.receiptQueue && summary.receiptQueue.pending_review_count > 0) {
-          todoItems.push({ label: 'kvitton att granska', href: '/receipts', count: summary.receiptQueue.pending_review_count, variant: 'default' })
-        }
-        if (summary.missingUnderlagCount > 0) {
-          todoItems.push({ label: 'saknade underlag', href: '/bookkeeping?missingUnderlag=true', count: summary.missingUnderlagCount, variant: 'warning' })
-        }
-
-        if (todoItems.length === 0) return null
-
-        return (
-          <section className="mb-10">
-            <div className="flex flex-wrap gap-1.5">
-              {todoItems.map((item) => (
-                <Link key={item.href} href={item.href}>
-                  <Badge
-                    variant={item.variant === 'destructive' ? 'destructive' : item.variant === 'warning' ? 'outline' : 'secondary'}
-                    className="px-2.5 py-1 text-xs cursor-pointer hover:opacity-80 transition-opacity"
-                  >
-                    {item.count} {item.label}
-                  </Badge>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )
-      })()}
 
       {/* New user checklist */}
       {onboardingProgress && (
@@ -358,10 +307,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
               {/* Card 1: Resultat */}
               <Card>
                 <CardContent className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">Resultat</span>
-                  </div>
+                  <p className="text-xs text-muted-foreground mb-2">Resultat</p>
                   <p className={cn(
                     'font-display text-xl font-medium tabular-nums leading-tight',
                     summary.mtd.net >= 0 ? 'text-success' : 'text-destructive'
@@ -379,10 +325,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
               <Link href="/invoices?status=unpaid">
                 <Card className="h-full hover:border-primary/50 transition-colors">
                   <CardContent className="p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Receipt className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">Att få betalt</span>
-                    </div>
+                    <p className="text-xs text-muted-foreground mb-2">Att få betalt</p>
                     <p className="font-display text-xl font-medium tabular-nums leading-tight">
                       {summary.unpaidInvoicesCount}
                       <span className="text-sm ml-0.5 text-muted-foreground font-normal">st</span>
@@ -398,10 +341,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
               {summary.bankBalance !== null ? (
                 <Card>
                   <CardContent className="p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Landmark className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">Banksaldo</span>
-                    </div>
+                    <p className="text-xs text-muted-foreground mb-2">Banksaldo</p>
                     <p className="font-display text-xl font-medium tabular-nums leading-tight">
                       {formatLargeNumber(summary.bankBalance)}
                       <span className="text-sm ml-0.5 text-muted-foreground font-normal">kr</span>
@@ -412,10 +352,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
                 <Link href="/import">
                   <Card className="h-full hover:border-primary/50 transition-colors">
                     <CardContent className="p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Landmark className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">Banksaldo</span>
-                      </div>
+                      <p className="text-xs text-muted-foreground mb-2">Banksaldo</p>
                       <p className="text-sm font-medium text-primary">Koppla bank</p>
                       <p className="text-[11px] text-muted-foreground mt-1">Importera transaktioner</p>
                     </CardContent>
@@ -426,10 +363,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
               {/* Card 4: Att göra */}
               <Card>
                 <CardContent className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <ClipboardList className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">Att göra</span>
-                  </div>
+                  <p className="text-xs text-muted-foreground mb-2">Att göra</p>
                   {todoCount > 0 ? (
                     <>
                       <p className="font-display text-xl font-medium tabular-nums leading-tight text-warning-foreground">
@@ -469,17 +403,14 @@ export default function DashboardContent({ firstName, settings, summary, onboard
                     ? 'border-primary/20 bg-primary/[0.03] hover:bg-primary/[0.06]'
                     : 'border-border/40 hover:bg-muted/30'
                 )}>
-                  <div className={cn(
-                    'p-2 rounded-lg',
-                    action.accent ? 'bg-primary/8' : 'bg-muted/50'
-                  )}>
-                    <Icon className={cn(
-                      'h-4 w-4',
-                      action.accent ? 'text-primary' : 'text-muted-foreground'
-                    )} />
-                  </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{action.label}</p>
+                    <p className="text-sm font-medium truncate flex items-center gap-1.5">
+                      <Icon className={cn(
+                        'h-3.5 w-3.5 flex-shrink-0',
+                        action.accent ? 'text-primary' : 'text-muted-foreground'
+                      )} />
+                      {action.label}
+                    </p>
                     <p className="text-xs text-muted-foreground truncate hidden md:block">{action.desc}</p>
                   </div>
                 </div>
@@ -493,11 +424,11 @@ export default function DashboardContent({ firstName, settings, summary, onboard
               return (
                 <Link key={action.key} href={action.href} className="group">
                   <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/40 hover:bg-muted/30 transition-colors duration-150">
-                    <div className="p-2 rounded-lg bg-muted/50">
-                      <Icon className="h-4 w-4 text-muted-foreground" />
-                    </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{action.label}</p>
+                      <p className="text-sm font-medium truncate flex items-center gap-1.5">
+                        <Icon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                        {action.label}
+                      </p>
                       <p className="text-xs text-muted-foreground truncate hidden md:block">{action.description}</p>
                     </div>
                   </div>
@@ -511,11 +442,11 @@ export default function DashboardContent({ firstName, settings, summary, onboard
                 className="group text-left"
               >
                 <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/40 hover:bg-muted/30 transition-colors duration-150">
-                  <div className="p-2 rounded-lg bg-muted/50">
-                    <Icon className="h-4 w-4 text-muted-foreground" />
-                  </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{action.label}</p>
+                    <p className="text-sm font-medium truncate flex items-center gap-1.5">
+                      <Icon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                      {action.label}
+                    </p>
                     <p className="text-xs text-muted-foreground truncate hidden md:block">{action.description}</p>
                   </div>
                 </div>
@@ -525,21 +456,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
         </div>
       </section>
 
-      {/* Upcoming deadlines — always visible */}
-      {summary.deadlines && summary.deadlines.length > 0 && (
-        <section className="mb-10">
-          <UpcomingDeadlinesWidget deadlines={summary.deadlines} maxItems={8} />
-        </section>
-      )}
-
-      {/* Tax todo widget — visible when there are incomplete tax deadlines */}
-      {summary.deadlines?.some(d => d.deadline_type === 'tax' && !d.is_completed) && (
-        <section className="mb-10">
-          <TaxTodoWidget deadlines={summary.deadlines} />
-        </section>
-      )}
-
-      {/* Alerts section — always visible */}
+      {/* Alerts section */}
       {alertItems.length > 0 && (
         <section id="alerts-section" className="mb-10">
           <h2 className="font-display text-lg font-medium mb-4">Att hantera</h2>
@@ -557,6 +474,21 @@ export default function DashboardContent({ firstName, settings, summary, onboard
           )}
         </section>
       )}
+
+      {/* Upcoming deadlines — always visible */}
+      {summary.deadlines && summary.deadlines.length > 0 && (
+        <section className="mb-10">
+          <UpcomingDeadlinesWidget deadlines={summary.deadlines} maxItems={8} />
+        </section>
+      )}
+
+      {/* Tax todo widget — visible when there are incomplete tax deadlines */}
+      {summary.deadlines?.some(d => d.deadline_type === 'tax' && !d.is_completed) && (
+        <section className="mb-10">
+          <TaxTodoWidget deadlines={summary.deadlines} />
+        </section>
+      )}
+
 
       {/* Collapsible details section */}
       <button
@@ -607,7 +539,6 @@ export default function DashboardContent({ firstName, settings, summary, onboard
                       {' '}saknas i resultatet
                     </p>
                   </div>
-                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground flex-shrink-0 mt-0.5 transition-colors" />
                 </div>
               </Link>
             </section>
@@ -619,10 +550,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
             <div className="grid md:grid-cols-2 gap-3">
               <Card>
                 <CardContent className="p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <TrendingUp className="h-3.5 w-3.5 text-success" />
-                    <span className="text-sm text-muted-foreground">Intäkter</span>
-                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">Intäkter</p>
                   <div>
                     <p className="font-display text-2xl font-medium tabular-nums leading-tight">
                       {formatLargeNumber(summary.mtd.income)}
@@ -641,10 +569,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
 
               <Card>
                 <CardContent className="p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <TrendingDown className="h-3.5 w-3.5 text-destructive" />
-                    <span className="text-sm text-muted-foreground">Kostnader</span>
-                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">Kostnader</p>
                   <div>
                     <p className="font-display text-2xl font-medium tabular-nums leading-tight">
                       {formatLargeNumber(summary.mtd.expenses)}

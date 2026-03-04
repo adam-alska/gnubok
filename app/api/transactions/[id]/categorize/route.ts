@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { eventBus } from '@/lib/events'
 import { ensureInitialized } from '@/lib/init'
 import { buildMappingResultFromCategory } from '@/lib/bookkeeping/category-mapping'
-import { getTemplateById, buildMappingResultFromTemplate } from '@/lib/bookkeeping/booking-templates'
+import { getTemplateById, buildMappingResultFromTemplate, validateTemplateForEntity } from '@/lib/bookkeeping/booking-templates'
 import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-entries'
 import { saveUserMappingRule } from '@/lib/bookkeeping/mapping-engine'
 import { validateBody } from '@/lib/api/validate'
@@ -158,6 +158,12 @@ export async function POST(
   if (body.template_id) {
     const template = getTemplateById(body.template_id)
     if (template) {
+      // Hard entity guard — reject templates that don't match the user's entity type
+      const entityValidation = validateTemplateForEntity(template, entityType)
+      if (!entityValidation.valid) {
+        return NextResponse.json({ error: entityValidation.error }, { status: 400 })
+      }
+
       finalCategory = is_business ? template.fallback_category : 'private'
       console.log(`[categorize] tx=${id} using template="${body.template_id}" (${template.name_sv}) → category=${finalCategory}, debit=${template.debit_account}, credit=${template.credit_account}, vat=${template.vat_treatment}`)
     } else {

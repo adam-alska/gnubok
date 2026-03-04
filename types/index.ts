@@ -64,9 +64,6 @@ export type ReconciliationMethod = 'auto_exact' | 'auto_date_range' | 'auto_refe
 // Bank connection status
 export type BankConnectionStatus = 'pending' | 'active' | 'expired' | 'revoked' | 'error'
 
-// Salary payment status
-export type SalaryPaymentStatus = 'planned' | 'paid' | 'reported'
-
 // Currency types
 export type Currency = 'SEK' | 'EUR' | 'USD' | 'GBP' | 'NOK' | 'DKK'
 
@@ -130,6 +127,7 @@ export interface CompanySettings {
   // Invoice settings
   invoice_prefix: string | null
   next_invoice_number: number
+  next_delivery_note_number: number
   invoice_default_days: number
   invoice_default_notes: string | null
 
@@ -532,34 +530,6 @@ export interface InvoiceItem {
   created_at: string
 }
 
-// Salary Payment (for AB)
-export interface SalaryPayment {
-  id: string
-  user_id: string
-
-  // Payment details
-  gross_amount: number
-  net_amount: number
-
-  // Employer costs
-  employer_tax: number  // Arbetsgivaravgifter (31.42%)
-  preliminary_tax: number  // Employee preliminary tax
-
-  // Dates
-  payment_date: string
-  period_start: string
-  period_end: string
-
-  // Status
-  status: SalaryPaymentStatus
-
-  // Notes
-  notes: string | null
-
-  created_at: string
-  updated_at: string
-}
-
 // Tax Rates (reference table)
 export interface TaxRate {
   id: string
@@ -786,6 +756,7 @@ export type JournalEntrySourceType =
   | 'supplier_invoice_paid'
   | 'supplier_invoice_cash_payment'
   | 'supplier_credit_note'
+  | 'currency_revaluation'
 
 // Journal entry status
 export type JournalEntryStatus = 'draft' | 'posted' | 'reversed'
@@ -1843,12 +1814,45 @@ export interface YearEndPreview {
   closingAccountName: string
   closingLines: CreateJournalEntryLineInput[]
   resultAccountSummary: { account_number: string; account_name: string; amount: number }[]
+  currencyRevaluation: CurrencyRevaluationPreview | null
 }
 
 export interface YearEndResult {
   closingEntry: JournalEntry
   nextPeriod: FiscalPeriod
   openingBalanceEntry: JournalEntry
+  revaluationEntry: JournalEntry | null
+}
+
+// ============================================================
+// Currency Revaluation Types (Omvärdering utländsk valuta)
+// ============================================================
+
+export interface RevaluationItem {
+  type: 'receivable' | 'payable'
+  source_id: string
+  reference: string
+  currency: Currency
+  amount_in_currency: number
+  original_rate: number
+  closing_rate: number
+  original_sek: number
+  closing_sek: number
+  difference_sek: number
+}
+
+export interface CurrencyRevaluationPreview {
+  items: RevaluationItem[]
+  lines: CreateJournalEntryLineInput[]
+  closingRates: Record<string, number>
+  totalGain: number
+  totalLoss: number
+  netEffect: number
+}
+
+export interface CurrencyRevaluationResult {
+  entry: JournalEntry
+  preview: CurrencyRevaluationPreview
 }
 
 export interface PeriodStatus {

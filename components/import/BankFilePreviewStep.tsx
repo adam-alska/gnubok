@@ -25,18 +25,16 @@ import type { BankFileParseResult } from '@/lib/import/bank-file/types'
 
 interface BankFilePreviewStepProps {
   parseResult: BankFileParseResult
-  existingTransactionCount: number
   onContinue: () => void
   onBack: () => void
 }
 
 export default function BankFilePreviewStep({
   parseResult,
-  existingTransactionCount,
   onContinue,
   onBack,
 }: BankFilePreviewStepProps) {
-  const { transactions, stats, issues, date_from, date_to, format_name } = parseResult
+  const { transactions, stats, issues, date_from, date_to } = parseResult
   const hasIssues = issues.filter((i) => i.severity === 'error').length > 0
   const warnings = issues.filter((i) => i.severity === 'warning')
 
@@ -73,11 +71,11 @@ export default function BankFilePreviewStep({
 
         <Card>
           <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-green-600 mb-1">
+            <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <TrendingUp className="h-4 w-4" />
               <span className="text-sm">Inkomster</span>
             </div>
-            <p className="text-lg font-bold text-green-600">
+            <p className="text-lg font-bold">
               {formatCurrency(stats.total_income)}
             </p>
           </CardContent>
@@ -85,28 +83,15 @@ export default function BankFilePreviewStep({
 
         <Card>
           <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-red-600 mb-1">
+            <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <TrendingDown className="h-4 w-4" />
               <span className="text-sm">Utgifter</span>
             </div>
-            <p className="text-lg font-bold text-red-600">
+            <p className="text-lg font-bold">
               {formatCurrency(stats.total_expenses)}
             </p>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Format and duplicate info */}
-      <div className="flex items-center gap-4">
-        <Badge variant="secondary">
-          Format: {format_name}
-        </Badge>
-        {existingTransactionCount > 0 && (
-          <Badge variant="outline" className="text-yellow-600 border-yellow-300">
-            <AlertTriangle className="mr-1 h-3 w-3" />
-            {existingTransactionCount} befintliga transaktioner i samma period
-          </Badge>
-        )}
       </div>
 
       {/* Warnings */}
@@ -165,9 +150,7 @@ export default function BankFilePreviewStep({
                     <TableCell className="font-mono text-sm">{tx.date}</TableCell>
                     <TableCell className="text-sm">{tx.description}</TableCell>
                     <TableCell
-                      className={`text-right font-mono text-sm ${
-                        tx.amount >= 0 ? 'text-green-600' : 'text-red-600'
-                      }`}
+                      className="text-right font-mono text-sm"
                     >
                       {formatCurrency(tx.amount)}
                     </TableCell>

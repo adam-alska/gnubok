@@ -72,7 +72,7 @@ export default function TransactionBookingDialog({
       if (linkFailCount > 0) {
         toast({
           title: 'Underlag kunde inte bifogas',
-          description: `${linkFailCount} fil(er) kunde inte lankas till verifikationen. Forsok igen via bokforingssidan.`,
+          description: `${linkFailCount} fil(er) kunde inte länkas till verifikationen. Försök igen via bokföringssidan.`,
           variant: 'destructive',
         })
       }
@@ -93,9 +93,9 @@ export default function TransactionBookingDialog({
     }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Bokfor transaktion</DialogTitle>
+          <DialogTitle>Bokför transaktion</DialogTitle>
           <DialogDescription>
-            Skapa en verifikation for transaktionen
+            Skapa en verifikation för transaktionen
           </DialogDescription>
         </DialogHeader>
 

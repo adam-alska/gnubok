@@ -81,39 +81,6 @@ export default function JournalEntryList({ periodId }: Props) {
     setExpandedId(expandedId === id ? null : id)
   }
 
-  const statusLabel = (status: string) => {
-    switch (status) {
-      case 'posted':
-        return <Badge variant="success">Bokförd</Badge>
-      case 'draft':
-        return <Badge variant="secondary">Utkast</Badge>
-      case 'reversed':
-        return <Badge variant="destructive">Makulerad</Badge>
-      default:
-        return <Badge variant="outline">{status}</Badge>
-    }
-  }
-
-  const sourceLabel = (source: string) => {
-    const labels: Record<string, string> = {
-      manual: 'Manuell',
-      bank_transaction: 'Banktransaktion',
-      invoice_created: 'Faktura',
-      invoice_paid: 'Betalning',
-      credit_note: 'Kreditfaktura',
-      salary_payment: 'Lön',
-      opening_balance: 'Ingående balans',
-      year_end: 'Årsbokslut',
-      supplier_invoice_registered: 'Leverantörsfaktura',
-      supplier_invoice_paid: 'Leverantörsbetalning',
-      supplier_invoice_cash_payment: 'Kontant leverantörsbetalning',
-      import: 'Import',
-      storno: 'Storno',
-      correction: 'Korrigering',
-    }
-    return labels[source] || source
-  }
-
   if (loading) {
     return (
       <Card>
@@ -199,10 +166,6 @@ export default function JournalEntryList({ periodId }: Props) {
                       </span>
                     )
                   )}
-                  <Badge variant="outline" className="text-xs mr-2">
-                    {sourceLabel(entry.source_type)}
-                  </Badge>
-                  {statusLabel(entry.status)}
                 </div>
               </button>
 
