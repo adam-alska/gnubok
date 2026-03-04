@@ -2,10 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
 import { DestructiveConfirmDialog, useDestructiveConfirm } from '@/components/ui/destructive-confirm-dialog'
-import { Loader2, Landmark } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { BankSelector, type Bank } from './BankSelector'
 import { BankConnectionStatus } from './BankConnectionStatus'
@@ -24,8 +23,8 @@ export default function BankingSettingsPanel() {
   const [bankConnections, setBankConnections] = useState<BankConnection[]>([])
   const [syncingConnectionId, setSyncingConnectionId] = useState<string | null>(null)
   const [isConnecting, setIsConnecting] = useState(false)
+  const [connectingBankName, setConnectingBankName] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedBank, setSelectedBank] = useState<Bank | null>(null)
 
   useEffect(() => {
     fetchConnections()
@@ -46,14 +45,15 @@ export default function BankingSettingsPanel() {
     setIsLoading(false)
   }
 
-  async function handleConnectBank(bankName: string, bankCountry: string) {
+  async function handleConnectBank(bank: Bank) {
     setIsConnecting(true)
+    setConnectingBankName(bank.name)
 
     try {
       const response = await fetch('/api/extensions/ext/enable-banking/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ aspsp_name: bankName, aspsp_country: bankCountry }),
+        body: JSON.stringify({ aspsp_name: bank.name, aspsp_country: bank.country }),
       })
 
       const data = await response.json()
@@ -70,6 +70,7 @@ export default function BankingSettingsPanel() {
         variant: 'destructive',
       })
       setIsConnecting(false)
+      setConnectingBankName(null)
     }
   }
 
@@ -183,35 +184,12 @@ export default function BankingSettingsPanel() {
             Välj din bank nedan för att koppla ditt konto via PSD2.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           <BankSelector
-            onSelect={setSelectedBank}
-            isLoading={isConnecting}
+            onConnect={handleConnectBank}
+            isConnecting={isConnecting}
+            connectingBankName={connectingBankName}
           />
-          {selectedBank && (
-            <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
-              <div className="flex items-center gap-3">
-                <Landmark className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="text-sm font-medium">{selectedBank.name}</p>
-                  <p className="text-xs text-muted-foreground">{selectedBank.country}</p>
-                </div>
-              </div>
-              <Button
-                onClick={() => handleConnectBank(selectedBank.name, selectedBank.country)}
-                disabled={isConnecting}
-              >
-                {isConnecting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Ansluter...
-                  </>
-                ) : (
-                  'Anslut bank'
-                )}
-              </Button>
-            </div>
-          )}
         </CardContent>
       </Card>
 
