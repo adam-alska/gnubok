@@ -188,6 +188,18 @@ export default function Step3TaxRegistration({
     }
   }, [vatRegistered, vatNumber, orgNumber, setValue])
 
+  // State for first-year start date selectors (month/year)
+  const [startMonth, setStartMonth] = useState<number>(
+    initialData.first_year_start
+      ? new Date(initialData.first_year_start).getMonth() + 1
+      : 0
+  )
+  const [startYear, setStartYear] = useState<number>(
+    initialData.first_year_start
+      ? new Date(initialData.first_year_start).getFullYear()
+      : 0
+  )
+
   // State for AB first-year end month selector
   const [abEndMonth, setAbEndMonth] = useState<number>(
     initialData.first_year_end
@@ -380,48 +392,28 @@ export default function Step3TaxRegistration({
                       name="first_year_start"
                       control={control}
                       render={({ field }) => {
-                        const parsed = field.value ? (() => {
-                          const d = new Date(field.value)
-                          if (isNaN(d.getTime())) return null
-                          return { day: d.getDate(), month: d.getMonth() + 1, year: d.getFullYear() }
-                        })() : null
-
-                        const selectedDay = parsed?.day ?? 0
-                        const selectedMonth = parsed?.month ?? 0
-                        const selectedYear = parsed?.year ?? 0
-
                         const currentYear = new Date().getFullYear()
                         const years = Array.from({ length: 7 }, (_, i) => currentYear - 5 + i)
 
-                        const maxDays = selectedMonth && selectedYear
-                          ? lastDayOfMonth(selectedYear, selectedMonth)
-                          : 31
+                        const handleMonthChange = (month: number) => {
+                          setStartMonth(month)
+                          if (month && startYear) {
+                            field.onChange(`${startYear}-${String(month).padStart(2, '0')}-01`)
+                          }
+                        }
 
-                        const compose = (day: number, month: number, year: number) => {
-                          if (day && month && year) {
-                            const clamped = Math.min(day, lastDayOfMonth(year, month))
-                            field.onChange(`${year}-${String(month).padStart(2, '0')}-${String(clamped).padStart(2, '0')}`)
+                        const handleYearChange = (year: number) => {
+                          setStartYear(year)
+                          if (startMonth && year) {
+                            field.onChange(`${year}-${String(startMonth).padStart(2, '0')}-01`)
                           }
                         }
 
                         return (
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="grid grid-cols-2 gap-2">
                             <Select
-                              value={selectedDay ? selectedDay.toString() : ''}
-                              onValueChange={(v) => compose(parseInt(v), selectedMonth, selectedYear)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Dag" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {Array.from({ length: maxDays }, (_, i) => i + 1).map((d) => (
-                                  <SelectItem key={d} value={d.toString()}>{d}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Select
-                              value={selectedMonth ? selectedMonth.toString() : ''}
-                              onValueChange={(v) => compose(selectedDay, parseInt(v), selectedYear)}
+                              value={startMonth ? startMonth.toString() : ''}
+                              onValueChange={(v) => handleMonthChange(parseInt(v))}
                             >
                               <SelectTrigger>
                                 <SelectValue placeholder="Månad" />
@@ -433,8 +425,8 @@ export default function Step3TaxRegistration({
                               </SelectContent>
                             </Select>
                             <Select
-                              value={selectedYear ? selectedYear.toString() : ''}
-                              onValueChange={(v) => compose(selectedDay, selectedMonth, parseInt(v))}
+                              value={startYear ? startYear.toString() : ''}
+                              onValueChange={(v) => handleYearChange(parseInt(v))}
                             >
                               <SelectTrigger>
                                 <SelectValue placeholder="År" />
@@ -450,7 +442,7 @@ export default function Step3TaxRegistration({
                       }}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Dagen verksamheten startade (bör vara den 1:a i en månad).
+                      Månaden verksamheten startade. Räkenskapsåret börjar alltid den 1:a.
                     </p>
                   </div>
 
