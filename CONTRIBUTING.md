@@ -1,6 +1,6 @@
-# Contributing to erp-base
+# Contributing to gnubok
 
-Thank you for your interest in contributing to erp-base. This guide covers the development workflow, coding standards, and submission process.
+Thank you for your interest in contributing to gnubok. This guide covers the development workflow, coding standards, and submission process.
 
 ## Getting Started
 

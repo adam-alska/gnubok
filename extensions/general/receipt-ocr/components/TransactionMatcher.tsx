@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { X, Check, Link2, AlertCircle, Search, Loader2 } from 'lucide-react'
-import type { Receipt, ReceiptMatchCandidate, Transaction } from '@/types'
+import type { Receipt, ReceiptMatchCandidate } from '@/types'
 
 interface TransactionMatcherProps {
   receipt: Receipt

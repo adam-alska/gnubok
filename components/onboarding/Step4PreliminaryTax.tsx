@@ -50,13 +50,6 @@ export default function Step4PreliminaryTax({
 
   return (
     <div className="space-y-6">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold tracking-tight">Preliminärskatt</h1>
-        <p className="text-muted-foreground mt-2">
-          Ange din månatliga F-skatt för att få bättre överblick över din ekonomi.
-        </p>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

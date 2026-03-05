@@ -177,8 +177,9 @@ export default async function DashboardPage() {
     }))
 
   // Fetch upcoming deadlines (next 7 days + overdue)
-  const today = new Date().toISOString().split('T')[0]
-  const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  const now = new Date()
+  const today = now.toISOString().split('T')[0]
+  const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
   const { data: deadlines } = await supabase
     .from('deadlines')
@@ -258,7 +259,7 @@ export default async function DashboardPage() {
       recentReceiptActivity.map((r) => new Date(r.created_at).toISOString().split('T')[0])
     )
 
-    let checkDate = new Date(todayDate)
+    const checkDate = new Date(todayDate)
     while (activityDates.has(checkDate.toISOString().split('T')[0])) {
       streakCount++
       checkDate.setDate(checkDate.getDate() - 1)

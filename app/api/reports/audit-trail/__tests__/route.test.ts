@@ -23,6 +23,7 @@ function mockAuth(userId: string | null) {
         data: { user: userId ? { id: userId } : null },
       }),
     },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any)
 }
 
@@ -67,6 +68,7 @@ describe('GET /api/reports/audit-trail', () => {
 
   it('returns CSV format with correct headers', async () => {
     mockAuth('user-1')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockGetAuditLog.mockResolvedValue({ data: sampleEntries as any, count: 2 })
 
     const req = createMockRequest('/api/reports/audit-trail', {
@@ -88,6 +90,7 @@ describe('GET /api/reports/audit-trail', () => {
 
   it('returns JSON format as downloadable file', async () => {
     mockAuth('user-1')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockGetAuditLog.mockResolvedValue({ data: sampleEntries as any, count: 2 })
 
     const req = createMockRequest('/api/reports/audit-trail', {
@@ -118,7 +121,9 @@ describe('GET /api/reports/audit-trail', () => {
     }))
 
     mockGetAuditLog
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .mockResolvedValueOnce({ data: bigPage as any, count: 600 })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .mockResolvedValueOnce({ data: lastPage as any, count: 600 })
 
     const req = createMockRequest('/api/reports/audit-trail', {

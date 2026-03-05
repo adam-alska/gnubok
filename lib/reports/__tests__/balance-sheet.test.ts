@@ -10,6 +10,7 @@ import type { TrialBalanceRow } from '@/types'
 
 const mockTrialBalance = vi.mocked(generateTrialBalance)
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const supabase = {} as any
 
 beforeEach(() => {

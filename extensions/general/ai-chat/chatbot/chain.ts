@@ -9,7 +9,6 @@ import {
 import {
   retrieveRelevantDocuments,
   documentsToSources,
-  type RetrievedDocument,
 } from './retriever'
 import { routeMessage, type RouteType } from './router'
 import { createAccountingTools } from './tools'
@@ -171,7 +170,7 @@ export async function* streamRoutedResponse(
   conversationHistory: ChatMessage[],
   supabase: SupabaseClient,
   userId: string,
-  sessionId?: string
+  _sessionId?: string
 ): AsyncGenerator<RoutedStreamEvent> {
   // 1. Route the message
   const { route, rewrittenQuery } = await routeMessage(userMessage, conversationHistory)

@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { Invoice, Deadline, DeadlineStatus } from '@/types'
+import { Invoice, Deadline } from '@/types'
 import { isInvoiceOverdue, isSameDay, formatDateISO, STATUS_COLORS } from '@/lib/calendar/utils'
 
 interface CalendarDayCellProps {

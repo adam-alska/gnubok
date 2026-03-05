@@ -21,6 +21,7 @@ function makeClient() {
   return {
     from: vi.fn().mockImplementation(() => makeBuilder()),
     rpc: vi.fn().mockImplementation(async () => results[resultIdx++] ?? { data: null, error: null }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any
 }
 

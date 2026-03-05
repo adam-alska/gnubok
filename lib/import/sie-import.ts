@@ -355,7 +355,7 @@ async function importVouchers(
     p_series: voucherSeries,
   })
 
-  let currentVoucherNumber = (startNumber as number) || 1
+  const currentVoucherNumber = (startNumber as number) || 1
 
   // Batch insert journal entries (in chunks of 100)
   const BATCH_SIZE = 100

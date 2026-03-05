@@ -18,8 +18,6 @@ interface ChatAgingBucketsProps {
 export function ChatAgingBuckets({ artifact }: ChatAgingBucketsProps) {
   const { title, buckets, total } = artifact
 
-  const maxAmount = Math.max(...buckets.map((b) => b.amount), 1)
-
   return (
     <div className="w-full">
       <div className="flex items-baseline justify-between mb-3">

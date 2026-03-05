@@ -7,11 +7,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PageHeader } from '@/components/ui/page-header'
 import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { Plus, Search, Receipt, FileText, Send, CheckCircle, Clock, XCircle, ReceiptText, AlertTriangle, FileQuestion, Truck } from 'lucide-react'
+import { Plus, Search, Receipt, FileText, Send, CheckCircle, Clock, XCircle, ReceiptText, FileQuestion, Truck } from 'lucide-react'
 import { EmptyInvoices } from '@/components/ui/empty-state'
 import type { Invoice, InvoiceStatus } from '@/types'
 
@@ -53,10 +53,6 @@ export default function InvoicesPage() {
   const { toast } = useToast()
   const supabase = createClient()
 
-  useEffect(() => {
-    fetchInvoices()
-  }, [])
-
   async function fetchInvoices() {
     setIsLoading(true)
     const { data, error } = await supabase
@@ -75,6 +71,10 @@ export default function InvoicesPage() {
     }
     setIsLoading(false)
   }
+
+  useEffect(() => {
+    fetchInvoices()
+  }, [])
 
   const filteredInvoices = invoices.filter((invoice) => {
     const matchesSearch =

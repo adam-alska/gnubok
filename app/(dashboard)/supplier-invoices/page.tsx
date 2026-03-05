@@ -38,10 +38,6 @@ export default function SupplierInvoicesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('all')
 
-  useEffect(() => {
-    fetchInvoices()
-  }, [])
-
   async function fetchInvoices() {
     setIsLoading(true)
     const res = await fetch('/api/supplier-invoices?status=all')
@@ -49,6 +45,10 @@ export default function SupplierInvoicesPage() {
     setInvoices(data || [])
     setIsLoading(false)
   }
+
+  useEffect(() => {
+    fetchInvoices()
+  }, [])
 
   const filteredInvoices = invoices.filter((inv) => {
     switch (activeTab) {

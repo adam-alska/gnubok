@@ -16,6 +16,7 @@ export default function ExtensionWorkspaceLoader({
   definition: ExtensionDefinition
   userId: string
 }) {
+   
   const WorkspaceComponent = getWorkspaceComponent(sector, slug)
 
   return (

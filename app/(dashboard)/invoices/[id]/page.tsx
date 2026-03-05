@@ -353,8 +353,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const isProforma = docType === 'proforma'
   const isDeliveryNote = docType === 'delivery_note'
   const isRealInvoice = docType === 'invoice'
-  const docLabel = isProforma ? 'Proformafaktura' : isDeliveryNote ? 'Följesedel' : 'Faktura'
-
   return (
     <div className="space-y-6">
       {/* Header */}

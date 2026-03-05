@@ -6,7 +6,7 @@ interface ChatDataTableProps {
   artifact: TableArtifact
 }
 
-function formatCell(value: string | number, align?: 'left' | 'right'): string {
+function formatCell(value: string | number, _align?: 'left' | 'right'): string {
   if (typeof value === 'number') {
     return new Intl.NumberFormat('sv-SE', {
       minimumFractionDigits: value % 1 !== 0 ? 2 : 0,

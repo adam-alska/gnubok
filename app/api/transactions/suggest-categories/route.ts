@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getSuggestedCategories, mergeAiSuggestions, getSuggestedTemplates, type SuggestedCategory, type SuggestedTemplate } from '@/lib/transactions/category-suggestions'
-import type { Transaction, TransactionCategory, EntityType } from '@/types'
+import type { Transaction, EntityType } from '@/types'
 
 /**
  * POST /api/transactions/suggest-categories

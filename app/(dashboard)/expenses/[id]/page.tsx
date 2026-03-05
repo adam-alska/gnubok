@@ -13,7 +13,6 @@ import { ArrowLeft, CheckCircle, CreditCard, FileText, Trash2 } from 'lucide-rea
 import Link from 'next/link'
 import { AccountNumber } from '@/components/ui/account-number'
 import { DestructiveConfirmDialog, useDestructiveConfirm } from '@/components/ui/destructive-confirm-dialog'
-import { formatCurrency } from '@/lib/utils'
 import type { SupplierInvoice, SupplierInvoiceItem, SupplierInvoicePayment, EntityType } from '@/types'
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -35,17 +34,12 @@ export default function ExpenseDetailPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [invoice, setInvoice] = useState<SupplierInvoice | null>(null)
-  const [entityType, setEntityType] = useState<EntityType>('enskild_firma')
+  const [, setEntityType] = useState<EntityType>('enskild_firma')
   const [isLoading, setIsLoading] = useState(true)
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false)
   const [payAmount, setPayAmount] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const { dialogProps: confirmDialogProps, confirm: confirmAction } = useDestructiveConfirm()
-
-  useEffect(() => {
-    fetchInvoice()
-    fetchEntityType()
-  }, [params.id])
 
   async function fetchInvoice() {
     setIsLoading(true)
@@ -71,6 +65,11 @@ export default function ExpenseDetailPage() {
       // Default to enskild_firma
     }
   }
+
+  useEffect(() => {
+    fetchInvoice()
+    fetchEntityType()
+  }, [params.id])
 
   async function handleApprove() {
     setIsProcessing(true)

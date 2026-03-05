@@ -34,10 +34,6 @@ export default function SuppliersPage() {
   const { toast } = useToast()
   const supabase = createClient()
 
-  useEffect(() => {
-    fetchSuppliers()
-  }, [])
-
   async function fetchSuppliers() {
     setIsLoading(true)
     const { data, error } = await supabase
@@ -56,6 +52,10 @@ export default function SuppliersPage() {
     }
     setIsLoading(false)
   }
+
+  useEffect(() => {
+    fetchSuppliers()
+  }, [])
 
   async function handleCreateSupplier(data: CreateSupplierInput) {
     setIsCreating(true)

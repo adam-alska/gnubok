@@ -5,7 +5,7 @@ import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { useChatStream } from './useChatStream'
 import { useToast } from '@/components/ui/use-toast'
-import { Bot, Trash2, RotateCcw } from 'lucide-react'
+import { Bot, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface ChatPanelProps {
@@ -20,7 +20,7 @@ export function ChatPanel({ className }: ChatPanelProps) {
     messages,
     isLoading,
     isStreaming,
-    error,
+    error: _error,
     toolsExecuting,
     sendMessage,
     clearChat,

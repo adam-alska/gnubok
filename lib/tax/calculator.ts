@@ -137,8 +137,6 @@ export function calculateABTax(
 
   // Arbetsgivaravgifter on salaries (already included in salary costs usually)
   // This is just for reference
-  const arbetsgivaravgifter = salaryCostsYTD * TAX_RATES.arbetsgivaravgifter
-
   const totalTax = bolagsskatt + momsFromUnpaidInvoices
 
   return {

@@ -1,6 +1,6 @@
 ---
 name: supabase-migration
-description: "Generate Supabase database migrations for the erp-base project with correct RLS policies, triggers, indexes, and Swedish accounting constraints. Use when creating new tables, adding columns, modifying constraints (e.g. source_type CHECK), or any DDL operation on the Supabase database. Ensures legal compliance with BFL 7-year retention, immutability triggers, and period lock enforcement."
+description: "Generate Supabase database migrations for the gnubok project with correct RLS policies, triggers, indexes, and Swedish accounting constraints. Use when creating new tables, adding columns, modifying constraints (e.g. source_type CHECK), or any DDL operation on the Supabase database. Ensures legal compliance with BFL 7-year retention, immutability triggers, and period lock enforcement."
 ---
 
 # Supabase Migration Generator

@@ -1,12 +1,12 @@
-# erp-base
+# gnubok
 
 Open-source Swedish accounting software for sole traders (enskild firma) and limited companies (aktiebolag).
 
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](LICENSE)
 
-## What is erp-base?
+## What is gnubok?
 
-erp-base implements double-entry bookkeeping compliant with Swedish accounting law (Bokforingslagen). It supports the BAS 2026 chart of accounts, handles VAT declarations (momsdeklaration), SIE import/export, and enforces 7-year document retention. Built for sole traders and limited companies operating in Sweden.
+gnubok implements double-entry bookkeeping compliant with Swedish accounting law (Bokforingslagen). It supports the BAS 2026 chart of accounts, handles VAT declarations (momsdeklaration), SIE import/export, and enforces 7-year document retention. Built for sole traders and limited companies operating in Sweden.
 
 ## Features
 
@@ -24,8 +24,8 @@ erp-base implements double-entry bookkeeping compliant with Swedish accounting l
 
 ```bash
 # Clone and configure
-git clone https://github.com/erp-mafia/erp-base.git
-cd erp-base
+git clone https://github.com/erp-mafia/gnubok.git
+cd gnubok
 cp .env.example .env  # Fill in your Supabase credentials
 
 # Start with Docker Compose

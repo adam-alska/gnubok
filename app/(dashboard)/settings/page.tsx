@@ -60,52 +60,6 @@ export default function SettingsPage() {
     setMounted(true)
   }, [])
 
-  useEffect(() => {
-    fetchData()
-
-    // Handle callback messages
-    const bankConnected = searchParams.get('bank_connected')
-    const bankError = searchParams.get('bank_error')
-
-    if (bankConnected === 'true') {
-      toast({
-        title: 'Bank ansluten!',
-        description: 'Din bank är nu kopplad. Transaktioner hämtas...',
-      })
-
-      // Auto-sync transactions after connection
-      const connectionId = searchParams.get('connection_id')
-      if (connectionId) {
-        fetch('/api/extensions/ext/enable-banking/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ connection_id: connectionId, days_back: 90 }),
-        })
-          .then(res => res.json())
-          .then(data => {
-            if (data.imported > 0) {
-              toast({
-                title: 'Transaktioner hämtade',
-                description: `${data.imported} transaktioner importerade`,
-              })
-            }
-          })
-          .catch(() => {})
-      }
-
-      router.replace('/settings?tab=banking')
-    }
-
-    if (bankError) {
-      toast({
-        title: 'Anslutning misslyckades',
-        description: decodeURIComponent(bankError),
-        variant: 'destructive',
-      })
-      router.replace('/settings')
-    }
-  }, [searchParams])
-
   async function fetchData() {
     setIsLoading(true)
 
@@ -151,6 +105,52 @@ export default function SettingsPage() {
 
     setIsLoading(false)
   }
+
+  useEffect(() => {
+    fetchData()
+
+    // Handle callback messages
+    const bankConnected = searchParams.get('bank_connected')
+    const bankError = searchParams.get('bank_error')
+
+    if (bankConnected === 'true') {
+      toast({
+        title: 'Bank ansluten!',
+        description: 'Din bank är nu kopplad. Transaktioner hämtas...',
+      })
+
+      // Auto-sync transactions after connection
+      const connectionId = searchParams.get('connection_id')
+      if (connectionId) {
+        fetch('/api/extensions/ext/enable-banking/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ connection_id: connectionId, days_back: 90 }),
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.imported > 0) {
+              toast({
+                title: 'Transaktioner hämtade',
+                description: `${data.imported} transaktioner importerade`,
+              })
+            }
+          })
+          .catch(() => {})
+      }
+
+      router.replace('/settings?tab=banking')
+    }
+
+    if (bankError) {
+      toast({
+        title: 'Anslutning misslyckades',
+        description: decodeURIComponent(bankError),
+        variant: 'destructive',
+      })
+      router.replace('/settings')
+    }
+  }, [searchParams])
 
   async function handleSaveSettings(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()

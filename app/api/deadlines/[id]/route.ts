@@ -60,7 +60,7 @@ export async function PUT(
   const body: Partial<CreateDeadlineInput> = await request.json()
 
   // First, get existing deadline to verify ownership
-  const { data: existing, error: fetchError } = await supabase
+  const { data: _existing, error: fetchError } = await supabase
     .from('deadlines')
     .select('*')
     .eq('id', id)

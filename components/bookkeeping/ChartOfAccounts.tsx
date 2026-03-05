@@ -29,16 +29,16 @@ export default function ChartOfAccounts() {
   const [editingSRU, setEditingSRU] = useState<string | null>(null)
   const [sruValue, setSruValue] = useState('')
 
-  useEffect(() => {
-    fetchAccounts()
-  }, [])
-
   async function fetchAccounts() {
     const res = await fetch('/api/bookkeeping/accounts')
     const { data } = await res.json()
     setAccounts(data || [])
     setLoading(false)
   }
+
+  useEffect(() => {
+    fetchAccounts()
+  }, [])
 
   async function updateSRUCode(accountId: string, newSruCode: string) {
     const supabase = createClient()

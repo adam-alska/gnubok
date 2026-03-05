@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useForm, useFieldArray, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -55,8 +55,6 @@ export default function NewInvoicePage() {
   const router = useRouter()
   const { toast } = useToast()
   const supabase = createClient()
-  const searchParams = useSearchParams()
-  const preselectedCustomerId = searchParams.get('customer_id')
 
   const [customers, setCustomers] = useState<Customer[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -68,7 +66,7 @@ export default function NewInvoicePage() {
   const [showSendPrompt, setShowSendPrompt] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [isPreviewing, setIsPreviewing] = useState(false)
-  const [defaultNotes, setDefaultNotes] = useState<string | null>(null)
+  const [, setDefaultNotes] = useState<string | null>(null)
   const [isCreateCustomerOpen, setIsCreateCustomerOpen] = useState(false)
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false)
 

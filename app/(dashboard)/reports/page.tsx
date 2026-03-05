@@ -34,11 +34,6 @@ export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState('trial-balance')
   const [entityType, setEntityType] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchPeriods()
-    fetchEntityType()
-  }, [])
-
   async function fetchPeriods() {
     const res = await fetch('/api/bookkeeping/fiscal-periods')
     const { data } = await res.json()
@@ -59,6 +54,11 @@ export default function ReportsPage() {
       // Ignore - entity type is optional for tab visibility
     }
   }
+
+  useEffect(() => {
+    fetchPeriods()
+    fetchEntityType()
+  }, [])
 
   const isEnskildFirma = entityType === 'enskild_firma'
   const isAktiebolag = entityType === 'aktiebolag'

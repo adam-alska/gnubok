@@ -70,11 +70,6 @@ export default function JournalEntryForm({
     uploadedFiles.length > 0
   useUnsavedChanges(hasContent)
 
-  useEffect(() => {
-    fetchPeriods()
-    fetchAccounts()
-  }, [])
-
   async function fetchPeriods() {
     const res = await fetch('/api/bookkeeping/fiscal-periods')
     const { data } = await res.json()
@@ -89,6 +84,11 @@ export default function JournalEntryForm({
     const { data } = await res.json()
     setAccounts(data || [])
   }
+
+  useEffect(() => {
+    fetchPeriods()
+    fetchAccounts()
+  }, [])
 
   const addLine = () => {
     setLines([...lines, { ...BLANK_LINE }])

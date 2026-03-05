@@ -2,10 +2,11 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
-import { Progress } from '@/components/ui/progress'
 import { useToast } from '@/components/ui/use-toast'
 import { Loader2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { validatePeriodDuration } from '@/lib/bookkeeping/validate-period-duration'
 import type { CompanySettings, EntityType, MomsPeriod } from '@/types'
 
@@ -15,12 +16,12 @@ import Step3TaxRegistration from '@/components/onboarding/Step3TaxRegistration'
 import Step4PreliminaryTax from '@/components/onboarding/Step4PreliminaryTax'
 import Step5ConnectBank from '@/components/onboarding/Step6ConnectBank'
 
-const STEP_TITLES = [
-  'Verksamhetsform',
-  'Företagsuppgifter',
-  'Skatteregistrering',
-  'F-skatt',
-  'Anslut bank',
+const STEP_INFO = [
+  { title: 'Välkommen', subtitle: 'Välj din företagsform för att komma igång.', label: 'Företagsform' },
+  { title: 'Ditt företag', subtitle: 'Uppgifterna visas på fakturor och dokument.', label: 'Uppgifter' },
+  { title: 'Skatt & bokföring', subtitle: 'F-skatt, räkenskapsår och momsregistrering.', label: 'Skatt' },
+  { title: 'Preliminärskatt', subtitle: 'Frivilligt — hjälper dig hålla koll på skatten.', label: 'F-skatt' },
+  { title: 'Bankuppgifter', subtitle: 'Dessa visas på dina fakturor.', label: 'Bank' },
 ]
 
 function translatePeriodError(msg: string): string {
@@ -33,7 +34,11 @@ function translatePeriodError(msg: string): string {
 
 export default function OnboardingPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    }>
       <OnboardingPageContent />
     </Suspense>
   )
@@ -51,7 +56,6 @@ function OnboardingPageContent() {
   const [settings, setSettings] = useState<Partial<CompanySettings>>({})
 
   const totalSteps = 5
-  const stepTitles = STEP_TITLES
 
   // Load existing settings on mount
   useEffect(() => {
@@ -63,7 +67,7 @@ function OnboardingPageContent() {
         return
       }
 
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('company_settings')
         .select('*')
         .eq('user_id', user.id)
@@ -81,26 +85,6 @@ function OnboardingPageContent() {
 
     loadSettings()
   }, [supabase, router, toast])
-
-  // Handle bank_connected callback from PSD2 flow
-  useEffect(() => {
-    if (searchParams.get('bank_connected') === 'true') {
-      toast({
-        title: 'Bank ansluten!',
-        description: 'Din bank har kopplats.',
-      })
-      // Complete onboarding after bank connection
-      saveSettings({ onboarding_complete: true }, totalSteps).then((success) => {
-        if (success) {
-          toast({
-            title: 'Välkommen!',
-            description: 'Din profil är nu redo.',
-          })
-          router.push('/')
-        }
-      })
-    }
-  }, [searchParams])
 
   const saveSettings = async (updates: Partial<CompanySettings>, nextStep?: number) => {
     setIsSaving(true)
@@ -145,6 +129,26 @@ function OnboardingPageContent() {
     setIsSaving(false)
     return true
   }
+
+  // Handle bank_connected callback from PSD2 flow
+  useEffect(() => {
+    if (searchParams.get('bank_connected') === 'true') {
+      toast({
+        title: 'Bank ansluten!',
+        description: 'Din bank har kopplats.',
+      })
+      // Complete onboarding after bank connection
+      saveSettings({ onboarding_complete: true }, totalSteps).then((success) => {
+        if (success) {
+          toast({
+            title: 'Välkommen!',
+            description: 'Din profil är nu redo.',
+          })
+          router.push('/')
+        }
+      })
+    }
+  }, [searchParams])
 
   const handleNext = async (stepData: Partial<CompanySettings>) => {
     // Fix org number bug: clear dependent fields when entity type changes
@@ -268,7 +272,7 @@ function OnboardingPageContent() {
               onConflict: 'user_id,period_start,period_end',
             })
           }
-        } catch (err) {
+        } catch {
           toast({
             title: 'Kunde inte skapa räkenskapsår',
             description: 'Ett fel uppstod när räkenskapsåret skulle skapas. Försök igen.',
@@ -307,13 +311,13 @@ function OnboardingPageContent() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     )
   }
 
-  const progressPercent = ((currentStep - 1) / (totalSteps - 1)) * 100
+  const stepInfo = STEP_INFO[currentStep - 1]
 
   const renderSteps = () => (
     <>
@@ -408,26 +412,77 @@ function OnboardingPageContent() {
   )
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-primary/10">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b">
-        <div className="max-w-2xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-muted-foreground">
-              Steg {currentStep} av {totalSteps}
-            </span>
-            <span className="text-sm font-medium">
-              {stepTitles[currentStep - 1]}
+    <div className="min-h-screen flex flex-col bg-background">
+      {/* ── Branded Header ── */}
+      <header className="relative bg-[#141414] text-white overflow-hidden">
+        {/* Decorative elements */}
+        <div className="absolute inset-0 pointer-events-none" aria-hidden>
+          <div
+            className="absolute inset-0"
+            style={{
+              background: 'radial-gradient(ellipse at 30% -20%, rgba(255,255,255,0.04) 0%, transparent 50%)',
+            }}
+          />
+          <span className="absolute -bottom-4 right-4 md:right-10 text-[120px] md:text-[160px] font-serif font-bold text-white/[0.02] leading-none select-none">
+            {String(currentStep).padStart(2, '0')}
+          </span>
+        </div>
+
+        <div className="relative z-10 max-w-2xl mx-auto w-full px-6 md:px-10 pt-5 pb-6 md:pt-6 md:pb-8">
+          {/* Top row: Logo + step indicator + counter */}
+          <div className="flex items-center justify-between mb-5 md:mb-6">
+            <div className="flex items-center gap-2.5">
+              <Image
+                src="/gnubokiceon-removebg-preview.png"
+                alt="Gnubok"
+                width={30}
+                height={30}
+                className="invert opacity-90"
+              />
+              <span className="font-serif text-base tracking-tight">gnubok</span>
+            </div>
+            {/* Step indicator — inline with logo row */}
+            <div className="flex items-center gap-1.5">
+              {STEP_INFO.map((_, i) => {
+                const num = i + 1
+                return (
+                  <div
+                    key={i}
+                    className={cn(
+                      'h-[3px] rounded-full transition-all duration-500',
+                      num === currentStep && 'w-7 bg-white',
+                      num < currentStep && 'w-4 bg-white/50',
+                      num > currentStep && 'w-4 bg-white/[0.1]',
+                    )}
+                  />
+                )
+              })}
+            </div>
+            <span className="text-[10px] text-white/30 tracking-[0.15em] uppercase">
+              {currentStep} / {totalSteps}
             </span>
           </div>
-          <Progress value={progressPercent} className="h-2" />
-        </div>
-      </div>
 
-      {/* Content */}
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        {renderSteps()}
-      </div>
+          {/* Step title — compact */}
+          <div key={`title-${currentStep}`} className="animate-fade-in">
+            <h1 className="font-serif text-2xl md:text-3xl font-medium tracking-tight leading-[1.1]">
+              {stepInfo.title}
+            </h1>
+            <p className="text-white/40 mt-1.5 text-sm max-w-sm leading-relaxed">
+              {stepInfo.subtitle}
+            </p>
+          </div>
+        </div>
+      </header>
+
+      {/* ── Form Content ── */}
+      <main className="flex-1">
+        <div className="max-w-lg mx-auto px-6 md:px-10 py-6 md:py-8">
+          <div key={`step-${currentStep}`} className="animate-slide-up">
+            {renderSteps()}
+          </div>
+        </div>
+      </main>
     </div>
   )
 }

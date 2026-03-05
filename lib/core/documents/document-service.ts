@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createServiceClient } from '@/lib/supabase/server'
 import { eventBus } from '@/lib/events'
-import type { DocumentAttachment, CreateDocumentAttachmentInput, DocumentUploadSource } from '@/types'
+import type { DocumentAttachment, DocumentUploadSource } from '@/types'
 
 /**
  * Document Service - WORM-style document archive

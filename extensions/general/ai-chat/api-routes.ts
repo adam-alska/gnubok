@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { ApiRouteDefinition, ExtensionContext } from '@/lib/extensions/types'
-import { generateChatResponse, streamChatResponse, streamRoutedResponse } from '@/extensions/general/ai-chat/chatbot/chain'
+import { generateChatResponse, streamRoutedResponse } from '@/extensions/general/ai-chat/chatbot/chain'
 import { CHATBOT_CONFIG } from '@/extensions/general/ai-chat/chatbot/config'
 import type { ChatMessage, ChatRequest, SourceReference, ArtifactSpec } from '@/types/chat'
 

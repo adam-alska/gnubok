@@ -1,6 +1,6 @@
 ---
 name: swedish-bookkeeping
-description: "Swedish double-entry bookkeeping domain knowledge for erp-base: BAS account codes, VAT treatments, journal entry patterns, entity type differences (enskild firma vs aktiebolag), and legal constraints (BFL/BFN). Use when creating journal entry generators, modifying bookkeeping logic, adding VAT handling, working with reports, or any accounting-related code. Prevents illegal accounting operations and ensures correct account/VAT mappings."
+description: "Swedish double-entry bookkeeping domain knowledge for gnubok: BAS account codes, VAT treatments, journal entry patterns, entity type differences (enskild firma vs aktiebolag), and legal constraints (BFL/BFN). Use when creating journal entry generators, modifying bookkeeping logic, adding VAT handling, working with reports, or any accounting-related code. Prevents illegal accounting operations and ensures correct account/VAT mappings."
 ---
 
 # Swedish Bookkeeping Reference

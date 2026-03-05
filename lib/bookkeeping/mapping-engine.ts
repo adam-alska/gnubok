@@ -2,14 +2,11 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   generateInputVatLine,
   generateReverseChargeLines,
-  extractNetAmount,
-  extractVatAmount,
 } from './vat-entries'
 import { findMatchingTemplates, buildMappingResultFromTemplate } from './booking-templates'
 import type {
   MappingRule,
   MappingResult,
-  RiskLevel,
   Transaction,
   EntityType,
   VatJournalLine,

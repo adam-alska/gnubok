@@ -183,7 +183,7 @@ export default async function RootPage() {
       recentReceiptActivity.map((r) => new Date(r.created_at).toISOString().split('T')[0])
     )
 
-    let checkDate = new Date(todayDate)
+    const checkDate = new Date(todayDate)
     while (activityDates.has(checkDate.toISOString().split('T')[0])) {
       streakCount++
       checkDate.setDate(checkDate.getDate() - 1)

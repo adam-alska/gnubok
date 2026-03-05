@@ -8,6 +8,7 @@ import ExtensionToggleButton from './ExtensionToggleButton'
 import Link from 'next/link'
 
 export default function ExtensionCard({ extension }: { extension: ExtensionDefinition }) {
+   
   const Icon = resolveIcon(extension.icon)
 
   return (

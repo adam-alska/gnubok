@@ -67,10 +67,6 @@ export default function ExpensesPage() {
   const { toast } = useToast()
   const supabase = createClient()
 
-  useEffect(() => {
-    fetchExpenses()
-  }, [])
-
   async function fetchExpenses() {
     setIsLoading(true)
     const { data, error } = await supabase
@@ -85,6 +81,10 @@ export default function ExpensesPage() {
     }
     setIsLoading(false)
   }
+
+  useEffect(() => {
+    fetchExpenses()
+  }, [])
 
   const filteredInvoices = invoices.filter((inv) => {
     const matchesSearch =

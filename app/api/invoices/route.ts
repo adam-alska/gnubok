@@ -4,7 +4,7 @@ import { eventBus } from '@/lib/events'
 import { ensureInitialized } from '@/lib/init'
 import { CreateInvoiceSchema, CreateCreditNoteSchema } from '@/lib/api/schemas'
 import type { EntityType, AccountingMethod, Invoice, CreditNote, InvoiceDocumentType } from '@/types'
-import { getVatRules, calculateVat, calculateTotal, getAvailableVatRates, getVatTreatmentForRate } from '@/lib/invoices/vat-rules'
+import { getVatRules, getAvailableVatRates } from '@/lib/invoices/vat-rules'
 import { fetchExchangeRate, convertToSEK } from '@/lib/currency/riksbanken'
 import {
   createCreditNoteJournalEntry,

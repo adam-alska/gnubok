@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { INK2_ACCOUNT_MAPPINGS, isAccountInMapping } from '../ink2-engine'
-import type { INK2AccountMapping, INK2SRUCode } from '../types'
+import type { INK2SRUCode } from '../types'
 
 /**
  * Helper to find which SRU code an account maps to

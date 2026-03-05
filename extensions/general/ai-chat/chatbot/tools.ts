@@ -65,7 +65,7 @@ export function createAccountingTools(supabase: SupabaseClient, userId: string) 
       if (date_from) query = query.gte('invoice_date', date_from)
       if (date_to) query = query.lte('invoice_date', date_to)
 
-      const { data, error, count } = await supabase
+      const { data: _data, error: _countError, count } = await supabase
         .from('invoices')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)

@@ -57,13 +57,6 @@ export default function Step2CompanyDetails({
 
   return (
     <div className="space-y-6">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold tracking-tight">Företagsuppgifter</h1>
-        <p className="text-muted-foreground mt-2">
-          Fyll i uppgifter om din verksamhet. Dessa används på fakturor.
-        </p>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Grunduppgifter</CardTitle>

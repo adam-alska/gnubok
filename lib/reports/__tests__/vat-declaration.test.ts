@@ -20,6 +20,7 @@ function makeBuilder() {
 function makeClient() {
   return {
     from: vi.fn().mockImplementation(() => makeBuilder()),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any
 }
 

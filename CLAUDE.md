@@ -1,8 +1,8 @@
-# CLAUDE.md — erp-base
+# CLAUDE.md — gnubok
 
 ## Project Overview
 
-erp-base is a Swedish-focused accounting SaaS for sole traders (enskild firma) and limited companies (aktiebolag). It implements double-entry bookkeeping compliant with Swedish accounting law (Bokforingslagen), including VAT handling, tax reporting, and 7-year document retention.
+gnubok is a Swedish-focused accounting SaaS for sole traders (enskild firma) and limited companies (aktiebolag). It implements double-entry bookkeeping compliant with Swedish accounting law (Bokforingslagen), including VAT handling, tax reporting, and 7-year document retention.
 
 **Tech stack**: Next.js 16 (App Router), React 19, TypeScript (strict), Supabase (PostgreSQL + RLS + magic link auth), Tailwind CSS 4 + shadcn/ui, Vercel hosting.
 
@@ -363,4 +363,4 @@ Hosted on **Vercel**. Cron jobs in `vercel.json` (banking sync daily 05:00, dead
 **Core env vars**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`. Extension env vars only needed when that extension is enabled.
 
 ## Other
-Never create a NUL/nul file: \erp-base\NUL
+Never create a NUL/nul file: \gnubok\NUL

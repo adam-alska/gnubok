@@ -173,10 +173,8 @@ export async function previewCurrencyRevaluation(
   let credit1510 = 0 // Receivable loss (revalue down)
   let debit2440 = 0 // Payable gain (liability shrank)
   let credit2440 = 0 // Payable loss (liability grew)
-  let debit3960 = 0 // Placeholder — we won't debit 3960
   let credit3960 = 0 // Gains
   let debit7960 = 0 // Losses
-  let credit7960 = 0 // Placeholder — we won't credit 7960
 
   for (const item of items) {
     if (item.type === 'receivable') {

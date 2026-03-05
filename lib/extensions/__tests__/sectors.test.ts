@@ -1,4 +1,4 @@
-import { resolve, join, dirname } from 'path'
+import { resolve, join } from 'path'
 import { readdirSync, readFileSync } from 'fs'
 
 /**
@@ -74,6 +74,7 @@ describe('sectors registry', () => {
   })
 
   it('getSector returns undefined for unknown slug', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sector = getSector('invalid' as any)
     expect(sector).toBeUndefined()
   })

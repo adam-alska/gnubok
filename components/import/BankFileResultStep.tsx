@@ -8,7 +8,6 @@ import {
   XCircle,
   ArrowRight,
   RotateCcw,
-  ExternalLink,
 } from 'lucide-react'
 import type { IngestResult } from '@/lib/transactions/ingest'
 

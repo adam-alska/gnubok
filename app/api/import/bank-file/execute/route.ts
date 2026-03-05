@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   }
 
   const body: ExecuteRequest = await request.json()
-  const { transactions, format, filename, file_hash, skip_duplicates = true, auto_categorize = true } = body
+  const { transactions, format, filename, file_hash, skip_duplicates: _skip_duplicates = true, auto_categorize: _auto_categorize = true } = body
 
   if (!transactions || transactions.length === 0) {
     return NextResponse.json({ error: 'No transactions to import' }, { status: 400 })

@@ -45,15 +45,8 @@ export default function Step1EntityType({ initialData, onNext, isSaving }: Step1
   }
 
   return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold tracking-tight">Välkommen!</h1>
-        <p className="text-muted-foreground mt-2">
-          Låt oss börja med att ställa in din verksamhet. Vilken företagsform har du?
-        </p>
-      </div>
-
-      <div className="grid gap-3 max-w-lg mx-auto">
+    <div className="space-y-8">
+      <div className="grid gap-3">
         {entityOptions.map((option) => {
           const Icon = option.icon
           const isSelected = selected === option.value

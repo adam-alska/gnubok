@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getExtensionDefinition, getSector } from '@/lib/extensions/sectors'
 import { resolveIcon } from '@/lib/extensions/icon-resolver'
+import type { SectorSlug } from '@/lib/extensions/types'
 import CategoryBadge from '@/components/extensions/CategoryBadge'
 import ExtensionToggleButton from '@/components/extensions/ExtensionToggleButton'
 import Link from 'next/link'
@@ -15,7 +16,8 @@ export default async function ExtensionDetailPage({
   const definition = getExtensionDefinition(sectorSlug, extensionSlug)
   if (!definition) notFound()
 
-  const sector = getSector(sectorSlug as any)
+  const sector = getSector(sectorSlug as SectorSlug)
+   
   const Icon = resolveIcon(definition.icon)
 
   const dataPatternLabels: Record<string, string> = {

@@ -451,7 +451,7 @@ function validateVatBreakdown(data: any): VatBreakdownItem[] {
  */
 export function validateExtractionConsistency(
   extraction: ReceiptExtractionResult | InvoiceExtractionResult,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   _type: 'receipt' | 'invoice'
 ): ConsistencyResult {
   const issues: string[] = []

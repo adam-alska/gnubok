@@ -12,6 +12,7 @@ import {
   Calculator,
   Building2,
   FileText,
+  FileDown,
   ExternalLink,
   ChevronDown,
   ChevronUp,
@@ -372,7 +373,7 @@ export default function HelpPage() {
             <CardContent className="py-12 text-center">
               <Search className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
               <p className="text-muted-foreground">
-                Inga termer hittades för "{searchQuery}"
+                Inga termer hittades för &quot;{searchQuery}&quot;
               </p>
             </CardContent>
           </Card>
@@ -387,6 +388,44 @@ export default function HelpPage() {
           ))
         )}
       </div>
+
+      {/* Document templates */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Dokument & Mallar</CardTitle>
+          <CardDescription>Lagstadgade mallar för din bokföring — ladda ner, fyll i och spara</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <a
+              href="/docs/arkivplan-mall.md"
+              download
+              className="p-3 rounded-lg border border-border hover:border-primary/50 transition-colors block"
+            >
+              <div className="flex items-center gap-2">
+                <FileDown className="h-4 w-4" />
+                <span className="font-medium">Arkivplan</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Mall enligt BFNAR 2013:2 — beskriver var räkenskapsinformation förvaras
+              </p>
+            </a>
+            <a
+              href="/docs/systemdokumentation-mall.md"
+              download
+              className="p-3 rounded-lg border border-border hover:border-primary/50 transition-colors block"
+            >
+              <div className="flex items-center gap-2">
+                <FileDown className="h-4 w-4" />
+                <span className="font-medium">Systemdokumentation</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Mall enligt BFL 5 kap. 11 § — beskriver bokföringssystemets uppbyggnad
+              </p>
+            </a>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* External resources */}
       <Card>

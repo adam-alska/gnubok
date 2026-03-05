@@ -311,13 +311,13 @@ function SIEImportWizard() {
   const [error, setError] = useState<string | null>(null)
 
   const [file, setFile] = useState<File | null>(null)
-  const [_parsed, setParsed] = useState<ParsedSIEFile | null>(null)
+  const [, setParsed] = useState<ParsedSIEFile | null>(null)
   const [mappings, setMappings] = useState<AccountMapping[]>([])
   const [basAccounts, setBasAccounts] = useState<BASAccount[]>([])
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [issues, setIssues] = useState<ParseIssue[]>([])
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
-  const [_sieAccounts, setSieAccounts] = useState<{ number: string; name: string }[]>([])
+  const [, setSieAccounts] = useState<{ number: string; name: string }[]>([])
   const [isCreatingAccounts, setIsCreatingAccounts] = useState(false)
 
   // Skip the mapping step when all accounts are already mapped

@@ -47,10 +47,6 @@ export default function CustomersPage() {
   const { toast } = useToast()
   const supabase = createClient()
 
-  useEffect(() => {
-    fetchCustomers()
-  }, [])
-
   async function fetchCustomers() {
     setIsLoading(true)
     const { data, error } = await supabase
@@ -69,6 +65,10 @@ export default function CustomersPage() {
     }
     setIsLoading(false)
   }
+
+  useEffect(() => {
+    fetchCustomers()
+  }, [])
 
   async function handleCreateCustomer(data: CreateCustomerInput) {
     setIsCreating(true)
@@ -167,7 +167,7 @@ export default function CustomersPage() {
                 <Users className="h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="text-lg font-medium">Inga träffar</h3>
                 <p className="text-muted-foreground text-center mt-1">
-                  Inga kunder matchar "{searchTerm}"
+                  Inga kunder matchar &quot;{searchTerm}&quot;
                 </p>
               </div>
             ) : (

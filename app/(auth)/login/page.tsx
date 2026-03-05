@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { Loader2, Mail, ArrowLeft } from 'lucide-react'
+import Image from 'next/image'
 import { getErrorMessage } from '@/lib/errors/get-error-message'
 
 export default function LoginPage() {
@@ -100,9 +101,14 @@ export default function LoginPage() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-background to-primary/[0.03] p-4">
       <div className="w-full max-w-sm animate-slide-up">
         <div className="text-center mb-10">
-          <h1 className="font-display text-[2.75rem] leading-none font-medium tracking-tight text-foreground">
-            Gnubok
-          </h1>
+          <Image
+            src="/gnubokiceon-removebg-preview.png"
+            alt="Gnubok"
+            width={240}
+            height={240}
+            className="mx-auto mb-2"
+            priority
+          />
           <p className="text-muted-foreground text-sm mt-3">
             Logga in med din e-post för att hantera din ekonomi
           </p>

@@ -23,6 +23,7 @@ function mockAuth(userId: string | null) {
         data: { user: userId ? { id: userId } : null },
       }),
     },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any)
 }
 
@@ -45,9 +46,11 @@ describe('GET /api/audit-trail', () => {
       { id: '1', action: 'INSERT', table_name: 'journal_entries', created_at: '2024-01-01T00:00:00Z' },
       { id: '2', action: 'COMMIT', table_name: 'journal_entries', created_at: '2024-01-02T00:00:00Z' },
     ]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockGetAuditLog.mockResolvedValue({ data: entries as any, count: 2 })
 
     const req = createMockRequest('/api/audit-trail')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { status, body } = await parseJsonResponse<{ data: any[]; count: number }>(await GET(req))
 
     expect(status).toBe(200)

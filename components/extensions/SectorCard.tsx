@@ -4,6 +4,7 @@ import { resolveIcon } from '@/lib/extensions/icon-resolver'
 import type { Sector } from '@/lib/extensions/types'
 
 export default function SectorCard({ sector }: { sector: Sector }) {
+   
   const Icon = resolveIcon(sector.icon)
 
   return (

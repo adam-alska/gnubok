@@ -89,7 +89,7 @@ describe('POST /api/invoices/[id]/mark-paid', () => {
 
     const request = createMockRequest('/api/invoices/inv-1/mark-paid', { method: 'POST' })
     const response = await POST(request, createMockRouteParams({ id: 'inv-1' }))
-    const { status, body } = await parseJsonResponse<{ error: string }>(response)
+    const { status, body: _body } = await parseJsonResponse<{ error: string }>(response)
 
     expect(status).toBe(400)
   })

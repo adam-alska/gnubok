@@ -1,4 +1,4 @@
-# BAS Account Quick Reference — erp-base
+# BAS Account Quick Reference — gnubok
 
 Accounts used in codebase. Search `dev_docs/BASKONTOPLAN.md` for full chart.
 

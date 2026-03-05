@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { findFiscalPeriod } from '@/lib/bookkeeping/engine'
 import {
   createSupplierInvoicePaymentEntry,
   createSupplierInvoiceCashEntry,
@@ -8,41 +7,6 @@ import {
 import { validateBody } from '@/lib/api/validate'
 import { MatchSupplierInvoiceSchema } from '@/lib/api/schemas'
 import type { SupplierInvoice, SupplierInvoiceItem } from '@/types'
-
-/**
- * Ensure a fiscal period exists for the given date
- */
-async function ensureFiscalPeriod(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
-  date: string
-): Promise<string | null> {
-  const existingPeriodId = await findFiscalPeriod(supabase, userId, date)
-  if (existingPeriodId) return existingPeriodId
-
-  const transactionDate = new Date(date)
-  const year = transactionDate.getFullYear()
-
-  const { data, error } = await supabase
-    .from('fiscal_periods')
-    .upsert({
-      user_id: userId,
-      name: `Räkenskapsår ${year}`,
-      period_start: `${year}-01-01`,
-      period_end: `${year}-12-31`,
-    }, {
-      onConflict: 'user_id,period_start,period_end',
-    })
-    .select('id')
-    .single()
-
-  if (error) {
-    console.error('Failed to create fiscal period:', error)
-    return null
-  }
-
-  return data?.id || null
-}
 
 /**
  * POST /api/transactions/[id]/match-supplier-invoice

@@ -9,7 +9,7 @@
 
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Receipt, ReceiptMatchCandidate, ReceiptExtractionResult } from '@/types'
+import type { Receipt, ReceiptExtractionResult } from '@/types'
 import { analyzeReceipt } from './receipt-analyzer'
 import { processLineItems, getDefaultClassification } from './receipt-categorizer'
 import { autoMatchReceipts } from './receipt-matcher'

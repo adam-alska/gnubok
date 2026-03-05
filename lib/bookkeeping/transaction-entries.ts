@@ -1,6 +1,6 @@
 import { createJournalEntry, findFiscalPeriod } from './engine'
 import { resolveSekAmount, buildCurrencyMetadata } from './currency-utils'
-import { generateInputVatLine, generateReverseChargeLines, extractNetAmount, extractVatAmount } from './vat-entries'
+import { extractNetAmount, extractVatAmount } from './vat-entries'
 import { createLogger } from '@/lib/logger'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {

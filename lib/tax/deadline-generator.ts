@@ -4,11 +4,10 @@
 
 import { SupabaseClient } from '@supabase/supabase-js'
 import { createLogger } from '@/lib/logger'
-import type { TaxDeadlineType, DeadlineStatus, CreateDeadlineInput } from '@/types'
+import type { TaxDeadlineType, DeadlineStatus } from '@/types'
 
 const log = createLogger('deadline-generator')
 import {
-  TAX_DEADLINE_CONFIGS,
   getApplicableDeadlineConfigs,
   type CompanySettingsForDeadlines,
   type DeadlineInstance,
@@ -180,7 +179,7 @@ export async function generateTaxDeadlinesForUser(
  */
 function createLinkedReportPeriod(
   instance: DeadlineInstance,
-  type: TaxDeadlineType
+  _type: TaxDeadlineType
 ): Record<string, unknown> | null {
   const period = instance.period
 

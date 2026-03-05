@@ -34,11 +34,6 @@ export default function SupplierDetailPage() {
   const [isSaving, setIsSaving] = useState(false)
   const { dialogProps: confirmDialogProps, confirm: confirmAction } = useDestructiveConfirm()
 
-  useEffect(() => {
-    fetchSupplier()
-    fetchInvoices()
-  }, [params.id])
-
   async function fetchSupplier() {
     setIsLoading(true)
     const res = await fetch(`/api/suppliers/${params.id}`)
@@ -58,6 +53,11 @@ export default function SupplierDetailPage() {
       setInvoices(data.filter((inv: SupplierInvoice) => inv.supplier_id === params.id))
     }
   }
+
+  useEffect(() => {
+    fetchSupplier()
+    fetchInvoices()
+  }, [params.id])
 
   async function handleUpdate(data: CreateSupplierInput) {
     setIsSaving(true)

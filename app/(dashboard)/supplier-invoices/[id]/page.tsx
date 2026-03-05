@@ -50,10 +50,6 @@ export default function SupplierInvoiceDetailPage() {
   const [isProcessing, setIsProcessing] = useState(false)
   const { dialogProps: confirmDialogProps, confirm: confirmAction } = useDestructiveConfirm()
 
-  useEffect(() => {
-    fetchInvoice()
-  }, [params.id])
-
   async function fetchInvoice() {
     setIsLoading(true)
     const res = await fetch(`/api/supplier-invoices/${params.id}`)
@@ -66,6 +62,10 @@ export default function SupplierInvoiceDetailPage() {
     }
     setIsLoading(false)
   }
+
+  useEffect(() => {
+    fetchInvoice()
+  }, [params.id])
 
   async function handleApprove() {
     setIsProcessing(true)

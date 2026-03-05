@@ -1,3 +1,5 @@
+import { getBASReference, ACCOUNT_CLASS_LABELS } from './bas-reference'
+
 export type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense' | 'untaxed_reserves'
 
 export interface AccountDescription {
@@ -332,8 +334,6 @@ export function getAccountDescription(accountNumber: string): AccountDescription
 
   // Fall back to BAS reference data for accounts not in the hardcoded list
   try {
-    // Dynamic import avoided — use lazy require pattern
-    const { getBASReference, ACCOUNT_CLASS_LABELS } = require('./bas-reference')
     const ref = getBASReference(accountNumber)
     if (ref) {
       const classLabel = ACCOUNT_CLASS_LABELS[ref.account_class] || ''

@@ -5,7 +5,7 @@
  * using pattern matching and AI-suggested categories.
  */
 
-import type { TransactionCategory, ReceiptLineItem, ExtractedLineItem } from '@/types'
+import type { TransactionCategory, ExtractedLineItem } from '@/types'
 import { getTemplateById } from '@/lib/bookkeeping/booking-templates'
 
 // Category mappings from suggested category to TransactionCategory

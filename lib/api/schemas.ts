@@ -13,9 +13,6 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD dat
 /** BAS account number — always a string of 4 digits */
 const accountNumber = z.string().regex(/^\d{4}$/, 'Account number must be exactly 4 digits')
 
-/** Positive monetary amount (> 0) */
-const positiveAmount = z.number().positive()
-
 /** Non-negative monetary amount (>= 0) */
 const nonNegativeAmount = z.number().nonnegative()
 

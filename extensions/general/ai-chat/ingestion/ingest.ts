@@ -144,7 +144,7 @@ function chunkText(text: string, maxSize: number, overlap: number): string[] {
  */
 function extractMetadata(
   content: string,
-  sectionTitle: string
+  _sectionTitle: string
 ): Record<string, unknown> {
   const metadata: Record<string, unknown> = {}
 

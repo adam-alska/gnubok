@@ -131,7 +131,7 @@ export function CalendarWeekView({
 
       {/* Time grid */}
       <div className="max-h-[500px] overflow-y-auto">
-        {timeSlots.map((time, timeIndex) => (
+        {timeSlots.map((time, _timeIndex) => (
           <div key={time} className="grid grid-cols-[60px_repeat(7,1fr)] border-b last:border-b-0">
             <div className="p-2 border-r text-xs text-muted-foreground text-right pr-2">
               {time}

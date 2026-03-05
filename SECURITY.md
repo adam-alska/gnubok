@@ -2,9 +2,9 @@
 
 ## Reporting Vulnerabilities
 
-If you discover a security vulnerability in erp-base, please report it responsibly. **Do not open a public issue.**
+If you discover a security vulnerability in gnubok, please report it responsibly. **Do not open a public issue.**
 
-Email: **security@gnubok.se**
+Email: **jakob.wennberg@arcim.io**
 
 Include:
 - Description of the vulnerability

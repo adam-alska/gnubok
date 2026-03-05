@@ -31,6 +31,7 @@ function mockAuth(userId: string | null) {
         data: { user: userId ? { id: userId } : null },
       }),
     },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any)
 }
 

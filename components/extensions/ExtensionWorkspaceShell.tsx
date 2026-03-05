@@ -12,6 +12,7 @@ export default function ExtensionWorkspaceShell({
   definition: ExtensionDefinition
   children: React.ReactNode
 }) {
+   
   const Icon = resolveIcon(definition.icon)
   const sector = getSector(definition.sector)
 

@@ -49,10 +49,6 @@ export default function JournalEntryList({ periodId }: Props) {
     }
   }, [])
 
-  useEffect(() => {
-    fetchEntries()
-  }, [periodId, page])
-
   async function fetchEntries() {
     setLoading(true)
     const params = new URLSearchParams({
@@ -72,6 +68,10 @@ export default function JournalEntryList({ periodId }: Props) {
     const ids = loadedEntries.map((e: JournalEntry) => e.id)
     fetchAttachmentCounts(ids)
   }
+
+  useEffect(() => {
+    fetchEntries()
+  }, [periodId, page])
 
   const handleAttachmentCountChange = useCallback((entryId: string, count: number) => {
     setAttachmentCounts((prev) => ({ ...prev, [entryId]: count }))

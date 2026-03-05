@@ -10,7 +10,6 @@ import {
   type CategorizationSuggestion,
   type AccountUsageEntry,
   type MerchantHistoryEntry,
-  type TrackingContext,
 } from './categorizer'
 import type { BookingTemplate } from '@/lib/bookkeeping/booking-templates'
 
@@ -198,9 +197,9 @@ async function handleTransactionSynced(
 // Helpers
 // ============================================================
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function buildEnrichedContext(
   userId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
   transactions: TransactionForCategorization[]
 ): Promise<EnrichedCategorizationContext> {

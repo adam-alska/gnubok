@@ -214,7 +214,6 @@ export const TAX_DEADLINE_CONFIGS: TaxDeadlineConfig[] = [
         const dl = getDeadline(fyEndYear)
         if (dl.year === year) {
           // Compute the FY start year
-          const fyStartYear = fyEndMonth === 12 ? fyEndYear : fyEndYear - (fyEndMonth < settings.fiscal_year_start_month ? 0 : 0)
           const fyStart = fyEndMonth === 12 ? fyEndYear : fyEndYear
           const periodLabel = fyEndMonth === 12
             ? `${fyEndYear}`
@@ -249,14 +248,12 @@ export const TAX_DEADLINE_CONFIGS: TaxDeadlineConfig[] = [
 
       // 7 months after FY end per ÅRL 8:3
       // Deadline month (0-indexed): ((fyEndMonth - 1) + 7) % 12
-      const deadlineMonth0 = ((fyEndMonth - 1) + 7) % 12
       // Last day of the deadline month
       // Determine which year the deadline falls in
-      const wrapsYear = fyEndMonth > 5 // Jun+ wraps into next year
+      const _wrapsYear = fyEndMonth > 5 // Jun+ wraps into next year
       // For calendar year (Dec end): deadline Jul 31 same year+1
       // The FY ending in `year` produces a deadline:
-      const fyEndYear = year - 1 // By default we show deadline for the FY that ended in year-1
-      const deadlineYear = wrapsYear ? fyEndYear + 1 + 1 : fyEndYear + 1
+      const _fyEndYear = year - 1 // By default we show deadline for the FY that ended in year-1
       // Simpler: compute from a concrete FY end date
       // FY ends: fyEndMonth (1-indexed), last day, in some year.
       // We want the deadline that falls in `year`.

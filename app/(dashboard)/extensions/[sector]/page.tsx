@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getSector } from '@/lib/extensions/sectors'
 import { resolveIcon } from '@/lib/extensions/icon-resolver'
+import type { SectorSlug } from '@/lib/extensions/types'
 import ExtensionCard from '@/components/extensions/ExtensionCard'
 import Link from 'next/link'
 
@@ -10,10 +11,11 @@ export default async function SectorExtensionsPage({
   params: Promise<{ sector: string }>
 }) {
   const { sector: sectorSlug } = await params
-  const sector = getSector(sectorSlug as any)
+  const sector = getSector(sectorSlug as SectorSlug)
 
   if (!sector) notFound()
 
+   
   const Icon = resolveIcon(sector.icon)
 
   return (

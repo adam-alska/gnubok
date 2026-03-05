@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { matchDocumentToTransactions } from '../document-matcher'
 import { makeInvoiceInboxItem, makeTransaction } from '@/tests/helpers'
-import type { InvoiceExtractionResult, ReceiptExtractionResult, Transaction } from '@/types'
+import type { InvoiceExtractionResult, ReceiptExtractionResult } from '@/types'
 
 describe('matchDocumentToTransactions', () => {
   const mockSupabase = {} as never // Not used when candidateTransactions is provided

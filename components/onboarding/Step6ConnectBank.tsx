@@ -57,14 +57,6 @@ export default function Step6ConnectBank({
 
   return (
     <div className="space-y-6">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold tracking-tight">Bankuppgifter</h1>
-        <p className="text-muted-foreground mt-2">
-          Ange dina bankuppgifter så visas de på dina fakturor.
-          Du kan importera transaktioner från din bank efteråt.
-        </p>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
