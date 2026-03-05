@@ -16,35 +16,6 @@ export const EXTENSION_DEFINITIONS: Record<string, ExtensionDefinition[]> = {
           "subscriptionNotice": "Denna integration kräver ett aktivt Enable Banking-abonnemang. Utan abonnemang kommer bankintegration inte att fungera."
     },
     {
-          "slug": "ai-chat",
-          "name": "AI-assistent",
-          "sector": "general",
-          "category": "operations",
-          "icon": "MessageSquare",
-          "dataPattern": "both",
-          "description": "AI-assistent för skatte- och bokföringsfrågor med tillgång till din data",
-          "longDescription": "Ställ frågor om skatt, bokföring och företagande till en AI-assistent som förstår svensk redovisning. Kan hämta och visualisera din bokföringsdata — fakturor, transaktioner, resultaträkning, balansräkning och mer.",
-          "readsCoreTables": [
-                "invoices",
-                "supplier_invoices",
-                "transactions",
-                "journal_entries",
-                "journal_entry_lines",
-                "fiscal_periods",
-                "company_settings",
-                "customers",
-                "suppliers",
-                "chart_of_accounts"
-          ],
-          "hasOwnData": true,
-          "quickAction": {
-                "label": "AI-assistent",
-                "description": "Fråga om bokföring",
-                "icon": "MessageSquare",
-                "event": "open-ai-chat"
-          }
-    },
-    {
           "slug": "email",
           "name": "E-post (Resend)",
           "sector": "general",

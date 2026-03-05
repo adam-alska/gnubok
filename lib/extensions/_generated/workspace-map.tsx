@@ -5,5 +5,4 @@ import type { WorkspaceComponentProps } from '../workspace-registry'
 
 export const WORKSPACES: Record<string, ComponentType<WorkspaceComponentProps>> = {
   'general/enable-banking': dynamic(() => import('@/components/extensions/general/EnableBankingWorkspace')),
-  'general/ai-chat': dynamic(() => import('@/components/extensions/general/AiChatWorkspace')),
 }

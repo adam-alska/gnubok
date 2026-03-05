@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import DashboardNav from '@/components/dashboard/DashboardNav'
-import { ChatWidget } from '@/components/chat'
 import { RecaptIdentify } from '@/components/RecaptIdentify'
 import type { EntityType } from '@/types'
 
@@ -55,7 +54,6 @@ export default async function DashboardLayout({
           {children}
         </div>
       </main>
-      <ChatWidget />
       <RecaptIdentify
         userId={user.id}
         email={user.email}

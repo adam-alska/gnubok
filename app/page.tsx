@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation'
 import DashboardNav from '@/components/dashboard/DashboardNav'
 import DashboardContent from '@/components/dashboard/DashboardContent'
 import type { Deadline, ReceiptQueueSummary } from '@/types'
-import { ChatWidget } from '@/components/chat'
 
 export default async function RootPage() {
   const supabase = await createClient()
@@ -230,7 +229,6 @@ export default async function RootPage() {
             enabledExtensions={enabledToggles || []}
           />
         </div>
-        <ChatWidget />
       </main>
     </div>
   )
