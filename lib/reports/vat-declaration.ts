@@ -20,21 +20,26 @@ import type {
  */
 
 /**
- * Account-to-ruta mapping for the Swedish momsdeklaration.
+ * Account-to-ruta mapping for the Swedish momsdeklaration (SKV 4700).
  *
- * Output VAT (26xx): net credit balance feeds output VAT boxes.
+ * Revenue (3001/3002/3003): net credit balance feeds ruta 05 (total domestic taxable sales).
+ * Output VAT (2611/2621/2631): net credit balance feeds ruta 10/11/12 (output VAT per rate).
  * Input VAT (2641/2645): net debit balance feeds ruta 48.
- * Revenue (3xxx): net credit balance feeds underlag (basis) boxes.
+ * EU/Export (3308/3305): net credit balance feeds ruta 39/40.
  */
 const ACCOUNT_RUTA: Record<string, { box: keyof VatDeclarationRutor; side: 'credit' | 'debit' }> = {
-  '2611': { box: 'ruta05', side: 'credit' },
-  '2621': { box: 'ruta06', side: 'credit' },
-  '2631': { box: 'ruta07', side: 'credit' },
+  // Output VAT accounts → ruta 10/11/12
+  '2611': { box: 'ruta10', side: 'credit' },
+  '2621': { box: 'ruta11', side: 'credit' },
+  '2631': { box: 'ruta12', side: 'credit' },
+  // Input VAT → ruta 48
   '2641': { box: 'ruta48', side: 'debit' },
   '2645': { box: 'ruta48', side: 'debit' },
-  '3001': { box: 'ruta10', side: 'credit' },
-  '3002': { box: 'ruta11', side: 'credit' },
-  '3003': { box: 'ruta12', side: 'credit' },
+  // Revenue accounts → ruta 05 (all domestic taxable sales combined)
+  '3001': { box: 'ruta05', side: 'credit' },
+  '3002': { box: 'ruta05', side: 'credit' },
+  '3003': { box: 'ruta05', side: 'credit' },
+  // EU/Export → ruta 39/40
   '3305': { box: 'ruta40', side: 'credit' },
   '3308': { box: 'ruta39', side: 'credit' },
 }
@@ -103,11 +108,11 @@ function round(value: number): number {
  * Calculate VAT declaration from the general ledger.
  *
  * Sums posted journal entry lines on 26xx and 3xxx accounts:
- *   - 2611/2621/2631 credit balance -> ruta 05/06/07 (output VAT)
+ *   - 3001/3002/3003 credit balance -> ruta 05 (total domestic taxable sales)
+ *   - 2611/2621/2631 credit balance -> ruta 10/11/12 (output VAT per rate)
  *   - 2641/2645 debit balance -> ruta 48 (input VAT)
- *   - 3001/3002/3003 credit balance -> ruta 10/11/12 (revenue basis)
  *   - 3308/3305 credit balance -> ruta 39/40 (EU/export)
- *   - ruta 49 = (05 + 06 + 07) - 48
+ *   - ruta 49 = (10 + 11 + 12) - 48
  *
  * The accounting method parameter is accepted for backward compatibility
  * but not used — the method is already baked into journal entry timing.
@@ -170,7 +175,18 @@ export async function calculateVatDeclaration(
     rutor[mapping.box] = round(rutor[mapping.box] + balance)
   }
 
-  rutor.ruta49 = round(rutor.ruta05 + rutor.ruta06 + rutor.ruta07 - rutor.ruta48)
+  rutor.ruta49 = round(rutor.ruta10 + rutor.ruta11 + rutor.ruta12 - rutor.ruta48)
+
+  // Compute per-rate base amounts from individual revenue accounts
+  const revenueByRate = {
+    base25: 0,  // 3001
+    base12: 0,  // 3002
+    base6: 0,   // 3003
+  }
+  for (const [account, rate] of [['3001', 'base25'], ['3002', 'base12'], ['3003', 'base6']] as const) {
+    const t = totals.get(account)
+    if (t) revenueByRate[rate] = round(t.credit - t.debit)
+  }
 
   // Count journal entries by source type for metadata
   const { data: entryCounts } = await supabase
@@ -206,6 +222,9 @@ export async function calculateVatDeclaration(
         ruta12: rutor.ruta12,
         ruta39: rutor.ruta39,
         ruta40: rutor.ruta40,
+        base25: revenueByRate.base25,
+        base12: revenueByRate.base12,
+        base6: revenueByRate.base6,
       },
       transactions: { ruta48: rutor.ruta48 },
       receipts: { ruta48: 0 },
@@ -223,9 +242,9 @@ export function getVatDeclarationSummary(declaration: VatDeclaration): {
   isRefund: boolean
 } {
   const totalOutputVat = round(
-    declaration.rutor.ruta05 +
-    declaration.rutor.ruta06 +
-    declaration.rutor.ruta07
+    declaration.rutor.ruta10 +
+    declaration.rutor.ruta11 +
+    declaration.rutor.ruta12
   )
 
   const totalInputVat = declaration.rutor.ruta48

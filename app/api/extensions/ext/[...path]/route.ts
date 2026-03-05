@@ -4,6 +4,7 @@ import { ensureInitialized } from '@/lib/init'
 import { extensionRegistry } from '@/lib/extensions/registry'
 import { createExtensionContext } from '@/lib/extensions/context-factory'
 import { isExtensionEnabled } from '@/lib/extensions/toggle-check'
+import { hasAiConsent, isAiExtension } from '@/lib/extensions/ai-consent'
 import type { ApiRouteDefinition } from '@/lib/extensions/types'
 
 ensureInitialized()
@@ -80,6 +81,17 @@ async function handleRequest(
   const enabled = await isExtensionEnabled(user.id, sector, extensionId)
   if (!enabled) {
     return NextResponse.json({ error: 'Extension is disabled' }, { status: 403 })
+  }
+
+  // AI consent check
+  if (isAiExtension(extensionId)) {
+    const consented = await hasAiConsent(supabase, user.id, extensionId)
+    if (!consented) {
+      return NextResponse.json(
+        { error: 'AI consent required', code: 'AI_CONSENT_REQUIRED' },
+        { status: 403 }
+      )
+    }
   }
 
   // Find matching route (supports :param patterns)

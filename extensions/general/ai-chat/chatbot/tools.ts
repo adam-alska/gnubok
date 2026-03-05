@@ -423,16 +423,17 @@ export function createAccountingTools(supabase: SupabaseClient, userId: string) 
 
       return JSON.stringify({
         period: `${period.start} – ${period.end}`,
-        output_vat_25: declaration.rutor.ruta05,
-        output_vat_12: declaration.rutor.ruta06,
-        output_vat_6: declaration.rutor.ruta07,
+        output_vat_25: declaration.rutor.ruta10,
+        output_vat_12: declaration.rutor.ruta11,
+        output_vat_6: declaration.rutor.ruta12,
         total_output_vat: summary.totalOutputVat,
         input_vat: summary.totalInputVat,
         vat_to_pay: summary.vatToPay,
         is_refund: summary.isRefund,
-        revenue_basis_25: declaration.rutor.ruta10,
-        revenue_basis_12: declaration.rutor.ruta11,
-        revenue_basis_6: declaration.rutor.ruta12,
+        domestic_taxable_sales: declaration.rutor.ruta05,
+        revenue_basis_25: declaration.breakdown.invoices.base25,
+        revenue_basis_12: declaration.breakdown.invoices.base12,
+        revenue_basis_6: declaration.breakdown.invoices.base6,
         invoice_count: declaration.invoiceCount,
         transaction_count: declaration.transactionCount,
       })

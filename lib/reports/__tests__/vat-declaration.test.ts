@@ -95,21 +95,21 @@ describe('getVatDeclarationSummary', () => {
     const declaration: VatDeclaration = {
       period: { type: 'monthly', year: 2024, period: 1, start: '2024-01-01', end: '2024-01-31' },
       rutor: {
-        ruta05: 2500,
+        ruta05: 10000,   // domestic taxable sales
         ruta06: 0,
         ruta07: 0,
-        ruta10: 10000,
+        ruta10: 2500,    // output VAT 25%
         ruta11: 0,
         ruta12: 0,
         ruta39: 0,
         ruta40: 0,
         ruta48: 1000,
-        ruta49: 1500,
+        ruta49: 1500,    // 2500 - 1000
       },
       invoiceCount: 5,
       transactionCount: 10,
       breakdown: {
-        invoices: { ruta05: 2500, ruta06: 0, ruta07: 0, ruta10: 10000, ruta11: 0, ruta12: 0, ruta39: 0, ruta40: 0 },
+        invoices: { ruta05: 10000, ruta06: 0, ruta07: 0, ruta10: 2500, ruta11: 0, ruta12: 0, ruta39: 0, ruta40: 0, base25: 10000, base12: 0, base6: 0 },
         transactions: { ruta48: 1000 },
         receipts: { ruta48: 0 },
       },
@@ -126,21 +126,21 @@ describe('getVatDeclarationSummary', () => {
     const declaration: VatDeclaration = {
       period: { type: 'monthly', year: 2024, period: 1, start: '2024-01-01', end: '2024-01-31' },
       rutor: {
-        ruta05: 500,
+        ruta05: 2000,    // domestic taxable sales
         ruta06: 0,
         ruta07: 0,
-        ruta10: 2000,
+        ruta10: 500,     // output VAT 25%
         ruta11: 0,
         ruta12: 0,
         ruta39: 0,
         ruta40: 0,
         ruta48: 3000,
-        ruta49: -2500,
+        ruta49: -2500,   // 500 - 3000
       },
       invoiceCount: 1,
       transactionCount: 20,
       breakdown: {
-        invoices: { ruta05: 500, ruta06: 0, ruta07: 0, ruta10: 2000, ruta11: 0, ruta12: 0, ruta39: 0, ruta40: 0 },
+        invoices: { ruta05: 2000, ruta06: 0, ruta07: 0, ruta10: 500, ruta11: 0, ruta12: 0, ruta39: 0, ruta40: 0, base25: 2000, base12: 0, base6: 0 },
         transactions: { ruta48: 3000 },
         receipts: { ruta48: 0 },
       },
@@ -170,15 +170,16 @@ describe('calculateVatDeclaration', () => {
     const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
 
     expect(result.rutor.ruta05).toBe(0)
-    expect(result.rutor.ruta06).toBe(0)
-    expect(result.rutor.ruta07).toBe(0)
+    expect(result.rutor.ruta10).toBe(0)
+    expect(result.rutor.ruta11).toBe(0)
+    expect(result.rutor.ruta12).toBe(0)
     expect(result.rutor.ruta48).toBe(0)
     expect(result.rutor.ruta49).toBe(0)
     expect(result.invoiceCount).toBe(0)
     expect(result.transactionCount).toBe(0)
   })
 
-  it('sums output VAT from 2611/2621/2631 credit balances', async () => {
+  it('sums output VAT to ruta10/11/12 and revenue to ruta05', async () => {
     results = [
       {
         data: [
@@ -196,12 +197,16 @@ describe('calculateVatDeclaration', () => {
 
     const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
 
-    expect(result.rutor.ruta05).toBe(2500)
-    expect(result.rutor.ruta06).toBe(600)
-    expect(result.rutor.ruta07).toBe(180)
-    expect(result.rutor.ruta10).toBe(10000)
-    expect(result.rutor.ruta11).toBe(5000)
-    expect(result.rutor.ruta12).toBe(3000)
+    // Output VAT in ruta 10/11/12
+    expect(result.rutor.ruta10).toBe(2500)
+    expect(result.rutor.ruta11).toBe(600)
+    expect(result.rutor.ruta12).toBe(180)
+    // All domestic revenue combined in ruta 05
+    expect(result.rutor.ruta05).toBe(18000)
+    // Per-rate base amounts in breakdown
+    expect(result.breakdown.invoices.base25).toBe(10000)
+    expect(result.breakdown.invoices.base12).toBe(5000)
+    expect(result.breakdown.invoices.base6).toBe(3000)
     expect(result.invoiceCount).toBe(2)
   })
 
@@ -277,9 +282,9 @@ describe('calculateVatDeclaration', () => {
 
     const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
 
-    // Net: 2500 - 625 = 1875 output VAT, 10000 - 2500 = 7500 revenue
-    expect(result.rutor.ruta05).toBe(1875)
-    expect(result.rutor.ruta10).toBe(7500)
+    // Net: 2500 - 625 = 1875 output VAT in ruta10, 10000 - 2500 = 7500 revenue in ruta05
+    expect(result.rutor.ruta10).toBe(1875)
+    expect(result.rutor.ruta05).toBe(7500)
     expect(result.invoiceCount).toBe(2)
   })
 
@@ -298,7 +303,8 @@ describe('calculateVatDeclaration', () => {
 
     const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
 
-    expect(result.rutor.ruta05).toBe(2500)
+    expect(result.rutor.ruta10).toBe(2500)
+    expect(result.rutor.ruta05).toBe(10000)
     expect(result.rutor.ruta48).toBe(350)
     expect(result.rutor.ruta49).toBe(2150) // 2500 - 350
   })
@@ -354,12 +360,12 @@ describe('calculateVatDeclaration', () => {
 
     const result = await calculateVatDeclaration(supabase, 'user-1', 'quarterly', 2024, 1)
 
-    expect(result.rutor.ruta05).toBe(2500)
-    expect(result.rutor.ruta06).toBe(600)
-    expect(result.rutor.ruta07).toBe(180)
-    expect(result.rutor.ruta10).toBe(10000)
-    expect(result.rutor.ruta11).toBe(5000)
-    expect(result.rutor.ruta12).toBe(3000)
+    // Output VAT in ruta 10/11/12
+    expect(result.rutor.ruta10).toBe(2500)
+    expect(result.rutor.ruta11).toBe(600)
+    expect(result.rutor.ruta12).toBe(180)
+    // All domestic revenue combined in ruta 05
+    expect(result.rutor.ruta05).toBe(18000)
     expect(result.rutor.ruta48).toBe(1000)
     // Output: 2500 + 600 + 180 = 3280, Input: 1000 → Pay: 2280
     expect(result.rutor.ruta49).toBe(2280)

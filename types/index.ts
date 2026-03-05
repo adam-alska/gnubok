@@ -1550,17 +1550,17 @@ export const RECEIPT_STATUS_LABELS: Record<ReceiptStatus, string> = {
 // VAT period type
 export type VatPeriodType = 'monthly' | 'quarterly' | 'yearly'
 
-// VAT declaration rutor (boxes) according to Swedish tax authority
+// VAT declaration rutor (boxes) according to SKV 4700
 export interface VatDeclarationRutor {
-  // Utgående moms (Output VAT)
-  ruta05: number  // Utgående moms 25%
-  ruta06: number  // Utgående moms 12%
-  ruta07: number  // Utgående moms 6%
+  // Momspliktig försäljning (taxable sales basis, all rates combined)
+  ruta05: number  // Momspliktig försäljning (excl. ruta 06, 07, 08)
+  ruta06: number  // Momspliktiga uttag (unused, always 0)
+  ruta07: number  // Vinstmarginalbeskattning (unused, always 0)
 
-  // Momspliktigt underlag (VAT-liable base amounts)
-  ruta10: number  // Momspliktigt underlag 25%
-  ruta11: number  // Momspliktigt underlag 12%
-  ruta12: number  // Momspliktigt underlag 6%
+  // Utgående moms (Output VAT per rate)
+  ruta10: number  // Utgående moms 25%
+  ruta11: number  // Utgående moms 12%
+  ruta12: number  // Utgående moms 6%
 
   // EU och export
   ruta39: number  // Försäljning av tjänster till annat EU-land (reverse charge)
@@ -1597,6 +1597,10 @@ export interface VatDeclaration {
       ruta12: number
       ruta39: number
       ruta40: number
+      // Per-rate base amounts for UI display
+      base25: number
+      base12: number
+      base6: number
     }
     transactions: {
       ruta48: number  // Ingående moms from categorized expenses
@@ -1616,16 +1620,16 @@ export interface VatDeclarationRequest {
 
 // Labels for VAT rutor
 export const VAT_RUTA_LABELS: Record<keyof VatDeclarationRutor, string> = {
-  ruta05: 'Utgående moms 25%',
-  ruta06: 'Utgående moms 12%',
-  ruta07: 'Utgående moms 6%',
-  ruta10: 'Momspliktigt underlag 25%',
-  ruta11: 'Momspliktigt underlag 12%',
-  ruta12: 'Momspliktigt underlag 6%',
+  ruta05: 'Momspliktig försäljning',
+  ruta06: 'Momspliktiga uttag',
+  ruta07: 'Vinstmarginalbeskattning',
+  ruta10: 'Utgående moms 25%',
+  ruta11: 'Utgående moms 12%',
+  ruta12: 'Utgående moms 6%',
   ruta39: 'Försäljning av tjänster till EU-land',
   ruta40: 'Export utanför EU',
   ruta48: 'Ingående moms att dra av',
-  ruta49: 'Moms att betala/återfå'
+  ruta49: 'Moms att betala/återfå',
 }
 
 // ============================================================

@@ -584,8 +584,8 @@ export default function Step3TaxRegistration({
                   content={
                     <div className="space-y-2">
                       <p className="font-medium">Behöver jag momsregistrera mig?</p>
-                      <p>Ja, om din omsättning överstiger 80 000 kr per år. Med moms lägger du på 25% extra på dina fakturor, men får också dra av moms på dina inköp.</p>
-                      <p className="text-xs text-muted-foreground">Om din omsättning överstiger 80 000 kr per år behöver du momsregistrera dig.</p>
+                      <p>Ja, om din omsättning överstiger 120 000 kr per år. Med moms lägger du på 25% extra på dina fakturor, men får också dra av moms på dina inköp.</p>
+                      <p className="text-xs text-muted-foreground">Om din omsättning överstiger 120 000 kr per år behöver du momsregistrera dig.</p>
                     </div>
                   }
                   side="right"
@@ -611,7 +611,7 @@ export default function Step3TaxRegistration({
                     Jag är momsregistrerad
                   </Label>
                   <p className="text-sm text-muted-foreground">
-                    Obligatoriskt om din omsättning överstiger 80 000 kr per år.
+                    Obligatoriskt om din omsättning överstiger 120 000 kr per år.
                   </p>
                 </div>
               </div>

@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Download, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react'
 import { AccountNumber } from '@/components/ui/account-number'
 import { NEDeclarationView } from '@/components/reports/NEDeclarationView'
+import { INK2DeclarationView } from '@/components/reports/INK2DeclarationView'
 import { BankReconciliationView } from '@/components/reports/BankReconciliationView'
 import { TrialBalanceChart } from '@/components/reports/TrialBalanceChart'
 import { VatCompositionChart } from '@/components/reports/VatCompositionChart'
@@ -60,6 +61,7 @@ export default function ReportsPage() {
   }
 
   const isEnskildFirma = entityType === 'enskild_firma'
+  const isAktiebolag = entityType === 'aktiebolag'
 
   return (
     <div className="space-y-6">
@@ -135,6 +137,11 @@ export default function ReportsPage() {
                     NE-bilaga
                   </TabsTrigger>
                 )}
+                {isAktiebolag && (
+                  <TabsTrigger value="ink2-declaration" className="w-full justify-start">
+                    INK2
+                  </TabsTrigger>
+                )}
               </TabsList>
             </div>
 
@@ -187,6 +194,11 @@ export default function ReportsPage() {
           {isEnskildFirma && (
             <TabsContent value="ne-declaration">
               <NEDeclarationView periodId={selectedPeriod} />
+            </TabsContent>
+          )}
+          {isAktiebolag && (
+            <TabsContent value="ink2-declaration">
+              <INK2DeclarationView periodId={selectedPeriod} />
             </TabsContent>
           )}
           <TabsContent value="huvudbok">
@@ -828,23 +840,32 @@ function VatDeclarationView() {
                   <h4 className="font-semibold mb-3">Utgående moms (försäljning)</h4>
                   <table className="w-full text-sm">
                     <tbody>
+                      {data.rutor.ruta05 > 0 && (
+                        <tr className="border-b">
+                          <td className="py-2">
+                            <span className="font-mono text-xs bg-muted px-1 rounded mr-2">05</span>
+                            Momspliktig försäljning
+                          </td>
+                          <td className="py-2 text-right">{formatAmount(data.rutor.ruta05)} kr</td>
+                        </tr>
+                      )}
                       <VatRutaRow
-                        ruta="05"
-                        label="Moms 25%"
-                        amount={data.rutor.ruta05}
-                        baseAmount={data.rutor.ruta10}
+                        ruta="10"
+                        label="Utgående moms 25%"
+                        amount={data.rutor.ruta10}
+                        baseAmount={data.breakdown.invoices.base25}
                       />
                       <VatRutaRow
-                        ruta="06"
-                        label="Moms 12%"
-                        amount={data.rutor.ruta06}
-                        baseAmount={data.rutor.ruta11}
+                        ruta="11"
+                        label="Utgående moms 12%"
+                        amount={data.rutor.ruta11}
+                        baseAmount={data.breakdown.invoices.base12}
                       />
                       <VatRutaRow
-                        ruta="07"
-                        label="Moms 6%"
-                        amount={data.rutor.ruta07}
-                        baseAmount={data.rutor.ruta12}
+                        ruta="12"
+                        label="Utgående moms 6%"
+                        amount={data.rutor.ruta12}
+                        baseAmount={data.breakdown.invoices.base6}
                       />
                       <VatRutaRow
                         ruta="39"
@@ -865,7 +886,7 @@ function VatDeclarationView() {
                       <tr className="border-t-2 font-semibold">
                         <td className="py-2">Summa utgående</td>
                         <td className="py-2 text-right">
-                          {formatAmount(data.rutor.ruta05 + data.rutor.ruta06 + data.rutor.ruta07)} kr
+                          {formatAmount(data.rutor.ruta10 + data.rutor.ruta11 + data.rutor.ruta12)} kr
                         </td>
                       </tr>
                     </tfoot>
@@ -975,7 +996,7 @@ function VatRutaRow({
         <td className="py-2 text-right">{noVat ? '-' : `${formatAmount(amount)} kr`}</td>
       </tr>
       <tr className="text-muted-foreground">
-        <td className="py-1 pl-6 text-xs">Underlag (ruta {parseInt(ruta) + 5})</td>
+        <td className="py-1 pl-6 text-xs">Underlag</td>
         <td className="py-1 text-right text-xs">{formatAmount(baseAmount)} kr</td>
       </tr>
     </>

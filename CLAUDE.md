@@ -6,7 +6,7 @@ erp-base is a Swedish-focused accounting SaaS for sole traders (enskild firma) a
 
 **Tech stack**: Next.js 16 (App Router), React 19, TypeScript (strict), Supabase (PostgreSQL + RLS + magic link auth), Tailwind CSS 4 + shadcn/ui, Vercel hosting.
 
-**Integrations**: Enable Banking (PSD2), Anthropic SDK, LangChain, OpenAI (embeddings), Resend (email), web-push (VAPID).
+**Integrations**: Enable Banking (PSD2), Anthropic SDK, LangChain, OpenAI (embeddings), Resend (email), JSZip (archive export).
 
 **Path alias**: `@/*` maps to the project root. **Language**: All code, comments, and commit messages in English.
 
@@ -34,7 +34,7 @@ app/
   (dashboard)/         Authenticated routes (invoices, customers, transactions,
                        bookkeeping, reports, suppliers, supplier-invoices,
                        receipts, deadlines, settings, help, import, extensions)
-  (public)/            Public invoice action links (no auth)
+  (public)/            Public invoice action links (no auth), DPA, privacy policy
   api/                 API routes organized by domain
 
 components/
@@ -67,12 +67,14 @@ lib/
   email/               EmailService interface + NoopEmailService default
   events/              Event bus (bus.ts, types.ts) — singleton, core emits, extensions subscribe
   extensions/          Extension system (loader, registry, types, hooks, context-factory)
+    ai-consent.ts      AI consent gate for extensions using third-party AI providers
     _generated/        Code-generated files (DO NOT EDIT)
   import/              SIE parser, bank file parser (10 Swedish bank formats)
   invoices/            VAT rules, invoice matching, PDF template, reminders
   reconciliation/      Bank reconciliation engine (4-pass matching)
   reports/             Financial reports (trial balance, income statement, balance sheet,
-                       VAT declaration, SIE export, general ledger, NE-bilaga, SRU export)
+                       VAT declaration, SIE export, general ledger, NE-bilaga, INK2, SRU export,
+                       full archive ZIP export)
   supabase/            Client setup (client.ts = browser, server.ts = server)
   tax/                 Tax calculations, deadlines, Swedish holidays
   vat/                 VIES validation, moms box mapping
@@ -92,7 +94,8 @@ extensions.config.json Extension opt-in configuration
 - **Event bus** (`lib/events/bus.ts`) is a module-level singleton. Handlers run via `Promise.allSettled`.
 - **Supabase clients**: browser (`lib/supabase/client.ts`), server with cookies (`createClient()` from `server.ts`), service role (`createServiceClient()`).
 - **Extension system**: Opt-in via `extensions.config.json`. Core builds and runs with zero extensions.
-- **NE-bilaga and SRU export** are core reports (in `lib/reports/`), not extensions.
+- **NE-bilaga, INK2 declaration, SRU export, and full archive export** are core reports (in `lib/reports/`), not extensions.
+- **AI consent gate** (`lib/extensions/ai-consent.ts`): AI extensions (`receipt-ocr`, `ai-categorization`, `ai-chat`) require user consent before API calls. The extension catch-all route checks consent and returns `403 AI_CONSENT_REQUIRED` if missing.
 
 ---
 
@@ -127,6 +130,19 @@ The engine (`lib/bookkeeping/engine.ts`) is the most critical system. All accoun
 `standard_25`, `reduced_12`, `reduced_6`, `reverse_charge`, `export`, `exempt`
 
 Invoice items support individual `vat_rate` values (mixed-rate invoices). `generatePerRateLines()` in `invoice-entries.ts` groups by rate. Use `getAvailableVatRates(customerType, vatNumberValidated)` from `lib/invoices/vat-rules.ts`.
+
+### VAT Declaration Rutor (SKV 4700)
+
+The `VatDeclarationRutor` type maps to the Swedish tax authority's momsdeklaration form:
+
+- **Ruta 05**: Momspliktig försäljning — total domestic taxable sales (all rates combined, from 3001+3002+3003)
+- **Ruta 06/07**: Unused (momspliktiga uttag / vinstmarginalbeskattning), always 0
+- **Ruta 10/11/12**: Utgående moms 25%/12%/6% — output VAT per rate (from 2611/2621/2631)
+- **Ruta 39/40**: EU services / Export (from 3308/3305)
+- **Ruta 48**: Ingående moms — input VAT (from 2641/2645)
+- **Ruta 49**: Moms att betala/återfå = (ruta 10 + 11 + 12) - ruta 48
+
+The `VatDeclaration.breakdown.invoices` also includes `base25`/`base12`/`base6` for per-rate revenue breakdown in the UI.
 
 ### Bank Reconciliation
 
@@ -174,7 +190,6 @@ Extensions are opt-in plugins controlled by `extensions.config.json`. Core build
 | `receipt-ocr` | import | `ANTHROPIC_API_KEY` |
 | `ai-categorization` | operations | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` |
 | `ai-chat` | operations | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` |
-| `push-notifications` | operations | VAPID keys |
 | `invoice-inbox` | import | `ANTHROPIC_API_KEY` |
 | `calendar` | operations | — |
 | `enable-banking` | import | Enable Banking keys |
@@ -328,13 +343,6 @@ export async function POST(request: Request) {
 
 - Dynamic route params: `{ params }: { params: Promise<{ id: string }> }` (Next.js 16)
 - Response shapes: `{ data }` for success, `{ error }` for failures
-
----
-
-## Type System
-
-- All shared types in `types/index.ts` (single source of truth). Import via `import type { T } from '@/types'`
-- Event types in `lib/events/types.ts`
 
 ---
 

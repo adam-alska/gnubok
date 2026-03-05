@@ -20,9 +20,9 @@ const COLORS = [
 export function VatCompositionChart({ rutor }: VatCompositionChartProps) {
   const chartData = useMemo(() => {
     const segments = [
-      { name: 'Utgående 25%', value: rutor.ruta05 },
-      { name: 'Utgående 12%', value: rutor.ruta06 },
-      { name: 'Utgående 6%', value: rutor.ruta07 },
+      { name: 'Utgående 25%', value: rutor.ruta10 },
+      { name: 'Utgående 12%', value: rutor.ruta11 },
+      { name: 'Utgående 6%', value: rutor.ruta12 },
       { name: 'Ingående moms', value: rutor.ruta48 },
     ]
     return segments.filter((s) => s.value > 0)
