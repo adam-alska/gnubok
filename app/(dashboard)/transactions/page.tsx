@@ -748,7 +748,7 @@ export default function TransactionsPage() {
           />
           <div className="pt-2 border-t">
             <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={handleManualBooking}>
-              Bokför manuellt utan mall...
+              Ange konton manuellt...
             </Button>
           </div>
         </DialogContent>

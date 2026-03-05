@@ -98,11 +98,11 @@ export default function JournalEntryPreview({
   if (lines.length === 0) return null
 
   return (
-    <div className="rounded-lg border bg-muted/30 px-3 py-2.5">
+    <div className="rounded-lg border bg-muted/30 px-3 py-2.5 overflow-hidden">
       <p className="text-xs font-medium text-muted-foreground mb-1.5">Verifikation</p>
-      <div className="space-y-0.5 font-mono text-xs">
+      <div className="space-y-0.5 font-mono text-xs min-w-0">
         {lines.map((line, i) => (
-          <div key={i} className="flex items-baseline gap-2">
+          <div key={i} className="flex items-baseline gap-2 min-w-0">
             <span className={`w-12 text-right flex-shrink-0 ${line.side === 'debet' ? 'text-foreground' : 'text-muted-foreground'}`}>
               {line.side === 'debet' ? 'Debet' : 'Kredit'}
             </span>

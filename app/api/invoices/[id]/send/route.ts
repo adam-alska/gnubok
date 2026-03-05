@@ -33,7 +33,7 @@ export async function POST(
   const emailService = getEmailService()
   if (!emailService.isConfigured()) {
     return NextResponse.json(
-      { error: 'E-posttjänsten är inte konfigurerad. Aktivera e-posttillägget i inställningar.' },
+      { error: 'E-posttjänsten är inte konfigurerad. Kontrollera att RESEND_API_KEY och RESEND_FROM_EMAIL är satta i miljövariablerna.' },
       { status: 503 }
     )
   }

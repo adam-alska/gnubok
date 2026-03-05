@@ -10,9 +10,6 @@ import type { ComponentType } from 'react'
  */
 
 const SETTINGS_PANELS: Record<string, ComponentType> = {
-  'push-notifications': dynamic(
-    () => import('@/extensions/general/push-notifications/NotificationSettings').then(m => ({ default: m.NotificationSettings }))
-  ),
   'enable-banking': dynamic(
     () => import('@/extensions/general/enable-banking/components/BankingSettingsPanel')
   ),

@@ -35,7 +35,6 @@ import type { CompanySettings } from '@/types'
 import { CalendarFeedSettings } from '@/components/settings/CalendarFeedSettings'
 import { getSettingsPanel } from '@/lib/extensions/settings-panel-registry'
 
-const NotificationPanel = getSettingsPanel('push-notifications')
 const BankingPanel = getSettingsPanel('enable-banking')
 
 export default function SettingsPage() {
@@ -48,7 +47,6 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [settings, setSettings] = useState<CompanySettings | null>(null)
   const [hasBankingExtension, setHasBankingExtension] = useState(false)
-  const [hasNotificationExtension, setHasNotificationExtension] = useState(false)
   const [hasCalendarExtension, setHasCalendarExtension] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
@@ -127,9 +125,8 @@ export default function SettingsPage() {
     setSettings(settingsData)
 
     // Check extension toggles in parallel
-    const [bankingToggleRes, notificationToggleRes, calendarToggleRes] = await Promise.all([
+    const [bankingToggleRes, calendarToggleRes] = await Promise.all([
       fetch('/api/extensions/toggles/general/enable-banking').catch(() => null),
-      fetch('/api/extensions/toggles/general/push-notifications').catch(() => null),
       fetch('/api/extensions/toggles/general/calendar').catch(() => null),
     ])
 
@@ -145,11 +142,6 @@ export default function SettingsPage() {
         .eq('status', 'active')
         .limit(1)
       setHasBankingExtension((connections && connections.length > 0) || false)
-    }
-
-    if (notificationToggleRes?.ok) {
-      const { data } = await notificationToggleRes.json()
-      setHasNotificationExtension(data?.enabled || false)
     }
 
     if (calendarToggleRes?.ok) {
@@ -271,11 +263,6 @@ export default function SettingsPage() {
           <TabsTrigger value="banking">
             Bank (PSD2)
           </TabsTrigger>
-          {hasNotificationExtension && (
-            <TabsTrigger value="notifications">
-              Aviseringar
-            </TabsTrigger>
-          )}
           {hasCalendarExtension && (
             <TabsTrigger value="calendar">
               Kalender
@@ -531,15 +518,6 @@ export default function SettingsPage() {
             </Card>
           )}
         </TabsContent>
-
-        {/* Notification settings — loaded dynamically from extension */}
-        {hasNotificationExtension && (
-          <TabsContent value="notifications">
-            {NotificationPanel ? (
-              <NotificationPanel />
-            ) : null}
-          </TabsContent>
-        )}
 
         {/* Calendar feed settings */}
         {hasCalendarExtension && (
