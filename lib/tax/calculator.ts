@@ -1,4 +1,4 @@
-import type { EntityType, TaxEstimate, TaxWarningLevel, TaxWarningStatus } from '@/types'
+import type { EntityType, TaxEstimate } from '@/types'
 
 // Current Swedish tax rates (2026)
 const TAX_RATES = {
@@ -12,14 +12,6 @@ const TAX_RATES = {
 // State income tax threshold (brytpunkt) for 2026
 const STATE_TAX_THRESHOLD = 643100 // Taxable income above this gets +20% state tax
 // Note: The "brytpunkt" is 660,400 kr but that includes grundavdrag
-
-// F-skatt warning thresholds (percentage difference)
-const WARNING_THRESHOLDS = {
-  safe: 0.05, // < 5% difference
-  info: 0.15, // 5-15% difference
-  warning: 0.30, // 15-30% difference
-  // > 30% = danger
-}
 
 /**
  * Calculate progressive grundavdrag (basic deduction) for 2026
@@ -167,121 +159,6 @@ export function calculateAvailableBalance(
 ): number {
   const taxReservation = Math.max(0, taxEstimate.total_tax_liability - taxEstimate.preliminary_paid_ytd)
   return Math.max(0, currentBalance - taxReservation)
-}
-
-/**
- * Get tax warning status (legacy - simplified version)
- */
-export function getTaxWarningStatus(
-  taxEstimate: TaxEstimate
-): { level: 'ok' | 'warning' | 'danger'; message: string } {
-  const enhanced = getEnhancedTaxWarningStatus(taxEstimate, 0)
-  // Map new levels to legacy format
-  const levelMap: Record<TaxWarningLevel, 'ok' | 'warning' | 'danger'> = {
-    safe: 'ok',
-    info: 'warning',
-    warning: 'warning',
-    danger: 'danger',
-  }
-  return {
-    level: levelMap[enhanced.level],
-    message: enhanced.message,
-  }
-}
-
-/**
- * Get enhanced tax warning status with more detail
- * @param taxEstimate - Current tax estimate
- * @param preliminaryTaxMonthly - Monthly preliminary tax amount
- * @param currentMonth - Current month (1-12), defaults to current date
- */
-export function getEnhancedTaxWarningStatus(
-  taxEstimate: TaxEstimate,
-  preliminaryTaxMonthly: number,
-  currentMonth: number = new Date().getMonth() + 1
-): TaxWarningStatus {
-  // Calculate percentage difference
-  const percentageDifference =
-    taxEstimate.total_tax_liability > 0
-      ? taxEstimate.difference / taxEstimate.total_tax_liability
-      : 0
-
-  // Determine warning level
-  let level: TaxWarningLevel
-  if (taxEstimate.difference <= 0) {
-    level = 'safe'
-  } else if (percentageDifference < WARNING_THRESHOLDS.safe) {
-    level = 'safe'
-  } else if (percentageDifference < WARNING_THRESHOLDS.info) {
-    level = 'info'
-  } else if (percentageDifference < WARNING_THRESHOLDS.warning) {
-    level = 'warning'
-  } else {
-    level = 'danger'
-  }
-
-  // Calculate year-end projection
-  const remainingMonths = 12 - currentMonth
-  const projectedPreliminaryPayments =
-    taxEstimate.preliminary_paid_ytd + preliminaryTaxMonthly * remainingMonths
-
-  // Project total tax assuming same income rate
-  const monthsElapsed = currentMonth
-  const projectedAnnualIncome =
-    monthsElapsed > 0
-      ? (taxEstimate.total_tax_liability / monthsElapsed) * 12
-      : taxEstimate.total_tax_liability
-
-  const yearEndProjection = {
-    estimatedTotalTax: Math.round(projectedAnnualIncome),
-    projectedPreliminaryPayments: Math.round(projectedPreliminaryPayments),
-    projectedDifference: Math.round(projectedAnnualIncome - projectedPreliminaryPayments),
-  }
-
-  // Generate message and recommendation
-  let message: string
-  let recommendation: string | undefined
-
-  switch (level) {
-    case 'safe':
-      message = 'Du ligger bra till med din preliminärskatt'
-      break
-    case 'info':
-      message = 'Din beräknade skatt är något högre än inbetald preliminärskatt'
-      recommendation = `Överväg att öka din månatliga F-skatt med ca ${formatCurrency(
-        Math.ceil((taxEstimate.difference / remainingMonths) * 1.1)
-      )} för att undvika kvarskatt.`
-      break
-    case 'warning':
-      message = `Du kan behöva betala ${formatCurrency(taxEstimate.difference)} extra i skatt`
-      recommendation = `Vi rekommenderar att du höjer din månatliga F-skatt till ${formatCurrency(
-        Math.ceil(preliminaryTaxMonthly + taxEstimate.difference / Math.max(remainingMonths, 1))
-      )} för resten av året.`
-      break
-    case 'danger':
-      message = `Stor skillnad! Du kan behöva betala ${formatCurrency(
-        taxEstimate.difference
-      )} extra i skatt vid deklaration`
-      recommendation = `Kontakta Skatteverket för att justera din F-skatt. Nuvarande skillnad är ${Math.round(
-        percentageDifference * 100
-      )}% av beräknad skatt.`
-      break
-  }
-
-  return {
-    level,
-    message,
-    percentageDifference,
-    yearEndProjection,
-    recommendation,
-  }
-}
-
-/**
- * Helper to format currency for messages
- */
-function formatCurrency(amount: number): string {
-  return `${Math.round(amount).toLocaleString('sv-SE')} kr`
 }
 
 /**

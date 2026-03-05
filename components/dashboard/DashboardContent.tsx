@@ -5,12 +5,6 @@ import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn, formatCurrency } from '@/lib/utils'
-import {
-  calculateEFTax,
-  calculateABTax,
-  getEnhancedTaxWarningStatus
-} from '@/lib/tax/calculator'
-import FSkattWarningCard from '@/components/dashboard/FSkattWarningCard'
 import { UpcomingDeadlinesWidget } from '@/components/deadlines/UpcomingDeadlinesWidget'
 import { TaxTodoWidget } from '@/components/deadlines/TaxTodoWidget'
 import NewUserChecklist from '@/components/onboarding/NewUserChecklist'
@@ -77,18 +71,6 @@ export default function DashboardContent({ firstName, settings, summary, onboard
   }, [])
 
   const entityType = (settings?.entity_type as EntityType) || 'enskild_firma'
-  const preliminaryTaxMonthly = settings?.preliminary_tax_monthly || 0
-  const currentMonth = new Date().getMonth() + 1
-  const preliminaryTaxPaidYTD = preliminaryTaxMonthly * currentMonth
-
-  const totalTaxableIncome = summary.ytd.net
-
-  const taxEstimate =
-    entityType === 'enskild_firma'
-      ? calculateEFTax(totalTaxableIncome, preliminaryTaxPaidYTD, null, summary.unpaidVatTotal)
-      : calculateABTax(totalTaxableIncome, 0, preliminaryTaxPaidYTD, summary.unpaidVatTotal)
-
-  const taxWarning = getEnhancedTaxWarningStatus(taxEstimate, preliminaryTaxMonthly, currentMonth)
 
   const formatLargeNumber = (amount: number) => {
     return new Intl.NumberFormat('sv-SE', {
@@ -492,14 +474,6 @@ export default function DashboardContent({ firstName, settings, summary, onboard
 
       {showMore && (
         <div>
-          {/* F-skatt warning */}
-          <section id="fskatt-section" className="mb-10">
-            <FSkattWarningCard
-              warningStatus={taxWarning}
-              onAdjustClick={() => { window.location.href = '/settings' }}
-            />
-          </section>
-
           {/* Uncategorized transactions warning */}
           {summary.uncategorizedCount > 0 && (summary.uncategorizedIncome > 0 || summary.uncategorizedExpenses > 0) && (
             <section className="mb-10">

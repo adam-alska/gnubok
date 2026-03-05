@@ -1009,28 +1009,12 @@ export interface CreateFiscalPeriodInput {
   period_end: string
 }
 
-// Tax warning levels
-export type TaxWarningLevel = 'safe' | 'info' | 'warning' | 'danger'
-
 // Onboarding progress for new user checklist
 export interface OnboardingProgress {
   hasCustomers: boolean
   hasInvoices: boolean
   hasReceipts: boolean
   hasBankConnected: boolean
-}
-
-// Enhanced tax warning status
-export interface TaxWarningStatus {
-  level: TaxWarningLevel
-  message: string
-  percentageDifference: number
-  yearEndProjection?: {
-    estimatedTotalTax: number
-    projectedPreliminaryPayments: number
-    projectedDifference: number
-  }
-  recommendation?: string
 }
 
 // Onboarding step data
