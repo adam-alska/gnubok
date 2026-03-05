@@ -30,7 +30,7 @@ function isResendConfigured(): boolean {
 
 export class ResendEmailService implements EmailService {
   async sendEmail(options: SendEmailOptions): Promise<SendEmailResult> {
-    const { to, subject, html, text, replyTo, fromName, attachments } = options
+    const { to, cc, subject, html, text, replyTo, fromName, attachments } = options
 
     if (!this.isConfigured()) {
       return { success: false, error: 'Email service is not configured' }
@@ -45,6 +45,7 @@ export class ResendEmailService implements EmailService {
       const response = await resend.emails.send({
         from,
         to: Array.isArray(to) ? to : [to],
+        cc: cc ? (Array.isArray(cc) ? cc : [cc]) : undefined,
         subject,
         html,
         text,

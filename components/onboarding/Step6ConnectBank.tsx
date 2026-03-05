@@ -41,6 +41,7 @@ export default function Step6ConnectBank({
     handleSubmit,
   } = useForm<ManualBankData>({
     resolver: zodResolver(manualBankSchema),
+    mode: 'onTouched',
     defaultValues: {
       bank_name: initialData?.bank_name || '',
       clearing_number: initialData?.clearing_number || '',

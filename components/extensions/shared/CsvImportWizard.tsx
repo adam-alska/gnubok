@@ -213,8 +213,8 @@ export default function CsvImportWizard({
 
         {step === 3 && (
           <div className="text-center py-4">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 mb-3">
-              <Check className="h-6 w-6 text-green-600" />
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-success/10 mb-3">
+              <Check className="h-6 w-6 text-success" />
             </div>
             <p className="font-medium">{importCount} rader importerades</p>
             <p className="text-sm text-muted-foreground mt-1">

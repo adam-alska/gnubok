@@ -61,8 +61,8 @@ export function DestructiveConfirmDialog({
               className={cn(
                 'flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-full',
                 variant === 'destructive'
-                  ? 'bg-red-100 text-red-600'
-                  : 'bg-amber-100 text-amber-600'
+                  ? 'bg-destructive/10 text-destructive'
+                  : 'bg-warning/10 text-warning'
               )}
             >
               <AlertTriangle className="h-5 w-5" />
@@ -87,7 +87,7 @@ export function DestructiveConfirmDialog({
             disabled={isLoading}
             className={
               variant === 'warning'
-                ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                ? 'bg-warning hover:bg-warning/90 text-warning-foreground'
                 : undefined
             }
           >

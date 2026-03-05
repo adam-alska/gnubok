@@ -270,7 +270,7 @@ export default function BankFileColumnMappingStep({
                         <TableCell className="text-sm">{row[descCol] || '–'}</TableCell>
                         <TableCell
                           className={`text-right font-mono text-sm ${
-                            !isNaN(amount) && amount >= 0 ? 'text-green-600' : 'text-red-600'
+                            !isNaN(amount) && amount >= 0 ? 'text-success' : 'text-destructive'
                           }`}
                         >
                           {!isNaN(amount) ? formatCurrency(amount) : amountStr}

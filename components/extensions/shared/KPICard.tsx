@@ -23,7 +23,7 @@ export default function KPICard({ label, value, suffix, trend, className }: KPIC
         {trend && (
           <p className={cn(
             'text-xs mt-1',
-            trend.value > 0 ? 'text-green-600' : trend.value < 0 ? 'text-red-600' : 'text-muted-foreground'
+            trend.value > 0 ? 'text-success' : trend.value < 0 ? 'text-destructive' : 'text-muted-foreground'
           )}>
             {trend.value > 0 ? '+' : ''}{trend.value}% {trend.label}
           </p>

@@ -1,11 +1,16 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { Card, CardContent } from '@/components/ui/card'
+import { useState, useCallback, useEffect } from 'react'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
-import { ArrowLeftRight, FileText, ArrowLeft } from 'lucide-react'
+import { ArrowLeftRight, FileText, ArrowLeft, Landmark, Loader2 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { BankSelector, type Bank } from '@/extensions/general/enable-banking/components/BankSelector'
+import { BankConnectionStatus } from '@/extensions/general/enable-banking/components/BankConnectionStatus'
+import { DestructiveConfirmDialog, useDestructiveConfirm } from '@/components/ui/destructive-confirm-dialog'
+import type { BankConnection } from '@/types'
 
 // Bank file import components
 import BankFileUploadStep from '@/components/import/BankFileUploadStep'
@@ -536,13 +541,208 @@ function SIEImportWizard() {
 }
 
 // ============================================================
+// PSD2 Bank Connection (inline, from Enable Banking extension)
+// ============================================================
+
+function PSD2ConnectWizard() {
+  const { toast } = useToast()
+  const supabase = createClient()
+  const { dialogProps, confirm } = useDestructiveConfirm()
+
+  const [bankConnections, setBankConnections] = useState<BankConnection[]>([])
+  const [syncingConnectionId, setSyncingConnectionId] = useState<string | null>(null)
+  const [isConnecting, setIsConnecting] = useState(false)
+  const [connectingBankName, setConnectingBankName] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    fetchConnections()
+  }, [])
+
+  async function fetchConnections() {
+    setIsLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data: connections } = await supabase
+      .from('bank_connections')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+
+    setBankConnections(connections || [])
+    setIsLoading(false)
+  }
+
+  async function handleConnectBank(bank: Bank) {
+    setIsConnecting(true)
+    setConnectingBankName(bank.name)
+
+    try {
+      const response = await fetch('/api/extensions/ext/enable-banking/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aspsp_name: bank.name, aspsp_country: bank.country }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error)
+      }
+
+      window.location.href = data.authorization_url
+    } catch (error) {
+      toast({
+        title: 'Fel',
+        description: error instanceof Error ? error.message : 'Kunde inte ansluta bank',
+        variant: 'destructive',
+      })
+      setIsConnecting(false)
+      setConnectingBankName(null)
+    }
+  }
+
+  async function handleSyncTransactions(connectionId: string) {
+    setSyncingConnectionId(connectionId)
+
+    try {
+      const response = await fetch('/api/extensions/ext/enable-banking/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connection_id: connectionId }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error)
+      }
+
+      toast({
+        title: 'Synkronisering klar',
+        description: `${data.imported} nya transaktioner importerade`,
+      })
+
+      fetchConnections()
+    } catch (error) {
+      toast({
+        title: 'Fel',
+        description: error instanceof Error ? error.message : 'Synkronisering misslyckades',
+        variant: 'destructive',
+      })
+    }
+
+    setSyncingConnectionId(null)
+  }
+
+  async function handleDisconnectBank(connectionId: string) {
+    const ok = await confirm({
+      title: 'Koppla bort bank?',
+      description: 'PSD2-samtycket kommer återkallas. Befintliga transaktioner påverkas inte.',
+      confirmLabel: 'Koppla bort',
+      variant: 'warning',
+    })
+    if (!ok) return
+
+    try {
+      const response = await fetch('/api/extensions/ext/enable-banking/disconnect', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connection_id: connectionId }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Disconnect failed')
+      }
+
+      toast({
+        title: 'Bank bortkopplad',
+        description: 'Bankanslutningen och PSD2-samtycket har återkallats',
+      })
+      fetchConnections()
+    } catch (error) {
+      toast({
+        title: 'Fel',
+        description: error instanceof Error ? error.message : 'Kunde inte koppla bort bank',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-32">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  const activeConnections = bankConnections.filter((c) => c.status === 'active')
+
+  return (
+    <div className="space-y-6">
+      <DestructiveConfirmDialog {...dialogProps} />
+
+      {/* Connected banks */}
+      {activeConnections.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Anslutna banker</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {activeConnections.map((connection) => (
+              <BankConnectionStatus
+                key={connection.id}
+                connection={connection}
+                onSync={handleSyncTransactions}
+                onDisconnect={handleDisconnectBank}
+                isSyncing={syncingConnectionId === connection.id}
+              />
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Connect new bank */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Anslut din bank</CardTitle>
+          <CardDescription>
+            Välj din bank nedan för att koppla ditt konto via PSD2. Transaktioner synkas automatiskt varje dag.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <BankSelector
+            onConnect={handleConnectBank}
+            isConnecting={isConnecting}
+            connectingBankName={connectingBankName}
+          />
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// ============================================================
 // Import Page with Selection Cards
 // ============================================================
 
-type ImportMode = null | 'bank' | 'sie'
+type ImportMode = null | 'psd2' | 'bank' | 'sie'
 
 export default function ImportPage() {
   const [mode, setMode] = useState<ImportMode>(null)
+  const [hasBankingExtension, setHasBankingExtension] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/extensions/toggles/general/enable-banking')
+      .then(res => res.ok ? res.json() : null)
+      .then(json => {
+        if (json?.data?.enabled) setHasBankingExtension(true)
+      })
+      .catch(() => {})
+  }, [])
 
   return (
     <div className="space-y-6">
@@ -555,7 +755,29 @@ export default function ImportPage() {
       </div>
 
       {mode === null && (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className={`grid gap-4 ${hasBankingExtension ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+          {hasBankingExtension && (
+            <Card
+              className="cursor-pointer hover:border-primary/50 transition-colors border-primary/20 relative"
+              onClick={() => setMode('psd2')}
+            >
+              <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Landmark className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">Koppla bank</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Anslut ditt bankkonto direkt och synka transaktioner automatiskt via PSD2.
+                  </p>
+                </div>
+                <p className="text-xs text-primary font-medium">
+                  Rekommenderat
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           <Card
             className="cursor-pointer hover:border-primary/50 transition-colors"
             onClick={() => setMode('bank')}
@@ -605,6 +827,7 @@ export default function ImportPage() {
         </Button>
       )}
 
+      {mode === 'psd2' && <PSD2ConnectWizard />}
       {mode === 'bank' && <BankFileImportWizard />}
       {mode === 'sie' && <SIEImportWizard />}
     </div>

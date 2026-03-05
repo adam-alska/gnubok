@@ -26,9 +26,9 @@ export function ChatKpiCards({ artifact }: ChatKpiCardsProps) {
                 <span
                   className={`flex items-center gap-0.5 text-xs ${
                     card.trend === 'up'
-                      ? 'text-green-600 dark:text-green-400'
+                      ? 'text-success'
                       : card.trend === 'down'
-                        ? 'text-red-600 dark:text-red-400'
+                        ? 'text-destructive'
                         : 'text-muted-foreground'
                   }`}
                 >

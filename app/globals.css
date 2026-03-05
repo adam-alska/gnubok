@@ -4,59 +4,61 @@
 
 :root {
   color-scheme: light;
-  /* Clean Slate — Modern ERP Palette */
+  /* Grayscale Chrome Palette */
 
-  --background: 220 14% 96%;              /* Cool off-white #F2F4F7 */
-  --foreground: 224 12% 13%;              /* Deep slate #1D2029 */
+  --background: 0 0% 97%;
+  --foreground: 0 0% 9%;
 
-  --card: 0 0% 100%;                      /* Pure white */
-  --card-foreground: 224 12% 13%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 9%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 224 12% 13%;
+  --popover-foreground: 0 0% 9%;
 
-  /* Primary — Refined navy-blue */
-  --primary: 222 47% 35%;                 /* #304D83 */
+  --primary: 0 0% 15%;
   --primary-foreground: 0 0% 100%;
 
-  /* Secondary — Cool pale gray */
-  --secondary: 220 13% 93%;               /* #EBEDF1 */
-  --secondary-foreground: 224 12% 13%;
+  --secondary: 0 0% 94%;
+  --secondary-foreground: 0 0% 9%;
 
-  /* Muted — Neutral gray */
-  --muted: 218 12% 91%;                   /* #E3E6EB */
-  --muted-foreground: 218 8% 46%;         /* #6B7280 */
+  --muted: 0 0% 92%;
+  --muted-foreground: 0 0% 45%;
 
-  /* Accent — Clear blue for interactive highlights */
-  --accent: 213 72% 50%;                  /* #2373D8 */
-  --accent-foreground: 0 0% 100%;
+  --accent: 0 0% 92%;
+  --accent-foreground: 0 0% 9%;
 
-  /* Destructive — Clean red */
-  --destructive: 0 68% 50%;               /* #D63232 */
+  --destructive: 6 36% 48%;               /* Muted terracotta */
   --destructive-foreground: 0 0% 100%;
 
-  /* Borders & Input */
-  --border: 218 14% 89%;                  /* #DEE1E7 */
-  --input: 218 14% 89%;
-  --ring: 222 47% 35%;
+  --border: 0 0% 90%;
+  --input: 0 0% 90%;
+  --ring: 0 0% 15%;
 
   /* Radius */
   --radius: 0.5rem;
 
-  /* Success — Clean green */
-  --success: 152 48% 38%;                 /* #329460 */
+  /* Success — Sage green */
+  --success: 155 25% 40%;
   --success-foreground: 0 0% 100%;
 
-  /* Warning — Clear amber */
-  --warning: 38 92% 50%;                  /* #F59E0B */
-  --warning-foreground: 224 12% 13%;
+  /* Warning — Muted ochre */
+  --warning: 38 55% 50%;
+  --warning-foreground: 0 0% 9%;
+
+  --warm-accent: 38 45% 52%;
+
+  /* Chart colors */
+  --chart-1: 155 25% 40%;
+  --chart-2: 6 36% 48%;
+  --chart-3: 38 55% 50%;
+  --chart-4: 0 0% 50%;
 
   /* Custom tokens */
   --font-display: var(--font-fraunces), Georgia, serif;
   --font-body: var(--font-geist-sans), system-ui, sans-serif;
 
   /* Shadows — cool-toned */
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
   --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06);
   --shadow-lg: 0 12px 40px rgba(15, 23, 42, 0.08);
 
@@ -71,39 +73,46 @@
 .dark {
   color-scheme: dark;
 
-  --background: 222 16% 10%;
-  --foreground: 216 12% 90%;
+  --background: 0 0% 7%;
+  --foreground: 0 0% 87%;
 
-  --card: 222 14% 13%;
-  --card-foreground: 216 12% 90%;
+  --card: 0 0% 10%;
+  --card-foreground: 0 0% 87%;
 
-  --popover: 222 14% 13%;
-  --popover-foreground: 216 12% 90%;
+  --popover: 0 0% 10%;
+  --popover-foreground: 0 0% 87%;
 
-  --primary: 222 50% 55%;
-  --primary-foreground: 0 0% 100%;
+  --primary: 0 0% 85%;
+  --primary-foreground: 0 0% 7%;
 
-  --secondary: 220 14% 18%;
-  --secondary-foreground: 216 12% 90%;
+  --secondary: 0 0% 14%;
+  --secondary-foreground: 0 0% 87%;
 
-  --muted: 220 12% 20%;
-  --muted-foreground: 218 8% 55%;
+  --muted: 0 0% 16%;
+  --muted-foreground: 0 0% 50%;
 
-  --accent: 213 72% 58%;
-  --accent-foreground: 0 0% 100%;
+  --accent: 0 0% 16%;
+  --accent-foreground: 0 0% 87%;
 
-  --destructive: 0 62% 55%;
+  --destructive: 6 32% 56%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 220 12% 22%;
-  --input: 220 12% 22%;
-  --ring: 222 50% 55%;
+  --border: 0 0% 18%;
+  --input: 0 0% 18%;
+  --ring: 0 0% 85%;
 
-  --success: 152 44% 45%;
+  --success: 155 22% 48%;
   --success-foreground: 0 0% 100%;
 
-  --warning: 38 85% 55%;
-  --warning-foreground: 224 12% 13%;
+  --warning: 38 50% 55%;
+  --warning-foreground: 0 0% 9%;
+
+  --warm-accent: 38 42% 58%;
+
+  --chart-1: 155 22% 48%;
+  --chart-2: 6 32% 56%;
+  --chart-3: 38 50% 55%;
+  --chart-4: 0 0% 55%;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
@@ -134,6 +143,7 @@
   --color-success-foreground: hsl(var(--success-foreground));
   --color-warning: hsl(var(--warning));
   --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-warm-accent: hsl(var(--warm-accent));
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
@@ -271,7 +281,7 @@ h1, h2, h3 {
 .focus-ring:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px hsl(var(--background)),
-              0 0 0 4px hsl(var(--primary) / 0.3);
+              0 0 0 4px hsl(var(--primary) / 0.35);
 }
 
 /* Custom scrollbar - minimal */

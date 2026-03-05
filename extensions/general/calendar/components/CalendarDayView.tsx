@@ -176,7 +176,7 @@ export function CalendarDayView({
                         {deadline.priority !== 'normal' && (
                           <span className={cn(
                             'ml-2 px-1.5 py-0.5 rounded',
-                            deadline.priority === 'critical' && 'bg-red-100 text-red-700',
+                            deadline.priority === 'critical' && 'bg-destructive/10 text-destructive',
                             deadline.priority === 'important' && 'bg-orange-100 text-orange-700'
                           )}>
                             {PRIORITY_LABELS[deadline.priority]}

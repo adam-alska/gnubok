@@ -10,12 +10,12 @@ import {
 import { cn } from '@/lib/utils'
 
 const TYPE_COLORS: Record<AccountType, string> = {
-  asset: 'bg-green-500',
-  liability: 'bg-orange-500',
-  equity: 'bg-blue-500',
-  revenue: 'bg-purple-500',
-  expense: 'bg-red-500',
-  untaxed_reserves: 'bg-amber-500',
+  asset: 'bg-success',
+  liability: 'bg-warning',
+  equity: 'bg-primary',
+  revenue: 'bg-muted-foreground',
+  expense: 'bg-destructive',
+  untaxed_reserves: 'bg-warning',
 }
 
 const TYPE_LABELS: Record<AccountType, string> = {

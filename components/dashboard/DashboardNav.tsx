@@ -112,7 +112,7 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
     <>
       {/* Desktop sidebar */}
       <aside className="hidden md:fixed md:inset-y-0 md:flex md:w-[232px] md:flex-col">
-        <div className="flex min-h-0 flex-1 flex-col border-r border-border/30 bg-card/80">
+        <div className="flex min-h-0 flex-1 flex-col border-r border-border/30 bg-card/90">
           <div className="flex flex-1 flex-col overflow-y-auto pt-7 pb-4">
             {/* Company name */}
             <div className="px-5 mb-8">
@@ -139,7 +139,7 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                         className={cn(
                           'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
                           active
-                            ? 'bg-primary/8 text-foreground font-medium'
+                            ? 'bg-primary/12 text-foreground font-medium'
                             : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
                         )}
                       >
@@ -173,7 +173,7 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                         className={cn(
                           'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
                           active
-                            ? 'bg-primary/8 text-foreground font-medium'
+                            ? 'bg-primary/12 text-foreground font-medium'
                             : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
                         )}
                       >
@@ -217,7 +217,7 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                           className={cn(
                             'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
                             active
-                              ? 'bg-primary/8 text-foreground font-medium'
+                              ? 'bg-primary/12 text-foreground font-medium'
                               : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
                           )}
                         >
@@ -236,7 +236,7 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
           </div>
 
           {/* Logout button */}
-          <div className="flex-shrink-0 px-3 py-3 border-t border-border/20">
+          <div className="flex-shrink-0 px-3 py-3 border-t border-border/30">
             <Button
               variant="ghost"
               className="w-full justify-start text-muted-foreground hover:text-foreground text-[13px] h-9 px-3"

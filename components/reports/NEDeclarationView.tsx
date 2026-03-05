@@ -211,7 +211,7 @@ export function NEDeclarationView({ periodId }: { periodId: string }) {
                 </div>
                 <span
                   className={`text-2xl font-bold ${
-                    data.rutor.R11 >= 0 ? 'text-green-600' : 'text-red-600'
+                    data.rutor.R11 >= 0 ? 'text-success' : 'text-destructive'
                   }`}
                 >
                   {formatCurrency(data.rutor.R11)}

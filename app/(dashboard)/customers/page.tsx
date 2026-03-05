@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
-import { Plus, Search, Users, Building, Globe, User } from 'lucide-react'
+import { Plus, Search, Users, MapPin, Mail, Hash } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import CustomerForm from '@/components/customers/CustomerForm'
 import { EmptyCustomers } from '@/components/ui/empty-state'
 import Link from 'next/link'
@@ -21,11 +22,20 @@ const customerTypeLabels: Record<CustomerType, string> = {
   non_eu_business: 'Utanför EU',
 }
 
-const customerTypeIcons: Record<CustomerType, React.ElementType> = {
-  individual: User,
-  swedish_business: Building,
-  eu_business: Globe,
-  non_eu_business: Globe,
+const customerTypeColors: Record<CustomerType, string> = {
+  individual: 'bg-blue-50 text-blue-700 border-blue-200',
+  swedish_business: 'bg-amber-50 text-amber-700 border-amber-200',
+  eu_business: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  non_eu_business: 'bg-violet-50 text-violet-700 border-violet-200',
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
 }
 
 export default function CustomersPage() {
@@ -167,49 +177,53 @@ export default function CustomersPage() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredCustomers.map((customer) => {
-            const Icon = customerTypeIcons[customer.customer_type]
-            return (
+          {filteredCustomers.map((customer) => (
               <Link key={customer.id} href={`/customers/${customer.id}`}>
-                <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Icon className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <CardTitle className="text-base">{customer.name}</CardTitle>
-                          <CardDescription>{customer.email || 'Ingen e-post'}</CardDescription>
-                        </div>
+                <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full group">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-3.5">
+                      <div className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-sm font-semibold text-primary tracking-tight">
+                        {getInitials(customer.name)}
                       </div>
-                      <Badge variant="secondary">
-                        {customerTypeLabels[customer.customer_type]}
-                      </Badge>
+                      <div className="min-w-0">
+                        <CardTitle className="text-base truncate group-hover:text-primary transition-colors">{customer.name}</CardTitle>
+                        <span className={cn(
+                          'inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full border',
+                          customerTypeColors[customer.customer_type]
+                        )}>
+                          {customerTypeLabels[customer.customer_type]}
+                        </span>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-sm text-muted-foreground space-y-1">
-                      {customer.org_number && (
-                        <p>Org.nr: {customer.org_number}</p>
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      {customer.email && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">{customer.email}</span>
+                        </div>
                       )}
-                      {customer.vat_number && (
-                        <p className="flex items-center gap-1">
-                          VAT: {customer.vat_number}
+                      {customer.org_number && (
+                        <div className="flex items-center gap-2">
+                          <Hash className="h-3.5 w-3.5 shrink-0" />
+                          <span>{customer.org_number}</span>
                           {customer.vat_number_validated && (
                             <Badge variant="success" className="text-xs">Verifierad</Badge>
                           )}
-                        </p>
+                        </div>
                       )}
                       {customer.city && (
-                        <p>{customer.city}, {customer.country}</p>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-3.5 w-3.5 shrink-0" />
+                          <span>{customer.city}, {customer.country}</span>
+                        </div>
                       )}
                     </div>
                   </CardContent>
                 </Card>
               </Link>
-            )
-          })}
+          ))}
         </div>
       )}
     </div>

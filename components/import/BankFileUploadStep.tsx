@@ -166,7 +166,7 @@ export default function BankFileUploadStep({
               </div>
             ) : selectedFile && detectedFormat ? (
               <div className="space-y-4">
-                <CheckCircle className="mx-auto h-12 w-12 text-green-600" />
+                <CheckCircle className="mx-auto h-12 w-12 text-success" />
                 <div>
                   <p className="font-medium">{selectedFile.name}</p>
                   <p className="text-sm text-muted-foreground">

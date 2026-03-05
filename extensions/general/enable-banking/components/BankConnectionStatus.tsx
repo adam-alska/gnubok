@@ -34,19 +34,19 @@ export function BankConnectionStatus({
   const statusConfig = {
     active: {
       icon: CheckCircle,
-      color: 'text-green-600',
+      color: 'text-success',
       label: 'Aktiv',
       variant: 'success' as const,
     },
     pending: {
       icon: Loader2,
-      color: 'text-yellow-600',
+      color: 'text-warning',
       label: 'Väntar',
       variant: 'warning' as const,
     },
     error: {
       icon: XCircle,
-      color: 'text-red-600',
+      color: 'text-destructive',
       label: 'Fel',
       variant: 'destructive' as const,
     },

@@ -697,8 +697,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                             <div className="flex items-center gap-1 mt-1">
                               {reminder.response_type === 'marked_paid' ? (
                                 <>
-                                  <CheckCircle className="h-3 w-3 text-green-600" />
-                                  <span className="text-xs text-green-600">Kunden markerat som betald</span>
+                                  <CheckCircle className="h-3 w-3 text-success" />
+                                  <span className="text-xs text-success">Kunden markerat som betald</span>
                                 </>
                               ) : (
                                 <>

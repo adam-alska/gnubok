@@ -296,7 +296,7 @@ function TrialBalanceView({ periodId }: { periodId: string }) {
           <div className="flex items-center justify-between">
             <CardTitle>Saldobalans</CardTitle>
             {data.isBalanced ? (
-              <Badge className="bg-green-100 text-green-800">Balanserad</Badge>
+              <Badge className="bg-success/10 text-success">Balanserad</Badge>
             ) : (
               <Badge variant="destructive">Ej balanserad</Badge>
             )}
@@ -343,10 +343,10 @@ function TrialBalanceView({ periodId }: { periodId: string }) {
               <td className="py-2 text-right">
                 {formatAmount(data.rows.reduce((s, r) => s + r.period_credit, 0))}
               </td>
-              <td className={`py-2 text-right ${data.isBalanced ? 'text-green-600' : 'text-red-600'}`}>
+              <td className={`py-2 text-right ${data.isBalanced ? 'text-success' : 'text-destructive'}`}>
                 {formatAmount(data.totalDebit)}
               </td>
-              <td className={`py-2 text-right ${data.isBalanced ? 'text-green-600' : 'text-red-600'}`}>
+              <td className={`py-2 text-right ${data.isBalanced ? 'text-success' : 'text-destructive'}`}>
                 {formatAmount(data.totalCredit)}
               </td>
             </tr>
@@ -468,7 +468,7 @@ function IncomeStatementView({ periodId }: { periodId: string }) {
         <CardContent className="py-4">
           <div className="flex justify-between font-bold text-lg">
             <span>Rörelseresultat</span>
-            <span className={data.total_revenue - data.total_expenses >= 0 ? 'text-green-600' : 'text-red-600'}>
+            <span className={data.total_revenue - data.total_expenses >= 0 ? 'text-success' : 'text-destructive'}>
               {formatAmount(data.total_revenue - data.total_expenses)} kr
             </span>
           </div>
@@ -496,7 +496,7 @@ function IncomeStatementView({ periodId }: { periodId: string }) {
         <CardContent className="py-4">
           <div className="flex justify-between font-bold text-xl">
             <span>Årets resultat</span>
-            <span className={data.net_result >= 0 ? 'text-green-600' : 'text-red-600'}>
+            <span className={data.net_result >= 0 ? 'text-success' : 'text-destructive'}>
               {formatAmount(data.net_result)} kr
             </span>
           </div>
@@ -599,7 +599,7 @@ function BalanceSheetView({ periodId }: { periodId: string }) {
           <div className="flex justify-between items-center">
             <span className="font-bold text-lg">Balanscheck</span>
             {isBalanced ? (
-              <Badge className="bg-green-100 text-green-800 text-base px-3 py-1">
+              <Badge className="bg-success/10 text-success text-base px-3 py-1">
                 Balanserar
               </Badge>
             ) : (
@@ -607,7 +607,7 @@ function BalanceSheetView({ periodId }: { periodId: string }) {
                 <Badge variant="destructive" className="text-base px-3 py-1">
                   Balanserar ej
                 </Badge>
-                <p className="text-sm text-red-600 mt-1">
+                <p className="text-sm text-destructive mt-1">
                   Differens: {formatAmount(Math.abs(data.total_assets - data.total_equity_liabilities))} kr
                 </p>
               </div>
@@ -817,7 +817,7 @@ function VatDeclarationView() {
                     data.rutor.ruta49 > 0
                       ? 'bg-orange-100 text-orange-800'
                       : data.rutor.ruta49 < 0
-                      ? 'bg-green-100 text-green-800'
+                      ? 'bg-success/10 text-success'
                       : 'bg-gray-100 text-gray-800'
                   }
                 >
@@ -946,7 +946,7 @@ function VatDeclarationView() {
                       data.rutor.ruta49 > 0
                         ? 'text-orange-600'
                         : data.rutor.ruta49 < 0
-                        ? 'text-green-600'
+                        ? 'text-success'
                         : ''
                     }`}
                   >
@@ -1106,7 +1106,7 @@ function SupplierLedgerView({ periodId }: { periodId: string }) {
             <CardTitle className="text-sm text-muted-foreground">Ej förfallet</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-green-600">{formatAmount(ledger.total_current)} kr</p>
+            <p className="text-2xl font-bold text-success">{formatAmount(ledger.total_current)} kr</p>
           </CardContent>
         </Card>
         <Card>
@@ -1114,7 +1114,7 @@ function SupplierLedgerView({ periodId }: { periodId: string }) {
             <CardTitle className="text-sm text-muted-foreground">Förfallet</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-red-600">{formatAmount(ledger.total_overdue)} kr</p>
+            <p className="text-2xl font-bold text-destructive">{formatAmount(ledger.total_overdue)} kr</p>
           </CardContent>
         </Card>
       </div>
@@ -1146,7 +1146,7 @@ function SupplierLedgerView({ periodId }: { periodId: string }) {
                     <td className="py-2 text-right">{entry.days_1_30 > 0 ? formatAmount(entry.days_1_30) : ''}</td>
                     <td className="py-2 text-right">{entry.days_31_60 > 0 ? formatAmount(entry.days_31_60) : ''}</td>
                     <td className="py-2 text-right">{entry.days_61_90 > 0 ? formatAmount(entry.days_61_90) : ''}</td>
-                    <td className="py-2 text-right text-red-600">{entry.days_90_plus > 0 ? formatAmount(entry.days_90_plus) : ''}</td>
+                    <td className="py-2 text-right text-destructive">{entry.days_90_plus > 0 ? formatAmount(entry.days_90_plus) : ''}</td>
                     <td className="py-2 text-right font-semibold">{formatAmount(entry.total_outstanding)}</td>
                   </tr>
                 ))}
@@ -1158,7 +1158,7 @@ function SupplierLedgerView({ periodId }: { periodId: string }) {
                   <td className="py-2 text-right">{formatAmount(ledger.entries.reduce((s, e) => s + e.days_1_30, 0))}</td>
                   <td className="py-2 text-right">{formatAmount(ledger.entries.reduce((s, e) => s + e.days_31_60, 0))}</td>
                   <td className="py-2 text-right">{formatAmount(ledger.entries.reduce((s, e) => s + e.days_61_90, 0))}</td>
-                  <td className="py-2 text-right text-red-600">{formatAmount(ledger.entries.reduce((s, e) => s + e.days_90_plus, 0))}</td>
+                  <td className="py-2 text-right text-destructive">{formatAmount(ledger.entries.reduce((s, e) => s + e.days_90_plus, 0))}</td>
                   <td className="py-2 text-right">{formatAmount(ledger.total_outstanding)}</td>
                 </tr>
               </tfoot>
@@ -1185,13 +1185,13 @@ function SupplierLedgerView({ periodId }: { periodId: string }) {
               </div>
               <div className="flex justify-between pt-2 border-t font-semibold">
                 <span>Differens</span>
-                <span className={reconciliation.is_reconciled ? 'text-green-600' : 'text-red-600'}>
+                <span className={reconciliation.is_reconciled ? 'text-success' : 'text-destructive'}>
                   {formatAmount(reconciliation.difference)} kr
                 </span>
               </div>
               <div className="pt-2">
                 {reconciliation.is_reconciled ? (
-                  <Badge className="bg-green-100 text-green-800">Avstämd</Badge>
+                  <Badge className="bg-success/10 text-success">Avstämd</Badge>
                 ) : (
                   <Badge variant="destructive">Ej avstämd - kontrollera bokföring</Badge>
                 )}
@@ -1704,7 +1704,7 @@ function ARLedgerView({ periodId }: { periodId: string }) {
             <CardTitle className="text-sm text-muted-foreground">Ej förfallet</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-green-600">{formatAmount(ledger.total_current)} kr</p>
+            <p className="text-2xl font-bold text-success">{formatAmount(ledger.total_current)} kr</p>
           </CardContent>
         </Card>
         <Card>
@@ -1712,7 +1712,7 @@ function ARLedgerView({ periodId }: { periodId: string }) {
             <CardTitle className="text-sm text-muted-foreground">Förfallet</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-red-600">{formatAmount(ledger.total_overdue)} kr</p>
+            <p className="text-2xl font-bold text-destructive">{formatAmount(ledger.total_overdue)} kr</p>
           </CardContent>
         </Card>
       </div>
@@ -1758,7 +1758,7 @@ function ARLedgerView({ periodId }: { periodId: string }) {
                         <td className="py-2 text-right">{entry.days_1_30 > 0 ? formatAmount(entry.days_1_30) : ''}</td>
                         <td className="py-2 text-right">{entry.days_31_60 > 0 ? formatAmount(entry.days_31_60) : ''}</td>
                         <td className="py-2 text-right">{entry.days_61_90 > 0 ? formatAmount(entry.days_61_90) : ''}</td>
-                        <td className="py-2 text-right text-red-600">{entry.days_90_plus > 0 ? formatAmount(entry.days_90_plus) : ''}</td>
+                        <td className="py-2 text-right text-destructive">{entry.days_90_plus > 0 ? formatAmount(entry.days_90_plus) : ''}</td>
                         <td className="py-2 text-right font-semibold">{formatAmount(entry.total_outstanding)}</td>
                       </tr>
                       {isExpanded && entry.invoices.map((inv) => (
@@ -1793,7 +1793,7 @@ function ARLedgerView({ periodId }: { periodId: string }) {
                   <td className="py-2 text-right">{formatAmount(ledger.entries.reduce((s, e) => s + e.days_1_30, 0))}</td>
                   <td className="py-2 text-right">{formatAmount(ledger.entries.reduce((s, e) => s + e.days_31_60, 0))}</td>
                   <td className="py-2 text-right">{formatAmount(ledger.entries.reduce((s, e) => s + e.days_61_90, 0))}</td>
-                  <td className="py-2 text-right text-red-600">{formatAmount(ledger.entries.reduce((s, e) => s + e.days_90_plus, 0))}</td>
+                  <td className="py-2 text-right text-destructive">{formatAmount(ledger.entries.reduce((s, e) => s + e.days_90_plus, 0))}</td>
                   <td className="py-2 text-right">{formatAmount(ledger.total_outstanding)}</td>
                 </tr>
               </tfoot>
@@ -1820,13 +1820,13 @@ function ARLedgerView({ periodId }: { periodId: string }) {
               </div>
               <div className="flex justify-between pt-2 border-t font-semibold">
                 <span>Differens</span>
-                <span className={reconciliation.is_reconciled ? 'text-green-600' : 'text-red-600'}>
+                <span className={reconciliation.is_reconciled ? 'text-success' : 'text-destructive'}>
                   {formatAmount(reconciliation.difference)} kr
                 </span>
               </div>
               <div className="pt-2">
                 {reconciliation.is_reconciled ? (
-                  <Badge className="bg-green-100 text-green-800">Avstämd</Badge>
+                  <Badge className="bg-success/10 text-success">Avstämd</Badge>
                 ) : (
                   <Badge variant="destructive">Ej avstämd - kontrollera bokföring</Badge>
                 )}

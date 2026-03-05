@@ -377,7 +377,7 @@ export default function MockDataImportDialog<T>({
               <span>{fileName}</span>
             </div>
 
-            <div className="flex items-center gap-2 p-3 rounded-md bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 text-sm">
+            <div className="flex items-center gap-2 p-3 rounded-md bg-success/10 text-success text-sm">
               <Check className="h-4 w-4 shrink-0" />
               <span>Giltig JSON — {jsonSummary}</span>
             </div>

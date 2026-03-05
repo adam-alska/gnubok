@@ -199,7 +199,7 @@ const glossaryTerms: GlossaryTerm[] = [
 const categoryConfig = {
   skatt: { label: 'Skatt', icon: Calculator, color: 'bg-orange-500/10 text-orange-600' },
   moms: { label: 'Moms', icon: Receipt, color: 'bg-blue-500/10 text-blue-600' },
-  faktura: { label: 'Faktura', icon: FileText, color: 'bg-green-500/10 text-green-600' },
+  faktura: { label: 'Faktura', icon: FileText, color: 'bg-success/10 text-success' },
   bokföring: { label: 'Bokföring', icon: BookOpen, color: 'bg-purple-500/10 text-purple-600' },
   bank: { label: 'Bank', icon: Building2, color: 'bg-pink-500/10 text-pink-600' },
   företag: { label: 'Företag', icon: Building2, color: 'bg-cyan-500/10 text-cyan-600' },

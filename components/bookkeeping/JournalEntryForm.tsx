@@ -338,14 +338,14 @@ export default function JournalEntryForm({
               </td>
               <td
                 className={`py-2 px-1 text-right ${
-                  isBalanced ? 'text-green-600' : 'text-red-600'
+                  isBalanced ? 'text-success' : 'text-destructive'
                 }`}
               >
                 {totalDebit.toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
               </td>
               <td
                 className={`py-2 px-1 text-right ${
-                  isBalanced ? 'text-green-600' : 'text-red-600'
+                  isBalanced ? 'text-success' : 'text-destructive'
                 }`}
               >
                 {totalCredit.toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
@@ -378,7 +378,7 @@ export default function JournalEntryForm({
       )}
 
       {!isBalanced && totalDebit > 0 && (
-        <p className="text-sm text-red-600">
+        <p className="text-sm text-destructive">
           Differens: {formatCurrency(Math.abs(totalDebit - totalCredit))}
         </p>
       )}

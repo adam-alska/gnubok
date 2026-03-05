@@ -155,6 +155,7 @@ export default function Step3TaxRegistration({
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
+    mode: 'onTouched',
     defaultValues: {
       f_skatt: initialData.f_skatt ?? true,
       is_first_fiscal_year: initialData.is_first_fiscal_year ?? false,

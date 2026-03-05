@@ -129,9 +129,11 @@ export async function POST(
       filename = `faktura-${invoice.invoice_number}.pdf`
     }
 
-    // Send email
+    // Send email (CC the user so they have a copy of what was sent)
+    const ccAddress = company.email || user.email
     const result = await emailService.sendEmail({
       to: customer.email,
+      cc: ccAddress,
       subject: generateInvoiceEmailSubject(emailData),
       html: generateInvoiceEmailHtml(emailData),
       text: generateInvoiceEmailText(emailData),
@@ -215,7 +217,7 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      message: `Fakturan har skickats till ${customer.email}`,
+      message: `Fakturan har skickats till ${customer.email} (kopia till ${ccAddress})`,
       messageId: result.messageId
     })
   } catch (error) {

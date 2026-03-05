@@ -205,7 +205,7 @@ export default function InboxUploadZone({
           {fileProgress.map((fp) => (
             <div key={fp.name} className="flex items-center gap-2 text-sm">
               {fp.status === 'uploading' && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-              {fp.status === 'done' && <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />}
+              {fp.status === 'done' && <CheckCircle2 className="h-3.5 w-3.5 text-success" />}
               {fp.status === 'error' && <AlertCircle className="h-3.5 w-3.5 text-destructive" />}
               <span className={cn(
                 'truncate',

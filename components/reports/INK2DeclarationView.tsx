@@ -203,13 +203,13 @@ export function INK2DeclarationView({ periodId }: { periodId: string }) {
                 <tfoot>
                   <tr className="border-t font-medium">
                     <td className="py-2">Rörelseresultat</td>
-                    <td className={`py-2 text-right ${data.totals.operatingResult >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <td className={`py-2 text-right ${data.totals.operatingResult >= 0 ? 'text-success' : 'text-destructive'}`}>
                       {formatCurrency(data.totals.operatingResult)}
                     </td>
                   </tr>
                   <tr className="border-t-2 font-semibold">
                     <td className="py-2">Resultat efter finansiella poster</td>
-                    <td className={`py-2 text-right ${data.totals.resultAfterFinancial >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <td className={`py-2 text-right ${data.totals.resultAfterFinancial >= 0 ? 'text-success' : 'text-destructive'}`}>
                       {formatCurrency(data.totals.resultAfterFinancial)}
                     </td>
                   </tr>

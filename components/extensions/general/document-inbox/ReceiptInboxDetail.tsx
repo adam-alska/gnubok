@@ -188,8 +188,8 @@ export default function ReceiptInboxDetail({
                 <p className="font-medium flex items-center gap-1">
                   {receipt.matched_transaction_id ? (
                     <>
-                      <LinkIcon className="h-3 w-3 text-green-600" />
-                      <span className="text-green-600">Matchad</span>
+                      <LinkIcon className="h-3 w-3 text-success" />
+                      <span className="text-success">Matchad</span>
                     </>
                   ) : (
                     <span className="text-muted-foreground">Ingen match</span>

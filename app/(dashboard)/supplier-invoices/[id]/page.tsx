@@ -22,9 +22,9 @@ function formatAmount(amount: number): string {
 const statusColors: Record<string, string> = {
   registered: 'bg-blue-100 text-blue-800',
   approved: 'bg-yellow-100 text-yellow-800',
-  paid: 'bg-green-100 text-green-800',
+  paid: 'bg-success/10 text-success',
   partially_paid: 'bg-orange-100 text-orange-800',
-  overdue: 'bg-red-100 text-red-800',
+  overdue: 'bg-destructive/10 text-destructive',
   disputed: 'bg-purple-100 text-purple-800',
   credited: 'bg-gray-100 text-gray-800',
 }
@@ -277,7 +277,7 @@ export default function SupplierInvoiceDetailPage() {
             </div>
             <div className="flex justify-between pt-2">
               <span className="text-muted-foreground">Betalt</span>
-              <span className="font-mono text-green-600">{formatAmount(invoice.paid_amount)} {invoice.currency}</span>
+              <span className="font-mono text-success">{formatAmount(invoice.paid_amount)} {invoice.currency}</span>
             </div>
             <div className="flex justify-between font-semibold">
               <span>Kvar att betala</span>

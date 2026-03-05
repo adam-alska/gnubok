@@ -268,15 +268,15 @@ export default function ReceiptCamera({ onCapture, onClose }: ReceiptCameraProps
       {isStreaming && (
         <div className="absolute bottom-36 left-0 right-0 flex justify-center z-10">
           <div className="bg-black/70 rounded-full px-4 py-2 flex items-center gap-4">
-            <div className={`flex items-center gap-1 ${quality.lightingOk ? 'text-green-400' : 'text-yellow-400'}`}>
+            <div className={`flex items-center gap-1 ${quality.lightingOk ? 'text-success' : 'text-yellow-400'}`}>
               <SunMedium className="h-4 w-4" />
               <span className="text-xs">Ljus</span>
             </div>
-            <div className={`flex items-center gap-1 ${quality.distanceOk ? 'text-green-400' : 'text-yellow-400'}`}>
+            <div className={`flex items-center gap-1 ${quality.distanceOk ? 'text-success' : 'text-yellow-400'}`}>
               <Move className="h-4 w-4" />
               <span className="text-xs">Avstånd</span>
             </div>
-            <div className={`flex items-center gap-1 ${quality.focusOk ? 'text-green-400' : 'text-yellow-400'}`}>
+            <div className={`flex items-center gap-1 ${quality.focusOk ? 'text-success' : 'text-yellow-400'}`}>
               <Focus className="h-4 w-4" />
               <span className="text-xs">Fokus</span>
             </div>

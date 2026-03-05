@@ -282,7 +282,7 @@ export function BankReconciliationView() {
             <div className="flex items-center justify-between">
               <CardTitle>Avstämning mot <AccountNumber number="1930" /></CardTitle>
               {status.is_reconciled ? (
-                <Badge className="bg-green-100 text-green-800">Avstämd</Badge>
+                <Badge className="bg-success/10 text-success">Avstämd</Badge>
               ) : (
                 <Badge variant="destructive">Ej avstämd</Badge>
               )}

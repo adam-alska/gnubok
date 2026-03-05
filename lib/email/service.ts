@@ -8,6 +8,7 @@
 
 export interface SendEmailOptions {
   to: string | string[]
+  cc?: string | string[]
   subject: string
   html: string
   text?: string

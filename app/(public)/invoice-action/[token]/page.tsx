@@ -119,7 +119,7 @@ export default function InvoiceActionPage({ params }: { params: Promise<{ token:
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
           <CardContent className="pt-6 text-center">
-            <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+            <CheckCircle className="h-12 w-12 text-success mx-auto mb-4" />
             <h2 className="text-lg font-semibold mb-2">Tack för ditt svar!</h2>
             <p className="text-muted-foreground mb-4">
               {successMessage || (
@@ -175,15 +175,15 @@ export default function InvoiceActionPage({ params }: { params: Promise<{ token:
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Förfallodatum</p>
-                <p className="font-medium text-red-600">{formatDate(invoice.dueDate)}</p>
+                <p className="font-medium text-destructive">{formatDate(invoice.dueDate)}</p>
               </div>
             </div>
 
-            <div className="bg-red-50 border border-red-100 rounded-lg p-4">
-              <p className="text-sm text-red-600 mb-1">
+            <div className="bg-destructive/5 border border-destructive/15 rounded-lg p-4">
+              <p className="text-sm text-destructive mb-1">
                 Förfallen med {daysOverdue} dagar
               </p>
-              <p className="text-2xl font-bold text-red-700">
+              <p className="text-2xl font-bold text-destructive">
                 {formatCurrency(invoice.total, invoice.currency)}
               </p>
             </div>
@@ -211,7 +211,7 @@ export default function InvoiceActionPage({ params }: { params: Promise<{ token:
               onClick={() => handleAction('marked_paid')}
               disabled={isSubmitting}
             >
-              <CheckCircle className="h-5 w-5 mr-3 text-green-600" />
+              <CheckCircle className="h-5 w-5 mr-3 text-success" />
               <div className="text-left">
                 <p className="font-medium">Jag har betalat</p>
                 <p className="text-sm text-muted-foreground font-normal">

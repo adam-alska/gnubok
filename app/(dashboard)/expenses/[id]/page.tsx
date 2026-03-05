@@ -19,9 +19,9 @@ import type { SupplierInvoice, SupplierInvoiceItem, SupplierInvoicePayment, Enti
 const statusConfig: Record<string, { label: string; color: string }> = {
   registered: { label: 'Obetald', color: 'bg-blue-100 text-blue-800' },
   approved: { label: 'Obetald', color: 'bg-yellow-100 text-yellow-800' },
-  paid: { label: 'Betald', color: 'bg-green-100 text-green-800' },
+  paid: { label: 'Betald', color: 'bg-success/10 text-success' },
   partially_paid: { label: 'Delbetald', color: 'bg-orange-100 text-orange-800' },
-  overdue: { label: 'Förfallen', color: 'bg-red-100 text-red-800' },
+  overdue: { label: 'Förfallen', color: 'bg-destructive/10 text-destructive' },
   disputed: { label: 'Tvist', color: 'bg-purple-100 text-purple-800' },
   credited: { label: 'Krediterad', color: 'bg-gray-100 text-gray-800' },
 }
@@ -322,7 +322,7 @@ export default function ExpenseDetailPage() {
                 </div>
                 <div className="flex justify-between pt-2">
                   <span className="text-muted-foreground">Betalt</span>
-                  <span className="font-mono text-green-600">{formatAmount(invoice.paid_amount)} {invoice.currency}</span>
+                  <span className="font-mono text-success">{formatAmount(invoice.paid_amount)} {invoice.currency}</span>
                 </div>
                 <div className="flex justify-between font-semibold">
                   <span>Kvar att betala</span>

@@ -294,7 +294,7 @@ export default function ReceiptReviewView({
                 <div className="p-2 rounded bg-muted text-xs space-y-1">
                   <p>
                     <span className="text-muted-foreground">Avdragsgill del:</span>{' '}
-                    <span className="font-medium text-green-600">
+                    <span className="font-medium text-success">
                       {formatCurrency(representationCalc.deductibleAmount, receipt.currency)}
                     </span>
                     {' '}(max {representationCalc.maxDeductiblePerPerson} kr/person)
@@ -351,7 +351,7 @@ export default function ReceiptReviewView({
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Företag:</span>
-                <span className="font-medium text-green-600">
+                <span className="font-medium text-success">
                   {formatCurrency(splitSummary.businessTotal, receipt.currency)}
                 </span>
               </div>

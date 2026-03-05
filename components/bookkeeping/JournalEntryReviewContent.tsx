@@ -68,7 +68,7 @@ export function JournalEntryReviewContent({
       {(showBalanceBadge || (attachmentCount != null && attachmentCount > 0)) && (
         <div className="flex items-center gap-2">
           {showBalanceBadge && (
-            <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+            <Badge className="bg-success/10 text-success">
               <CheckCircle2 className="h-3 w-3 mr-1" />
               Debet = Kredit
             </Badge>
@@ -117,8 +117,8 @@ export function JournalEntryReviewContent({
         <tfoot>
           <tr className="font-semibold border-t-2">
             <td colSpan={2} className="py-2">Summa</td>
-            <td className="py-2 text-right text-green-600">{formatAmount(totalDebit)}</td>
-            <td className="py-2 text-right text-green-600">{formatAmount(totalCredit)}</td>
+            <td className="py-2 text-right text-success">{formatAmount(totalDebit)}</td>
+            <td className="py-2 text-right text-success">{formatAmount(totalCredit)}</td>
           </tr>
         </tfoot>
       </table>

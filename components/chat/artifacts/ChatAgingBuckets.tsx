@@ -4,11 +4,11 @@ import type { AgingBucketsArtifact } from '@/types/chat'
 import { formatCurrency } from '@/lib/utils'
 
 const BUCKET_COLORS = [
-  'bg-green-500',
-  'bg-yellow-400',
-  'bg-orange-400',
-  'bg-red-400',
-  'bg-red-600',
+  'bg-success',
+  'bg-warning',
+  'bg-warning/70',
+  'bg-destructive/70',
+  'bg-destructive',
 ]
 
 interface ChatAgingBucketsProps {

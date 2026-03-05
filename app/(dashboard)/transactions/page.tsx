@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
+import { ToastAction } from '@/components/ui/toast'
 import { X } from 'lucide-react'
 import TransactionForm from '@/components/transactions/TransactionForm'
 import SwipeCategorizationView from '@/components/transactions/SwipeCategorizationView'
@@ -235,7 +236,34 @@ export default function TransactionsPage() {
       setExitingIds((prev) => new Set(prev).add(id))
 
       if (result.journal_entry_created) {
-        toast({ title: 'Bokförd', description: 'Transaktion bokförd och verifikation skapad' })
+        toast({
+          title: 'Bokförd',
+          description: 'Transaktion bokförd och verifikation skapad',
+          action: (
+            <ToastAction altText="Ångra kategorisering" onClick={async () => {
+              try {
+                const undoRes = await fetch(`/api/transactions/${id}/uncategorize`, { method: 'POST' })
+                if (undoRes.ok) {
+                  setTransactions((prev) =>
+                    prev.map((t) =>
+                      t.id === id
+                        ? { ...t, is_business: null, category: null as unknown as TransactionCategory, journal_entry_id: null }
+                        : t
+                    )
+                  )
+                  toast({ title: 'Ångrad', description: 'Kategorisering har ångrats' })
+                } else {
+                  const errData = await undoRes.json()
+                  toast({ title: 'Kunde inte ångra', description: errData.error || 'Något gick fel', variant: 'destructive' })
+                }
+              } catch {
+                toast({ title: 'Kunde inte ångra', description: 'Något gick fel', variant: 'destructive' })
+              }
+            }}>
+              Ångra
+            </ToastAction>
+          ),
+        })
       } else if (result.journal_entry_error) {
         toast({ title: 'Delvis bokförd', description: `Verifikation kunde inte skapas: ${result.journal_entry_error}`, variant: 'destructive' })
       } else {

@@ -16,9 +16,9 @@ function formatAmount(amount: number): string {
 const statusColors: Record<string, string> = {
   registered: 'bg-blue-100 text-blue-800',
   approved: 'bg-yellow-100 text-yellow-800',
-  paid: 'bg-green-100 text-green-800',
+  paid: 'bg-success/10 text-success',
   partially_paid: 'bg-orange-100 text-orange-800',
-  overdue: 'bg-red-100 text-red-800',
+  overdue: 'bg-destructive/10 text-destructive',
   disputed: 'bg-purple-100 text-purple-800',
   credited: 'bg-gray-100 text-gray-800',
 }
@@ -105,12 +105,12 @@ export default function SupplierInvoicesPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-red-500" />
+              <AlertCircle className="h-4 w-4 text-destructive" />
               Förfallet
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-red-600">{formatAmount(overdueAmount)} kr</p>
+            <p className="text-2xl font-bold text-destructive">{formatAmount(overdueAmount)} kr</p>
             <p className="text-xs text-muted-foreground">{overdueCount} fakturor</p>
           </CardContent>
         </Card>

@@ -510,7 +510,7 @@ export default function DescribeTransactionDialog({
                           <div className="flex items-center gap-1.5">
                             <p className="font-medium text-sm">{template.name_sv}</p>
                             {aiAgreesWithTop && template.template_id === topTemplate.template_id && (
-                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-success/10 text-success">
                                 AI bekräftar
                               </Badge>
                             )}

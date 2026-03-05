@@ -36,6 +36,7 @@ export default function Step4PreliminaryTax({
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
+    mode: 'onTouched',
     defaultValues: {
       preliminary_tax_monthly: initialData.preliminary_tax_monthly ?? undefined,
     },

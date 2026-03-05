@@ -12,7 +12,9 @@ import type { EntityType } from '@/types'
 
 const schema = z.object({
   company_name: z.string().min(1, 'Företagsnamn krävs'),
-  org_number: z.string().min(1, 'Organisationsnummer krävs'),
+  org_number: z.string()
+    .min(1, 'Organisationsnummer krävs')
+    .regex(/^\d{6,8}[-\s]?\d{4}$/, 'Ogiltigt format. Ange XXXXXX-XXXX'),
   address_line1: z.string().optional(),
   postal_code: z.string().optional(),
   city: z.string().optional(),
@@ -41,6 +43,7 @@ export default function Step2CompanyDetails({
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
+    mode: 'onTouched',
     defaultValues: {
       company_name: initialData.company_name || '',
       org_number: initialData.org_number || '',
