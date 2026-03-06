@@ -17,6 +17,7 @@ CREATE OR REPLACE FUNCTION public.generate_invoice_number(p_user_id UUID)
 RETURNS TEXT
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
   v_prefix TEXT;
@@ -51,6 +52,7 @@ CREATE OR REPLACE FUNCTION public.generate_delivery_note_number(p_user_id UUID)
 RETURNS TEXT
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
   v_number INTEGER;

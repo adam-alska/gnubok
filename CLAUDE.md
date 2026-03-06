@@ -83,7 +83,7 @@ lib/
 types/index.ts         Canonical type definitions (single source of truth)
 types/chat.ts          Chat types
 tests/helpers.ts       Mock factories and fixture builders
-supabase/migrations/   SQL migration files (45 files)
+supabase/migrations/   SQL migration files (63 files)
 extensions.config.json Extension opt-in configuration
 ```
 
@@ -265,14 +265,14 @@ Path params extracted as `_paramName` search params (e.g., `/:id` → `searchPar
 
 ## Database & Migrations
 
-**Location**: `supabase/migrations/` — 45 files, numbered `20240101000001`–`20240101000045`.
-**Next migration**: `20240101000052_*.sql`
+**Location**: `supabase/migrations/` — 63 files. Early migrations use sequential numbering (`20240101000001`–`20240101000038`), later ones use real timestamps (`20260223150836`+).
+**Next migration**: Use `mcp__plugin_supabase_supabase__apply_migration` which assigns timestamps automatically.
 
 ### Placeholder Migrations
 
 Some migrations are no-op placeholders to preserve the numbering sequence:
-- **012** (`tax_codes`) — Planned but never deployed. The system operates without the `tax_codes` table.
-- **023** (`document_version_chain`) — Planned but never deployed. Document versioning columns/functions do not exist in production.
+- **012** (`tax_codes_placeholder`) — Planned but never deployed. The system operates without the `tax_codes` table.
+- **023** (`document_version_chain_placeholder`) — Planned but never deployed. Document versioning columns/functions do not exist in production.
 
 ### Migration Rules
 
@@ -296,14 +296,15 @@ Some migrations are no-op placeholders to preserve the numbering sequence:
 
 ### Recent Migrations
 
-- **Migration 039 (`invoice_inbox`)** — Invoice inbox table with document type classification, AI extraction, supplier/transaction matching, and receipt linking.
-- **Migration 040 (`booking_template_embeddings`)** — Booking templates with AI embeddings for suggestion matching.
-- **Migration 041 (`user_description_matching`)** — User description matching for transaction categorization.
-- **Migration 042 (`prevent_overlapping_fiscal_periods`)** — Exclusion constraint preventing overlapping fiscal periods per user.
-- **Migration 043 (`enforce_fiscal_period_month_boundaries`)** — Ensures fiscal periods start/end on month boundaries.
-- **Migration 044 (`full_bas_2026`)** — Full BAS 2026 account catalog, K2-excluded flag, and SRU code backfill.
-- **Migration 045 (`expand_account_type_untaxed_reserves`)** — Adds `untaxed_reserves` to `chart_of_accounts.account_type` CHECK constraint for BAS 21xx accounts (obeskattade reserver).
-- **Migration 051 (`set_search_path_on_functions`)** — Pins `search_path = public` on all 24 custom functions to prevent search_path injection.
+- **`20260223150836_invoice_inbox`** — Invoice inbox table with document type classification, AI extraction, supplier/transaction matching, and receipt linking.
+- **`20260224101905_booking_template_embeddings`** — Booking templates with AI embeddings for suggestion matching.
+- **`20260224132419_user_description_matching`** — User description matching for transaction categorization.
+- **`20260224165254_prevent_overlapping_fiscal_periods`** — Exclusion constraint preventing overlapping fiscal periods per user.
+- **`20260224190818_enforce_fiscal_period_month_boundaries`** — Ensures fiscal periods start/end on month boundaries.
+- **`20260225103139_full_bas_2026`** — Full BAS 2026 account catalog, K2-excluded flag, and SRU code backfill.
+- **`20260226120553_expand_account_type_untaxed_reserves`** — Adds `untaxed_reserves` to `chart_of_accounts.account_type` CHECK constraint for BAS 21xx accounts (obeskattade reserver).
+- **`20260304191528_set_search_path_on_functions`** — Pins `search_path = public` on all 24 custom functions to prevent search_path injection.
+- **`20260306084837_invoice_delivery_note_sequences`** — Adds delivery note number sequence and `generate_invoice_number`/`generate_delivery_note_number` RPC functions.
 
 ---
 
