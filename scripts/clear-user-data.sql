@@ -15,7 +15,7 @@
 DO $$
 DECLARE
   -- >>> SET THE TARGET USER EMAIL HERE <<<
-  target_email TEXT := 'jakob.wennberg@arcim.io';
+  target_email TEXT := 'user@example.com';  -- change this to the target user's email
   target_user_id UUID;
 BEGIN
   -- Resolve email to user ID

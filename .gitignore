@@ -41,6 +41,12 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# supabase temp files
+supabase/.temp/
+
+# claude local settings
+.claude/settings.local.json
+
 # Extension registry (auto-generated but defaults are committed)
 # Run `npm run setup:extensions` to regenerate after changing extensions.config.json
 # The empty defaults in lib/extensions/_generated/ are committed so core compiles
