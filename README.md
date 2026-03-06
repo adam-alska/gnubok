@@ -23,16 +23,13 @@ gnubok implements double-entry bookkeeping compliant with Swedish accounting law
 ## Self-Hosting
 
 ```bash
-# Clone and configure
 git clone https://github.com/erp-mafia/gnubok.git
 cd gnubok
-cp .env.example .env  # Fill in your Supabase credentials
-
-# Start with Docker Compose
+cp .env.docker.example .env   # Fill in your Supabase credentials
 docker compose up -d
 ```
 
-See `docker-compose.yml` for the full service configuration. You need a Supabase project -- create one at [supabase.com](https://supabase.com) and run the migrations from `supabase/migrations/`.
+You need a Supabase project and must apply the database migrations before first use. See [SELF-HOSTING.md](SELF-HOSTING.md) for the full step-by-step guide, including Supabase setup, auth configuration, optional features (AI, email, push notifications), and troubleshooting.
 
 ## Development Setup
 
@@ -55,6 +52,7 @@ npm run lint      # ESLint
 
 ## Documentation
 
+- [SELF-HOSTING.md](SELF-HOSTING.md) -- Full self-hosting guide (Docker, Supabase setup, migrations, optional features)
 - [CLAUDE.md](CLAUDE.md) -- Architecture, bookkeeping engine, database conventions, extension system
 - [CONTRIBUTING.md](CONTRIBUTING.md) -- Development workflow, code style, pull request process
 - [SECURITY.md](SECURITY.md) -- Vulnerability reporting policy
