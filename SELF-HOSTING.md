@@ -26,7 +26,7 @@ gnubok uses passwordless magic link login — the default Supabase email auth se
 
 ## 3. Apply Database Migrations
 
-The `supabase/migrations/` directory contains 52 ordered SQL files that set up the full schema, including tables, RLS policies, triggers, and functions.
+The `supabase/migrations/` directory contains 63 ordered SQL files that set up the full schema, including tables, RLS policies, triggers, and functions.
 
 **Option A — Supabase CLI (recommended):**
 
@@ -43,7 +43,7 @@ supabase db push
 
 **Option B — SQL Editor:**
 
-Run each file in `supabase/migrations/` in order (001 through 052) in the Supabase SQL Editor. They must be applied sequentially — later migrations depend on earlier ones.
+Run each file in `supabase/migrations/` in order in the Supabase SQL Editor. They must be applied sequentially — later migrations depend on earlier ones.
 
 ### PostgreSQL Extensions
 
@@ -59,6 +59,18 @@ The migrations automatically enable these extensions:
 These are all available on Supabase hosted. `pg_cron` requires a paid plan — if you are on the free tier, migration 048 will fail. You can safely skip it; the cron sidecar container handles the equivalent job via HTTP instead.
 
 ## 4. Configure Environment
+
+**Option A — Setup script (recommended):**
+
+```bash
+git clone https://github.com/erp-mafia/gnubok.git
+cd gnubok
+./setup.sh
+```
+
+The script checks prerequisites, prompts for your Supabase credentials, auto-generates `CRON_SECRET`, and writes everything to `.env`.
+
+**Option B — Manual:**
 
 ```bash
 git clone https://github.com/erp-mafia/gnubok.git
@@ -89,7 +101,7 @@ This starts two containers:
 
 | Container | Purpose |
 |-----------|---------|
-| `app` | Next.js application (pulls `ghcr.io/erp-mafia/gnubok:latest`) |
+| `app` | Next.js application (`ghcr.io/erp-mafia/gnubok:latest`) |
 | `cron` | Scheduled jobs via [supercronic](https://github.com/aptible/supercronic) |
 
 The cron container waits for the app health check to pass before starting.

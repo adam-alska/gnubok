@@ -25,7 +25,7 @@ gnubok implements double-entry bookkeeping compliant with Swedish accounting law
 ```bash
 git clone https://github.com/erp-mafia/gnubok.git
 cd gnubok
-cp .env.docker.example .env   # Fill in your Supabase credentials
+./setup.sh              # Prompts for Supabase credentials, generates .env
 docker compose up -d
 ```
 
