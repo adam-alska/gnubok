@@ -84,7 +84,6 @@ export function SecuritySettings() {
         title: 'Lösenord uppdaterat',
         description: 'Ditt lösenord har ändrats.',
       })
-      setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
     } catch {

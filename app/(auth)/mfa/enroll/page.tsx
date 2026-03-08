@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,14 @@ import { useToast } from '@/components/ui/use-toast'
 import { Loader2, ShieldCheck, Copy, Check } from 'lucide-react'
 
 export default function MfaEnrollPage() {
+  return (
+    <Suspense>
+      <MfaEnrollContent />
+    </Suspense>
+  )
+}
+
+function MfaEnrollContent() {
   const [qrCode, setQrCode] = useState<string | null>(null)
   const [secret, setSecret] = useState<string | null>(null)
   const [factorId, setFactorId] = useState<string | null>(null)
