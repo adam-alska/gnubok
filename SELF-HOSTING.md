@@ -22,7 +22,9 @@ In the Supabase dashboard under **Authentication > URL Configuration**:
 1. Set **Site URL** to your deployment URL (e.g., `https://gnubok.example.com`).
 2. Add `https://gnubok.example.com/auth/callback` to the **Redirect URLs** allowlist.
 
-gnubok uses passwordless magic link login — the default Supabase email auth settings work out of the box. For production, configure a custom SMTP provider under **Authentication > SMTP Settings** to avoid Supabase's built-in rate limits.
+gnubok uses email + password authentication with magic link as a fallback. The default Supabase email auth settings work out of the box. For production, configure a custom SMTP provider under **Authentication > SMTP Settings** to avoid Supabase's built-in rate limits.
+
+MFA (two-factor authentication via TOTP) is **not enforced** for self-hosted deployments — the Docker image sets `NEXT_PUBLIC_SELF_HOSTED=true` by default, which disables MFA enforcement. Users can still optionally enable 2FA in Settings > Säkerhet if they wish.
 
 ## 3. Apply Database Migrations
 
@@ -134,8 +136,8 @@ PORT=8080 docker compose up -d
 ## 6. First Login
 
 1. Open your deployment URL in a browser.
-2. Enter any email address and click "Skicka magisk lank" (Send magic link).
-3. Check your email and click the link.
+2. Click "Skapa konto" (Create account) and register with email + password.
+3. Check your email and click the confirmation link.
 4. Complete the 5-step onboarding wizard:
    - **Step 1**: Choose entity type (enskild firma or aktiebolag)
    - **Step 2**: Company name and org number
@@ -143,7 +145,7 @@ PORT=8080 docker compose up -d
    - **Step 4**: Preliminary tax amount (optional, skip if unsure)
    - **Step 5**: Bank details for invoices (optional)
 
-There is no admin account or invite system — any email address that receives the magic link can sign up.
+There is no admin account or invite system — any email address can sign up. You can also use the magic link option on the login page if preferred.
 
 ## Scheduled Jobs
 
@@ -256,7 +258,7 @@ Check the [release notes](https://github.com/erp-mafia/gnubok/releases) for migr
 ┌─────────────────────┐
 │  Supabase           │
 │  - PostgreSQL + RLS │
-│  - Auth (magic link)│
+│  - Auth (email+pw)  │
 │  - Storage (docs)   │
 └─────────────────────┘
 ```
@@ -268,7 +270,7 @@ The Next.js app is stateless — all data lives in Supabase. The Docker entrypoi
 **Health check fails with "unhealthy":**
 Migrations have not been applied, or the Supabase credentials are wrong. Check that `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are correct and that migrations have been pushed.
 
-**Magic link email not arriving:**
+**Confirmation email not arriving:**
 Check the Supabase dashboard under **Authentication > Users** to verify the signup attempt was received. On the free tier, Supabase rate-limits emails to 4/hour. Configure custom SMTP under **Authentication > SMTP Settings** for production use.
 
 **Auth callback redirects to error:**

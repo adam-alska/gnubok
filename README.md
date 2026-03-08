@@ -46,7 +46,7 @@ npm run lint      # ESLint
 ## Tech Stack
 
 - **Framework**: Next.js 16 (App Router), React 19, TypeScript (strict)
-- **Database**: Supabase (PostgreSQL + Row Level Security + magic link auth)
+- **Database**: Supabase (PostgreSQL + Row Level Security + email/password auth + TOTP MFA)
 - **Styling**: Tailwind CSS 4 + shadcn/ui
 - **Integrations**: Enable Banking (PSD2), Anthropic SDK, LangChain, OpenAI, Resend, JSZip
 
