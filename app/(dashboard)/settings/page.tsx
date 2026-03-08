@@ -34,6 +34,7 @@ import { useTheme } from 'next-themes'
 import type { CompanySettings } from '@/types'
 import { CalendarFeedSettings } from '@/components/settings/CalendarFeedSettings'
 import { getSettingsPanel } from '@/lib/extensions/settings-panel-registry'
+import { SecuritySettings } from '@/components/settings/SecuritySettings'
 
 const BankingPanel = getSettingsPanel('enable-banking')
 
@@ -268,6 +269,9 @@ export default function SettingsPage() {
               Kalender
             </TabsTrigger>
           )}
+          <TabsTrigger value="security">
+            Säkerhet
+          </TabsTrigger>
           <TabsTrigger value="appearance">
             Utseende
           </TabsTrigger>
@@ -525,6 +529,11 @@ export default function SettingsPage() {
             <CalendarFeedSettings />
           </TabsContent>
         )}
+
+        {/* Security settings */}
+        <TabsContent value="security">
+          <SecuritySettings />
+        </TabsContent>
 
         {/* Appearance settings */}
         <TabsContent value="appearance">

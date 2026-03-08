@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { isMfaRequired } from '@/lib/auth/mfa'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -48,11 +49,15 @@ export async function updateSession(request: NextRequest) {
     await supabase.auth.signOut()
   }
 
-  // Auth routes - allow access
-  if (pathname.startsWith('/login') || pathname.startsWith('/auth')) {
-    // If user is logged in and trying to access login, redirect to dashboard or onboarding
+  // Public auth routes — allow access
+  if (
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/register') ||
+    pathname.startsWith('/auth') ||
+    pathname.startsWith('/reset-password')
+  ) {
+    // If user is logged in and trying to access auth pages, redirect to dashboard or onboarding
     if (user) {
-      // Check if onboarding is complete
       const { data: settings } = await supabase
         .from('company_settings')
         .select('onboarding_complete')
@@ -73,6 +78,32 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
+  }
+
+  // MFA pages — accessible to authenticated users (AAL1+), skip MFA enforcement
+  if (pathname.startsWith('/mfa/')) {
+    return supabaseResponse
+  }
+
+  // MFA enforcement (application-side only, not RLS)
+  if (isMfaRequired()) {
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+
+    // User has MFA enrolled but hasn't verified this session → redirect to verify
+    if (aal?.nextLevel === 'aal2' && aal?.currentLevel === 'aal1') {
+      return NextResponse.redirect(new URL('/mfa/verify', request.url))
+    }
+
+    // MFA required but user has no factor enrolled yet → force enrollment
+    // (skip during onboarding — let them finish setup first)
+    if (!pathname.startsWith('/onboarding')) {
+      const { data: factors } = await supabase.auth.mfa.listFactors()
+      const hasVerifiedFactor = factors?.totp?.some(f => f.status === 'verified')
+
+      if (!hasVerifiedFactor) {
+        return NextResponse.redirect(new URL('/mfa/enroll', request.url))
+      }
+    }
   }
 
   // Onboarding route - only accessible if not complete

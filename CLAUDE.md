@@ -4,7 +4,7 @@
 
 gnubok is a Swedish-focused accounting SaaS for sole traders (enskild firma) and limited companies (aktiebolag). It implements double-entry bookkeeping compliant with Swedish accounting law (Bokforingslagen), including VAT handling, tax reporting, and 7-year document retention.
 
-**Tech stack**: Next.js 16 (App Router), React 19, TypeScript (strict), Supabase (PostgreSQL + RLS + magic link auth), Tailwind CSS 4 + shadcn/ui, Vercel hosting.
+**Tech stack**: Next.js 16 (App Router), React 19, TypeScript (strict), Supabase (PostgreSQL + RLS + email/password + TOTP MFA auth), Tailwind CSS 4 + shadcn/ui, Vercel hosting.
 
 **Integrations**: Enable Banking (PSD2), Anthropic SDK, LangChain, OpenAI (embeddings), Resend (email), JSZip (archive export).
 
@@ -29,7 +29,7 @@ npm run setup:extensions # Regenerate extension registry from extensions.config.
 
 ```
 app/
-  (auth)/              Login, auth callback
+  (auth)/              Login, register, auth callback, MFA enroll/verify, password reset
   (onboarding)/        6-step setup wizard
   (dashboard)/         Authenticated routes (invoices, customers, transactions,
                        bookkeeping, reports, suppliers, supplier-invoices,
@@ -75,6 +75,7 @@ lib/
   reports/             Financial reports (trial balance, income statement, balance sheet,
                        VAT declaration, SIE export, general ledger, NE-bilaga, INK2, SRU export,
                        full archive ZIP export)
+  auth/                MFA helpers (mfa.ts) and API auth guard (require-auth.ts)
   supabase/            Client setup (client.ts = browser, server.ts = server)
   tax/                 Tax calculations, deadlines, Swedish holidays
   vat/                 VIES validation, moms box mapping
@@ -96,6 +97,46 @@ extensions.config.json Extension opt-in configuration
 - **Extension system**: Opt-in via `extensions.config.json`. Core builds and runs with zero extensions.
 - **NE-bilaga, INK2 declaration, SRU export, and full archive export** are core reports (in `lib/reports/`), not extensions.
 - **AI consent gate** (`lib/extensions/ai-consent.ts`): AI extensions (`receipt-ocr`, `ai-categorization`, `ai-chat`) require user consent before API calls. The extension catch-all route checks consent and returns `403 AI_CONSENT_REQUIRED` if missing.
+
+---
+
+## Authentication
+
+Authentication uses Supabase Auth with **email+password** (primary) and **magic link** (fallback). MFA via TOTP is supported.
+
+### Auth Flow
+
+1. **Login** (`/login`) — Email+password with magic link toggle. After password login, checks MFA status.
+2. **Register** (`/register`) — Email+password signup. Supabase sends confirmation email. Strong password required (8+ chars, uppercase, lowercase, number, special character).
+3. **Password reset** (`/reset-password`) — Via recovery link from login page.
+4. **MFA verify** (`/mfa/verify`) — 6-digit TOTP code input after login when MFA is enrolled.
+5. **MFA enroll** (`/mfa/enroll`) — QR code + manual secret for authenticator app setup.
+
+### MFA Enforcement
+
+MFA is enforced **application-side** (middleware + API routes), **not** in RLS policies. This is controlled by two env vars:
+
+| Env Var | Hosted (Vercel) | Self-hosted (Docker) |
+|---------|-----------------|----------------------|
+| `NEXT_PUBLIC_REQUIRE_MFA` | `true` | `false` (default) |
+| `NEXT_PUBLIC_SELF_HOSTED` | not set | `true` |
+
+- **Self-hosted**: MFA is never enforced (`NEXT_PUBLIC_SELF_HOSTED=true` overrides). Users can still enable it voluntarily via Settings → Säkerhet.
+- **Hosted**: When `NEXT_PUBLIC_REQUIRE_MFA=true`, middleware redirects users without MFA to `/mfa/enroll` after onboarding, and users with MFA to `/mfa/verify` until AAL2 is achieved.
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `lib/auth/mfa.ts` | `isMfaRequired()` — checks env vars |
+| `lib/auth/require-auth.ts` | `requireAuth()` — API route guard (auth + MFA) |
+| `lib/supabase/middleware.ts` | Session refresh + MFA enforcement |
+| `app/(auth)/auth/callback/route.ts` | PKCE/magic link callback with MFA redirect |
+| `components/settings/SecuritySettings.tsx` | Password change + MFA enable/disable UI |
+
+### Supabase MFA Setup
+
+Enable TOTP in Supabase Dashboard → `Authentication` → `Multi-Factor Authentication`. No database migration needed — Supabase manages `auth.mfa_factors`, `auth.mfa_challenges`, and `auth.mfa_amr_claims` internally.
 
 ---
 
@@ -361,7 +402,7 @@ export async function POST(request: Request) {
 
 Hosted on **Vercel**. Cron jobs in `vercel.json` (banking sync daily 05:00, deadlines 06:00, reminders 08:00, push notifications 09:00, tax deadlines yearly Jan 2, document verify weekly Sunday 03:00).
 
-**Core env vars**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`. Extension env vars only needed when that extension is enabled.
+**Core env vars**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`. **Auth env vars**: `NEXT_PUBLIC_REQUIRE_MFA` (set `true` on hosted), `NEXT_PUBLIC_SELF_HOSTED` (set `true` for Docker). Extension env vars only needed when that extension is enabled.
 
 ## Other
 Never create a NUL/nul file: \gnubok\NUL

@@ -47,9 +47,19 @@ export async function GET(request: NextRequest) {
   if (authenticated) {
     let redirectPath = next
 
-    // Check if user has completed onboarding
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
+      // Check MFA status — redirect to verify if factor is enrolled but session is AAL1
+      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+      if (aal?.nextLevel === 'aal2' && aal?.currentLevel === 'aal1') {
+        const response = NextResponse.redirect(new URL('/mfa/verify', origin))
+        for (const { name, value, options } of pendingCookies) {
+          response.cookies.set({ name, value, ...options })
+        }
+        return response
+      }
+
+      // Check if user has completed onboarding
       const { data: settings } = await supabase
         .from('company_settings')
         .select('onboarding_complete')
