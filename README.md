@@ -65,4 +65,4 @@ All commits require a [DCO sign-off](DCO) (`git commit -s`).
 
 ## License
 
-[AGPL-3.0-or-later](LICENSE). See [NOTICE](NOTICE) for third-party attributions.
+[AGPL-3.0-or-later](LICENSE) with an **extension exception**: third-party extensions that interact solely through the documented Extension API may be licensed under any terms, including proprietary. See [LICENSE](LICENSE) for details and [NOTICE](NOTICE) for third-party attributions.
