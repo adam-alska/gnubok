@@ -4,7 +4,7 @@
 
 If you discover a security vulnerability in gnubok, please report it responsibly. **Do not open a public issue.**
 
-Email: **security@arcim.io**
+Email: **jakob.wennberg@arcim.io**
 
 Include:
 - Description of the vulnerability
