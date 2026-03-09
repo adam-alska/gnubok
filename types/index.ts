@@ -64,6 +64,47 @@ export type ReconciliationMethod = 'auto_exact' | 'auto_date_range' | 'auto_refe
 // Bank connection status
 export type BankConnectionStatus = 'pending' | 'active' | 'expired' | 'revoked' | 'error'
 
+// Accounting provider connections
+export type AccountingProvider = 'fortnox' | 'visma' | 'briox' | 'bokio' | 'bjorn_lunden'
+export type ProviderAuthStrategy = 'oauth2' | 'application_token' | 'static_api_key' | 'client_credentials'
+export type ProviderConnectionStatus = 'pending' | 'active' | 'expired' | 'error' | 'revoked'
+
+export interface ProviderConnection {
+  id: string
+  user_id: string
+  provider: AccountingProvider
+  status: ProviderConnectionStatus
+  provider_company_name: string | null
+  error_message: string | null
+  connected_at: string | null
+  last_synced_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ProviderInfo {
+  id: AccountingProvider
+  name: string
+  description: string
+  authStrategy: ProviderAuthStrategy
+  logo: string
+  website: string
+}
+
+export interface SIESyncResult {
+  success: boolean
+  accountsActivated: number
+  journalEntriesCreated: number
+  openingBalanceCreated: boolean
+  importId: string | null
+  fiscalPeriodId: string | null
+  fiscalYearStart: string | null
+  fiscalYearEnd: string | null
+  companyName: string | null
+  warnings: string[]
+  errors: string[]
+}
+
 // Currency types
 export type Currency = 'SEK' | 'EUR' | 'USD' | 'GBP' | 'NOK' | 'DKK'
 

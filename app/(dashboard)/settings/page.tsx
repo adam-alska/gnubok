@@ -35,6 +35,7 @@ import type { CompanySettings } from '@/types'
 import { CalendarFeedSettings } from '@/components/settings/CalendarFeedSettings'
 import { getSettingsPanel } from '@/lib/extensions/settings-panel-registry'
 import { SecuritySettings } from '@/components/settings/SecuritySettings'
+import { ProviderConnectionsSettings } from '@/components/settings/ProviderConnectionsSettings'
 
 const BankingPanel = getSettingsPanel('enable-banking')
 
@@ -151,6 +152,27 @@ export default function SettingsPage() {
       })
       router.replace('/settings')
     }
+
+    // Handle provider connection OAuth callbacks
+    const providerConnected = searchParams.get('connected')
+    const providerError = searchParams.get('error')
+
+    if (providerConnected) {
+      toast({
+        title: 'Ansluten!',
+        description: `${providerConnected} är nu kopplad till gnubok.`,
+      })
+      router.replace('/settings?tab=connections')
+    }
+
+    if (providerError) {
+      toast({
+        title: 'Anslutning misslyckades',
+        description: decodeURIComponent(providerError),
+        variant: 'destructive',
+      })
+      router.replace('/settings?tab=connections')
+    }
   }, [searchParams])
 
   async function handleSaveSettings(e: React.FormEvent<HTMLFormElement>) {
@@ -263,6 +285,9 @@ export default function SettingsPage() {
           </TabsTrigger>
           <TabsTrigger value="banking">
             Bank (PSD2)
+          </TabsTrigger>
+          <TabsTrigger value="connections">
+            Kopplingar
           </TabsTrigger>
           {hasCalendarExtension && (
             <TabsTrigger value="calendar">
@@ -521,6 +546,11 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* Provider connections */}
+        <TabsContent value="connections" className="space-y-6">
+          <ProviderConnectionsSettings />
         </TabsContent>
 
         {/* Calendar feed settings */}

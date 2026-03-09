@@ -129,9 +129,19 @@ async function ensureFiscalPeriod(
     return overlapping[0].id
   }
 
-  // Create new fiscal period
-  const startYear = startDate.getFullYear()
-  const endYear = endDate.getFullYear()
+  // Create new fiscal period — snap to month boundaries (BFL 3 kap.)
+  // Build date strings directly to avoid timezone issues with formatDate/toISOString
+  const sy = startDate.getFullYear()
+  const sm = startDate.getMonth() + 1
+  const periodStart = `${sy}-${String(sm).padStart(2, '0')}-01`
+
+  const ey = endDate.getFullYear()
+  const em = endDate.getMonth() + 1
+  const lastDay = new Date(ey, em, 0).getDate()
+  const periodEnd = `${ey}-${String(em).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+
+  const startYear = sy
+  const endYear = ey
   const name = startYear === endYear
     ? `Räkenskapsår ${startYear}`
     : `Räkenskapsår ${startYear}/${endYear}`
@@ -141,8 +151,8 @@ async function ensureFiscalPeriod(
     .insert({
       user_id: userId,
       name,
-      period_start: formatDate(startDate),
-      period_end: formatDate(endDate),
+      period_start: periodStart,
+      period_end: periodEnd,
       is_closed: false,
       opening_balances_set: false,
     })
