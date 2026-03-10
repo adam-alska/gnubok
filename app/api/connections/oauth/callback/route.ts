@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { exchangeCodeForTokens } from '@/lib/connections/oauth'
+import { exchangeCodeForTokens, getOAuthConfig } from '@/lib/connections/oauth'
 import { fetchFortnoxCompanyInfo } from '@/lib/connections/fortnox-api'
 import type { AccountingProvider } from '@/types'
 
@@ -11,13 +11,13 @@ const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
 function redirectWithError(error: string) {
   return NextResponse.redirect(
-    `${appUrl}/settings?tab=connections&error=${encodeURIComponent(error)}`
+    `${appUrl}/import?error=${encodeURIComponent(error)}`
   )
 }
 
 function redirectWithSuccess(provider: string) {
   return NextResponse.redirect(
-    `${appUrl}/settings?tab=connections&connected=${provider}`
+    `${appUrl}/import?connected=${provider}`
   )
 }
 
@@ -98,24 +98,51 @@ export async function GET(request: Request) {
     return redirectWithError(message)
   }
 
-  // Store tokens
+  // Store tokens (upsert to handle re-auth / scope expansion)
   const tokenExpiresAt = tokenResponse.expires_in
     ? new Date(Date.now() + tokenResponse.expires_in * 1000).toISOString()
     : null
 
-  const { error: tokenError } = await adminClient
+  // Determine granted scopes from the OAuth config (Fortnox doesn't return scopes in token response)
+  const oauthConfig = getOAuthConfig(provider as 'fortnox' | 'visma')
+  const grantedScopes = oauthConfig.scopes
+
+  // Try with granted_scopes first, fall back without if column doesn't exist yet
+  let tokenError
+  const { error: err1 } = await adminClient
     .from('provider_connection_tokens')
-    .insert({
-      connection_id: connectionId,
-      access_token: tokenResponse.access_token,
-      refresh_token: tokenResponse.refresh_token ?? null,
-      token_expires_at: tokenExpiresAt,
-    })
+    .upsert(
+      {
+        connection_id: connectionId,
+        access_token: tokenResponse.access_token,
+        refresh_token: tokenResponse.refresh_token ?? null,
+        token_expires_at: tokenExpiresAt,
+        granted_scopes: grantedScopes,
+      },
+      { onConflict: 'connection_id' }
+    )
+
+  if (err1) {
+    // Retry without granted_scopes (column may not exist if migration not applied)
+    const { error: err2 } = await adminClient
+      .from('provider_connection_tokens')
+      .upsert(
+        {
+          connection_id: connectionId,
+          access_token: tokenResponse.access_token,
+          refresh_token: tokenResponse.refresh_token ?? null,
+          token_expires_at: tokenExpiresAt,
+        },
+        { onConflict: 'connection_id' }
+      )
+    tokenError = err2
+  }
 
   if (tokenError) {
+    console.error('[oauth/callback] Failed to store tokens:', tokenError)
     await adminClient
       .from('provider_connections')
-      .update({ status: 'error', error_message: 'Failed to store tokens' })
+      .update({ status: 'error', error_message: tokenError.message || 'Failed to store tokens' })
       .eq('id', connectionId)
     return redirectWithError('Failed to store tokens')
   }

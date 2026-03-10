@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { validateBody } from '@/lib/api/validate'
 import { SyncDataRequestSchema } from '@/lib/api/schemas'
-import { syncFortnoxSIEData } from '@/lib/connections/fortnox-sync'
+import { syncFortnoxData } from '@/lib/connections/fortnox-sync-orchestrator'
 
 export async function POST(
   request: Request,
@@ -44,11 +44,12 @@ export async function POST(
   }
 
   const adminClient = await createServiceClient()
-  const syncResult = await syncFortnoxSIEData(
+  const syncResult = await syncFortnoxData(
     auth.supabase,
     adminClient,
     auth.user.id,
     connection.id,
+    result.data.dataTypeIds,
     result.data.financialYear
   )
 

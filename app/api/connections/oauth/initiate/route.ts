@@ -31,13 +31,13 @@ export async function POST(request: Request) {
     )
   }
 
-  // Clean up stale pending/error connections
+  // Clean up stale pending/error/revoked connections
   await auth.supabase
     .from('provider_connections')
     .delete()
     .eq('user_id', userId)
     .eq('provider', provider)
-    .in('status', ['pending', 'error'])
+    .in('status', ['pending', 'error', 'revoked'])
 
   // Create pending connection
   const { data: connection, error: connError } = await auth.supabase

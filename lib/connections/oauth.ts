@@ -28,7 +28,11 @@ export function getOAuthConfig(provider: 'fortnox' | 'visma'): OAuthConfig {
         clientSecret: process.env.FORTNOX_CLIENT_SECRET || '',
         authorizeUrl: 'https://apps.fortnox.se/oauth-v1/auth',
         tokenUrl: 'https://apps.fortnox.se/oauth-v1/token',
-        scopes: ['bookkeeping', 'companyinformation'],
+        scopes: [
+          'bookkeeping', 'companyinformation', 'invoice', 'customer',
+          'supplier', 'article', 'salary', 'offer', 'order',
+          'costcenter', 'project', 'currency', 'settings', 'assets',
+        ],
       }
     case 'visma':
       return {
@@ -116,4 +120,27 @@ export async function refreshAccessToken(
 
 export function isOAuthProvider(provider: AccountingProvider): provider is 'fortnox' | 'visma' {
   return provider === 'fortnox' || provider === 'visma'
+}
+
+/**
+ * Build an auth URL with specific scopes (for re-auth / scope expansion).
+ */
+export function buildAuthUrlWithScopes(
+  provider: 'fortnox' | 'visma',
+  state: string,
+  scopes: string[]
+): string {
+  const config = getOAuthConfig(provider)
+  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/connections/oauth/callback`
+
+  const params = new URLSearchParams({
+    client_id: config.clientId,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    scope: scopes.join(' '),
+    state,
+    access_type: 'offline',
+  })
+
+  return `${config.authorizeUrl}?${params.toString()}`
 }
