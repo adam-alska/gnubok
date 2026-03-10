@@ -73,6 +73,28 @@ export function BankSelector({
     }
   }, [scriptReady, handleSelected])
 
+  // Inject styles into the widget's shadow DOM to hide logos
+  useEffect(() => {
+    if (!scriptReady) return
+    const widget = widgetRef.current
+    if (!widget?.shadowRoot) return
+
+    const style = document.createElement('style')
+    style.textContent = `
+      .radio-chips__pic,
+      .radio-chips__pic img,
+      .radio-chips__content img,
+      .radio-chips__content svg,
+      .radio-chips__content .avatar,
+      .radio-chips__content .icon,
+      .radio-chips__content .fallback,
+      .radio-chips__content > *:first-child:not(.radio-chips__title):not(.beta-flag) {
+        display: none !important;
+      }
+    `
+    widget.shadowRoot.appendChild(style)
+  }, [scriptReady])
+
   return (
     <div className={cn('space-y-4', className)}>
       {/* Popular banks — one-click connect */}
@@ -119,7 +141,7 @@ export function BankSelector({
 
         {scriptReady ? (
           <div className={cn(
-            'rounded-lg border overflow-hidden',
+            'rounded-lg border bg-card/50 overflow-hidden p-3',
             isConnecting && 'pointer-events-none opacity-50'
           )}>
             {/* @ts-expect-error - Enable Banking custom element */}
@@ -132,7 +154,7 @@ export function BankSelector({
             />
           </div>
         ) : (
-          <div className="flex items-center justify-center rounded-lg border" style={{ minHeight: '200px' }}>
+          <div className="flex items-center justify-center rounded-lg border bg-card/50" style={{ minHeight: '200px' }}>
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             <span className="ml-2 text-sm text-muted-foreground">Laddar banker...</span>
           </div>
