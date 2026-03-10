@@ -9,7 +9,7 @@ import { ProviderCard } from './ProviderCard'
 import { ConnectProviderDialog } from './ConnectProviderDialog'
 import { SyncDataDialog } from './SyncDataDialog'
 import { SyncResultsDialog } from './SyncResultsDialog'
-import type { AccountingProvider, ProviderConnection, SIESyncResult } from '@/types'
+import type { AccountingProvider, ProviderConnection, FortnoxSyncResult } from '@/types'
 
 export function ProviderConnectionsSettings() {
   const { toast } = useToast()
@@ -22,7 +22,7 @@ export function ProviderConnectionsSettings() {
   const [syncDataDialogOpen, setSyncDataDialogOpen] = useState(false)
   const [syncDataConnectionId, setSyncDataConnectionId] = useState<string | null>(null)
   const [isSyncingData, setIsSyncingData] = useState(false)
-  const [syncResult, setSyncResult] = useState<SIESyncResult | null>(null)
+  const [syncResult, setSyncResult] = useState<FortnoxSyncResult | null>(null)
   const [syncResultsOpen, setSyncResultsOpen] = useState(false)
 
   const fetchConnections = useCallback(async () => {
@@ -186,7 +186,7 @@ export function ProviderConnectionsSettings() {
     setSyncDataDialogOpen(true)
   }
 
-  async function handleSyncDataSubmit(financialYear: number) {
+  async function handleSyncDataSubmit(dataTypeIds: string[], financialYear?: number) {
     if (!syncDataConnectionId) return
 
     setIsSyncingData(true)
@@ -194,7 +194,7 @@ export function ProviderConnectionsSettings() {
       const res = await fetch(`/api/connections/${syncDataConnectionId}/sync-data`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ financialYear }),
+        body: JSON.stringify({ dataTypeIds, financialYear }),
       })
       const result = await res.json()
 
@@ -222,12 +222,31 @@ export function ProviderConnectionsSettings() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-32">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    )
+  async function handleExpandScopes() {
+    if (!syncDataConnectionId) return
+
+    try {
+      const res = await fetch(`/api/connections/${syncDataConnectionId}/expand-scopes`, {
+        method: 'POST',
+      })
+      const result = await res.json()
+
+      if (res.ok && result.data?.authUrl) {
+        window.location.href = result.data.authUrl
+      } else {
+        toast({
+          title: 'Fel',
+          description: result.error || 'Kunde inte utöka behörigheter',
+          variant: 'destructive',
+        })
+      }
+    } catch {
+      toast({
+        title: 'Fel',
+        description: 'Kunde inte utöka behörigheter',
+        variant: 'destructive',
+      })
+    }
   }
 
   return (

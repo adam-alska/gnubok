@@ -10,12 +10,32 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, AlertTriangle, XCircle } from 'lucide-react'
-import type { SIESyncResult } from '@/types'
+import type { FortnoxSyncResult, FortnoxResourceSyncResult } from '@/types'
 
 interface SyncResultsDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  result: SIESyncResult | null
+  result: FortnoxSyncResult | null
+}
+
+function ResourceResultRow({ r }: { r: FortnoxResourceSyncResult }) {
+  const total = r.created + r.updated + r.skipped
+  return (
+    <div className="flex items-center gap-2 py-1.5 text-sm">
+      {r.success ? (
+        <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" />
+      ) : (
+        <XCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
+      )}
+      <span className="flex-1 truncate">{r.name}</span>
+      <div className="flex gap-3 text-xs text-muted-foreground tabular-nums">
+        {r.created > 0 && <span className="text-green-600">+{r.created}</span>}
+        {r.updated > 0 && <span className="text-blue-600">{r.updated} upd</span>}
+        {r.skipped > 0 && <span>{r.skipped} skip</span>}
+        {total === 0 && r.success && <span>0</span>}
+      </div>
+    </div>
+  )
 }
 
 export function SyncResultsDialog({
@@ -25,9 +45,14 @@ export function SyncResultsDialog({
 }: SyncResultsDialogProps) {
   if (!result) return null
 
+  const totalCreated = result.results.reduce((sum, r) => sum + r.created, 0)
+  const totalUpdated = result.results.reduce((sum, r) => sum + r.updated, 0)
+  const allErrors = result.results.flatMap((r) => r.errors).concat(result.errors)
+  const hasSie = result.results.some((r) => r.sieResult)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {result.success ? (
@@ -38,60 +63,56 @@ export function SyncResultsDialog({
             ) : (
               <>
                 <XCircle className="h-5 w-5 text-destructive" />
-                Import misslyckades
+                Import slutförd med fel
               </>
             )}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
-          {result.companyName && (
-            <p className="text-sm text-muted-foreground">
-              Företag: <span className="font-medium text-foreground">{result.companyName}</span>
-            </p>
-          )}
-
-          {result.fiscalYearStart && result.fiscalYearEnd && (
-            <p className="text-sm text-muted-foreground">
-              Räkenskapsår: {result.fiscalYearStart} — {result.fiscalYearEnd}
-            </p>
-          )}
-
+          {/* Summary stats */}
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-lg border p-3">
-              <p className="text-2xl font-bold">{result.journalEntriesCreated}</p>
-              <p className="text-xs text-muted-foreground">Verifikationer skapade</p>
+              <p className="text-2xl font-bold">{totalCreated}</p>
+              <p className="text-xs text-muted-foreground">Poster skapade</p>
             </div>
             <div className="rounded-lg border p-3">
-              <p className="text-2xl font-bold">{result.accountsActivated}</p>
-              <p className="text-xs text-muted-foreground">Konton aktiverade</p>
+              <p className="text-2xl font-bold">{totalUpdated}</p>
+              <p className="text-xs text-muted-foreground">Poster uppdaterade</p>
             </div>
           </div>
 
-          {result.openingBalanceCreated && (
-            <p className="text-sm text-green-600">
-              <CheckCircle2 className="inline h-3.5 w-3.5 mr-1" />
-              Ingående balans importerad
-            </p>
-          )}
-
-          {result.errors.length > 0 && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-1">
-              {result.errors.map((err, i) => (
-                <p key={i} className="text-sm text-destructive flex items-start gap-1.5">
-                  <XCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                  {err}
-                </p>
-              ))}
+          {/* Per-resource results */}
+          {result.results.length > 0 && (
+            <div className="rounded-lg border divide-y">
+              <div className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase">
+                Per datatyp
+              </div>
+              <div className="px-3 py-1">
+                {result.results.map((r) => (
+                  <ResourceResultRow key={r.dataTypeId} r={r} />
+                ))}
+              </div>
             </div>
           )}
 
-          {result.warnings.length > 0 && (
-            <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3 space-y-1">
-              {result.warnings.map((warn, i) => (
-                <p key={i} className="text-sm text-yellow-700 dark:text-yellow-400 flex items-start gap-1.5">
-                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                  {warn}
+          {/* Scope mismatch warning */}
+          {result.scopeMismatch && (
+            <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3">
+              <p className="text-sm text-yellow-700 dark:text-yellow-400 flex items-start gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                Vissa datatyper hoppades över p.g.a. saknade behörigheter.
+              </p>
+            </div>
+          )}
+
+          {/* Errors */}
+          {allErrors.length > 0 && (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-1 max-h-32 overflow-y-auto">
+              {allErrors.map((err, i) => (
+                <p key={i} className="text-sm text-destructive flex items-start gap-1.5">
+                  <XCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  {err}
                 </p>
               ))}
             </div>
@@ -102,7 +123,7 @@ export function SyncResultsDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Stäng
           </Button>
-          {result.success && (
+          {hasSie && result.success && (
             <Button asChild>
               <Link href="/bookkeeping">Visa bokföring</Link>
             </Button>

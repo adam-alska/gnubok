@@ -1,12 +1,15 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
-import { ArrowLeftRight, FileText, ArrowLeft, Landmark, Loader2 } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { ArrowLeftRight, FileText, ArrowLeft, Landmark, Loader2, Link2, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { ProviderConnectionsSettings } from '@/components/settings/ProviderConnectionsSettings'
 import { BankSelector, type Bank } from '@/extensions/general/enable-banking/components/BankSelector'
 import { BankConnectionStatus } from '@/extensions/general/enable-banking/components/BankConnectionStatus'
 import { DestructiveConfirmDialog, useDestructiveConfirm } from '@/components/ui/destructive-confirm-dialog'
@@ -729,11 +732,15 @@ function PSD2ConnectWizard() {
 // Import Page with Selection Cards
 // ============================================================
 
-type ImportMode = null | 'psd2' | 'bank' | 'sie'
+type ImportMode = null | 'psd2' | 'bank' | 'sie' | 'provider'
 
 export default function ImportPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { toast } = useToast()
   const [mode, setMode] = useState<ImportMode>(null)
   const [hasBankingExtension, setHasBankingExtension] = useState(false)
+  const [extensionCheckDone, setExtensionCheckDone] = useState(false)
 
   useEffect(() => {
     fetch('/api/extensions/toggles/general/enable-banking')
@@ -742,7 +749,33 @@ export default function ImportPage() {
         if (json?.data?.enabled) setHasBankingExtension(true)
       })
       .catch(() => {})
+      .finally(() => setExtensionCheckDone(true))
   }, [])
+
+  // Handle provider OAuth callbacks
+  useEffect(() => {
+    const providerConnected = searchParams.get('connected')
+    const providerError = searchParams.get('error')
+
+    if (providerConnected) {
+      toast({
+        title: 'Ansluten!',
+        description: `${providerConnected} är nu kopplad till gnubok.`,
+      })
+      setMode('provider')
+      router.replace('/import')
+    }
+
+    if (providerError) {
+      toast({
+        title: 'Anslutning misslyckades',
+        description: decodeURIComponent(providerError),
+        variant: 'destructive',
+      })
+      setMode('provider')
+      router.replace('/import')
+    }
+  }, [searchParams, toast, router])
 
   return (
     <div className="space-y-6">
@@ -754,67 +787,108 @@ export default function ImportPage() {
         </p>
       </div>
 
-      {mode === null && (
-        <div className={`grid gap-4 ${hasBankingExtension ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+      {mode === null && !extensionCheckDone && (
+        <div className="flex items-center justify-center h-32">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      )}
+
+      {mode === null && extensionCheckDone && (
+        <div className="grid gap-3 md:grid-cols-2">
           {hasBankingExtension && (
             <Card
-              className="cursor-pointer hover:border-primary/50 transition-colors border-primary/20 relative"
+              className="group cursor-pointer border-l-4 border-l-[hsl(var(--warm-accent))] hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5 transition-all duration-[var(--duration-base)] ease-[var(--ease-out)]"
+              style={{ animationDelay: '0ms' }}
               onClick={() => setMode('psd2')}
             >
-              <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
-                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Landmark className="h-6 w-6 text-primary" />
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="h-11 w-11 shrink-0 rounded-lg bg-[hsl(var(--warm-accent)/0.1)] flex items-center justify-center">
+                  <Landmark className="h-5 w-5 text-[hsl(var(--warm-accent))]" />
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold">Koppla bank</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold">Koppla bank</h3>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-[hsl(var(--warm-accent)/0.4)] text-[hsl(var(--warm-accent))]">Rekommenderat</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-0.5">
                     Anslut ditt bankkonto direkt och synka transaktioner automatiskt via PSD2.
                   </p>
                 </div>
-                <p className="text-xs text-primary font-medium">
-                  Rekommenderat
-                </p>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40 group-hover:text-foreground/60 group-hover:translate-x-0.5 transition-all duration-[var(--duration-fast)]" />
               </CardContent>
             </Card>
           )}
 
           <Card
-            className="cursor-pointer hover:border-primary/50 transition-colors"
+            className="group cursor-pointer hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5 transition-all duration-[var(--duration-base)] ease-[var(--ease-out)]"
+            style={{ animationDelay: '80ms' }}
             onClick={() => setMode('bank')}
           >
-            <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
-              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                <ArrowLeftRight className="h-6 w-6 text-muted-foreground" />
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="h-11 w-11 shrink-0 rounded-lg bg-muted flex items-center justify-center">
+                <ArrowLeftRight className="h-5 w-5 text-muted-foreground" />
               </div>
-              <div>
-                <h3 className="text-lg font-semibold">Banktransaktioner</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Importera kontoutdrag från din bank. Stöder CSV, OFX och de flesta svenska banker.
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold">Banktransaktioner</h3>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Importera kontoutdrag från din bank.
                 </p>
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {['CSV', 'OFX', 'SEB', 'Swedbank', 'Nordea'].map(f => (
+                    <Badge key={f} variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">{f}</Badge>
+                  ))}
+                  <span className="text-[10px] text-muted-foreground/60 self-center">m.fl.</span>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                CSV, OFX, SEB, Swedbank, Handelsbanken, Nordea m.fl.
-              </p>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40 group-hover:text-foreground/60 group-hover:translate-x-0.5 transition-all duration-[var(--duration-fast)]" />
             </CardContent>
           </Card>
 
           <Card
-            className="cursor-pointer hover:border-primary/50 transition-colors"
+            className="group cursor-pointer hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5 transition-all duration-[var(--duration-base)] ease-[var(--ease-out)]"
+            style={{ animationDelay: '160ms' }}
             onClick={() => setMode('sie')}
           >
-            <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
-              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                <FileText className="h-6 w-6 text-muted-foreground" />
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="h-11 w-11 shrink-0 rounded-lg bg-muted flex items-center justify-center">
+                <FileText className="h-5 w-5 text-muted-foreground" />
               </div>
-              <div>
-                <h3 className="text-lg font-semibold">Bokföringsdata (SIE)</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Importera verifikationer och kontoplan från ett annat bokföringsprogram via SIE-filer.
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold">Bokföringsdata</h3>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Importera verifikationer och kontoplan från ett annat bokföringsprogram.
                 </p>
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">SIE4</Badge>
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">.se</Badge>
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">.si</Badge>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                SIE4-format (.se, .si)
-              </p>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40 group-hover:text-foreground/60 group-hover:translate-x-0.5 transition-all duration-[var(--duration-fast)]" />
+            </CardContent>
+          </Card>
+
+          <Card
+            className="group cursor-pointer hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5 transition-all duration-[var(--duration-base)] ease-[var(--ease-out)]"
+            style={{ animationDelay: '240ms' }}
+            onClick={() => setMode('provider')}
+          >
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="h-11 w-11 shrink-0 rounded-lg bg-muted flex items-center justify-center">
+                <Link2 className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold">Koppla bokföringssystem</h3>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Anslut Fortnox eller annat bokföringssystem för att importera data direkt.
+                </p>
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">Fortnox</Badge>
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">Visma</Badge>
+                  <span className="text-[10px] text-muted-foreground/60 self-center">m.fl.</span>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40 group-hover:text-foreground/60 group-hover:translate-x-0.5 transition-all duration-[var(--duration-fast)]" />
             </CardContent>
           </Card>
         </div>
@@ -830,6 +904,7 @@ export default function ImportPage() {
       {mode === 'psd2' && <PSD2ConnectWizard />}
       {mode === 'bank' && <BankFileImportWizard />}
       {mode === 'sie' && <SIEImportWizard />}
+      {mode === 'provider' && <ProviderConnectionsSettings />}
     </div>
   )
 }
