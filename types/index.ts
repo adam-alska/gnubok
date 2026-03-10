@@ -105,6 +105,30 @@ export interface SIESyncResult {
   errors: string[]
 }
 
+// Fortnox multi-resource sync types
+export interface FortnoxResourceSyncResult {
+  dataTypeId: string
+  name: string
+  success: boolean
+  created: number
+  updated: number
+  skipped: number
+  errors: string[]
+  durationMs: number
+  sieResult?: SIESyncResult
+}
+
+export interface FortnoxSyncResult {
+  success: boolean
+  results: FortnoxResourceSyncResult[]
+  scopeMismatch: {
+    missingScopes: string[]
+    affectedDataTypes: string[]
+  } | null
+  totalDurationMs: number
+  errors: string[]
+}
+
 // Currency types
 export type Currency = 'SEK' | 'EUR' | 'USD' | 'GBP' | 'NOK' | 'DKK'
 
@@ -341,6 +365,10 @@ export interface Customer {
   // Notes
   notes: string | null
 
+  // External provider sync
+  external_id: string | null
+  external_provider: string | null
+
   created_at: string
   updated_at: string
 }
@@ -376,6 +404,10 @@ export interface Supplier {
   default_currency: string
 
   notes: string | null
+
+  // External provider sync
+  external_id: string | null
+  external_provider: string | null
 
   created_at: string
   updated_at: string
@@ -426,6 +458,10 @@ export interface SupplierInvoice {
   document_id: string | null
 
   notes: string | null
+
+  // External provider sync
+  external_id: string | null
+  external_provider: string | null
 
   created_at: string
   updated_at: string
@@ -534,6 +570,10 @@ export interface Invoice {
   // Payment tracking
   paid_at: string | null
   paid_amount: number | null
+
+  // External provider sync
+  external_id: string | null
+  external_provider: string | null
 
   created_at: string
   updated_at: string

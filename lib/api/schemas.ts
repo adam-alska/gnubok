@@ -564,5 +564,6 @@ export const ConnectProviderSchema = z.discriminatedUnion('provider', [
 ])
 
 export const SyncDataRequestSchema = z.object({
-  financialYear: z.number().int().min(0).max(5),
+  dataTypeIds: z.array(z.string().min(1)).min(1, 'Select at least one data type'),
+  financialYear: z.number().int().min(0).max(5).optional(),
 })
