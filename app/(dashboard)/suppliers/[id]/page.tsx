@@ -238,40 +238,69 @@ export default function SupplierDetailPage() {
               Inga fakturor registrerade för denna leverantör
             </p>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="py-2">Ankomst</th>
-                  <th className="py-2">Fakturanr</th>
-                  <th className="py-2">Datum</th>
-                  <th className="py-2">Förfaller</th>
-                  <th className="py-2 text-right">Belopp</th>
-                  <th className="py-2 text-right">Kvar</th>
-                  <th className="py-2">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map((inv) => (
-                  <tr key={inv.id} className="border-b last:border-0">
-                    <td className="py-2 font-mono">{inv.arrival_number}</td>
-                    <td className="py-2">
-                      <Link href={`/supplier-invoices/${inv.id}`} className="text-primary hover:underline">
-                        {inv.supplier_invoice_number}
-                      </Link>
-                    </td>
-                    <td className="py-2">{inv.invoice_date}</td>
-                    <td className="py-2">{inv.due_date}</td>
-                    <td className="py-2 text-right">{formatAmount(inv.total)} kr</td>
-                    <td className="py-2 text-right">{formatAmount(inv.remaining_amount)} kr</td>
-                    <td className="py-2">
-                      <Badge className={statusColors[inv.status] || ''}>
-                        {statusLabels[inv.status] || inv.status}
-                      </Badge>
-                    </td>
+            <>
+            {/* Desktop table */}
+            <div className="hidden sm:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="py-2">Ankomst</th>
+                    <th className="py-2">Fakturanr</th>
+                    <th className="py-2">Datum</th>
+                    <th className="py-2">Förfaller</th>
+                    <th className="py-2 text-right">Belopp</th>
+                    <th className="py-2 text-right">Kvar</th>
+                    <th className="py-2">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {invoices.map((inv) => (
+                    <tr key={inv.id} className="border-b last:border-0">
+                      <td className="py-2 font-mono">{inv.arrival_number}</td>
+                      <td className="py-2">
+                        <Link href={`/supplier-invoices/${inv.id}`} className="text-primary hover:underline">
+                          {inv.supplier_invoice_number}
+                        </Link>
+                      </td>
+                      <td className="py-2">{inv.invoice_date}</td>
+                      <td className="py-2">{inv.due_date}</td>
+                      <td className="py-2 text-right">{formatAmount(inv.total)} kr</td>
+                      <td className="py-2 text-right">{formatAmount(inv.remaining_amount)} kr</td>
+                      <td className="py-2">
+                        <Badge className={statusColors[inv.status] || ''}>
+                          {statusLabels[inv.status] || inv.status}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* Mobile cards */}
+            <div className="sm:hidden space-y-3">
+              {invoices.map((inv) => (
+                <div key={inv.id} className="border rounded-lg p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Link href={`/supplier-invoices/${inv.id}`} className="text-primary hover:underline font-medium text-sm">
+                      {inv.supplier_invoice_number}
+                    </Link>
+                    <Badge className={statusColors[inv.status] || ''}>
+                      {statusLabels[inv.status] || inv.status}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{inv.invoice_date} → {inv.due_date}</span>
+                    <span className="font-mono">{formatAmount(inv.total)} kr</span>
+                  </div>
+                  {Number(inv.remaining_amount) > 0 && Number(inv.remaining_amount) !== Number(inv.total) && (
+                    <div className="text-xs text-muted-foreground text-right">
+                      Kvar: {formatAmount(inv.remaining_amount)} kr
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -280,7 +309,7 @@ export default function SupplierDetailPage() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl max-h-[95dvh] sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Redigera leverantör</DialogTitle>
           </DialogHeader>

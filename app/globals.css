@@ -194,6 +194,11 @@ h1, h2, h3 {
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
 }
 
+/* Main content padding: clears bottom nav + safe area on mobile */
+.safe-area-main-padding {
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+}
+
 /* Animation Keyframes */
 @keyframes fadeIn {
   from { opacity: 0; }

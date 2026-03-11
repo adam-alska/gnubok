@@ -229,7 +229,7 @@ export default function MockDataImportDialog<T>({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[95dvh] sm:max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {step === 'upload' && 'Importera testdata'}

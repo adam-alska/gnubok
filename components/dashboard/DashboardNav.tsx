@@ -72,11 +72,13 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
   const router = useRouter()
   const supabase = createClient()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isClosing, setIsClosing] = useState(false)
   // Auto-expand Övrigt when the user is on one of its pages, or when manually toggled
   const isOnOvrigtPage = ['/help', '/settings'].some(p => pathname.startsWith(p))
   const [manualOvrigtExpanded, setManualOvrigtExpanded] = useState(false)
   const isOvrigtExpanded = isOnOvrigtPage || manualOvrigtExpanded
   const openMobileMenu = () => {
+    setIsClosing(false)
     setIsMobileMenuOpen(true)
   }
 
@@ -92,7 +94,13 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
     return pathname.startsWith(href)
   }
 
-  const closeMobileMenu = () => setIsMobileMenuOpen(false)
+  const closeMobileMenu = () => {
+    setIsClosing(true)
+    setTimeout(() => {
+      setIsMobileMenuOpen(false)
+      setIsClosing(false)
+    }, 200)
+  }
 
   // Filter nav items by entity type and hidden flag
   const filteredItems = navItems.filter(item =>
@@ -251,7 +259,7 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
       </aside>
 
       {/* Mobile bottom navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-sm border-t border-border/40" aria-label="Mobilnavigation">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-sm border-t border-border/40" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }} aria-label="Mobilnavigation">
         <div className="flex items-center justify-around h-16 px-2">
           {mobileNavItems.map((item) => {
             const Icon = item.icon
@@ -306,13 +314,21 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
         <>
           {/* Backdrop */}
           <div
-            className="md:hidden fixed inset-0 bg-background/80 backdrop-blur-sm z-50"
+            className={cn(
+              "md:hidden fixed inset-0 bg-background/80 backdrop-blur-sm z-50",
+              isClosing ? "animate-out fade-out duration-200" : "animate-in fade-in duration-300"
+            )}
             onClick={closeMobileMenu}
             aria-hidden="true"
           />
           {/* Drawer */}
           <div
-            className="md:hidden fixed right-0 top-0 bottom-0 w-72 bg-card border-l border-border/40 z-50 overflow-y-auto animate-in slide-in-from-right duration-300"
+            className={cn(
+              "md:hidden fixed right-0 top-0 bottom-0 w-72 bg-card border-l border-border/40 z-50 overflow-y-auto",
+              isClosing
+                ? "animate-out slide-out-to-right duration-200"
+                : "animate-in slide-in-from-right duration-300"
+            )}
             role="dialog"
             aria-label="Navigeringsmeny"
           >

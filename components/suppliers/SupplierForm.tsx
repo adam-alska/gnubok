@@ -119,7 +119,7 @@ export default function SupplierForm({
       </div>
 
       {/* Contact */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="email">E-post</Label>
           <Input
@@ -145,7 +145,7 @@ export default function SupplierForm({
       {/* Business info */}
       <div className="space-y-4 pt-4 border-t">
         <h3 className="font-medium">Företagsuppgifter</h3>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="org_number">Organisationsnummer</Label>
             <Input
@@ -176,7 +176,7 @@ export default function SupplierForm({
             {...register('address_line1')}
           />
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label htmlFor="postal_code">Postnummer</Label>
             <Input id="postal_code" placeholder="123 45" {...register('postal_code')} />
@@ -195,7 +195,7 @@ export default function SupplierForm({
       {/* Payment details */}
       <div className="space-y-4 pt-4 border-t">
         <h3 className="font-medium">Betalningsuppgifter</h3>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="bankgiro">Bankgiro</Label>
             <Input id="bankgiro" placeholder="XXX-XXXX" {...register('bankgiro')} />
@@ -205,7 +205,7 @@ export default function SupplierForm({
             <Input id="plusgiro" placeholder="XXXXXXX-X" {...register('plusgiro')} />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="iban">IBAN</Label>
             <Input id="iban" placeholder="SE00 0000 0000 0000 0000 0000" {...register('iban')} />
@@ -220,7 +220,7 @@ export default function SupplierForm({
       {/* Defaults */}
       <div className="space-y-4 pt-4 border-t">
         <h3 className="font-medium">Standardvärden</h3>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label htmlFor="default_expense_account">Kostnadskonto</Label>
             <Input

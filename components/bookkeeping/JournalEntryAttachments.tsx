@@ -185,7 +185,7 @@ export default function JournalEntryAttachments({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 w-6 p-0 shrink-0"
+                  className="h-6 w-6 p-0 shrink-0 min-h-[44px] min-w-[44px]"
                   onClick={() => handleDownload(doc.id)}
                   title="Ladda ner"
                 >

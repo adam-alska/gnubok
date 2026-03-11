@@ -125,7 +125,7 @@ export default function CorrectionEntryDialog({ entry, open, onOpenChange, onCor
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-3xl max-h-[95dvh] sm:max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Skapa ändringsverifikation</DialogTitle>
         </DialogHeader>
@@ -139,34 +139,50 @@ export default function CorrectionEntryDialog({ entry, open, onOpenChange, onCor
           </div>
           <p className="text-sm">{entry.description}</p>
 
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-muted-foreground">
-                <th className="py-1.5 w-48">Konto</th>
-                <th className="py-1.5">Beskrivning</th>
-                <th className="py-1.5 w-28 text-right">Debet</th>
-                <th className="py-1.5 w-28 text-right">Kredit</th>
-              </tr>
-            </thead>
-            <tbody>
-              {originalLines.map((line) => (
-                <tr key={line.id} className="border-b last:border-0">
-                  <td className="py-1.5"><AccountNumber number={line.account_number} showName /></td>
-                  <td className="py-1.5 text-muted-foreground">{line.line_description || ''}</td>
-                  <td className="py-1.5 text-right">
-                    {Number(line.debit_amount) > 0
-                      ? Number(line.debit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })
-                      : ''}
-                  </td>
-                  <td className="py-1.5 text-right">
-                    {Number(line.credit_amount) > 0
-                      ? Number(line.credit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })
-                      : ''}
-                  </td>
+          <div className="hidden sm:block">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-muted-foreground">
+                  <th className="py-1.5 w-48">Konto</th>
+                  <th className="py-1.5">Beskrivning</th>
+                  <th className="py-1.5 w-28 text-right">Debet</th>
+                  <th className="py-1.5 w-28 text-right">Kredit</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {originalLines.map((line) => (
+                  <tr key={line.id} className="border-b last:border-0">
+                    <td className="py-1.5"><AccountNumber number={line.account_number} showName /></td>
+                    <td className="py-1.5 text-muted-foreground">{line.line_description || ''}</td>
+                    <td className="py-1.5 text-right">
+                      {Number(line.debit_amount) > 0
+                        ? Number(line.debit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })
+                        : ''}
+                    </td>
+                    <td className="py-1.5 text-right">
+                      {Number(line.credit_amount) > 0
+                        ? Number(line.credit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })
+                        : ''}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="sm:hidden space-y-1.5">
+            {originalLines.map((line) => (
+              <div key={line.id} className="flex items-center justify-between py-1.5 border-b last:border-0 text-sm">
+                <div className="min-w-0">
+                  <AccountNumber number={line.account_number} showName />
+                </div>
+                <span className="font-mono text-xs shrink-0 ml-2">
+                  {Number(line.debit_amount) > 0
+                    ? `D ${Number(line.debit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })}`
+                    : `K ${Number(line.credit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })}`}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Divider */}
@@ -178,45 +194,49 @@ export default function CorrectionEntryDialog({ entry, open, onOpenChange, onCor
 
           <div className="space-y-2">
             {lines.map((line, index) => (
-              <div key={index} className="grid grid-cols-[1fr_1fr_120px_120px_auto] gap-2 items-start">
-                <AccountCombobox
-                  value={line.account_number}
-                  accounts={accounts}
-                  onChange={(v) => updateLine(index, 'account_number', v)}
-                />
+              <div key={index} className="space-y-2 sm:space-y-0 sm:grid sm:grid-cols-[1fr_1fr_120px_120px_auto] sm:gap-2 sm:items-start border-b sm:border-0 pb-3 sm:pb-0 last:border-0">
+                <div className="grid grid-cols-[1fr_auto] sm:contents gap-2">
+                  <AccountCombobox
+                    value={line.account_number}
+                    accounts={accounts}
+                    onChange={(v) => updateLine(index, 'account_number', v)}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 min-h-[44px] min-w-[44px] sm:order-last"
+                    onClick={() => removeLine(index)}
+                    disabled={lines.length <= 2}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
                 <Input
                   value={line.line_description}
                   onChange={(e) => updateLine(index, 'line_description', e.target.value)}
                   placeholder="Beskrivning"
                   className="h-8"
                 />
-                <Input
-                  type="number"
-                  value={line.debit_amount}
-                  onChange={(e) => updateLine(index, 'debit_amount', e.target.value)}
-                  placeholder="Debet"
-                  className="h-8 text-right"
-                  min={0}
-                  step="0.01"
-                />
-                <Input
-                  type="number"
-                  value={line.credit_amount}
-                  onChange={(e) => updateLine(index, 'credit_amount', e.target.value)}
-                  placeholder="Kredit"
-                  className="h-8 text-right"
-                  min={0}
-                  step="0.01"
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => removeLine(index)}
-                  disabled={lines.length <= 2}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="grid grid-cols-2 gap-2 sm:contents">
+                  <Input
+                    type="number"
+                    value={line.debit_amount}
+                    onChange={(e) => updateLine(index, 'debit_amount', e.target.value)}
+                    placeholder="Debet"
+                    className="h-8 text-right"
+                    min={0}
+                    step="0.01"
+                  />
+                  <Input
+                    type="number"
+                    value={line.credit_amount}
+                    onChange={(e) => updateLine(index, 'credit_amount', e.target.value)}
+                    placeholder="Kredit"
+                    className="h-8 text-right"
+                    min={0}
+                    step="0.01"
+                  />
+                </div>
               </div>
             ))}
           </div>
