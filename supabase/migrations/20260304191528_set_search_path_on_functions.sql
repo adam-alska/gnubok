@@ -14,7 +14,7 @@ ALTER FUNCTION public.enforce_opening_balance_immutability() SET search_path = p
 ALTER FUNCTION public.enforce_period_lock() SET search_path = public;
 ALTER FUNCTION public.enforce_period_lock_documents() SET search_path = public;
 ALTER FUNCTION public.enforce_retention_journal_entries() SET search_path = public;
-ALTER FUNCTION public.generate_invoice_number(p_user_id uuid) SET search_path = public;
+-- generate_invoice_number removed: created in later migration (20260306) with search_path already set
 ALTER FUNCTION public.get_next_arrival_number(p_user_id uuid) SET search_path = public;
 ALTER FUNCTION public.get_unlinked_1930_lines(p_user_id uuid, p_date_from date, p_date_to date) SET search_path = public;
 ALTER FUNCTION public.handle_new_user() SET search_path = public;
