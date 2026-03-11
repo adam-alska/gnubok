@@ -54,7 +54,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith('/login') ||
     pathname.startsWith('/register') ||
     pathname.startsWith('/auth') ||
-    pathname.startsWith('/reset-password')
+    pathname.startsWith('/reset-password') ||
+    pathname.startsWith('/sandbox')
   ) {
     // If user is logged in and trying to access auth pages, redirect to dashboard or onboarding
     if (user) {

@@ -138,6 +138,9 @@ export interface CompanySettings {
   // Sector
   sector_slug: string | null
 
+  // Sandbox
+  is_sandbox: boolean
+
   // Timestamps
   created_at: string
   updated_at: string
