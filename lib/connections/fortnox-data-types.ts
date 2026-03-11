@@ -19,6 +19,7 @@ export interface FortnoxDataType {
   category: FortnoxDataCategory
   sortOrder: number
   requiresFinancialYear?: boolean
+  singleResource?: boolean // true if endpoint returns a single object, not a paginated list
   description?: string // Swedish description for UI tooltip
 }
 
@@ -87,6 +88,7 @@ export const FORTNOX_DATA_TYPES: FortnoxDataType[] = [
     responseKey: 'LockedPeriod',
     requiredScope: 'settings',
     syncTarget: 'raw_json',
+    singleResource: true,
     category: 'accounting',
     sortOrder: 5,
   },
@@ -97,6 +99,7 @@ export const FORTNOX_DATA_TYPES: FortnoxDataType[] = [
     responseKey: 'CompanyInformation',
     requiredScope: 'companyinformation',
     syncTarget: 'raw_json',
+    singleResource: true,
     category: 'accounting',
     sortOrder: 6,
   },
@@ -129,7 +132,7 @@ export const FORTNOX_DATA_TYPES: FortnoxDataType[] = [
     name: 'Kundbetalningar',
     endpoint: '/3/invoicepayments',
     responseKey: 'InvoicePayments',
-    requiredScope: 'invoice',
+    requiredScope: 'payment',
     syncTarget: 'gnubok_table',
     targetTable: 'invoices',
     category: 'sales',
@@ -194,7 +197,7 @@ export const FORTNOX_DATA_TYPES: FortnoxDataType[] = [
     name: 'Leverantörsfakturor',
     endpoint: '/3/supplierinvoices',
     responseKey: 'SupplierInvoices',
-    requiredScope: 'supplier',
+    requiredScope: 'supplierinvoice',
     syncTarget: 'gnubok_table',
     targetTable: 'supplier_invoices',
     category: 'purchase',
@@ -205,7 +208,7 @@ export const FORTNOX_DATA_TYPES: FortnoxDataType[] = [
     name: 'Leverantörsbetalningar',
     endpoint: '/3/supplierinvoicepayments',
     responseKey: 'SupplierInvoicePayments',
-    requiredScope: 'supplier',
+    requiredScope: 'payment',
     syncTarget: 'gnubok_table',
     targetTable: 'supplier_invoices',
     category: 'purchase',
@@ -321,7 +324,7 @@ export const FORTNOX_DATA_TYPES: FortnoxDataType[] = [
     name: 'Priser',
     endpoint: '/3/prices',
     responseKey: 'Prices',
-    requiredScope: 'article',
+    requiredScope: 'price',
     syncTarget: 'raw_json',
     category: 'other',
     sortOrder: 46,
@@ -331,7 +334,7 @@ export const FORTNOX_DATA_TYPES: FortnoxDataType[] = [
     name: 'Prislistor',
     endpoint: '/3/pricelists',
     responseKey: 'PriceLists',
-    requiredScope: 'article',
+    requiredScope: 'price',
     syncTarget: 'raw_json',
     category: 'other',
     sortOrder: 47,

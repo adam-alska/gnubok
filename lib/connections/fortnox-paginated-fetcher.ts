@@ -16,6 +16,17 @@ export class FortnoxScopeError extends Error {
   }
 }
 
+/**
+ * Thrown when the Fortnox account lacks the required license/module
+ * (e.g. payroll module not enabled). Error code 0 with "Behörighet saknas".
+ */
+export class FortnoxLicenseError extends Error {
+  constructor(endpoint: string) {
+    super(`Fortnox-kontot saknar licens för: ${endpoint}`)
+    this.name = 'FortnoxLicenseError'
+  }
+}
+
 const RATE_LIMIT_WINDOW_MS = 5000
 const MAX_REQUESTS_PER_WINDOW = 25
 
@@ -74,6 +85,10 @@ async function fetchPage<T>(
     if (response.status === 400 && body.includes('2000663')) {
       throw new FortnoxScopeError(baseUrl)
     }
+    // Detect missing license/module (code 0, "Behörighet saknas")
+    if (response.status === 400 && body.includes('Beh\u00f6righet saknas')) {
+      throw new FortnoxLicenseError(baseUrl)
+    }
     throw new Error(`Fortnox API error ${response.status}: ${body}`)
   }
 
@@ -114,6 +129,39 @@ export async function fetchAllPages<T>(
   }
 
   return allItems
+}
+
+/**
+ * Fetch a single (non-paginated) resource from Fortnox.
+ * Used for endpoints like /3/companyinformation and /3/settings/lockedperiod
+ * that return a single object instead of a paginated list.
+ */
+export async function fetchSingleResource<T>(
+  accessToken: string,
+  endpoint: string,
+  responseKey: string,
+  rateLimiter: FortnoxRateLimiter
+): Promise<T> {
+  await rateLimiter.waitIfNeeded()
+
+  const url = `https://api.fortnox.se${endpoint}`
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+
+  if (!response.ok) {
+    const body = await response.text()
+    if (response.status === 400 && body.includes('2000663')) {
+      throw new FortnoxScopeError(endpoint)
+    }
+    if (response.status === 400 && body.includes('Beh\u00f6righet saknas')) {
+      throw new FortnoxLicenseError(endpoint)
+    }
+    throw new Error(`Fortnox API error ${response.status}: ${body}`)
+  }
+
+  const data = await response.json()
+  return data[responseKey] as T
 }
 
 /**

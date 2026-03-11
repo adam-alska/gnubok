@@ -29,9 +29,10 @@ export function getOAuthConfig(provider: 'fortnox' | 'visma'): OAuthConfig {
         authorizeUrl: 'https://apps.fortnox.se/oauth-v1/auth',
         tokenUrl: 'https://apps.fortnox.se/oauth-v1/token',
         scopes: [
-          'bookkeeping', 'companyinformation', 'invoice', 'customer',
-          'supplier', 'article', 'salary', 'offer', 'order',
-          'costcenter', 'project', 'currency', 'settings', 'assets',
+          'bookkeeping', 'companyinformation', 'invoice', 'payment',
+          'customer', 'supplier', 'supplierinvoice', 'article', 'price',
+          'salary', 'offer', 'order', 'costcenter', 'project', 'currency',
+          'settings', 'assets',
         ],
       }
     case 'visma':

@@ -41,10 +41,26 @@ export async function GET(
 
   const grantedScopes: string[] = tokenData?.granted_scopes || []
 
-  const dataTypes = FORTNOX_DATA_TYPES.map((dt) => ({
-    ...dt,
-    scopeAvailable: grantedScopes.length === 0 || grantedScopes.includes(dt.requiredScope),
-  }))
+  // Get sync status for all data types
+  const { data: syncData } = await auth.supabase
+    .from('provider_sync_data')
+    .select('resource_type, record_count, synced_at')
+    .eq('connection_id', id)
+    .eq('user_id', auth.user.id)
+
+  const syncMap = new Map(
+    (syncData || []).map((s) => [s.resource_type, { recordCount: s.record_count, syncedAt: s.synced_at }])
+  )
+
+  const dataTypes = FORTNOX_DATA_TYPES.map((dt) => {
+    const syncStatus = syncMap.get(dt.id)
+    return {
+      ...dt,
+      scopeAvailable: grantedScopes.length === 0 || grantedScopes.includes(dt.requiredScope),
+      lastSyncedAt: syncStatus?.syncedAt ?? null,
+      syncedRecordCount: syncStatus?.recordCount ?? null,
+    }
+  })
 
   return NextResponse.json({ data: dataTypes })
 }

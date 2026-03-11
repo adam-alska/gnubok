@@ -19,8 +19,13 @@ import {
   Users,
   Layers,
   Calendar,
-  Clock,
+  CheckCircle2,
 } from 'lucide-react'
+
+function formatSyncDate(isoDate: string): string {
+  const date = new Date(isoDate)
+  return date.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })
+}
 
 interface FinancialYear {
   id: number
@@ -36,6 +41,8 @@ interface DataTypeInfo {
   requiresFinancialYear?: boolean
   description?: string
   scopeAvailable: boolean
+  lastSyncedAt: string | null
+  syncedRecordCount: number | null
 }
 
 const CATEGORY_ORDER = ['accounting', 'sales', 'purchase', 'hr', 'other']
@@ -102,8 +109,10 @@ export function SyncDataDialog({
       }
 
       if (typesRes.status === 'fulfilled' && typesRes.value.data) {
-        setDataTypes(typesRes.value.data as DataTypeInfo[])
-        setSelectedTypes(new Set())
+        const types = typesRes.value.data as DataTypeInfo[]
+        setDataTypes(types)
+        const alreadySynced = new Set(types.filter((dt) => dt.lastSyncedAt !== null).map((dt) => dt.id))
+        setSelectedTypes(alreadySynced)
       } else {
         setDataTypes([])
         setSelectedTypes(new Set())
@@ -120,7 +129,10 @@ export function SyncDataDialog({
 
   const sieType = useMemo(() => dataTypes.find((dt) => dt.id === 'sie4'), [dataTypes])
   const sieSelected = selectedTypes.has('sie4')
-  const needsFinancialYear = sieSelected
+  const needsFinancialYear = useMemo(
+    () => dataTypes.some((dt) => selectedTypes.has(dt.id) && dt.requiresFinancialYear),
+    [dataTypes, selectedTypes]
+  )
 
   const otherTypesByCategory = useMemo(() => {
     const groups: Record<string, DataTypeInfo[]> = {}
@@ -132,11 +144,20 @@ export function SyncDataDialog({
     return groups
   }, [dataTypes])
 
+  const syncedIds = useMemo(
+    () => new Set(dataTypes.filter((dt) => dt.lastSyncedAt !== null).map((dt) => dt.id)),
+    [dataTypes]
+  )
+
+  const newSelectedIds = useMemo(
+    () => Array.from(selectedTypes).filter((id) => !syncedIds.has(id)),
+    [selectedTypes, syncedIds]
+  )
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (selectedTypes.size === 0) return
-    const ids = Array.from(selectedTypes)
-    onSubmit(ids, needsFinancialYear && selectedYear !== null ? selectedYear : undefined)
+    if (newSelectedIds.length === 0) return
+    onSubmit(newSelectedIds, needsFinancialYear && selectedYear !== null ? selectedYear : undefined)
   }
 
   const isInitializing = isFetchingTypes || isFetchingYears
@@ -175,8 +196,8 @@ export function SyncDataDialog({
 
                   <label
                     className={`group flex items-start gap-3.5 rounded-xl border-2 p-4 transition-all duration-[var(--duration-base)] ease-[var(--ease-out)] ${
-                      !sieType.scopeAvailable
-                        ? 'opacity-50 cursor-not-allowed border-border'
+                      syncedIds.has('sie4')
+                        ? 'border-emerald-500/30 bg-emerald-500/[0.03] cursor-default'
                         : sieSelected
                           ? 'border-primary bg-primary/[0.03] shadow-[var(--shadow-sm)] cursor-pointer'
                           : 'border-border hover:border-primary/30 hover:shadow-[var(--shadow-sm)] cursor-pointer'
@@ -185,6 +206,7 @@ export function SyncDataDialog({
                     <Checkbox
                       checked={sieSelected}
                       onCheckedChange={() => {
+                        if (syncedIds.has('sie4')) return
                         setSelectedTypes((prev) => {
                           const next = new Set(prev)
                           if (next.has('sie4')) next.delete('sie4')
@@ -192,12 +214,18 @@ export function SyncDataDialog({
                           return next
                         })
                       }}
-                      disabled={!sieType.scopeAvailable}
+                      disabled={syncedIds.has('sie4')}
                       className="mt-0.5"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold">{sieType.name}</span>
+                        {sieType.lastSyncedAt && (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                            <CheckCircle2 className="h-3 w-3" />
+                            Hämtad {formatSyncDate(sieType.lastSyncedAt)}
+                          </span>
+                        )}
                       </div>
                       {sieType.description && (
                         <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
@@ -245,7 +273,7 @@ export function SyncDataDialog({
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <div className="h-5 w-5 rounded-md bg-muted flex items-center justify-center">
-                    <Clock className="h-3 w-3 text-muted-foreground" />
+                    <Layers className="h-3 w-3 text-muted-foreground" />
                   </div>
                   <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Fler datatyper
@@ -273,23 +301,80 @@ export function SyncDataDialog({
 
                         {/* Data type rows */}
                         <div className="px-1 py-1">
-                          {types.map((dt) => (
-                            <div
-                              key={dt.id}
-                              className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-muted-foreground/50"
-                            >
-                              <Checkbox disabled checked={false} className="opacity-30" />
-                              <span className="flex-1 truncate">{dt.name}</span>
-                              <span className="text-[10px] tracking-wider text-muted-foreground/35 shrink-0 font-medium uppercase">
-                                Kommer snart
-                              </span>
-                            </div>
-                          ))}
+                          {types.map((dt) => {
+                            const isChecked = selectedTypes.has(dt.id)
+                            const isSynced = syncedIds.has(dt.id)
+                            return (
+                              <label
+                                key={dt.id}
+                                className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors ${
+                                  isSynced
+                                    ? 'text-muted-foreground cursor-default'
+                                    : isChecked
+                                      ? 'text-foreground bg-primary/[0.04] cursor-pointer'
+                                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/40 cursor-pointer'
+                                }`}
+                              >
+                                <Checkbox
+                                  checked={isChecked}
+                                  disabled={isSynced}
+                                  onCheckedChange={() => {
+                                    if (isSynced) return
+                                    setSelectedTypes((prev) => {
+                                      const next = new Set(prev)
+                                      if (next.has(dt.id)) next.delete(dt.id)
+                                      else next.add(dt.id)
+                                      return next
+                                    })
+                                  }}
+                                />
+                                <span className="flex-1 truncate">{dt.name}</span>
+                                {isSynced && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 shrink-0 font-medium" title={`${dt.syncedRecordCount} poster, hämtad ${formatSyncDate(dt.lastSyncedAt!)}`}>
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    {formatSyncDate(dt.lastSyncedAt!)}
+                                  </span>
+                                )}
+                              </label>
+                            )
+                          })}
                         </div>
                       </div>
                     )
                   })}
                 </div>
+
+                {/* Financial year selector for non-SIE types that need it */}
+                {needsFinancialYear && !sieSelected && (
+                  <div className="mt-4 rounded-xl border border-border/60 bg-muted/20 p-4">
+                    <div className="flex items-center gap-1.5 mb-2.5">
+                      <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-xs font-medium text-muted-foreground">Räkenskapsår</span>
+                    </div>
+                    {years.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        Inga räkenskapsår hittades i Fortnox.
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {years.map((year) => (
+                          <button
+                            key={year.id}
+                            type="button"
+                            onClick={() => setSelectedYear(year.id)}
+                            className={`px-3.5 py-2 rounded-lg border text-sm transition-all duration-[var(--duration-fast)] ease-[var(--ease-out)] ${
+                              selectedYear === year.id
+                                ? 'border-primary bg-primary/10 font-medium text-foreground shadow-[var(--shadow-sm)]'
+                                : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                            }`}
+                          >
+                            {year.fromDate} — {year.toDate}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -307,7 +392,7 @@ export function SyncDataDialog({
                 type="submit"
                 disabled={
                   isLoading ||
-                  selectedTypes.size === 0 ||
+                  newSelectedIds.length === 0 ||
                   (needsFinancialYear && years.length > 0 && selectedYear === null)
                 }
               >
@@ -316,8 +401,10 @@ export function SyncDataDialog({
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Hämtar data...
                   </>
+                ) : newSelectedIds.length > 0 ? (
+                  `Hämta ${newSelectedIds.length} datatyp${newSelectedIds.length > 1 ? 'er' : ''}`
                 ) : (
-                  'Hämta data'
+                  'All data redan hämtad'
                 )}
               </Button>
             </DialogFooter>

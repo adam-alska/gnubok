@@ -8,7 +8,7 @@ import type { FortnoxSyncResult, FortnoxResourceSyncResult } from '@/types'
 import { refreshAccessToken } from './oauth'
 import { getFortnoxDataType, getMissingScopesForTypes } from './fortnox-data-types'
 import type { FortnoxDataType } from './fortnox-data-types'
-import { FortnoxRateLimiter, FortnoxScopeError, fetchAllPages, fetchDetails } from './fortnox-paginated-fetcher'
+import { FortnoxRateLimiter, FortnoxScopeError, FortnoxLicenseError, fetchAllPages, fetchDetails, fetchSingleResource } from './fortnox-paginated-fetcher'
 import { syncFortnoxSIEData } from './fortnox-sync'
 
 /** Extract a useful error message from any thrown value (including Supabase PostgrestError objects). */
@@ -249,7 +249,9 @@ async function syncGnubokTable(
       name: dataType.name,
       success: false,
       created: 0, updated: 0, skipped: 0,
-      errors: [errorMessage(err)],
+      errors: [err instanceof FortnoxLicenseError
+        ? `Fortnox-kontot saknar licens för ${dataType.name}`
+        : errorMessage(err)],
       durationMs: Date.now() - startTime,
     }
   }
@@ -267,13 +269,28 @@ async function syncRawJson(
   const startTime = Date.now()
 
   try {
-    const items = await fetchAllPages<Record<string, unknown>>(
-      accessToken,
-      dataType.endpoint,
-      dataType.responseKey,
-      rateLimiter,
-      dataType.requiresFinancialYear ? financialYear : undefined
-    )
+    let data: unknown
+    let recordCount: number
+
+    if (dataType.singleResource) {
+      // Single-resource endpoint (e.g. /3/companyinformation, /3/settings/lockedperiod)
+      const resource = await fetchSingleResource<Record<string, unknown>>(
+        accessToken, dataType.endpoint, dataType.responseKey, rateLimiter
+      )
+      data = resource
+      recordCount = 1
+    } else {
+      // Paginated list endpoint
+      const items = await fetchAllPages<Record<string, unknown>>(
+        accessToken,
+        dataType.endpoint,
+        dataType.responseKey,
+        rateLimiter,
+        dataType.requiresFinancialYear ? financialYear : undefined
+      )
+      data = items
+      recordCount = items.length
+    }
 
     // Upsert into provider_sync_data
     const { error } = await supabase
@@ -284,8 +301,8 @@ async function syncRawJson(
           connection_id: connectionId,
           resource_type: dataType.id,
           provider: 'fortnox',
-          data: items,
-          record_count: items.length,
+          data,
+          record_count: recordCount,
           synced_at: new Date().toISOString(),
         },
         { onConflict: 'user_id,connection_id,resource_type' }
@@ -297,7 +314,7 @@ async function syncRawJson(
       dataTypeId: dataType.id,
       name: dataType.name,
       success: true,
-      created: items.length,
+      created: recordCount,
       updated: 0,
       skipped: 0,
       errors: [],
@@ -309,7 +326,9 @@ async function syncRawJson(
       name: dataType.name,
       success: false,
       created: 0, updated: 0, skipped: 0,
-      errors: [errorMessage(err)],
+      errors: [err instanceof FortnoxLicenseError
+        ? `Fortnox-kontot saknar licens för ${dataType.name}`
+        : errorMessage(err)],
       durationMs: Date.now() - startTime,
     }
   }
@@ -453,6 +472,24 @@ export async function syncFortnoxData(
     }
 
     results.push(result)
+
+    // Record sync metadata for non-raw_json types (raw_json already upserts in syncRawJson)
+    if (result.success && dataType.syncTarget !== 'raw_json') {
+      await supabase
+        .from('provider_sync_data')
+        .upsert(
+          {
+            user_id: userId,
+            connection_id: connectionId,
+            resource_type: dataType.id,
+            provider: 'fortnox',
+            data: [],
+            record_count: result.created + result.updated,
+            synced_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,connection_id,resource_type' }
+        )
+    }
   }
 
   // 5. Detect runtime scope failures and update granted_scopes

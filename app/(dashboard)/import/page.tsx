@@ -795,21 +795,45 @@ export default function ImportPage() {
 
       {mode === null && extensionCheckDone && (
         <div className="grid gap-3 md:grid-cols-2">
+          <Card
+            className="group cursor-pointer border-l-4 border-l-[hsl(var(--warm-accent))] hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5 transition-all duration-[var(--duration-base)] ease-[var(--ease-out)]"
+            style={{ animationDelay: '0ms' }}
+            onClick={() => setMode('provider')}
+          >
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="h-11 w-11 shrink-0 rounded-lg bg-[hsl(var(--warm-accent)/0.1)] flex items-center justify-center">
+                <Link2 className="h-5 w-5 text-[hsl(var(--warm-accent))]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold">Koppla bokföringssystem</h3>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-[hsl(var(--warm-accent)/0.4)] text-[hsl(var(--warm-accent))]">Rekommenderat</Badge>
+                </div>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Anslut Fortnox eller annat bokföringssystem för att importera data direkt.
+                </p>
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">Fortnox</Badge>
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">Visma</Badge>
+                  <span className="text-[10px] text-muted-foreground/60 self-center">m.fl.</span>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40 group-hover:text-foreground/60 group-hover:translate-x-0.5 transition-all duration-[var(--duration-fast)]" />
+            </CardContent>
+          </Card>
+
           {hasBankingExtension && (
             <Card
-              className="group cursor-pointer border-l-4 border-l-[hsl(var(--warm-accent))] hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5 transition-all duration-[var(--duration-base)] ease-[var(--ease-out)]"
-              style={{ animationDelay: '0ms' }}
+              className="group cursor-pointer hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5 transition-all duration-[var(--duration-base)] ease-[var(--ease-out)]"
+              style={{ animationDelay: '80ms' }}
               onClick={() => setMode('psd2')}
             >
               <CardContent className="p-5 flex items-center gap-4">
-                <div className="h-11 w-11 shrink-0 rounded-lg bg-[hsl(var(--warm-accent)/0.1)] flex items-center justify-center">
-                  <Landmark className="h-5 w-5 text-[hsl(var(--warm-accent))]" />
+                <div className="h-11 w-11 shrink-0 rounded-lg bg-muted flex items-center justify-center">
+                  <Landmark className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold">Koppla bank</h3>
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-[hsl(var(--warm-accent)/0.4)] text-[hsl(var(--warm-accent))]">Rekommenderat</Badge>
-                  </div>
+                  <h3 className="font-semibold">Koppla bank</h3>
                   <p className="text-sm text-muted-foreground mt-0.5">
                     Anslut ditt bankkonto direkt och synka transaktioner automatiskt via PSD2.
                   </p>
@@ -821,7 +845,7 @@ export default function ImportPage() {
 
           <Card
             className="group cursor-pointer hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5 transition-all duration-[var(--duration-base)] ease-[var(--ease-out)]"
-            style={{ animationDelay: '80ms' }}
+            style={{ animationDelay: '160ms' }}
             onClick={() => setMode('bank')}
           >
             <CardContent className="p-5 flex items-center gap-4">
@@ -846,7 +870,7 @@ export default function ImportPage() {
 
           <Card
             className="group cursor-pointer hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5 transition-all duration-[var(--duration-base)] ease-[var(--ease-out)]"
-            style={{ animationDelay: '160ms' }}
+            style={{ animationDelay: '240ms' }}
             onClick={() => setMode('sie')}
           >
             <CardContent className="p-5 flex items-center gap-4">
@@ -862,30 +886,6 @@ export default function ImportPage() {
                   <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">SIE4</Badge>
                   <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">.se</Badge>
                   <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">.si</Badge>
-                </div>
-              </div>
-              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40 group-hover:text-foreground/60 group-hover:translate-x-0.5 transition-all duration-[var(--duration-fast)]" />
-            </CardContent>
-          </Card>
-
-          <Card
-            className="group cursor-pointer hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5 transition-all duration-[var(--duration-base)] ease-[var(--ease-out)]"
-            style={{ animationDelay: '240ms' }}
-            onClick={() => setMode('provider')}
-          >
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className="h-11 w-11 shrink-0 rounded-lg bg-muted flex items-center justify-center">
-                <Link2 className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold">Koppla bokföringssystem</h3>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  Anslut Fortnox eller annat bokföringssystem för att importera data direkt.
-                </p>
-                <div className="flex flex-wrap gap-1 mt-1.5">
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">Fortnox</Badge>
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">Visma</Badge>
-                  <span className="text-[10px] text-muted-foreground/60 self-center">m.fl.</span>
                 </div>
               </div>
               <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40 group-hover:text-foreground/60 group-hover:translate-x-0.5 transition-all duration-[var(--duration-fast)]" />
