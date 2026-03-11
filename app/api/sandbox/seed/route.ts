@@ -68,10 +68,11 @@ export async function POST() {
     if (settingsError) throw settingsError
 
     // 3. Seed chart of accounts via RPC
-    await supabase.rpc('seed_chart_of_accounts', {
+    const { error: coaError } = await supabase.rpc('seed_chart_of_accounts', {
       p_user_id: userId,
       p_entity_type: 'enskild_firma',
     })
+    if (coaError) throw coaError
 
     // 4. Create fiscal period (current year)
     const currentYear = new Date().getFullYear()
