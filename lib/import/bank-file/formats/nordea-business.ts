@@ -1,11 +1,14 @@
 /**
- * SEB CSV format parser
+ * Nordea Business CSV format parser
  *
  * Format: Semicolon-delimited, comma decimal separator
- * Columns vary but typically: Bokföringsdag, Valutadag, Verifikationsnummer,
- *   Text/mottagare, Belopp, Saldo
+ * Columns: Bokföringsdag, Belopp, Avsändare, Mottagare, Namn, Rubrik, Saldo, Valuta
  * Date format: YYYY-MM-DD
  * Encoding: UTF-8 or Windows-1252
+ *
+ * This is the format used by Nordea Business / Internetbanken Företag
+ * (netbank.nordea.se), including Plusgiro and corporate accounts.
+ * It differs from the personal banking format which is comma-delimited.
  */
 
 import type { BankFileFormat, BankFileParseResult, ParsedBankTransaction, BankFileParseIssue } from '../types'
@@ -16,22 +19,21 @@ function parseCommaDecimal(value: string): number {
   return parseFloat(cleaned)
 }
 
-export const sebFormat: BankFileFormat = {
-  id: 'seb',
-  name: 'SEB',
-  description: 'SEB CSV (semicolon-delimited)',
+export const nordeaBusinessFormat: BankFileFormat = {
+  id: 'nordea_business',
+  name: 'Nordea Företag',
+  description: 'Nordea Företag CSV (Bokföringsdag;Belopp;Avsändare;Mottagare;Namn;Rubrik;Saldo;Valuta)',
   fileExtensions: ['.csv', '.txt'],
 
   detect(content: string, _filename: string): boolean {
     const prepared = prepareContent(content)
     const firstLine = prepared.split('\n')[0]?.toLowerCase() || ''
-    // SEB headers contain "bokföringsdag"/"bokforingsdatum" AND "valutadag"/"verifikationsnummer"
-    // The secondary check distinguishes SEB from Länsförsäkringar (which also has "bokföringsdag")
+    // Nordea Business: semicolon-delimited with "bokföringsdag" and "rubrik"
+    // "rubrik" distinguishes from SEB (which has "valutadag"/"verifikationsnummer")
     return (
       firstLine.includes(';') &&
-      (firstLine.includes('bokföringsdag') ||
-        firstLine.includes('bokforingsdatum')) &&
-      (firstLine.includes('valutadag') || firstLine.includes('verifikationsnummer'))
+      (firstLine.includes('bokföringsdag') || firstLine.includes('bokforingsdag')) &&
+      (firstLine.includes('rubrik') || (firstLine.includes('avsändare') && firstLine.includes('mottagare')))
     )
   },
 
@@ -43,29 +45,30 @@ export const sebFormat: BankFileFormat = {
     const issues: BankFileParseIssue[] = []
     let skippedRows = 0
 
-    // Parse header to find column indices
+    // Parse header to find column indices dynamically
     const headerLine = lines[0] || ''
     const headers = headerLine.split(';').map((h) => h.trim().toLowerCase().replace(/"/g, ''))
 
-    // Find column indices dynamically
     const dateIdx = headers.findIndex(
-      (h) => h.includes('bokföringsdag') || h.includes('bokforingsdatum')
+      (h) => h.includes('bokföringsdag') || h.includes('bokforingsdag')
     )
-    const descIdx = headers.findIndex(
-      (h) => h.includes('text') || h.includes('mottagare') || h.includes('beskrivning')
-    )
-    const amountIdx = headers.findIndex((h) => h.includes('belopp'))
-    const balanceIdx = headers.findIndex((h) => h.includes('saldo'))
+    const amountIdx = headers.findIndex((h) => h === 'belopp' || h.includes('belopp'))
+    const senderIdx = headers.findIndex((h) => h.includes('avsändare') || h.includes('avsandare'))
+    const receiverIdx = headers.findIndex((h) => h.includes('mottagare'))
+    const nameIdx = headers.findIndex((h) => h === 'namn')
+    const subjectIdx = headers.findIndex((h) => h === 'rubrik')
+    const balanceIdx = headers.findIndex((h) => h === 'saldo' || h.includes('saldo'))
+    const currencyIdx = headers.findIndex((h) => h === 'valuta' || h.includes('valuta'))
 
     if (dateIdx === -1 || amountIdx === -1) {
       issues.push({
         row: 1,
-        message: 'Could not identify required columns (date, amount)',
+        message: 'Could not identify required columns (Bokföringsdag, Belopp)',
         severity: 'error',
       })
       return {
-        format: 'seb',
-        format_name: 'SEB',
+        format: 'nordea_business',
+        format_name: 'Nordea Företag',
         transactions: [],
         date_from: null,
         date_to: null,
@@ -80,10 +83,8 @@ export const sebFormat: BankFileFormat = {
 
       const fields = line.split(';').map((f) => f.trim().replace(/^"|"$/g, ''))
 
-      const date = fields[dateIdx]
-      const description = fields[descIdx >= 0 ? descIdx : dateIdx + 1] || 'Unknown'
+      const date = fields[dateIdx]?.trim()
       const amountStr = fields[amountIdx]
-      const balanceStr = balanceIdx >= 0 ? fields[balanceIdx] : undefined
 
       if (!date || !amountStr) {
         issues.push({ row: i + 1, message: 'Missing required fields', severity: 'warning' })
@@ -98,22 +99,34 @@ export const sebFormat: BankFileFormat = {
         continue
       }
 
+      // Validate date format (YYYY-MM-DD)
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         issues.push({ row: i + 1, message: `Invalid date: ${date}`, severity: 'warning' })
         skippedRows++
         continue
       }
 
-      const balance = balanceStr ? parseCommaDecimal(balanceStr) : null
+      // Build description from Namn + Rubrik (name is the counterparty, rubrik is the subject/memo)
+      const name = nameIdx >= 0 ? fields[nameIdx]?.trim() : ''
+      const subject = subjectIdx >= 0 ? fields[subjectIdx]?.trim() : ''
+      const description = [name, subject].filter(Boolean).join(' — ') || 'Unknown'
+
+      // Counterparty from Avsändare (incoming) or Mottagare (outgoing)
+      const sender = senderIdx >= 0 ? fields[senderIdx]?.trim() : null
+      const receiver = receiverIdx >= 0 ? fields[receiverIdx]?.trim() : null
+      const counterparty = (amount > 0 ? sender : receiver) || null
+
+      const balance = balanceIdx >= 0 && fields[balanceIdx] ? parseCommaDecimal(fields[balanceIdx]) : null
+      const currency = currencyIdx >= 0 && fields[currencyIdx] ? fields[currencyIdx].trim() : 'SEK'
 
       transactions.push({
         date,
-        description: description.trim(),
+        description,
         amount,
-        currency: 'SEK',
+        currency: currency || 'SEK',
         balance: isNaN(balance as number) ? null : balance,
         reference: null,
-        counterparty: null,
+        counterparty: counterparty || null,
         raw_line: line,
       })
     }
@@ -121,8 +134,8 @@ export const sebFormat: BankFileFormat = {
     const dates = transactions.map((t) => t.date).sort()
 
     return {
-      format: 'seb',
-      format_name: 'SEB',
+      format: 'nordea_business',
+      format_name: 'Nordea Företag',
       transactions,
       date_from: dates[0] || null,
       date_to: dates[dates.length - 1] || null,

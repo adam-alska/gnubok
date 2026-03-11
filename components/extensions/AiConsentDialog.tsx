@@ -52,16 +52,16 @@ export function AiConsentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>AI-samtycke kravs</DialogTitle>
+          <DialogTitle>AI-samtycke krävs</DialogTitle>
           <DialogDescription>
-            Denna funktion anvander AI-tjanster fran externa leverantorer.
-            Granska informationen nedan innan du fortsatter.
+            Denna funktion använder AI-tjänster från externa leverantörer.
+            Granska informationen nedan innan du fortsätter.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div>
-            <p className="text-sm font-medium mb-1">Leverantor</p>
+            <p className="text-sm font-medium mb-1">Leverantör</p>
             <p className="text-sm text-muted-foreground">{disclosure.provider}</p>
           </div>
 
@@ -80,11 +80,11 @@ export function AiConsentDialog({
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Las mer i var{' '}
+            Läs mer i vår{' '}
             <Link href="/privacy" className="underline underline-offset-4" target="_blank">
               integritetspolicy
             </Link>
-            . Du kan nar som helst aterkalla ditt samtycke i installningarna.
+            . Du kan när som helst återkalla ditt samtycke i inställningarna.
           </p>
         </div>
 

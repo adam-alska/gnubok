@@ -1977,7 +1977,7 @@ export const CLASS_1_ACCOUNTS: BASReferenceAccount[] = [
     account_group: '16',
     account_type: 'asset',
     normal_balance: 'debit',
-    description: 'Fordran på Skatteverket nar ingående moms överstiger utgående moms.',
+    description: 'Fordran på Skatteverket när ingående moms överstiger utgående moms.',
     sru_code: '7212',
     k2_excluded: false,
   },

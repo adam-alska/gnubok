@@ -24,9 +24,9 @@ export default function PrivacyPolicyPage() {
           </CardHeader>
           <CardContent className="prose prose-sm max-w-none">
             <p>
-              Arcim (&quot;vi&quot;, &quot;oss&quot;) ar personuppgiftsansvarig for behandlingen av dina
-              personuppgifter i samband med anvandningen av Gnubok. Vi behandlar dina uppgifter i
-              enlighet med EU:s dataskyddsforordning (GDPR) och svensk dataskyddslagstiftning.
+              Arcim (&quot;vi&quot;, &quot;oss&quot;) är personuppgiftsansvarig för behandlingen av dina
+              personuppgifter i samband med användningen av Gnubok. Vi behandlar dina uppgifter i
+              enlighet med EU:s dataskyddsförordning (GDPR) och svensk dataskyddslagstiftning.
             </p>
           </CardContent>
         </Card>
@@ -36,39 +36,39 @@ export default function PrivacyPolicyPage() {
             <CardTitle>2. Vilka uppgifter vi behandlar</CardTitle>
           </CardHeader>
           <CardContent className="prose prose-sm max-w-none">
-            <p>Vi behandlar foljande kategorier av personuppgifter:</p>
+            <p>Vi behandlar följande kategorier av personuppgifter:</p>
             <ul>
-              <li><strong>Kontouppgifter:</strong> E-postadress (for inloggning via magic link)</li>
-              <li><strong>Foretagsuppgifter:</strong> Foretagsnamn, organisationsnummer, adress, kontaktuppgifter</li>
-              <li><strong>Bokforingsdata:</strong> Verifikationer, fakturor, kvitton, transaktioner, kontoplaner</li>
+              <li><strong>Kontouppgifter:</strong> E-postadress (för inloggning via magic link)</li>
+              <li><strong>Företagsuppgifter:</strong> Företagsnamn, organisationsnummer, adress, kontaktuppgifter</li>
+              <li><strong>Bokföringsdata:</strong> Verifikationer, fakturor, kvitton, transaktioner, kontoplaner</li>
               <li><strong>Bankdata:</strong> Kontosaldon och transaktioner (via PSD2-koppling)</li>
-              <li><strong>Dokument:</strong> Uppladdade kvitton, fakturor och andra bokforingsunderlag</li>
-              <li><strong>Tekniska uppgifter:</strong> IP-adress, enhetstyp, anvandningsstatistik</li>
+              <li><strong>Dokument:</strong> Uppladdade kvitton, fakturor och andra bokföringsunderlag</li>
+              <li><strong>Tekniska uppgifter:</strong> IP-adress, enhetstyp, användningsstatistik</li>
             </ul>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>3. Rattslig grund (GDPR Art. 6)</CardTitle>
+            <CardTitle>3. Rättslig grund (GDPR Art. 6)</CardTitle>
           </CardHeader>
           <CardContent className="prose prose-sm max-w-none">
             <ul>
               <li>
-                <strong>Avtal (Art. 6.1b):</strong> Behandling som ar nodvandig for att fullgora vara
-                tjanster enligt anvandaravtalet.
+                <strong>Avtal (Art. 6.1b):</strong> Behandling som är nödvändig för att fullgöra våra
+                tjänster enligt användaravtalet.
               </li>
               <li>
-                <strong>Rattslig forpliktelse (Art. 6.1c):</strong> Bokforingslagens (BFL) krav pa
-                7 ars arkivering av raknenskapsmaterial.
+                <strong>Rättslig förpliktelse (Art. 6.1c):</strong> Bokföringslagens (BFL) krav på
+                7 års arkivering av räkenskapsmaterial.
               </li>
               <li>
-                <strong>Berattigat intresse (Art. 6.1f):</strong> Produktforbattringar, sakerhet och
-                bedrageriforbud.
+                <strong>Berättigat intresse (Art. 6.1f):</strong> Produktförbättringar, säkerhet och
+                bedrägeriforbud.
               </li>
               <li>
-                <strong>Samtycke (Art. 6.1a):</strong> For AI-baserade funktioner som skickar data
-                till tredjepartstjanster (se separat samtycke vid aktivering).
+                <strong>Samtycke (Art. 6.1a):</strong> För AI-baserade funktioner som skickar data
+                till tredjepartstjänster (se separat samtycke vid aktivering).
               </li>
             </ul>
           </CardContent>
@@ -76,12 +76,12 @@ export default function PrivacyPolicyPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>4. Underbitraden</CardTitle>
+            <CardTitle>4. Underbiträden</CardTitle>
           </CardHeader>
           <CardContent className="prose prose-sm max-w-none">
             <p>
-              Vi anvander foljande underbitraden for att tillhandahalla tjansten. Uppgifterna nedan anger
-              vilka uppgifter som delas med respektive underbitrade, syftet samt var behandlingen sker
+              Vi använder följande underbiträden för att tillhandahålla tjänsten. Uppgifterna nedan anger
+              vilka uppgifter som delas med respektive underbiträde, syftet samt var behandlingen sker
               (GDPR Art. 13).
             </p>
 
@@ -89,7 +89,7 @@ export default function PrivacyPolicyPage() {
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-2 pr-4 font-semibold">Underbitrade</th>
+                    <th className="text-left py-2 pr-4 font-semibold">Underbiträde</th>
                     <th className="text-left py-2 pr-4 font-semibold">Syfte</th>
                     <th className="text-left py-2 pr-4 font-semibold">Plats</th>
                     <th className="text-left py-2 font-semibold">Skyddsmekanism</th>
@@ -105,7 +105,7 @@ export default function PrivacyPolicyPage() {
                   <tr className="border-b">
                     <td className="py-2 pr-4 font-medium">Vercel</td>
                     <td className="py-2 pr-4">Applikationshosting</td>
-                    <td className="py-2 pr-4">Globalt CDN (EU-regioner tillgangliga)</td>
+                    <td className="py-2 pr-4">Globalt CDN (EU-regioner tillgängliga)</td>
                     <td className="py-2">EU Data Residency</td>
                   </tr>
                   <tr className="border-b">
@@ -120,7 +120,7 @@ export default function PrivacyPolicyPage() {
                   <tr className="border-b">
                     <td className="py-2 pr-4 font-medium">OpenAI</td>
                     <td className="py-2 pr-4">
-                      Embedding-generering for likhetssokning (transaktionsmallar, kunskapsbas)
+                      Embedding-generering för likhetssökning (transaktionsmallar, kunskapsbas)
                     </td>
                     <td className="py-2 pr-4">USA</td>
                     <td className="py-2">SCCs (standardavtalsklausuler)</td>
@@ -139,7 +139,7 @@ export default function PrivacyPolicyPage() {
                   </tr>
                   <tr className="border-b">
                     <td className="py-2 pr-4 font-medium">Recapt</td>
-                    <td className="py-2 pr-4">Produktanalys och anvanderfeedback</td>
+                    <td className="py-2 pr-4">Produktanalys och användarfeedback</td>
                     <td className="py-2 pr-4">EU</td>
                     <td className="py-2">EU-baserad</td>
                   </tr>
@@ -148,21 +148,21 @@ export default function PrivacyPolicyPage() {
             </div>
 
             <p className="mt-4 text-sm text-muted-foreground">
-              AI-funktioner (Anthropic, OpenAI) kraver separat samtycke fore aktivering.
-              Data skickas forst nar du aktivt godkanner anvandningen.
+              AI-funktioner (Anthropic, OpenAI) kräver separat samtycke före aktivering.
+              Data skickas först när du aktivt godkänner användningen.
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>5. Tredjelandsoverforing</CardTitle>
+            <CardTitle>5. Tredjelandsöverföring</CardTitle>
           </CardHeader>
           <CardContent className="prose prose-sm max-w-none">
             <p>
-              Vissa underbitraden ar baserade i USA. For dessa overforing anvands EU-kommissionens
+              Vissa underbiträden är baserade i USA. För dessa överföringar används EU-kommissionens
               standardavtalsklausuler (SCCs) som skyddsmekanism i enlighet med GDPR kapitel V.
-              All primaer datalagring (databas, filer) sker inom EU via Supabase (eu-central-1).
+              All primär datalagring (databas, filer) sker inom EU via Supabase (eu-central-1).
             </p>
           </CardContent>
         </Card>
@@ -174,13 +174,13 @@ export default function PrivacyPolicyPage() {
           <CardContent className="prose prose-sm max-w-none">
             <ul>
               <li>
-                <strong>Bokforingsmaterial:</strong> 7 ar fran rakenskapsarets slut, i enlighet
-                med Bokforingslagen (BFL) 7 kap. 2 §. Systemet hindrar radering av material
-                kopplat till bokforda verifikationer under denna period.
+                <strong>Bokföringsmaterial:</strong> 7 år från räkenskapsårets slut, i enlighet
+                med Bokföringslagen (BFL) 7 kap. 2 §. Systemet hindrar radering av material
+                kopplat till bokförda verifikationer under denna period.
               </li>
               <li>
-                <strong>Kontouppgifter:</strong> Sa lange kontot ar aktivt, plus 30 dagar efter
-                begaran om radering (for att hantera pagaende bokforingsplikter).
+                <strong>Kontouppgifter:</strong> Så länge kontot är aktivt, plus 30 dagar efter
+                begäran om radering (för att hantera pågående bokföringsplikter).
               </li>
               <li>
                 <strong>Tekniska loggar:</strong> Maximalt 90 dagar.
@@ -191,24 +191,24 @@ export default function PrivacyPolicyPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>7. Dina rattigheter</CardTitle>
+            <CardTitle>7. Dina rättigheter</CardTitle>
           </CardHeader>
           <CardContent className="prose prose-sm max-w-none">
-            <p>Du har foljande rattigheter enligt GDPR:</p>
+            <p>Du har följande rättigheter enligt GDPR:</p>
             <ul>
-              <li><strong>Tillgang (Art. 15):</strong> Du kan begara en kopia av alla dina personuppgifter.</li>
-              <li><strong>Rattelse (Art. 16):</strong> Du kan begara rattelse av felaktiga uppgifter.</li>
-              <li><strong>Radering (Art. 17):</strong> Du kan begara radering, med undantag for uppgifter som
-                omfattas av lagstadgade arkiveringskrav (BFL 7 ar).</li>
-              <li><strong>Begransning (Art. 18):</strong> Du kan begara begransning av behandlingen.</li>
+              <li><strong>Tillgång (Art. 15):</strong> Du kan begära en kopia av alla dina personuppgifter.</li>
+              <li><strong>Rättelse (Art. 16):</strong> Du kan begära rättelse av felaktiga uppgifter.</li>
+              <li><strong>Radering (Art. 17):</strong> Du kan begära radering, med undantag för uppgifter som
+                omfattas av lagstadgade arkiveringskrav (BFL 7 år).</li>
+              <li><strong>Begränsning (Art. 18):</strong> Du kan begära begränsning av behandlingen.</li>
               <li><strong>Dataportabilitet (Art. 20):</strong> Du kan exportera dina uppgifter i
-                maskinlasbart format (SIE4, JSON, CSV) via exportfunktionerna i appen.</li>
-              <li><strong>Invandning (Art. 21):</strong> Du kan invanda mot behandling baserad pa
-                berattigat intresse.</li>
+                maskinläsbart format (SIE4, JSON, CSV) via exportfunktionerna i appen.</li>
+              <li><strong>Invändning (Art. 21):</strong> Du kan invända mot behandling baserad på
+                berättigat intresse.</li>
             </ul>
             <p>
-              For att utova dina rattigheter, kontakta oss pa adressen nedan. Vi besvarar alla
-              forfragar inom 30 dagar.
+              För att utöva dina rättigheter, kontakta oss på adressen nedan. Vi besvarar alla
+              förfrågningar inom 30 dagar.
             </p>
           </CardContent>
         </Card>
@@ -219,14 +219,14 @@ export default function PrivacyPolicyPage() {
           </CardHeader>
           <CardContent className="prose prose-sm max-w-none">
             <p>
-              For fragor om behandlingen av dina personuppgifter, kontakta oss:
+              För frågor om behandlingen av dina personuppgifter, kontakta oss:
             </p>
             <ul>
-              <li><strong>Foretag:</strong> Arcim</li>
+              <li><strong>Företag:</strong> Arcim</li>
               <li><strong>E-post:</strong> privacy@gnubok.se</li>
             </ul>
             <p>
-              Du har aven ratt att lamna klagomal till Integritetsskyddsmyndigheten (IMY),
+              Du har även rätt att lämna klagomål till Integritetsskyddsmyndigheten (IMY),
               www.imy.se.
             </p>
           </CardContent>

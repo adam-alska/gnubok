@@ -246,11 +246,11 @@ export default function ImportReviewStep({
       </Card>
 
       {/* Actions */}
-      <div className="flex justify-between">
-        <Button variant="outline" onClick={onBack} disabled={isLoading}>
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+        <Button variant="outline" className="min-h-11" onClick={onBack} disabled={isLoading}>
           Tillbaka
         </Button>
-        <Button onClick={handleExecute} disabled={isLoading}>
+        <Button className="min-h-11" onClick={handleExecute} disabled={isLoading}>
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

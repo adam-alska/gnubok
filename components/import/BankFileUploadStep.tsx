@@ -23,6 +23,7 @@ import type { BankFileFormatId } from '@/lib/import/bank-file/types'
 
 const FORMAT_NAMES: Record<string, string> = {
   nordea: 'Nordea',
+  nordea_business: 'Nordea Företag',
   seb: 'SEB',
   swedbank: 'Swedbank',
   handelsbanken: 'Handelsbanken',
@@ -110,18 +111,19 @@ export default function BankFileUploadStep({
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Format override */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
             <label className="text-sm font-medium whitespace-nowrap">Bank/format:</label>
             <Select
               value={formatOverride || 'auto'}
               onValueChange={handleFormatChange}
             >
-              <SelectTrigger className="w-64">
+              <SelectTrigger className="w-full sm:w-64">
                 <SelectValue placeholder="Automatisk identifiering" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="auto">Automatisk identifiering</SelectItem>
                 <SelectItem value="nordea">Nordea</SelectItem>
+                <SelectItem value="nordea_business">Nordea Företag</SelectItem>
                 <SelectItem value="seb">SEB</SelectItem>
                 <SelectItem value="swedbank">Swedbank</SelectItem>
                 <SelectItem value="handelsbanken">Handelsbanken</SelectItem>
@@ -181,7 +183,8 @@ export default function BankFileUploadStep({
               <div className="space-y-4">
                 <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
                 <div>
-                  <p className="font-medium">Dra och släpp bankfil här</p>
+                  <p className="font-medium hidden sm:block">Dra och släpp bankfil här</p>
+                  <p className="font-medium sm:hidden">Tryck för att välja bankfil</p>
                   <p className="text-sm text-muted-foreground">
                     CSV, TXT eller XML (max 10 MB)
                   </p>

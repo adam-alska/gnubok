@@ -41,7 +41,7 @@ export default function BankFilePreviewStep({
   return (
     <div className="space-y-6">
       {/* Summary cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -129,7 +129,7 @@ export default function BankFilePreviewStep({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border max-h-96 overflow-y-auto">
+          <div className="rounded-md border max-h-96 overflow-x-auto overflow-y-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -201,12 +201,12 @@ export default function BankFilePreviewStep({
       )}
 
       {/* Navigation */}
-      <div className="flex justify-between">
-        <Button variant="outline" onClick={onBack}>
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+        <Button variant="outline" className="min-h-11" onClick={onBack}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Tillbaka
         </Button>
-        <Button onClick={onContinue} disabled={hasIssues || transactions.length === 0}>
+        <Button className="min-h-11" onClick={onContinue} disabled={hasIssues || transactions.length === 0}>
           Fortsätt
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>

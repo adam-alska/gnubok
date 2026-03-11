@@ -1779,7 +1779,7 @@ export const CLASS_7_ACCOUNTS: BASReferenceAccount[] = [
     account_group: '78',
     account_type: 'expense',
     normal_balance: 'debit',
-    description: 'Planmässig avskrivning av goodwill, patent och andra immateriella tillgangar.',
+    description: 'Planmässig avskrivning av goodwill, patent och andra immateriella tillgångar.',
     sru_code: '7325',
     k2_excluded: false,
   },

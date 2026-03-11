@@ -35,8 +35,10 @@ import type { CompanySettings } from '@/types'
 import { CalendarFeedSettings } from '@/components/settings/CalendarFeedSettings'
 import { getSettingsPanel } from '@/lib/extensions/settings-panel-registry'
 import { SecuritySettings } from '@/components/settings/SecuritySettings'
+import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
 
 const BankingPanel = getSettingsPanel('enable-banking')
+const bankingCompiledIn = ENABLED_EXTENSION_IDS.has('enable-banking')
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -47,7 +49,9 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [settings, setSettings] = useState<CompanySettings | null>(null)
-  const [hasBankingExtension, setHasBankingExtension] = useState(false)
+  const [hasBankingExtension, setHasBankingExtension] = useState<boolean | null>(
+    bankingCompiledIn ? null : false
+  )
   const [hasCalendarExtension, setHasCalendarExtension] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
@@ -70,20 +74,14 @@ export default function SettingsPage() {
       return
     }
 
-    // Fetch settings
-    const { data: settingsData } = await supabase
-      .from('company_settings')
-      .select('*')
-      .eq('user_id', user.id)
-      .single()
-
-    setSettings(settingsData)
-
-    // Check extension toggles in parallel
-    const [bankingToggleRes, calendarToggleRes] = await Promise.all([
+    // Fetch settings and extension toggles in parallel
+    const [settingsRes, bankingToggleRes, calendarToggleRes] = await Promise.all([
+      supabase.from('company_settings').select('*').eq('user_id', user.id).single(),
       fetch('/api/extensions/toggles/general/enable-banking').catch(() => null),
       fetch('/api/extensions/toggles/general/calendar').catch(() => null),
     ])
+
+    setSettings(settingsRes.data)
 
     if (bankingToggleRes?.ok) {
       const { data } = await bankingToggleRes.json()
@@ -541,7 +539,11 @@ export default function SettingsPage() {
         {/* Banking settings — loaded dynamically from extension, hidden for sandbox */}
         {!settings?.is_sandbox && (
           <TabsContent value="banking" className="space-y-6">
-            {hasBankingExtension && BankingPanel ? (
+            {hasBankingExtension === null ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : hasBankingExtension && BankingPanel ? (
               <BankingPanel />
             ) : (
               <Card>

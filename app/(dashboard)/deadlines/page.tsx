@@ -23,40 +23,27 @@ export default function DeadlinesPage() {
     setIsLoading(true)
 
     try {
-      // Fetch deadlines with customer names
-      const { data: deadlinesData, error: deadlinesError } = await supabase
-        .from('deadlines')
-        .select('*, customer:customers(name)')
-        .order('due_date', { ascending: true })
-
-      if (deadlinesError) throw deadlinesError
-
-      // Fetch customers for the form
-      const { data: customersData, error: customersError } = await supabase
-        .from('customers')
-        .select('id, name')
-        .order('name', { ascending: true })
-
-      if (customersError) throw customersError
-
-      // Fetch overdue invoices summary
       const today = new Date().toISOString().split('T')[0]
-      const { data: overdueData, error: overdueError } = await supabase
-        .from('invoices')
-        .select('total_sek, total')
-        .in('status', ['sent', 'unpaid'])
-        .lt('due_date', today)
 
-      if (overdueError) throw overdueError
+      // Fetch all data in parallel
+      const [deadlinesRes, customersRes, overdueRes] = await Promise.all([
+        supabase.from('deadlines').select('*, customer:customers(name)').order('due_date', { ascending: true }),
+        supabase.from('customers').select('id, name').order('name', { ascending: true }),
+        supabase.from('invoices').select('total_sek, total').in('status', ['sent', 'unpaid']).lt('due_date', today),
+      ])
 
-      const overdueCount = overdueData?.length || 0
-      const overdueTotal = (overdueData || []).reduce(
+      if (deadlinesRes.error) throw deadlinesRes.error
+      if (customersRes.error) throw customersRes.error
+      if (overdueRes.error) throw overdueRes.error
+
+      const overdueCount = overdueRes.data?.length || 0
+      const overdueTotal = (overdueRes.data || []).reduce(
         (sum, inv) => sum + (inv.total_sek || inv.total || 0),
         0
       )
 
-      setDeadlines(deadlinesData || [])
-      setCustomers(customersData || [])
+      setDeadlines(deadlinesRes.data || [])
+      setCustomers(customersRes.data || [])
       setOverdueInvoices({ count: overdueCount, total: overdueTotal })
     } catch {
       toast({

@@ -18,8 +18,8 @@ interface ConfirmDeleteDialogProps {
 export default function ConfirmDeleteDialog({
   open,
   onOpenChange,
-  title = 'Bekrafta borttagning',
-  description = 'Ar du saker pa att du vill ta bort detta? Atgarden kan inte angras.',
+  title = 'Bekräfta borttagning',
+  description = 'Är du säker på att du vill ta bort detta? Åtgärden kan inte ångras.',
   onConfirm,
   isDeleting = false,
 }: ConfirmDeleteDialogProps) {
