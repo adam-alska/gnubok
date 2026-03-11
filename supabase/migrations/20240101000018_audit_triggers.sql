@@ -110,7 +110,4 @@ CREATE TRIGGER audit_company_settings
   AFTER INSERT OR UPDATE OR DELETE ON public.company_settings
   FOR EACH ROW EXECUTE FUNCTION public.write_audit_log();
 
--- tax_codes
-CREATE TRIGGER audit_tax_codes
-  AFTER INSERT OR UPDATE OR DELETE ON public.tax_codes
-  FOR EACH ROW EXECUTE FUNCTION public.write_audit_log();
+-- tax_codes trigger removed: table never created (migration 012 is a placeholder)
