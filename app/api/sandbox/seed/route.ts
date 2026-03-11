@@ -499,6 +499,7 @@ export async function POST() {
     if (dlError) throw dlError
 
     return NextResponse.json({ seeded: true })
+  } catch {
     return NextResponse.json(
       { error: 'Failed to seed sandbox data' },
       { status: 500 }
