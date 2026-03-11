@@ -40,9 +40,11 @@ export default function SandboxPage() {
       const res = await fetch('/api/sandbox/seed', { method: 'POST' })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
+        // Clean up the orphaned anonymous session so the user can retry cleanly
+        await supabase.auth.signOut()
         toast({
           title: 'Kunde inte skapa demodata',
-          description: body.detail || 'Försök igen om en stund.',
+          description: 'Försök igen om en stund.',
           variant: 'destructive',
         })
         setIsLoading(false)
