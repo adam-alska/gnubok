@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import DashboardNav from '@/components/dashboard/DashboardNav'
 import DashboardContent from '@/components/dashboard/DashboardContent'
+import { SandboxBanner } from '@/components/dashboard/SandboxBanner'
 import type { Deadline, ReceiptQueueSummary } from '@/types'
 
 export default async function RootPage() {
@@ -204,9 +205,12 @@ export default async function RootPage() {
     .eq('user_id', user.id)
     .eq('enabled', true)
 
+  const isSandbox = settings.is_sandbox === true
+
   return (
     <div className="min-h-screen bg-background">
-      <DashboardNav companyName={settings.company_name || 'Min verksamhet'} entityType={settings.entity_type || 'enskild_firma'} />
+      {isSandbox && <SandboxBanner />}
+      <DashboardNav companyName={settings.company_name || 'Min verksamhet'} entityType={settings.entity_type || 'enskild_firma'} isSandbox={isSandbox} />
       <main className="pb-20 md:pb-0 md:pl-64">
         <div className="container max-w-6xl mx-auto px-4 py-6">
           <DashboardContent

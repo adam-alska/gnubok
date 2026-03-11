@@ -31,6 +31,7 @@ interface DashboardNavProps {
   companyName: string
   entityType: EntityType
   uncategorizedTransactionCount?: number
+  isSandbox?: boolean
 }
 
 interface NavItem {
@@ -66,7 +67,7 @@ const groupLabels: Record<string, string> = {
   övrigt: 'Övrigt',
 }
 
-export default function DashboardNav({ companyName, entityType, uncategorizedTransactionCount = 0 }: DashboardNavProps) {
+export default function DashboardNav({ companyName, entityType, uncategorizedTransactionCount = 0, isSandbox = false }: DashboardNavProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -81,7 +82,7 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    router.push('/login')
+    router.push(isSandbox ? '/sandbox' : '/login')
   }
 
   const isActive = (href: string) => {
@@ -243,7 +244,7 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
               onClick={handleLogout}
             >
               <LogOut className="mr-2.5 h-[15px] w-[15px]" />
-              Logga ut
+              {isSandbox ? 'Avsluta sandbox' : 'Logga ut'}
             </Button>
           </div>
         </div>
@@ -424,7 +425,7 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                   }}
                 >
                   <LogOut className="mr-3 h-5 w-5" />
-                  Logga ut
+                  {isSandbox ? 'Avsluta sandbox' : 'Logga ut'}
                 </Button>
               </div>
             </div>
