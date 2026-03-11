@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -73,11 +73,16 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
   const supabase = createClient()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isClosing, setIsClosing] = useState(false)
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Auto-expand Övrigt when the user is on one of its pages, or when manually toggled
   const isOnOvrigtPage = ['/help', '/settings'].some(p => pathname.startsWith(p))
   const [manualOvrigtExpanded, setManualOvrigtExpanded] = useState(false)
   const isOvrigtExpanded = isOnOvrigtPage || manualOvrigtExpanded
   const openMobileMenu = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
     setIsClosing(false)
     setIsMobileMenuOpen(true)
   }
@@ -96,9 +101,10 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
 
   const closeMobileMenu = () => {
     setIsClosing(true)
-    setTimeout(() => {
+    closeTimerRef.current = setTimeout(() => {
       setIsMobileMenuOpen(false)
       setIsClosing(false)
+      closeTimerRef.current = null
     }, 200)
   }
 

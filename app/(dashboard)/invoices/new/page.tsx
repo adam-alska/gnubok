@@ -583,7 +583,14 @@ export default function NewInvoicePage() {
                               />
                             </div>
                           </div>
-                          {!isRateLocked && (
+                          {isRateLocked ? (
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Moms</Label>
+                              <p className="text-sm py-2">
+                                {availableRates.find(r => r.rate === (watchItems[index]?.vat_rate ?? 25))?.label ?? `${watchItems[index]?.vat_rate ?? 25}%`}
+                              </p>
+                            </div>
+                          ) : (
                             <div className="space-y-1">
                               <Label className="text-xs text-muted-foreground">Moms</Label>
                               <Controller
@@ -766,7 +773,7 @@ export default function NewInvoicePage() {
         </div>
 
         {/* Mobile sticky total bar */}
-        <div className="lg:hidden fixed bottom-16 left-0 right-0 z-40 bg-card/98 backdrop-blur-sm border-t border-border/40 px-5 py-3" style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}>
+        <div className="lg:hidden fixed left-0 right-0 z-40 bg-card/98 backdrop-blur-sm border-t border-border/40 px-5 py-3" style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}>
           <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
             <div>
               <p className="text-xs text-muted-foreground">Totalt</p>
