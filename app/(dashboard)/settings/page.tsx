@@ -262,9 +262,11 @@ export default function SettingsPage() {
           <TabsTrigger value="company">
             Företag
           </TabsTrigger>
-          <TabsTrigger value="banking">
-            Bank (PSD2)
-          </TabsTrigger>
+          {!settings?.is_sandbox && (
+            <TabsTrigger value="banking">
+              Bank (PSD2)
+            </TabsTrigger>
+          )}
           {hasCalendarExtension && (
             <TabsTrigger value="calendar">
               Kalender
@@ -501,28 +503,30 @@ export default function SettingsPage() {
           </form>
         </TabsContent>
 
-        {/* Banking settings — loaded dynamically from extension */}
-        <TabsContent value="banking" className="space-y-6">
-          {hasBankingExtension && BankingPanel ? (
-            <BankingPanel />
-          ) : (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <CreditCard className="h-10 w-10 text-muted-foreground/40 mb-4" />
-                <p className="font-medium mb-1">Bankintegration (PSD2) är inte aktiverad</p>
-                <p className="text-sm text-muted-foreground mb-4 max-w-md">
-                  Aktivera tillägget Enable Banking för att koppla ditt bankkonto och automatiskt hämta transaktioner.
-                </p>
-                <Button variant="outline" asChild>
-                  <Link href="/extensions">
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    Gå till Tillägg
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
+        {/* Banking settings — loaded dynamically from extension, hidden for sandbox */}
+        {!settings?.is_sandbox && (
+          <TabsContent value="banking" className="space-y-6">
+            {hasBankingExtension && BankingPanel ? (
+              <BankingPanel />
+            ) : (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                  <CreditCard className="h-10 w-10 text-muted-foreground/40 mb-4" />
+                  <p className="font-medium mb-1">Bankintegration (PSD2) är inte aktiverad</p>
+                  <p className="text-sm text-muted-foreground mb-4 max-w-md">
+                    Aktivera tillägget Enable Banking för att koppla ditt bankkonto och automatiskt hämta transaktioner.
+                  </p>
+                  <Button variant="outline" asChild>
+                    <Link href="/extensions">
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Gå till Tillägg
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        )}
 
         {/* Calendar feed settings */}
         {hasCalendarExtension && (
@@ -655,7 +659,7 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-destructive/50">
+          {!settings?.is_sandbox && <Card className="border-destructive/50">
             <CardHeader>
               <CardTitle className="text-destructive">Radera konto</CardTitle>
               <CardDescription>
@@ -693,7 +697,7 @@ export default function SettingsPage() {
                 </Button>
               </div>
             </CardContent>
-          </Card>
+          </Card>}
         </TabsContent>
       </Tabs>
 
