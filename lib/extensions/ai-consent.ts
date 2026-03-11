@@ -33,18 +33,18 @@ export const AI_DATA_DISCLOSURES: Record<AiExtensionId, {
 }> = {
   'receipt-ocr': {
     provider: 'Anthropic',
-    dataTypes: ['Kvittobilder', 'Extraherad text fran kvitton'],
-    purpose: 'Automatisk avlasning och kategorisering av kvitton',
+    dataTypes: ['Kvittobilder', 'Extraherad text från kvitton'],
+    purpose: 'Automatisk avläsning och kategorisering av kvitton',
   },
   'ai-categorization': {
     provider: 'Anthropic, OpenAI',
-    dataTypes: ['Transaktionsbeskrivningar', 'Belopp', 'Bokformallar'],
+    dataTypes: ['Transaktionsbeskrivningar', 'Belopp', 'Bokförmallar'],
     purpose: 'Automatisk kategorisering av banktransaktioner',
   },
   'ai-chat': {
     provider: 'Anthropic, OpenAI',
-    dataTypes: ['Chattmeddelanden', 'Bokforingsdata som refereras i chatten'],
-    purpose: 'AI-assistent for bokforingsfragor',
+    dataTypes: ['Chattmeddelanden', 'Bokföringsdata som refereras i chatten'],
+    purpose: 'AI-assistent för bokföringsfrågor',
   },
 }
 

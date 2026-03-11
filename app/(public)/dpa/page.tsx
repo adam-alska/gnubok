@@ -25,14 +25,14 @@ export default function DPAPage() {
           </CardHeader>
           <CardContent className="prose prose-sm max-w-none">
             <p>
-              Detta personuppgiftsbitradesavtal (&quot;DPA&quot;) ingar mellan:
+              Detta personuppgiftsbitradesavtal (&quot;DPA&quot;) ingår mellan:
             </p>
             <ul>
-              <li><strong>Personuppgiftsansvarig (&quot;den Ansvarige&quot;):</strong> Du som anvandare av Gnubok,
-                i egenskap av ansvarig for de personuppgifter du registrerar i tjansten
-                (kunder, leverantorer, anstallda m.fl.).</li>
-              <li><strong>Personuppgiftsbitrade (&quot;Bitradet&quot;):</strong> Arcim, som tillhandahaller
-                Gnubok-tjansten och behandlar personuppgifter pa dina vagar.</li>
+              <li><strong>Personuppgiftsansvarig (&quot;den Ansvarige&quot;):</strong> Du som användare av Gnubok,
+                i egenskap av ansvarig för de personuppgifter du registrerar i tjänsten
+                (kunder, leverantörer, anställda m.fl.).</li>
+              <li><strong>Personuppgiftsbiträde (&quot;Biträdet&quot;):</strong> Arcim, som tillhandahåller
+                Gnubok-tjänsten och behandlar personuppgifter på dina vägnar.</li>
             </ul>
           </CardContent>
         </Card>
@@ -42,10 +42,10 @@ export default function DPAPage() {
             <CardTitle>2. Behandlingens syfte och omfattning</CardTitle>
           </CardHeader>
           <CardContent className="prose prose-sm max-w-none">
-            <p>Bitradet behandlar personuppgifter for foljande andamal:</p>
+            <p>Biträdet behandlar personuppgifter för följande ändamål:</p>
             <ul>
-              <li>Tillhandahallande av bokforings- och redovisningstjanster</li>
-              <li>Lagring och arkivering av bokforingsmaterial</li>
+              <li>Tillhandahållande av bokförings- och redovisningstjänster</li>
+              <li>Lagring och arkivering av bokföringsmaterial</li>
               <li>Fakturering och betalningshantering</li>
               <li>Bankkontosynkronisering (PSD2)</li>
               <li>AI-assisterad kategorisering och kvittohantering (efter separat samtycke)</li>
@@ -53,92 +53,92 @@ export default function DPAPage() {
             <p>Kategorier av registrerade vars uppgifter behandlas:</p>
             <ul>
               <li>Den Ansvariges kunder (namn, kontaktuppgifter, organisationsnummer)</li>
-              <li>Den Ansvariges leverantorer (namn, kontaktuppgifter, bankuppgifter)</li>
-              <li>Den Ansvarige sjalv (kontouppgifter, foretagsinformation)</li>
+              <li>Den Ansvariges leverantörer (namn, kontaktuppgifter, bankuppgifter)</li>
+              <li>Den Ansvarige själv (kontouppgifter, företagsinformation)</li>
             </ul>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>3. Tekniska och organisatoriska atgarder</CardTitle>
+            <CardTitle>3. Tekniska och organisatoriska åtgärder</CardTitle>
           </CardHeader>
           <CardContent className="prose prose-sm max-w-none">
-            <p>Bitradet vidtar foljande atgarder for att skydda personuppgifterna:</p>
+            <p>Biträdet vidtar följande åtgärder för att skydda personuppgifterna:</p>
             <ul>
               <li><strong>Kryptering:</strong> All data krypteras i transit (TLS 1.3) och i vila (AES-256)</li>
-              <li><strong>Atkomstkontroll:</strong> Row Level Security (RLS) sakerstaller att varje anvandare
-                enbart kan komma at sina egna uppgifter</li>
-              <li><strong>Autentisering:</strong> Sakra inloggningsmetoder (magic link, inga losenord lagrade)</li>
-              <li><strong>Integritetskontroll:</strong> SHA-256 checksummor for alla dokument, med
+              <li><strong>Åtkomstkontroll:</strong> Row Level Security (RLS) säkerställer att varje användare
+                enbart kan komma åt sina egna uppgifter</li>
+              <li><strong>Autentisering:</strong> Säkra inloggningsmetoder (magic link, inga lösenord lagrade)</li>
+              <li><strong>Integritetskontroll:</strong> SHA-256 checksummor för alla dokument, med
                 regelbunden verifiering</li>
-              <li><strong>Revisionslogg:</strong> Alla andringshandelser loggas automatiskt av databasen
+              <li><strong>Revisionslogg:</strong> Alla ändringshandelser loggas automatiskt av databasen
                 (ej redigerbara)</li>
-              <li><strong>Oforanderlig bokforing:</strong> Bokforda verifikationer kan inte andras eller
-                raderas (databasutlosare)</li>
-              <li><strong>Sakerhetskopior:</strong> Kontinuerliga databaskopior med point-in-time-recovery</li>
-              <li><strong>EU-lagring:</strong> All primar datalagring sker i EU (eu-central-1)</li>
+              <li><strong>Oföränderlig bokföring:</strong> Bokförda verifikationer kan inte ändras eller
+                raderas (databasutlösare)</li>
+              <li><strong>Säkerhetskopior:</strong> Kontinuerliga databaskopior med point-in-time-recovery</li>
+              <li><strong>EU-lagring:</strong> All primär datalagring sker i EU (eu-central-1)</li>
             </ul>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>4. Underbitraden</CardTitle>
+            <CardTitle>4. Underbiträden</CardTitle>
           </CardHeader>
           <CardContent className="prose prose-sm max-w-none">
             <p>
-              Bitradet anvander underbitraden for att tillhandahalla tjansten. En fullstandig
-              forteckning over underbitraden, inklusive syfte och geografisk plats, finns i
-              var{' '}
+              Biträdet använder underbiträden för att tillhandahålla tjänsten. En fullständig
+              förteckning över underbiträden, inklusive syfte och geografisk plats, finns i
+              vår{' '}
               <Link href="/privacy" className="text-primary underline underline-offset-4">
                 integritetspolicy
               </Link>.
             </p>
             <p>
-              Bitradet kommer att informera den Ansvarige minst 30 dagar i forvag innan
-              en ny underbitrade anlitas, sa att den Ansvarige har mojlighet att invanda.
+              Biträdet kommer att informera den Ansvarige minst 30 dagar i förväg innan
+              en ny underbiträde anlitas, så att den Ansvarige har möjlighet att invända.
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>5. Dataintrangsnotifiering</CardTitle>
+            <CardTitle>5. Dataintrångsnotifiering</CardTitle>
           </CardHeader>
           <CardContent className="prose prose-sm max-w-none">
             <p>
-              Vid en personuppgiftsincident ska Bitradet utan ondodigt drojsmal, och senast
-              inom 72 timmar fran det att incidenten upptacktes, meddela den Ansvarige.
-              Meddelandet ska innehalla:
+              Vid en personuppgiftsincident ska Biträdet utan onödigt dröjsmål, och senast
+              inom 72 timmar från det att incidenten upptäcktes, meddela den Ansvarige.
+              Meddelandet ska innehålla:
             </p>
             <ul>
               <li>Typ av personuppgiftsincident</li>
-              <li>Kategorier och ungefirligt antal registrerade som berorts</li>
+              <li>Kategorier och ungefärligt antal registrerade som berörts</li>
               <li>Sannolika konsekvenser av incidenten</li>
-              <li>Atgarder som vidtagits eller foreslas for att hantera incidenten</li>
+              <li>Åtgärder som vidtagits eller föreslås för att hantera incidenten</li>
             </ul>
             <p>
-              Bitradet ska bistå den Ansvarige med den information som behovs for att den
-              Ansvarige ska kunna uppfylla sin anmalningsplikt till IMY (Integritetsskyddsmyndigheten).
+              Biträdet ska bistå den Ansvarige med den information som behövs för att den
+              Ansvarige ska kunna uppfylla sin anmälningsplikt till IMY (Integritetsskyddsmyndigheten).
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>6. Revisionsratt</CardTitle>
+            <CardTitle>6. Revisionsrätt</CardTitle>
           </CardHeader>
           <CardContent className="prose prose-sm max-w-none">
             <p>
-              Den Ansvarige har ratt att, direkt eller genom en oberoende revisor, utfora
-              revisioner och inspektioner for att sakerst alla att Bitradet uppfyller sina
-              atagarder enligt detta avtal. Bitradet ska tillhandahalla all nodvandig
+              Den Ansvarige har rätt att, direkt eller genom en oberoende revisor, utföra
+              revisioner och inspektioner för att säkerställa att Biträdet uppfyller sina
+              åtaganden enligt detta avtal. Biträdet ska tillhandahålla all nödvändig
               information och medverka till revisioner.
             </p>
             <p>
               Revisioner ska ske med rimligt varsel (minst 30 dagar) och under ordinarie
-              kontorstider. Bitradet kan erbjuda alternativ i form av tredjepartsgranskningar
+              kontorstider. Biträdet kan erbjuda alternativ i form av tredjepartsgranskningar
               eller certifieringar.
             </p>
           </CardContent>
@@ -150,22 +150,22 @@ export default function DPAPage() {
           </CardHeader>
           <CardContent className="prose prose-sm max-w-none">
             <p>
-              Vid uppsagning av tjansten ska Bitradet, enligt den Ansvariges val:
+              Vid uppsägning av tjänsten ska Biträdet, enligt den Ansvariges val:
             </p>
             <ul>
               <li>
-                <strong>Aterlamna:</strong> Exportera alla personuppgifter i maskinlasbart format
-                (SIE4, JSON, CSV) via tjansens exportfunktioner.
+                <strong>Återlämna:</strong> Exportera alla personuppgifter i maskinläsbart format
+                (SIE4, JSON, CSV) via tjänstens exportfunktioner.
               </li>
               <li>
-                <strong>Radera:</strong> Radera alla personuppgifter inom 30 dagar fran
-                anvandarens begaran, med undantag for uppgifter som maste bevaras enligt lag.
+                <strong>Radera:</strong> Radera alla personuppgifter inom 30 dagar från
+                användarens begäran, med undantag för uppgifter som måste bevaras enligt lag.
               </li>
             </ul>
             <p>
-              <strong>Undantag:</strong> Bokforingsmaterial som omfattas av Bokforingslagen (BFL)
-              7 kap. 2 § (7 ars arkiveringskrav) raderas forst nar lagringsfristen lopt ut.
-              Under denna period ar materialet skyddat mot obehorig atkomst och andring.
+              <strong>Undantag:</strong> Bokföringsmaterial som omfattas av Bokföringslagen (BFL)
+              7 kap. 2 § (7 års arkiveringskrav) raderas först när lagringsfristen löpt ut.
+              Under denna period är materialet skyddat mot obehörig åtkomst och ändring.
             </p>
           </CardContent>
         </Card>
@@ -173,9 +173,9 @@ export default function DPAPage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground text-center">
-              Detta personuppgiftsbitradesavtal trader i kraft nar du skapar ett konto pa
-              Gnubok och galler sa lange du anvander tjansten. For fragor, kontakta oss
-              pa privacy@gnubok.se.
+              Detta personuppgiftsbitradesavtal träder i kraft när du skapar ett konto på
+              Gnubok och gäller så länge du använder tjänsten. För frågor, kontakta oss
+              på privacy@gnubok.se.
             </p>
           </CardContent>
         </Card>

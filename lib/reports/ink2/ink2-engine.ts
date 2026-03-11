@@ -322,9 +322,6 @@ export async function generateINK2Declaration(
   const totalAssets = rutor['7201'] + rutor['7202'] + rutor['7203'] +
     rutor['7210'] + rutor['7211'] + rutor['7212']
 
-  const totalEquityLiabilities = rutor['7220'] + rutor['7221'] + rutor['7222'] +
-    rutor['7230'] + rutor['7231']
-
   // Operating result = revenue - operating costs
   const operatingResult = rutor['7310'] -
     rutor['7320'] - rutor['7330'] - rutor['7340'] -
@@ -332,6 +329,23 @@ export async function generateINK2Declaration(
 
   // Result after financial items
   const resultAfterFinancial = operatingResult + rutor['7370'] + rutor['7380']
+
+  // Årets resultat (7222): During an open fiscal year, account 2099 has no balance —
+  // the profit only exists as the net of income statement accounts (class 3-8).
+  // After year-end closing, 2099 has the balance and income accounts are zeroed.
+  // Adding resultAfterFinancial handles both cases correctly (0 + profit, or profit + 0).
+  rutor['7222'] += roundToKrona(resultAfterFinancial)
+  breakdown['7222'].total = rutor['7222']
+  if (resultAfterFinancial !== 0) {
+    breakdown['7222'].accounts.push({
+      accountNumber: 'calc',
+      accountName: 'Beräknat resultat från resultaträkningen',
+      amount: roundToKrona(resultAfterFinancial),
+    })
+  }
+
+  const totalEquityLiabilities = rutor['7220'] + rutor['7221'] + rutor['7222'] +
+    rutor['7230'] + rutor['7231']
 
   // Add warnings
   if (!(period as FiscalPeriod).is_closed) {

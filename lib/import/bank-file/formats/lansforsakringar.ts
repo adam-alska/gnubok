@@ -27,10 +27,18 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
  * Check if a line has the Länsförsäkringar structure:
  * two adjacent YYYY-MM-DD date fields in a semicolon-delimited, quoted row.
  */
+// Matches Swedish-format numbers like "-1 234,56", "1234,50", "-500,00"
+const COMMA_NUMBER_RE = /^-?[\d\s]+,\d{1,2}$/
+
 function isLFRow(line: string): boolean {
   if (!line.includes(';')) return false
-  const fields = parseCSVLine(line, ';').map((f) => f.trim())
-  return fields.length >= 5 && DATE_RE.test(fields[0]) && DATE_RE.test(fields[1])
+  const fields = parseCSVLine(line, ';').map((f) => f.trim().replace(/^"|"$/g, ''))
+  return (
+    fields.length >= 5 &&
+    DATE_RE.test(fields[0]) &&
+    DATE_RE.test(fields[1]) &&
+    COMMA_NUMBER_RE.test(fields[4].trim())
+  )
 }
 
 /**

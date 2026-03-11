@@ -51,7 +51,7 @@ export default function ImportResultStep({ result, onNewImport }: ImportResultSt
 
       {/* Statistics */}
       {result.success && (
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -183,21 +183,21 @@ export default function ImportResultStep({ result, onNewImport }: ImportResultSt
       )}
 
       {/* Actions */}
-      <div className="flex justify-between">
-        <Button variant="outline" onClick={onNewImport}>
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+        <Button variant="outline" className="min-h-11" onClick={onNewImport}>
           <RotateCcw className="mr-2 h-4 w-4" />
           Ny import
         </Button>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           {result.success && (
             <>
-              <Button variant="outline" asChild>
+              <Button variant="outline" className="min-h-11" asChild>
                 <Link href="/bookkeeping">
                   Visa bokföring
                   <ExternalLink className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
-              <Button asChild>
+              <Button className="min-h-11" asChild>
                 <Link href="/reports">
                   Visa rapporter
                   <ExternalLink className="ml-2 h-4 w-4" />

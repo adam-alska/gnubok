@@ -9,7 +9,7 @@
 export type SIEType = 1 | 2 | 3 | 4
 
 // Encoding types supported by SIE files
-export type SIEEncoding = 'cp437' | 'utf8'
+export type SIEEncoding = 'cp437' | 'utf8' | 'windows1252'
 
 // Import status
 export type SIEImportStatus = 'pending' | 'mapped' | 'completed' | 'failed'

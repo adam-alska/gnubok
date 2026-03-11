@@ -602,7 +602,7 @@ export const CLASS_2_ACCOUNTS: BASReferenceAccount[] = [
     account_group: '20',
     account_type: 'equity',
     normal_balance: 'credit',
-    description: 'Foregaende ars resultat innan det fordelats till balanserat resultat eller utdelning.',
+    description: 'Föregående års resultat innan det fördelats till balanserat resultat eller utdelning.',
     sru_code: '7221',
     k2_excluded: false,
   },

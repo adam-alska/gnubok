@@ -73,7 +73,7 @@ describe('description-analyzer', () => {
         vatTreatment: 'standard_25',
         category: 'income_services',
         confidence: 0.9,
-        reasoning: 'Konsultarvode bokfors som tjansteintakt.',
+        reasoning: 'Konsultarvode bokförs som tjänsteintäkt.',
         warnings: [],
         templateId: null,
       })

@@ -34,6 +34,18 @@ export function parseGenericCSV(
       f.trim().replace(/^"|"$/g, '')
     )
 
+    // Validate required column indices are within bounds
+    const maxRequired = Math.max(mapping.date, mapping.description, mapping.amount)
+    if (maxRequired >= fields.length) {
+      issues.push({
+        row: i + 1,
+        message: `Row has ${fields.length} columns but mapping requires column ${maxRequired + 1}`,
+        severity: 'warning',
+      })
+      skippedRows++
+      continue
+    }
+
     const dateStr = fields[mapping.date]
     const description = fields[mapping.description] || 'Unknown'
     const amountStr = fields[mapping.amount]

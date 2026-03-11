@@ -204,7 +204,7 @@ export default function AccountMappingStep({
           </div>
 
           {/* Mapping table */}
-          <div className="border rounded-lg overflow-hidden">
+          <div className="border rounded-lg overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -317,11 +317,11 @@ export default function AccountMappingStep({
       </Card>
 
       {/* Actions */}
-      <div className="flex justify-between">
-        <Button variant="outline" onClick={onBack}>
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+        <Button variant="outline" className="min-h-11" onClick={onBack}>
           Tillbaka
         </Button>
-        <Button onClick={onContinue} disabled={!canContinue}>
+        <Button className="min-h-11" onClick={onContinue} disabled={!canContinue}>
           {canContinue ? 'Fortsätt till granskning' : `${stats.unmapped} konton saknar mappning`}
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>

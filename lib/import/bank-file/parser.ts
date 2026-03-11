@@ -8,6 +8,7 @@
 import * as crypto from 'crypto'
 import type { BankFileFormat, BankFileFormatId, BankFileParseResult, ParsedBankTransaction } from './types'
 import { nordeaFormat } from './formats/nordea'
+import { nordeaBusinessFormat } from './formats/nordea-business'
 import { sebFormat } from './formats/seb'
 import { swedbankFormat } from './formats/swedbank'
 import { handelsbankenFormat } from './formats/handelsbanken'
@@ -27,6 +28,7 @@ import { genericCSVFormat } from './formats/generic-csv'
 const FORMATS: BankFileFormat[] = [
   camt053Format,
   nordeaFormat,
+  nordeaBusinessFormat,
   sebFormat,
   swedbankFormat,
   handelsbankenFormat,

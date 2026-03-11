@@ -248,7 +248,7 @@ export default function BankFileColumnMappingStep({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="rounded-md border max-h-64 overflow-y-auto">
+            <div className="rounded-md border max-h-64 overflow-x-auto overflow-y-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -286,12 +286,12 @@ export default function BankFileColumnMappingStep({
       )}
 
       {/* Navigation */}
-      <div className="flex justify-between">
-        <Button variant="outline" onClick={onBack}>
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+        <Button variant="outline" className="min-h-11" onClick={onBack}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Tillbaka
         </Button>
-        <Button onClick={handleConfirm} disabled={!isValid}>
+        <Button className="min-h-11" onClick={handleConfirm} disabled={!isValid}>
           Fortsätt
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>

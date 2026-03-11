@@ -35,11 +35,11 @@ describe('validateSwedishPersonalNumber', () => {
   })
 
   it('rejects invalid month', () => {
-    expect(validateSwedishPersonalNumber('199913011234')).toBe('Ogiltig manad')
+    expect(validateSwedishPersonalNumber('199913011234')).toBe('Ogiltig månad')
   })
 
   it('rejects month 00', () => {
-    expect(validateSwedishPersonalNumber('199900011234')).toBe('Ogiltig manad')
+    expect(validateSwedishPersonalNumber('199900011234')).toBe('Ogiltig månad')
   })
 
   it('rejects invalid day', () => {
@@ -51,12 +51,12 @@ describe('validateSwedishPersonalNumber', () => {
   })
 
   it('rejects year before 1900', () => {
-    expect(validateSwedishPersonalNumber('189901011234')).toBe('Ogiltigt ar')
+    expect(validateSwedishPersonalNumber('189901011234')).toBe('Ogiltigt år')
   })
 
   it('rejects future year', () => {
     const futureYear = new Date().getFullYear() + 1
-    expect(validateSwedishPersonalNumber(`${futureYear}01011234`)).toBe('Ogiltigt ar')
+    expect(validateSwedishPersonalNumber(`${futureYear}01011234`)).toBe('Ogiltigt år')
   })
 
   it('rejects invalid Luhn checksum', () => {
