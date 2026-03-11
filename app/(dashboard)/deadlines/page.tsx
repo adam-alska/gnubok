@@ -190,9 +190,35 @@ export default function DeadlinesPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Deadlines</h1>
         </div>
-        <div className="animate-pulse">
-          <div className="h-10 bg-muted rounded w-48 mb-4" />
-          <div className="h-96 bg-muted rounded" />
+        {/* Overdue alert skeleton */}
+        <div className="rounded-lg border p-4 animate-pulse">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-5 w-5 bg-muted rounded" />
+              <div className="space-y-1">
+                <div className="h-4 bg-muted rounded w-32" />
+                <div className="h-3 bg-muted rounded w-24" />
+              </div>
+            </div>
+            <div className="h-5 bg-muted rounded w-8" />
+          </div>
+        </div>
+        {/* Deadline list skeleton */}
+        <div className="space-y-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="rounded-lg border p-4 animate-pulse">
+              <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                  <div className="h-4 bg-muted rounded w-48" />
+                  <div className="h-3 bg-muted rounded w-32" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-5 bg-muted rounded w-16" />
+                  <div className="h-8 bg-muted rounded w-8" />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     )

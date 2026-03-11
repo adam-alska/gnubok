@@ -287,7 +287,7 @@ export default function NewSupplierInvoicePage() {
             <CardTitle className="text-lg">Datum</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Fakturadatum *</Label>
                 <Input type="date" {...register('invoice_date')} />
@@ -383,21 +383,97 @@ export default function NewSupplierInvoicePage() {
             </Button>
           </CardHeader>
           <CardContent>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="pb-2 w-28">Konto</th>
-                  <th className="pb-2">Beskrivning</th>
-                  <th className="pb-2 w-32">Belopp (exkl.)</th>
-                  <th className="pb-2 w-24">Momssats</th>
-                  <th className="pb-2 w-24 text-right">Moms</th>
-                  <th className="pb-2 w-8"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {fields.map((field, index) => (
-                  <tr key={field.id} className="border-b last:border-0 align-top">
-                    <td className="py-2 pr-2">
+            {/* Desktop table */}
+            <div className="hidden sm:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="pb-2 w-28">Konto</th>
+                    <th className="pb-2">Beskrivning</th>
+                    <th className="pb-2 w-32">Belopp (exkl.)</th>
+                    <th className="pb-2 w-24">Momssats</th>
+                    <th className="pb-2 w-24 text-right">Moms</th>
+                    <th className="pb-2 w-8"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fields.map((field, index) => (
+                    <tr key={field.id} className="border-b last:border-0 align-top">
+                      <td className="py-2 pr-2">
+                        <Controller
+                          name={`items.${index}.account_number`}
+                          control={control}
+                          render={({ field: f }) => (
+                            <AccountCombobox
+                              value={f.value}
+                              accounts={accounts}
+                              onChange={(val) => handleAccountChange(index, val)}
+                            />
+                          )}
+                        />
+                      </td>
+                      <td className="py-2 pr-2">
+                        <Input
+                          placeholder="Beskrivning"
+                          {...register(`items.${index}.description`)}
+                        />
+                      </td>
+                      <td className="py-2 pr-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="0,00"
+                          {...register(`items.${index}.amount`, { valueAsNumber: true })}
+                        />
+                      </td>
+                      <td className="py-2 pr-2">
+                        <Controller
+                          name={`items.${index}.vat_rate`}
+                          control={control}
+                          render={({ field: f }) => (
+                            <Select
+                              value={String(f.value)}
+                              onValueChange={(v) => f.onChange(parseFloat(v))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="0.25">25%</SelectItem>
+                                <SelectItem value="0.12">12%</SelectItem>
+                                <SelectItem value="0.06">6%</SelectItem>
+                                <SelectItem value="0">0%</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                      </td>
+                      <td className="py-2 pr-2 text-right font-mono pt-4">
+                        {formatAmount(itemTotals[index]?.vatAmount || 0)}
+                      </td>
+                      <td className="py-2 pt-3">
+                        {fields.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => remove(index)}
+                          >
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* Mobile cards */}
+            <div className="sm:hidden space-y-4">
+              {fields.map((field, index) => (
+                <div key={field.id} className="border rounded-lg p-3 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
                       <Controller
                         name={`items.${index}.account_number`}
                         control={control}
@@ -409,22 +485,35 @@ export default function NewSupplierInvoicePage() {
                           />
                         )}
                       />
-                    </td>
-                    <td className="py-2 pr-2">
-                      <Input
-                        placeholder="Beskrivning"
-                        {...register(`items.${index}.description`)}
-                      />
-                    </td>
-                    <td className="py-2 pr-2">
+                    </div>
+                    {fields.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0"
+                        onClick={() => remove(index)}
+                      >
+                        <Trash2 className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    )}
+                  </div>
+                  <Input
+                    placeholder="Beskrivning"
+                    {...register(`items.${index}.description`)}
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Belopp (exkl.)</label>
                       <Input
                         type="number"
                         step="0.01"
                         placeholder="0,00"
                         {...register(`items.${index}.amount`, { valueAsNumber: true })}
                       />
-                    </td>
-                    <td className="py-2 pr-2">
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Momssats</label>
                       <Controller
                         name={`items.${index}.vat_rate`}
                         control={control}
@@ -445,26 +534,14 @@ export default function NewSupplierInvoicePage() {
                           </Select>
                         )}
                       />
-                    </td>
-                    <td className="py-2 pr-2 text-right font-mono pt-4">
-                      {formatAmount(itemTotals[index]?.vatAmount || 0)}
-                    </td>
-                    <td className="py-2 pt-3">
-                      {fields.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => remove(index)}
-                        >
-                          <Trash2 className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  </div>
+                  <div className="text-right text-sm text-muted-foreground">
+                    Moms: <span className="font-mono">{formatAmount(itemTotals[index]?.vatAmount || 0)} kr</span>
+                  </div>
+                </div>
+              ))}
+            </div>
 
             {/* Totals */}
             <div className="mt-4 pt-4 border-t space-y-2 text-right">

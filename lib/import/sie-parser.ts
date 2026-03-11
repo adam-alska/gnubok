@@ -146,8 +146,9 @@ function parseStringField(field: string): string {
  */
 function parseNumberField(field: string): number {
   if (!field) return 0
-  // SIE uses dot as decimal separator
-  return parseFloat(field.replace(',', '.')) || 0
+  // Strip quotes and use dot as decimal separator
+  const cleaned = parseStringField(field)
+  return parseFloat(cleaned.replace(',', '.')) || 0
 }
 
 /**
@@ -434,12 +435,13 @@ export function parseSIEFile(content: string): ParsedSIEFile {
 
         case 'VER': {
           // #VER series number date "description" [regdate] [signature]
+          // Some programs quote all fields, so strip quotes from number/date too
           const series = parseStringField(fields[1])
-          const number = parseInt(fields[2], 10)
-          const date = parseSIEDate(fields[3])
+          const number = parseInt(parseStringField(fields[2]), 10)
+          const date = parseSIEDate(parseStringField(fields[3]))
           const description = parseStringField(fields[4])
 
-          if (series && !isNaN(number) && date) {
+          if (!isNaN(number) && date) {
             currentVoucher = {
               series,
               number,
@@ -450,7 +452,7 @@ export function parseSIEFile(content: string): ParsedSIEFile {
 
             // Optional registration date and signature
             if (fields[5]) {
-              currentVoucher.registrationDate = parseSIEDate(fields[5]) || undefined
+              currentVoucher.registrationDate = parseSIEDate(parseStringField(fields[5])) || undefined
             }
             if (fields[6]) {
               currentVoucher.signature = parseStringField(fields[6])
@@ -470,7 +472,7 @@ export function parseSIEFile(content: string): ParsedSIEFile {
 
           // Parse account and skip object list (in braces)
           let fieldIndex = 1
-          const account = fields[fieldIndex++]
+          const account = parseStringField(fields[fieldIndex++])
 
           // Skip object list if present (now a single field thanks to brace-aware splitting)
           if (fields[fieldIndex]?.startsWith('{')) {
@@ -486,7 +488,7 @@ export function parseSIEFile(content: string): ParsedSIEFile {
 
           // Optional fields
           if (fields[fieldIndex]) {
-            transLine.date = parseSIEDate(fields[fieldIndex++]) || undefined
+            transLine.date = parseSIEDate(parseStringField(fields[fieldIndex++])) || undefined
           }
           if (fields[fieldIndex]) {
             transLine.description = parseStringField(fields[fieldIndex++])

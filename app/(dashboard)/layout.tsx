@@ -18,23 +18,24 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
-  const { data: settings } = await supabase
-    .from('company_settings')
-    .select('company_name, onboarding_complete, entity_type, is_sandbox')
-    .eq('user_id', user.id)
-    .single()
+  const [{ data: settings }, { count: uncategorizedCount }] = await Promise.all([
+    supabase
+      .from('company_settings')
+      .select('company_name, onboarding_complete, entity_type, is_sandbox')
+      .eq('user_id', user.id)
+      .single(),
+    supabase
+      .from('transactions')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .is('is_business', null),
+  ])
 
   if (!settings?.onboarding_complete) {
     redirect('/onboarding')
   }
 
   const entityType = (settings.entity_type as EntityType) || 'enskild_firma'
-
-  const { count: uncategorizedCount } = await supabase
-    .from('transactions')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-    .is('is_business', null)
 
   const isSandbox = settings.is_sandbox === true
 
@@ -54,7 +55,7 @@ export default async function DashboardLayout({
         uncategorizedTransactionCount={uncategorizedCount ?? 0}
         isSandbox={isSandbox}
       />
-      <main id="main-content" className="pb-20 md:pb-0 md:pl-[232px]" role="main">
+      <main id="main-content" className="safe-area-main-padding md:!pb-0 md:pl-[232px]" role="main">
         <div className="max-w-5xl mx-auto px-5 py-8 md:px-8 md:py-10">
           {children}
         </div>

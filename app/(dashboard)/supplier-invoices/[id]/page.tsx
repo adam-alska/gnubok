@@ -165,28 +165,28 @@ export default function SupplierInvoiceDetailPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/supplier-invoices')}>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+          <Button variant="ghost" size="icon" className="shrink-0" onClick={() => router.push('/supplier-invoices')}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
                 Ankomst #{invoice.arrival_number}
               </h1>
               <Badge className={statusColors[invoice.status] || ''}>
                 {statusLabels[invoice.status] || invoice.status}
               </Badge>
             </div>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-sm sm:text-base truncate">
               {invoice.supplier?.name} | Faktura {invoice.supplier_invoice_number}
             </p>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {invoice.status === 'registered' && (
             <>
               <Button onClick={handleApprove} disabled={isProcessing}>
@@ -311,34 +311,53 @@ export default function SupplierInvoiceDetailPage() {
           <CardTitle className="text-lg">Rader</CardTitle>
         </CardHeader>
         <CardContent>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-muted-foreground">
-                <th className="pb-2">Beskrivning</th>
-                <th className="pb-2 w-16 text-right">Antal</th>
-                <th className="pb-2 w-16">Enhet</th>
-                <th className="pb-2 w-28 text-right">À-pris</th>
-                <th className="pb-2 w-20">Konto</th>
-                <th className="pb-2 w-16 text-right">Moms%</th>
-                <th className="pb-2 w-28 text-right">Belopp</th>
-                <th className="pb-2 w-24 text-right">Moms</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id} className="border-b last:border-0">
-                  <td className="py-2">{item.description}</td>
-                  <td className="py-2 text-right">{item.quantity}</td>
-                  <td className="py-2">{item.unit}</td>
-                  <td className="py-2 text-right font-mono">{formatAmount(item.unit_price)}</td>
-                  <td className="py-2"><AccountNumber number={item.account_number} /></td>
-                  <td className="py-2 text-right">{Math.round(item.vat_rate * 100)}%</td>
-                  <td className="py-2 text-right font-mono">{formatAmount(item.line_total)}</td>
-                  <td className="py-2 text-right font-mono">{formatAmount(item.vat_amount)}</td>
+          {/* Desktop table */}
+          <div className="hidden sm:block">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-muted-foreground">
+                  <th className="pb-2">Beskrivning</th>
+                  <th className="pb-2 w-16 text-right">Antal</th>
+                  <th className="pb-2 w-16">Enhet</th>
+                  <th className="pb-2 w-28 text-right">À-pris</th>
+                  <th className="pb-2 w-20">Konto</th>
+                  <th className="pb-2 w-16 text-right">Moms%</th>
+                  <th className="pb-2 w-28 text-right">Belopp</th>
+                  <th className="pb-2 w-24 text-right">Moms</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr key={item.id} className="border-b last:border-0">
+                    <td className="py-2">{item.description}</td>
+                    <td className="py-2 text-right">{item.quantity}</td>
+                    <td className="py-2">{item.unit}</td>
+                    <td className="py-2 text-right font-mono">{formatAmount(item.unit_price)}</td>
+                    <td className="py-2"><AccountNumber number={item.account_number} /></td>
+                    <td className="py-2 text-right">{Math.round(item.vat_rate * 100)}%</td>
+                    <td className="py-2 text-right font-mono">{formatAmount(item.line_total)}</td>
+                    <td className="py-2 text-right font-mono">{formatAmount(item.vat_amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {/* Mobile cards */}
+          <div className="sm:hidden space-y-3">
+            {items.map((item) => (
+              <div key={item.id} className="border rounded-lg p-3 space-y-1.5">
+                <div className="font-medium text-sm">{item.description}</div>
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>{item.quantity} {item.unit} × {formatAmount(item.unit_price)}</span>
+                  <span className="font-mono">{formatAmount(item.line_total)} kr</span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span><AccountNumber number={item.account_number} /> · {Math.round(item.vat_rate * 100)}% moms</span>
+                  <span className="font-mono">moms {formatAmount(item.vat_amount)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
@@ -349,32 +368,54 @@ export default function SupplierInvoiceDetailPage() {
             <CardTitle className="text-lg">Betalningshistorik</CardTitle>
           </CardHeader>
           <CardContent>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="pb-2">Datum</th>
-                  <th className="pb-2 text-right">Belopp</th>
-                  <th className="pb-2">Verifikation</th>
-                  <th className="pb-2">Anteckning</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payments.map((p) => (
-                  <tr key={p.id} className="border-b last:border-0">
-                    <td className="py-2">{p.payment_date}</td>
-                    <td className="py-2 text-right font-mono">{formatAmount(p.amount)} {p.currency}</td>
-                    <td className="py-2">
-                      {p.journal_entry_id ? (
-                        <Link href={`/bookkeeping?entry=${p.journal_entry_id}`} className="text-primary hover:underline font-mono text-xs">
-                          {p.journal_entry_id.substring(0, 8)}...
-                        </Link>
-                      ) : '-'}
-                    </td>
-                    <td className="py-2 text-muted-foreground">{p.notes || '-'}</td>
+            {/* Desktop table */}
+            <div className="hidden sm:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="pb-2">Datum</th>
+                    <th className="pb-2 text-right">Belopp</th>
+                    <th className="pb-2">Verifikation</th>
+                    <th className="pb-2">Anteckning</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {payments.map((p) => (
+                    <tr key={p.id} className="border-b last:border-0">
+                      <td className="py-2">{p.payment_date}</td>
+                      <td className="py-2 text-right font-mono">{formatAmount(p.amount)} {p.currency}</td>
+                      <td className="py-2">
+                        {p.journal_entry_id ? (
+                          <Link href={`/bookkeeping?entry=${p.journal_entry_id}`} className="text-primary hover:underline font-mono text-xs">
+                            {p.journal_entry_id.substring(0, 8)}...
+                          </Link>
+                        ) : '-'}
+                      </td>
+                      <td className="py-2 text-muted-foreground">{p.notes || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* Mobile cards */}
+            <div className="sm:hidden space-y-3">
+              {payments.map((p) => (
+                <div key={p.id} className="border rounded-lg p-3 space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span>{p.payment_date}</span>
+                    <span className="font-mono font-medium">{formatAmount(p.amount)} {p.currency}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    {p.journal_entry_id ? (
+                      <Link href={`/bookkeeping?entry=${p.journal_entry_id}`} className="text-primary hover:underline font-mono">
+                        {p.journal_entry_id.substring(0, 8)}...
+                      </Link>
+                    ) : <span>-</span>}
+                    <span>{p.notes || ''}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}

@@ -148,7 +148,7 @@ export function DeadlineForm({
           </div>
 
           {/* Date and Time */}
-          <div className="grid gap-4 grid-cols-2">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="due_date">Datum *</Label>
               <Input
@@ -171,7 +171,7 @@ export function DeadlineForm({
           </div>
 
           {/* Type and Priority */}
-          <div className="grid gap-4 grid-cols-2">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Typ *</Label>
               <Select
@@ -215,14 +215,14 @@ export function DeadlineForm({
             <div className="space-y-2">
               <Label>Kund (valfritt)</Label>
               <Select
-                value={formData.customer_id}
-                onValueChange={(v) => updateField('customer_id', v)}
+                value={formData.customer_id || 'none'}
+                onValueChange={(v) => updateField('customer_id', v === 'none' ? '' : v)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Välj kund..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Ingen kund</SelectItem>
+                  <SelectItem value="none">Ingen kund</SelectItem>
                   {customers.map((customer) => (
                     <SelectItem key={customer.id} value={customer.id}>
                       {customer.name}

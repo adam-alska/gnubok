@@ -162,7 +162,7 @@ export default function TransactionHistoryList({
                       <Button
                         size="sm"
                         variant="default"
-                        className="h-7 text-xs"
+                        className="h-7 min-h-[44px] text-xs"
                         onClick={() => onOpenCategoryDialog(transaction)}
                       >
                         Bokför

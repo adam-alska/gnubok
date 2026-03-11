@@ -106,6 +106,52 @@ const SIE_WITH_OBJECT_LIST = [
   '}',
 ].join('\n')
 
+// SIE file where all VER/TRANS fields are quoted (common from some accounting programs)
+const SIE_QUOTED_FIELDS = [
+  '#FLAGGA 0',
+  '#SIETYP 4',
+  '#FNAMN "Quoted AB"',
+  '#RAR 0 20240101 20241231',
+  '#KONTO 1510 "Kundfordringar"',
+  '#KONTO 3001 "Försäljning"',
+  '#KONTO 2611 "Utgående moms 25%"',
+  '#VER "A" "1" "20240115" "Faktura 1001"',
+  '{',
+  '#TRANS "1510" {} "12500.00"',
+  '#TRANS "3001" {} "-10000.00"',
+  '#TRANS "2611" {} "-2500.00"',
+  '}',
+].join('\n')
+
+// SIE file with empty series (some programs use "" for series)
+const SIE_EMPTY_SERIES = [
+  '#FLAGGA 0',
+  '#SIETYP 4',
+  '#FNAMN "Empty Series AB"',
+  '#RAR 0 20240101 20241231',
+  '#KONTO 1930 "Företagskonto"',
+  '#KONTO 3001 "Försäljning"',
+  '#VER "" 1 20240115 "No series"',
+  '{',
+  '#TRANS 1930 {} 10000.00',
+  '#TRANS 3001 {} -10000.00',
+  '}',
+].join('\n')
+
+// SIE file with { on same line as #VER
+const SIE_BRACE_ON_VER_LINE = [
+  '#FLAGGA 0',
+  '#SIETYP 4',
+  '#FNAMN "Brace AB"',
+  '#RAR 0 20240101 20241231',
+  '#KONTO 1930 "Företagskonto"',
+  '#KONTO 3001 "Försäljning"',
+  '#VER A 1 20240115 "Inline brace" {',
+  '#TRANS 1930 {} 10000.00',
+  '#TRANS 3001 {} -10000.00',
+  '}',
+].join('\n')
+
 // --- parseSIEFile tests ---
 
 describe('parseSIEFile', () => {
@@ -230,6 +276,50 @@ describe('parseSIEFile', () => {
       expect(v.lines).toHaveLength(2)
       expect(v.lines[0]).toMatchObject({ account: '5010', amount: 15000 })
       expect(v.lines[1]).toMatchObject({ account: '1930', amount: -15000 })
+    })
+
+    it('parses quoted VER fields (series, number, date)', () => {
+      const result = parseSIEFile(SIE_QUOTED_FIELDS)
+      expect(result.vouchers).toHaveLength(1)
+
+      const v = result.vouchers[0]
+      expect(v.series).toBe('A')
+      expect(v.number).toBe(1)
+      expect(v.date).toEqual(new Date(2024, 0, 15))
+      expect(v.description).toBe('Faktura 1001')
+      expect(v.lines).toHaveLength(3)
+      expect(v.lines[0]).toMatchObject({ account: '1510', amount: 12500 })
+      expect(v.lines[1]).toMatchObject({ account: '3001', amount: -10000 })
+      expect(v.lines[2]).toMatchObject({ account: '2611', amount: -2500 })
+
+      const errors = result.issues.filter((i) => i.severity === 'error')
+      expect(errors).toHaveLength(0)
+    })
+
+    it('allows empty series in VER', () => {
+      const result = parseSIEFile(SIE_EMPTY_SERIES)
+      expect(result.vouchers).toHaveLength(1)
+
+      const v = result.vouchers[0]
+      expect(v.series).toBe('')
+      expect(v.number).toBe(1)
+      expect(v.lines).toHaveLength(2)
+
+      const errors = result.issues.filter((i) => i.severity === 'error')
+      expect(errors).toHaveLength(0)
+    })
+
+    it('handles { on same line as #VER', () => {
+      const result = parseSIEFile(SIE_BRACE_ON_VER_LINE)
+      expect(result.vouchers).toHaveLength(1)
+
+      const v = result.vouchers[0]
+      expect(v.series).toBe('A')
+      expect(v.number).toBe(1)
+      expect(v.lines).toHaveLength(2)
+
+      const errors = result.issues.filter((i) => i.severity === 'error')
+      expect(errors).toHaveLength(0)
     })
 
     it('detects unbalanced vouchers as errors', () => {

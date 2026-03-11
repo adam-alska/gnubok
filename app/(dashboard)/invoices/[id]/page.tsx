@@ -356,14 +356,14 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">{invoice.invoice_number}</h1>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{invoice.invoice_number}</h1>
               {isProforma && (
                 <Badge variant="secondary" className="bg-blue-100 text-blue-700">Proforma</Badge>
               )}
@@ -383,7 +383,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {isProforma && invoice.status !== 'cancelled' && (
             <Button onClick={convertToInvoice} disabled={isConverting}>
               {isConverting ? (
@@ -492,8 +492,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {/* Header */}
-                <div className="grid grid-cols-12 gap-4 text-sm font-medium text-muted-foreground border-b pb-2">
+                {/* Header — desktop */}
+                <div className="hidden sm:grid grid-cols-12 gap-4 text-sm font-medium text-muted-foreground border-b pb-2">
                   <div className="col-span-5">Beskrivning</div>
                   <div className="col-span-2 text-right">Antal</div>
                   <div className="col-span-1 text-center">Enhet</div>
@@ -501,20 +501,37 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                   <div className="col-span-2 text-right">Summa</div>
                 </div>
 
-                {/* Items */}
-                {invoice.items.map((item) => (
-                  <div key={item.id} className="grid grid-cols-12 gap-4 text-sm">
-                    <div className="col-span-5">{item.description}</div>
-                    <div className="col-span-2 text-right">{item.quantity}</div>
-                    <div className="col-span-1 text-center">{item.unit}</div>
-                    <div className="col-span-2 text-right">
-                      {formatCurrency(item.unit_price, invoice.currency)}
+                {/* Items — desktop */}
+                <div className="hidden sm:block space-y-4">
+                  {invoice.items.map((item) => (
+                    <div key={item.id} className="grid grid-cols-12 gap-4 text-sm">
+                      <div className="col-span-5">{item.description}</div>
+                      <div className="col-span-2 text-right">{item.quantity}</div>
+                      <div className="col-span-1 text-center">{item.unit}</div>
+                      <div className="col-span-2 text-right">
+                        {formatCurrency(item.unit_price, invoice.currency)}
+                      </div>
+                      <div className="col-span-2 text-right font-medium">
+                        {formatCurrency(item.line_total, invoice.currency)}
+                      </div>
                     </div>
-                    <div className="col-span-2 text-right font-medium">
-                      {formatCurrency(item.line_total, invoice.currency)}
+                  ))}
+                </div>
+
+                {/* Items — mobile cards */}
+                <div className="sm:hidden space-y-2">
+                  {invoice.items.map((item) => (
+                    <div key={item.id} className="border rounded-lg p-3 text-sm space-y-1.5">
+                      <p className="font-medium">{item.description}</p>
+                      <div className="flex items-center justify-between text-muted-foreground">
+                        <span>{item.quantity} {item.unit} × {formatCurrency(item.unit_price, invoice.currency)}</span>
+                      </div>
+                      <p className="text-right font-medium">
+                        {formatCurrency(item.line_total, invoice.currency)}
+                      </p>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
 
                 <Separator />
 

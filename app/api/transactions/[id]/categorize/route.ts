@@ -203,8 +203,8 @@ export async function POST(
     vatLines: mappingResult.vat_lines.map((v) => `${v.account_number} debit=${v.debit_amount} credit=${v.credit_amount}`),
   })
 
-  // Apply account override if provided (only for business transactions)
-  if (is_business && body.account_override) {
+  // Apply account override if provided (only for category-based booking, not templates)
+  if (is_business && body.account_override && !body.template_id) {
     // Validate the account exists in the user's chart of accounts
     const { data: accountExists } = await supabase
       .from('chart_of_accounts')

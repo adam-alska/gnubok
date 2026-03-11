@@ -79,7 +79,7 @@ export default function BankFileColumnMappingStep({
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Delimiter and decimal settings */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Avgränsare</Label>
               <Select value={delimiter} onValueChange={setDelimiter}>
@@ -110,7 +110,7 @@ export default function BankFileColumnMappingStep({
           {/* Required column mappings */}
           <div>
             <h3 className="text-sm font-medium mb-3">Obligatoriska kolumner</h3>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Datum *</Label>
                 <Select
@@ -173,7 +173,7 @@ export default function BankFileColumnMappingStep({
           {/* Optional column mappings */}
           <div>
             <h3 className="text-sm font-medium mb-3">Valfria kolumner</h3>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Referens/OCR</Label>
                 <Select

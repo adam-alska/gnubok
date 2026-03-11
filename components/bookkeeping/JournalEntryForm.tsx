@@ -230,7 +230,7 @@ export default function JournalEntryForm({
 
   const formContent = (
     <div className="space-y-4">
-      <div className={`grid gap-4 ${embedded && initialDate ? 'grid-cols-2' : 'grid-cols-3'}`}>
+      <div className={`grid gap-4 grid-cols-1 ${embedded && initialDate ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
         <div>
           <Label>Räkenskapsår</Label>
           <select
@@ -265,8 +265,90 @@ export default function JournalEntryForm({
         </div>
       </div>
 
-      {/* Entry lines */}
-      <div>
+      {/* Entry lines — mobile cards */}
+      <div className="sm:hidden space-y-3">
+        {lines.map((line, index) => (
+          <div key={index} className="rounded-lg border bg-card p-3 space-y-2">
+            <div className="flex items-start gap-2">
+              <div className="flex-1">
+                <AccountCombobox
+                  value={line.account_number}
+                  accounts={accounts}
+                  onChange={(num) => updateLine(index, 'account_number', num)}
+                />
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => removeLine(index)}
+                disabled={lines.length <= 2}
+                className="h-8 w-8 p-0 min-h-[44px] min-w-[44px] shrink-0 -mr-1 -mt-1"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <Input
+              value={line.line_description}
+              onChange={(e) => updateLine(index, 'line_description', e.target.value)}
+              placeholder="Radtext..."
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Debet</Label>
+                <Input
+                  type="number"
+                  value={line.debit_amount}
+                  onChange={(e) => updateLine(index, 'debit_amount', e.target.value)}
+                  placeholder="0,00"
+                  className="text-right"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Kredit</Label>
+                <Input
+                  type="number"
+                  value={line.credit_amount}
+                  onChange={(e) => updateLine(index, 'credit_amount', e.target.value)}
+                  placeholder="0,00"
+                  className="text-right"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {/* Mobile totals */}
+        <div className="flex justify-between items-center px-1 pt-2 font-semibold text-sm">
+          <span>Summa</span>
+          <div className="flex gap-4">
+            <span className={isBalanced ? 'text-success' : 'text-destructive'}>
+              D: {totalDebit.toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
+            </span>
+            <span className={isBalanced ? 'text-success' : 'text-destructive'}>
+              K: {totalCredit.toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={addLine}
+          className="w-full"
+        >
+          <Plus className="h-3 w-3 mr-1" />
+          Lägg till rad
+        </Button>
+      </div>
+
+      {/* Entry lines — desktop table */}
+      <div className="hidden sm:block">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left text-muted-foreground">
@@ -302,6 +384,7 @@ export default function JournalEntryForm({
                     onChange={(e) => updateLine(index, 'debit_amount', e.target.value)}
                     placeholder="0,00"
                     className="text-right h-8"
+                    inputMode="decimal"
                     min="0"
                     step="0.01"
                   />
@@ -313,6 +396,7 @@ export default function JournalEntryForm({
                     onChange={(e) => updateLine(index, 'credit_amount', e.target.value)}
                     placeholder="0,00"
                     className="text-right h-8"
+                    inputMode="decimal"
                     min="0"
                     step="0.01"
                   />
@@ -323,9 +407,9 @@ export default function JournalEntryForm({
                     size="sm"
                     onClick={() => removeLine(index)}
                     disabled={lines.length <= 2}
-                    className="h-8 w-8 p-0"
+                    className="h-8 w-8 p-0 min-h-[44px] min-w-[44px]"
                   >
-                    <Trash2 className="h-3 w-3" />
+                    <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </td>
               </tr>

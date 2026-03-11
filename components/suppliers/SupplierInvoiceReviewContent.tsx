@@ -139,12 +139,12 @@ export function SupplierInvoiceReviewContent({
   return (
     <div className="space-y-4">
       {/* Supplier info */}
-      <div className="bg-muted rounded-lg p-4 flex items-center justify-between">
-        <div>
-          <p className="font-medium text-base">{supplier.name}</p>
+      <div className="bg-muted rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
+        <div className="min-w-0">
+          <p className="font-medium text-base truncate">{supplier.name}</p>
           <p className="text-sm text-muted-foreground">Fakturanr: {invoiceNumber}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2 shrink-0">
           {reverseCharge && (
             <Badge variant="outline" className="border-orange-300 text-orange-700 dark:text-orange-400">
               Omvänd skattskyldighet
@@ -160,7 +160,7 @@ export function SupplierInvoiceReviewContent({
       </div>
 
       {/* Dates */}
-      <div className="grid grid-cols-3 gap-4 text-sm">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 text-sm">
         <div>
           <span className="text-muted-foreground">Fakturadatum</span>
           <p className="font-medium">{invoiceDate}</p>
@@ -177,34 +177,53 @@ export function SupplierInvoiceReviewContent({
         )}
       </div>
 
-      {/* Line items table */}
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b text-left text-muted-foreground">
-            <th className="py-2 w-20">Konto</th>
-            <th className="py-2">Beskrivning</th>
-            <th className="py-2 w-28 text-right">Belopp</th>
-            <th className="py-2 w-16 text-right">Moms%</th>
-            <th className="py-2 w-24 text-right">Moms</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item, index) => {
-            const vatAmount = Math.round(item.amount * item.vat_rate * 100) / 100
-            return (
-              <tr key={index} className="border-b last:border-0">
-                <td className="py-2">
-                  <AccountNumber number={item.account_number} size="sm" />
-                </td>
-                <td className="py-2">{item.description}</td>
-                <td className="py-2 text-right font-mono">{formatAmount(item.amount)}</td>
-                <td className="py-2 text-right">{Math.round(item.vat_rate * 100)}%</td>
-                <td className="py-2 text-right font-mono">{formatAmount(vatAmount)}</td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+      {/* Line items — table on desktop, cards on mobile */}
+      <div className="hidden sm:block">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left text-muted-foreground">
+              <th className="py-2 w-20">Konto</th>
+              <th className="py-2">Beskrivning</th>
+              <th className="py-2 w-28 text-right">Belopp</th>
+              <th className="py-2 w-16 text-right">Moms%</th>
+              <th className="py-2 w-24 text-right">Moms</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, index) => {
+              const vatAmount = Math.round(item.amount * item.vat_rate * 100) / 100
+              return (
+                <tr key={index} className="border-b last:border-0">
+                  <td className="py-2">
+                    <AccountNumber number={item.account_number} size="sm" />
+                  </td>
+                  <td className="py-2">{item.description}</td>
+                  <td className="py-2 text-right font-mono">{formatAmount(item.amount)}</td>
+                  <td className="py-2 text-right">{Math.round(item.vat_rate * 100)}%</td>
+                  <td className="py-2 text-right font-mono">{formatAmount(vatAmount)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="sm:hidden space-y-2">
+        {items.map((item, index) => {
+          const vatAmount = Math.round(item.amount * item.vat_rate * 100) / 100
+          return (
+            <div key={index} className="border rounded-lg p-3 text-sm space-y-1.5">
+              <div className="flex items-center justify-between">
+                <p className="font-medium">{item.description}</p>
+                <AccountNumber number={item.account_number} size="sm" />
+              </div>
+              <div className="flex items-center justify-between text-muted-foreground">
+                <span>{formatAmount(item.amount)} kr</span>
+                <span className="text-xs">{Math.round(item.vat_rate * 100)}% moms ({formatAmount(vatAmount)})</span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
 
       {/* Totals */}
       <div className="space-y-2 text-sm">
@@ -217,7 +236,7 @@ export function SupplierInvoiceReviewContent({
           <span>{formatCurrency(totalVat, currency)}</span>
         </div>
         <Separator />
-        <div className="flex justify-between font-bold text-2xl">
+        <div className="flex justify-between font-bold text-xl sm:text-2xl">
           <span>Totalt</span>
           <span>{formatCurrency(total, currency)}</span>
         </div>
@@ -230,43 +249,66 @@ export function SupplierInvoiceReviewContent({
       </div>
 
       {/* Verifikation preview */}
-      <div className="bg-muted/50 border rounded-lg p-4 space-y-2">
+      <div className="bg-muted/50 border rounded-lg p-3 sm:p-4 space-y-2">
         <p className="text-sm font-semibold text-muted-foreground">Verifikation som bokförs</p>
-        <table className="w-full text-sm font-mono">
-          <thead>
-            <tr className="text-left text-muted-foreground text-xs">
-              <th className="pb-1 w-16">Konto</th>
-              <th className="pb-1">Beskrivning</th>
-              <th className="pb-1 w-24 text-right">Debet</th>
-              <th className="pb-1 w-24 text-right">Kredit</th>
-            </tr>
-          </thead>
-          <tbody>
-            {journalLines.map((line, index) => (
-              <tr key={index} className="border-b border-dashed border-muted-foreground/20 last:border-0">
-                <td className="py-1">
-                  <AccountNumber number={line.account_number} size="sm" />
-                </td>
-                <td className="py-1 text-xs">
-                  {ACCOUNT_LABELS[line.account_number] || line.description}
-                </td>
-                <td className="py-1 text-right">
-                  {line.debit > 0 ? formatAmount(line.debit) : ''}
-                </td>
-                <td className="py-1 text-right">
-                  {line.credit > 0 ? formatAmount(line.credit) : ''}
-                </td>
+        <div className="hidden sm:block">
+          <table className="w-full text-sm font-mono">
+            <thead>
+              <tr className="text-left text-muted-foreground text-xs">
+                <th className="pb-1 w-16">Konto</th>
+                <th className="pb-1">Beskrivning</th>
+                <th className="pb-1 w-24 text-right">Debet</th>
+                <th className="pb-1 w-24 text-right">Kredit</th>
               </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="border-t font-semibold">
-              <td className="pt-1" colSpan={2}>SUMMA</td>
-              <td className="pt-1 text-right">{formatAmount(totalDebit)}</td>
-              <td className="pt-1 text-right">{formatAmount(totalCredit)}</td>
-            </tr>
-          </tfoot>
-        </table>
+            </thead>
+            <tbody>
+              {journalLines.map((line, index) => (
+                <tr key={index} className="border-b border-dashed border-muted-foreground/20 last:border-0">
+                  <td className="py-1">
+                    <AccountNumber number={line.account_number} size="sm" />
+                  </td>
+                  <td className="py-1 text-xs">
+                    {ACCOUNT_LABELS[line.account_number] || line.description}
+                  </td>
+                  <td className="py-1 text-right">
+                    {line.debit > 0 ? formatAmount(line.debit) : ''}
+                  </td>
+                  <td className="py-1 text-right">
+                    {line.credit > 0 ? formatAmount(line.credit) : ''}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t font-semibold">
+                <td className="pt-1" colSpan={2}>SUMMA</td>
+                <td className="pt-1 text-right">{formatAmount(totalDebit)}</td>
+                <td className="pt-1 text-right">{formatAmount(totalCredit)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div className="sm:hidden space-y-1.5 text-sm">
+          {journalLines.map((line, index) => (
+            <div key={index} className="flex items-center justify-between py-1 border-b border-dashed border-muted-foreground/20 last:border-0">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <AccountNumber number={line.account_number} size="sm" />
+                  <span className="text-xs text-muted-foreground truncate">
+                    {ACCOUNT_LABELS[line.account_number] || line.description}
+                  </span>
+                </div>
+              </div>
+              <span className="font-mono text-xs shrink-0 ml-2">
+                {line.debit > 0 ? `D ${formatAmount(line.debit)}` : `K ${formatAmount(line.credit)}`}
+              </span>
+            </div>
+          ))}
+          <div className="flex justify-between pt-1 border-t font-semibold text-xs font-mono">
+            <span>SUMMA</span>
+            <span>D {formatAmount(totalDebit)} / K {formatAmount(totalCredit)}</span>
+          </div>
+        </div>
       </div>
 
       {/* Payment reference */}

@@ -364,7 +364,7 @@ export default function CustomerDetailPage({
 
       {/* Edit dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl max-h-[95dvh] sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Redigera kund</DialogTitle>
           </DialogHeader>
