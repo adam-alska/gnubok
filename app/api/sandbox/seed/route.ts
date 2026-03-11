@@ -499,11 +499,8 @@ export async function POST() {
     if (dlError) throw dlError
 
     return NextResponse.json({ seeded: true })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    console.error('Error seeding sandbox data:', message, error)
     return NextResponse.json(
-      { error: 'Failed to seed sandbox data', detail: message },
+      { error: 'Failed to seed sandbox data' },
       { status: 500 }
     )
   }
