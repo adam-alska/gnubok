@@ -44,6 +44,7 @@ export interface BankFileParseIssue {
 /** Supported bank file format identifiers */
 export type BankFileFormatId =
   | 'nordea'
+  | 'nordea_business'
   | 'seb'
   | 'swedbank'
   | 'handelsbanken'

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseSIEFile, validateSIEFile } from '../sie-parser'
+import { parseSIEFile, validateSIEFile, detectEncoding, decodeBuffer } from '../sie-parser'
 
 // --- SIE content fixtures ---
 
@@ -103,6 +103,52 @@ const SIE_WITH_OBJECT_LIST = [
   '{',
   '#TRANS 5010 {1 "Kontor"} 15000.00',
   '#TRANS 1930 {} -15000.00',
+  '}',
+].join('\n')
+
+// SIE file where all VER/TRANS fields are quoted (common from some accounting programs)
+const SIE_QUOTED_FIELDS = [
+  '#FLAGGA 0',
+  '#SIETYP 4',
+  '#FNAMN "Quoted AB"',
+  '#RAR 0 20240101 20241231',
+  '#KONTO 1510 "Kundfordringar"',
+  '#KONTO 3001 "Försäljning"',
+  '#KONTO 2611 "Utgående moms 25%"',
+  '#VER "A" "1" "20240115" "Faktura 1001"',
+  '{',
+  '#TRANS "1510" {} "12500.00"',
+  '#TRANS "3001" {} "-10000.00"',
+  '#TRANS "2611" {} "-2500.00"',
+  '}',
+].join('\n')
+
+// SIE file with empty series (some programs use "" for series)
+const SIE_EMPTY_SERIES = [
+  '#FLAGGA 0',
+  '#SIETYP 4',
+  '#FNAMN "Empty Series AB"',
+  '#RAR 0 20240101 20241231',
+  '#KONTO 1930 "Företagskonto"',
+  '#KONTO 3001 "Försäljning"',
+  '#VER "" 1 20240115 "No series"',
+  '{',
+  '#TRANS 1930 {} 10000.00',
+  '#TRANS 3001 {} -10000.00',
+  '}',
+].join('\n')
+
+// SIE file with { on same line as #VER
+const SIE_BRACE_ON_VER_LINE = [
+  '#FLAGGA 0',
+  '#SIETYP 4',
+  '#FNAMN "Brace AB"',
+  '#RAR 0 20240101 20241231',
+  '#KONTO 1930 "Företagskonto"',
+  '#KONTO 3001 "Försäljning"',
+  '#VER A 1 20240115 "Inline brace" {',
+  '#TRANS 1930 {} 10000.00',
+  '#TRANS 3001 {} -10000.00',
   '}',
 ].join('\n')
 
@@ -232,6 +278,50 @@ describe('parseSIEFile', () => {
       expect(v.lines[1]).toMatchObject({ account: '1930', amount: -15000 })
     })
 
+    it('parses quoted VER fields (series, number, date)', () => {
+      const result = parseSIEFile(SIE_QUOTED_FIELDS)
+      expect(result.vouchers).toHaveLength(1)
+
+      const v = result.vouchers[0]
+      expect(v.series).toBe('A')
+      expect(v.number).toBe(1)
+      expect(v.date).toEqual(new Date(2024, 0, 15))
+      expect(v.description).toBe('Faktura 1001')
+      expect(v.lines).toHaveLength(3)
+      expect(v.lines[0]).toMatchObject({ account: '1510', amount: 12500 })
+      expect(v.lines[1]).toMatchObject({ account: '3001', amount: -10000 })
+      expect(v.lines[2]).toMatchObject({ account: '2611', amount: -2500 })
+
+      const errors = result.issues.filter((i) => i.severity === 'error')
+      expect(errors).toHaveLength(0)
+    })
+
+    it('allows empty series in VER', () => {
+      const result = parseSIEFile(SIE_EMPTY_SERIES)
+      expect(result.vouchers).toHaveLength(1)
+
+      const v = result.vouchers[0]
+      expect(v.series).toBe('')
+      expect(v.number).toBe(1)
+      expect(v.lines).toHaveLength(2)
+
+      const errors = result.issues.filter((i) => i.severity === 'error')
+      expect(errors).toHaveLength(0)
+    })
+
+    it('handles { on same line as #VER', () => {
+      const result = parseSIEFile(SIE_BRACE_ON_VER_LINE)
+      expect(result.vouchers).toHaveLength(1)
+
+      const v = result.vouchers[0]
+      expect(v.series).toBe('A')
+      expect(v.number).toBe(1)
+      expect(v.lines).toHaveLength(2)
+
+      const errors = result.issues.filter((i) => i.severity === 'error')
+      expect(errors).toHaveLength(0)
+    })
+
     it('detects unbalanced vouchers as errors', () => {
       const result = parseSIEFile(SIE_UNBALANCED_VOUCHER)
       expect(result.vouchers).toHaveLength(1)
@@ -341,5 +431,234 @@ describe('validateSIEFile', () => {
     // IB: 50000 + 100000 + (-150000) = 0 → balanced
     const ibWarning = validation.warnings.find((w) => w.includes('Opening balances not balanced'))
     expect(ibWarning).toBeUndefined()
+  })
+})
+
+// --- Fix 2: Windows-1252 encoding detection and decoding ---
+
+describe('detectEncoding — Windows-1252', () => {
+  it('detects Windows-1252 when Swedish chars use Win-1252 byte values', () => {
+    // Build a buffer with Windows-1252 encoded Swedish text: "#FNAMN Företag"
+    // å=0xE5, ä=0xE4, ö=0xF6 in Windows-1252 (NOT in CP437 map)
+    const text = '#FNAMN F'
+    const encoder = new TextEncoder()
+    const prefix = encoder.encode(text)
+    // Add ö (0xF6) r (0x72) e (0x65) t (0x74) a (0x61) g (0x67)
+    const buf = new Uint8Array(prefix.length + 6)
+    buf.set(prefix)
+    buf[prefix.length] = 0xf6     // ö in Windows-1252
+    buf[prefix.length + 1] = 0x72 // r
+    buf[prefix.length + 2] = 0x65 // e
+    buf[prefix.length + 3] = 0x74 // t
+    buf[prefix.length + 4] = 0x61 // a
+    buf[prefix.length + 5] = 0x67 // g
+    const encoding = detectEncoding(buf.buffer)
+    expect(encoding).toBe('windows1252')
+  })
+
+  it('detects UTF-8 BOM even when Windows-1252 bytes are present', () => {
+    const buf = new Uint8Array([0xef, 0xbb, 0xbf, 0x23, 0xe5]) // BOM + # + å-win1252
+    const encoding = detectEncoding(buf.buffer)
+    expect(encoding).toBe('utf8')
+  })
+
+  it('detects CP437 when CP437-specific bytes are present', () => {
+    // 0x86 = å in CP437 (not in Win-1252 Swedish set)
+    const buf = new Uint8Array([0x23, 0x86, 0x86, 0x86])
+    const encoding = detectEncoding(buf.buffer)
+    expect(encoding).toBe('cp437')
+  })
+
+  it('detects UTF-8 multi-byte Swedish chars', () => {
+    // å in UTF-8 = C3 A5, ä = C3 A4
+    const buf = new Uint8Array([0x23, 0xc3, 0xa5, 0xc3, 0xa4])
+    const encoding = detectEncoding(buf.buffer)
+    expect(encoding).toBe('utf8')
+  })
+})
+
+describe('decodeBuffer — Windows-1252', () => {
+  it('decodes Windows-1252 Swedish characters correctly', () => {
+    // "åäö" in Windows-1252 = [0xE5, 0xE4, 0xF6]
+    const buf = new Uint8Array([0xe5, 0xe4, 0xf6])
+    const result = decodeBuffer(buf.buffer, 'windows1252')
+    expect(result).toBe('åäö')
+  })
+
+  it('decodes Windows-1252 uppercase Swedish characters correctly', () => {
+    // "ÅÄÖ" in Windows-1252 = [0xC5, 0xC4, 0xD6]
+    const buf = new Uint8Array([0xc5, 0xc4, 0xd6])
+    const result = decodeBuffer(buf.buffer, 'windows1252')
+    expect(result).toBe('ÅÄÖ')
+  })
+
+  it('decodes CP437 Swedish characters correctly', () => {
+    // å in CP437 = 0x86, ä = 0x84, ö = 0x94
+    const buf = new Uint8Array([0x86, 0x84, 0x94])
+    const result = decodeBuffer(buf.buffer, 'cp437')
+    expect(result).toBe('åäö')
+  })
+})
+
+// --- Fix 3: Invalid date rejection ---
+
+describe('parseSIEFile — invalid date handling', () => {
+  it('rejects Feb 30 (auto-rolled dates) in #RAR', () => {
+    const content = [
+      '#FLAGGA 0',
+      '#SIETYP 4',
+      '#FNAMN "Test"',
+      '#RAR 0 20240101 20240230',  // Feb 30 is invalid
+    ].join('\n')
+
+    const result = parseSIEFile(content)
+    // RAR with invalid end date should produce a warning and not add the fiscal year
+    expect(result.header.fiscalYears).toHaveLength(0)
+    expect(result.issues.some((i) => i.message.includes('Invalid fiscal year dates'))).toBe(true)
+  })
+
+  it('rejects Apr 31 in #VER date', () => {
+    const content = [
+      '#FLAGGA 0',
+      '#SIETYP 4',
+      '#FNAMN "Test"',
+      '#RAR 0 20240101 20241231',
+      '#KONTO 1930 "Företagskonto"',
+      '#KONTO 3001 "Försäljning"',
+      '#VER A 1 20240431 "Invalid date"',  // Apr 31 is invalid
+      '{',
+      '#TRANS 1930 {} 1000.00',
+      '#TRANS 3001 {} -1000.00',
+      '}',
+    ].join('\n')
+
+    const result = parseSIEFile(content)
+    // Voucher should not be created because date is invalid
+    expect(result.vouchers).toHaveLength(0)
+    expect(result.issues.some((i) => i.severity === 'error' && i.message.includes('Invalid voucher definition'))).toBe(true)
+  })
+
+  it('accepts valid leap year date Feb 29', () => {
+    const content = [
+      '#FLAGGA 0',
+      '#SIETYP 4',
+      '#FNAMN "Test"',
+      '#RAR 0 20240101 20241231',
+      '#KONTO 1930 "Konto"',
+      '#KONTO 3001 "Konto"',
+      '#VER A 1 20240229 "Leap year"',
+      '{',
+      '#TRANS 1930 {} 1000.00',
+      '#TRANS 3001 {} -1000.00',
+      '}',
+    ].join('\n')
+
+    const result = parseSIEFile(content)
+    expect(result.vouchers).toHaveLength(1)
+    expect(result.vouchers[0].date).toEqual(new Date(2024, 1, 29))
+  })
+
+  it('rejects Feb 29 in non-leap year', () => {
+    const content = [
+      '#FLAGGA 0',
+      '#SIETYP 4',
+      '#FNAMN "Test"',
+      '#RAR 0 20230101 20231231',
+      '#KONTO 1930 "Konto"',
+      '#VER A 1 20230229 "Not a leap year"',
+      '{',
+      '#TRANS 1930 {} 1000.00',
+      '}',
+    ].join('\n')
+
+    const result = parseSIEFile(content)
+    expect(result.vouchers).toHaveLength(0)
+    expect(result.issues.some((i) => i.message.includes('Invalid voucher definition'))).toBe(true)
+  })
+})
+
+// --- Fix 4: Missing amount handling ---
+
+describe('parseSIEFile — missing amount handling', () => {
+  it('skips #IB with missing amount and adds warning', () => {
+    const content = [
+      '#FLAGGA 0',
+      '#SIETYP 4',
+      '#FNAMN "Test"',
+      '#RAR 0 20240101 20241231',
+      '#KONTO 1510 "Kundfordringar"',
+      '#IB 0 1510',  // No amount field
+    ].join('\n')
+
+    const result = parseSIEFile(content)
+    expect(result.openingBalances).toHaveLength(0)
+    expect(result.issues.some((i) => i.severity === 'warning' && i.message.includes('Missing amount in #IB'))).toBe(true)
+  })
+
+  it('skips #UB with missing amount and adds warning', () => {
+    const content = [
+      '#FLAGGA 0',
+      '#SIETYP 4',
+      '#FNAMN "Test"',
+      '#RAR 0 20240101 20241231',
+      '#KONTO 1510 "Kundfordringar"',
+      '#UB 0 1510',  // No amount field
+    ].join('\n')
+
+    const result = parseSIEFile(content)
+    expect(result.closingBalances).toHaveLength(0)
+    expect(result.issues.some((i) => i.severity === 'warning' && i.message.includes('Missing amount in #UB'))).toBe(true)
+  })
+
+  it('skips #RES with missing amount and adds warning', () => {
+    const content = [
+      '#FLAGGA 0',
+      '#SIETYP 4',
+      '#FNAMN "Test"',
+      '#RAR 0 20240101 20241231',
+      '#KONTO 3001 "Försäljning"',
+      '#RES 0 3001',  // No amount field
+    ].join('\n')
+
+    const result = parseSIEFile(content)
+    expect(result.resultBalances).toHaveLength(0)
+    expect(result.issues.some((i) => i.severity === 'warning' && i.message.includes('Missing amount in #RES'))).toBe(true)
+  })
+
+  it('skips #TRANS with missing amount and adds warning', () => {
+    const content = [
+      '#FLAGGA 0',
+      '#SIETYP 4',
+      '#FNAMN "Test"',
+      '#RAR 0 20240101 20241231',
+      '#KONTO 1930 "Företagskonto"',
+      '#VER A 1 20240115 "Test"',
+      '{',
+      '#TRANS 1930 {}',  // No amount field
+      '}',
+    ].join('\n')
+
+    const result = parseSIEFile(content)
+    expect(result.vouchers).toHaveLength(1)
+    expect(result.vouchers[0].lines).toHaveLength(0)
+    expect(result.issues.some((i) => i.severity === 'warning' && i.message.includes('Missing amount in #TRANS'))).toBe(true)
+  })
+
+  it('still parses valid #IB lines alongside missing-amount ones', () => {
+    const content = [
+      '#FLAGGA 0',
+      '#SIETYP 4',
+      '#FNAMN "Test"',
+      '#RAR 0 20240101 20241231',
+      '#KONTO 1510 "Kundfordringar"',
+      '#KONTO 1930 "Företagskonto"',
+      '#IB 0 1510',           // Missing → skipped
+      '#IB 0 1930 100000.00', // Valid → kept
+    ].join('\n')
+
+    const result = parseSIEFile(content)
+    expect(result.openingBalances).toHaveLength(1)
+    expect(result.openingBalances[0].account).toBe('1930')
+    expect(result.openingBalances[0].amount).toBe(100000)
   })
 })

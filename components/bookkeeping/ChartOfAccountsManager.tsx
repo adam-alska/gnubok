@@ -419,7 +419,7 @@ export default function ChartOfAccountsManager() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-7 w-7"
+                                    className="h-7 w-7 min-h-[44px] min-w-[44px]"
                                     onClick={() => setEditAccount(account)}
                                   >
                                     <Pencil className="h-3.5 w-3.5" />
@@ -428,7 +428,7 @@ export default function ChartOfAccountsManager() {
                                     <Button
                                       variant="ghost"
                                       size="icon"
-                                      className="h-7 w-7 text-destructive hover:text-destructive"
+                                      className="h-7 w-7 min-h-[44px] min-w-[44px] text-destructive hover:text-destructive"
                                       onClick={() => deleteAccount(account)}
                                       disabled={deletingAccount === account.account_number}
                                     >

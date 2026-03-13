@@ -71,9 +71,9 @@ export default function SupplierInvoicesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Leverantörsfakturor</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Leverantörsfakturor</h1>
           <p className="text-muted-foreground">
             Registrera och hantera inkommande fakturor
           </p>
@@ -88,43 +88,61 @@ export default function SupplierInvoicesPage() {
 
       {/* Summary cards */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-              <FileInput className="h-4 w-4" />
-              Totalt obetalt
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{formatAmount(totalUnpaid)} kr</p>
-            <p className="text-xs text-muted-foreground">
-              {invoices.filter((i) => !['paid', 'credited'].includes(i.status)).length} fakturor
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-destructive" />
-              Förfallet
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-destructive">{formatAmount(overdueAmount)} kr</p>
-            <p className="text-xs text-muted-foreground">{overdueCount} fakturor</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Antal fakturor
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{invoices.length}</p>
-          </CardContent>
-        </Card>
+        {isLoading ? (
+          <>
+            {[1, 2, 3].map((i) => (
+              <Card key={i}>
+                <CardHeader className="pb-2">
+                  <div className="h-4 bg-muted rounded w-24 animate-pulse" />
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="h-7 bg-muted rounded w-32 animate-pulse" />
+                  <div className="h-3 bg-muted rounded w-16 animate-pulse" />
+                </CardContent>
+              </Card>
+            ))}
+          </>
+        ) : (
+          <>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                  <FileInput className="h-4 w-4" />
+                  Totalt obetalt
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{formatAmount(totalUnpaid)} kr</p>
+                <p className="text-xs text-muted-foreground">
+                  {invoices.filter((i) => !['paid', 'credited'].includes(i.status)).length} fakturor
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-destructive" />
+                  Förfallet
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-destructive">{formatAmount(overdueAmount)} kr</p>
+                <p className="text-xs text-muted-foreground">{overdueCount} fakturor</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Antal fakturor
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{invoices.length}</p>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Tabs */}
@@ -140,8 +158,21 @@ export default function SupplierInvoicesPage() {
         <TabsContent value={activeTab}>
           {isLoading ? (
             <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                Laddar fakturor...
+              <CardContent className="p-0">
+                <div className="p-3 border-b">
+                  <div className="h-4 bg-muted rounded w-full animate-pulse" />
+                </div>
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="flex items-center gap-4 p-3 border-b last:border-0">
+                    <div className="h-4 bg-muted rounded w-12 animate-pulse" />
+                    <div className="h-4 bg-muted rounded w-28 animate-pulse" />
+                    <div className="h-4 bg-muted rounded w-20 animate-pulse" />
+                    <div className="h-4 bg-muted rounded w-20 animate-pulse" />
+                    <div className="h-4 bg-muted rounded w-20 animate-pulse" />
+                    <div className="h-4 bg-muted rounded w-20 animate-pulse ml-auto" />
+                    <div className="h-5 bg-muted rounded w-16 animate-pulse" />
+                  </div>
+                ))}
               </CardContent>
             </Card>
           ) : filteredInvoices.length === 0 ? (

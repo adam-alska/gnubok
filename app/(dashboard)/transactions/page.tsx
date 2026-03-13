@@ -110,40 +110,36 @@ export default function TransactionsPage() {
       .filter((t) => t.potential_invoice_id)
       .map((t) => t.potential_invoice_id)
 
-    let invoiceMap: Record<string, Invoice & { customer?: Customer }> = {}
-    if (potentialInvoiceIds.length > 0) {
-      const { data: invoices } = await supabase
-        .from('invoices')
-        .select('*, customer:customers(*)')
-        .in('id', potentialInvoiceIds)
-      if (invoices) {
-        invoiceMap = invoices.reduce((acc, inv) => {
-          acc[inv.id] = inv
-          return acc
-        }, {} as Record<string, Invoice & { customer?: Customer }>)
-      }
-    }
-
-    // Fetch matched inbox items for unbooked transactions
     const unbookedTxIds = (txData || [])
       .filter((t) => !t.journal_entry_id && t.is_business === null)
       .map((t) => t.id)
 
+    // Fetch invoices and inbox items in parallel
+    const [invoiceResult, inboxResult] = await Promise.all([
+      potentialInvoiceIds.length > 0
+        ? supabase.from('invoices').select('*, customer:customers(*)').in('id', potentialInvoiceIds)
+        : Promise.resolve({ data: null }),
+      unbookedTxIds.length > 0
+        ? supabase.from('invoice_inbox_items').select('*').in('matched_transaction_id', unbookedTxIds).in('status', ['ready', 'processing'])
+        : Promise.resolve({ data: null }),
+    ])
+
+    let invoiceMap: Record<string, Invoice & { customer?: Customer }> = {}
+    if (invoiceResult.data) {
+      invoiceMap = invoiceResult.data.reduce((acc, inv) => {
+        acc[inv.id] = inv
+        return acc
+      }, {} as Record<string, Invoice & { customer?: Customer }>)
+    }
+
     let inboxItemMap: Record<string, InvoiceInboxItem> = {}
-    if (unbookedTxIds.length > 0) {
-      const { data: inboxItems } = await supabase
-        .from('invoice_inbox_items')
-        .select('*')
-        .in('matched_transaction_id', unbookedTxIds)
-        .in('status', ['ready', 'processing'])
-      if (inboxItems) {
-        inboxItemMap = inboxItems.reduce((acc, item) => {
-          if (item.matched_transaction_id) {
-            acc[item.matched_transaction_id] = item as InvoiceInboxItem
-          }
-          return acc
-        }, {} as Record<string, InvoiceInboxItem>)
-      }
+    if (inboxResult.data) {
+      inboxItemMap = inboxResult.data.reduce((acc, item) => {
+        if (item.matched_transaction_id) {
+          acc[item.matched_transaction_id] = item as InvoiceInboxItem
+        }
+        return acc
+      }, {} as Record<string, InvoiceInboxItem>)
     }
 
     const transactionsWithInvoices: TransactionWithInvoice[] = (txData || []).map((t) => ({
@@ -178,24 +174,27 @@ export default function TransactionsPage() {
     setIsLoadingSuggestions(false)
   }
 
-  // Fetch transactions on mount
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchTransactions() }, [])
-
-  // Fetch entity type for tooltip context
+  // Fetch transactions and entity type in parallel on mount, then suggestions
   useEffect(() => {
-    async function fetchEntityType() {
-      try {
-        const res = await fetch('/api/settings')
-        const data = await res.json()
-        if (data?.entity_type) {
-          setEntityType(data.entity_type)
-        }
-      } catch {
-        // Non-critical, defaults to enskild_firma
+    let cancelled = false
+
+    async function loadAll() {
+      // Fetch transactions and entity type in parallel
+      const [, entityRes] = await Promise.all([
+        fetchTransactions(),
+        fetch('/api/settings').then(r => r.json()).catch(() => null),
+      ])
+
+      if (cancelled) return
+
+      if (entityRes?.entity_type) {
+        setEntityType(entityRes.entity_type)
       }
     }
-    fetchEntityType()
+
+    loadAll()
+
+    return () => { cancelled = true }
   }, [])
 
   // Auto-fetch suggestions when transactions load
@@ -207,6 +206,7 @@ export default function TransactionsPage() {
     if (uncatIds.length > 0) {
       fetchCategorySuggestions(uncatIds)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactions.length])
 
   const handleCategorize: CategorizeHandler = async (id, isBusiness, category, vatTreatment, accountOverride, templateId, inboxItemId) => {

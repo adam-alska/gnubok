@@ -119,52 +119,72 @@ export default function InvoicesPage() {
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center">
-                <Receipt className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Totalt antal</p>
-                <p className="text-2xl font-bold tabular-nums">{invoices.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center">
-                <Clock className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Obetalda</p>
-                <div className="flex items-center gap-2">
-                  <p className="text-2xl font-bold tabular-nums">{stats.unpaid}</p>
-                  {stats.overdue > 0 && (
-                    <Badge variant="destructive" className="text-xs">
-                      {stats.overdue} förfallna
-                    </Badge>
-                  )}
+        {isLoading ? (
+          <>
+            {[1, 2, 3].map((i) => (
+              <Card key={i}>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-lg bg-muted animate-pulse" />
+                    <div className="space-y-2">
+                      <div className="h-3.5 bg-muted rounded w-20 animate-pulse" />
+                      <div className="h-7 bg-muted rounded w-16 animate-pulse" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </>
+        ) : (
+          <>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center">
+                    <Receipt className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Totalt antal</p>
+                    <p className="text-2xl font-bold tabular-nums">{invoices.length}</p>
+                  </div>
                 </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center">
-                <Send className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Att få in</p>
-                <p className="text-2xl font-bold tabular-nums">{formatCurrency(stats.unpaidAmount)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center">
+                    <Clock className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Obetalda</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-2xl font-bold tabular-nums">{stats.unpaid}</p>
+                      {stats.overdue > 0 && (
+                        <Badge variant="destructive" className="text-xs">
+                          {stats.overdue} förfallna
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center">
+                    <Send className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Att få in</p>
+                    <p className="text-2xl font-bold tabular-nums">{formatCurrency(stats.unpaidAmount)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Search and tabs */}
@@ -248,51 +268,47 @@ export default function InvoicesPage() {
               <Link key={invoice.id} href={`/invoices/${invoice.id}`}>
                 <Card className={`hover:border-primary/50 transition-colors cursor-pointer ${borderClass} ${invoice.status === 'overdue' ? 'ring-1 ring-destructive/20' : ''}`}>
                   <CardContent className="py-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${isCreditNote ? 'bg-destructive/10' : 'bg-muted'}`}>
-                          <StatusIcon className={`h-5 w-5 ${isCreditNote ? 'text-destructive' : 'text-muted-foreground'}`} />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium">{invoice.invoice_number}</p>
-                            {isCreditNote && (
-                              <Badge variant="destructive" className="text-xs">
-                                Kredit
-                              </Badge>
-                            )}
-                            {isProforma && (
-                              <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
-                                Proforma
-                              </Badge>
-                            )}
-                            {isDeliveryNote && (
-                              <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-700">
-                                Följesedel
-                              </Badge>
-                            )}
-                            <Badge variant={status.variant as 'default' | 'secondary' | 'destructive'}>
-                              {status.label}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm text-muted-foreground">
-                              {(invoice.customer as { name: string })?.name} · {formatDate(invoice.invoice_date)}
-                            </p>
-                            {relativeTime && (
-                              <span className={`text-xs font-medium ${relativeTime.color}`}>
-                                {relativeTime.text}
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                    <div className="flex items-start gap-3 sm:gap-4 sm:items-center">
+                      <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${isCreditNote ? 'bg-destructive/10' : 'bg-muted'}`}>
+                        <StatusIcon className={`h-5 w-5 ${isCreditNote ? 'text-destructive' : 'text-muted-foreground'}`} />
                       </div>
-                      <div className="text-right">
-                        <p className={`font-medium tabular-nums ${isCreditNote ? 'text-destructive' : ''}`}>
-                          {formatCurrency(Number(invoice.total), invoice.currency)}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start sm:items-center justify-between gap-2">
+                          <p className="font-medium truncate">{invoice.invoice_number}</p>
+                          <p className={`font-medium tabular-nums shrink-0 ${isCreditNote ? 'text-destructive' : ''}`}>
+                            {formatCurrency(Number(invoice.total), invoice.currency)}
+                          </p>
+                        </div>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {(invoice.customer as { name: string })?.name} · {formatDate(invoice.invoice_date)}
                         </p>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                          {isCreditNote && (
+                            <Badge variant="destructive" className="text-xs">
+                              Kredit
+                            </Badge>
+                          )}
+                          {isProforma && (
+                            <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+                              Proforma
+                            </Badge>
+                          )}
+                          {isDeliveryNote && (
+                            <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-700">
+                              Följesedel
+                            </Badge>
+                          )}
+                          <Badge variant={status.variant as 'default' | 'secondary' | 'destructive'}>
+                            {status.label}
+                          </Badge>
+                          {relativeTime && (
+                            <span className={`text-xs font-medium ${relativeTime.color}`}>
+                              {relativeTime.text}
+                            </span>
+                          )}
+                        </div>
                         {invoice.currency !== 'SEK' && invoice.total_sek && (
-                          <p className={`text-sm tabular-nums ${isCreditNote ? 'text-destructive/70' : 'text-muted-foreground'}`}>
+                          <p className={`text-xs tabular-nums mt-0.5 ${isCreditNote ? 'text-destructive/70' : 'text-muted-foreground'}`}>
                             {formatCurrency(Number(invoice.total_sek))}
                           </p>
                         )}

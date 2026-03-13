@@ -15,9 +15,9 @@ export function validateSwedishPersonalNumber(pnr: string): string | null {
   const month = parseInt(cleaned.slice(4, 6))
   const day = parseInt(cleaned.slice(6, 8))
 
-  if (month < 1 || month > 12) return 'Ogiltig manad'
+  if (month < 1 || month > 12) return 'Ogiltig månad'
   if (day < 1 || day > 31) return 'Ogiltig dag'
-  if (year < 1900 || year > new Date().getFullYear()) return 'Ogiltigt ar'
+  if (year < 1900 || year > new Date().getFullYear()) return 'Ogiltigt år'
 
   // Luhn check on the last 10 digits (YYMMDDXXXX)
   const luhnDigits = cleaned.slice(2)

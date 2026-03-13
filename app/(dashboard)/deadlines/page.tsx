@@ -23,40 +23,27 @@ export default function DeadlinesPage() {
     setIsLoading(true)
 
     try {
-      // Fetch deadlines with customer names
-      const { data: deadlinesData, error: deadlinesError } = await supabase
-        .from('deadlines')
-        .select('*, customer:customers(name)')
-        .order('due_date', { ascending: true })
-
-      if (deadlinesError) throw deadlinesError
-
-      // Fetch customers for the form
-      const { data: customersData, error: customersError } = await supabase
-        .from('customers')
-        .select('id, name')
-        .order('name', { ascending: true })
-
-      if (customersError) throw customersError
-
-      // Fetch overdue invoices summary
       const today = new Date().toISOString().split('T')[0]
-      const { data: overdueData, error: overdueError } = await supabase
-        .from('invoices')
-        .select('total_sek, total')
-        .in('status', ['sent', 'unpaid'])
-        .lt('due_date', today)
 
-      if (overdueError) throw overdueError
+      // Fetch all data in parallel
+      const [deadlinesRes, customersRes, overdueRes] = await Promise.all([
+        supabase.from('deadlines').select('*, customer:customers(name)').order('due_date', { ascending: true }),
+        supabase.from('customers').select('id, name').order('name', { ascending: true }),
+        supabase.from('invoices').select('total_sek, total').in('status', ['sent', 'unpaid']).lt('due_date', today),
+      ])
 
-      const overdueCount = overdueData?.length || 0
-      const overdueTotal = (overdueData || []).reduce(
+      if (deadlinesRes.error) throw deadlinesRes.error
+      if (customersRes.error) throw customersRes.error
+      if (overdueRes.error) throw overdueRes.error
+
+      const overdueCount = overdueRes.data?.length || 0
+      const overdueTotal = (overdueRes.data || []).reduce(
         (sum, inv) => sum + (inv.total_sek || inv.total || 0),
         0
       )
 
-      setDeadlines(deadlinesData || [])
-      setCustomers(customersData || [])
+      setDeadlines(deadlinesRes.data || [])
+      setCustomers(customersRes.data || [])
       setOverdueInvoices({ count: overdueCount, total: overdueTotal })
     } catch {
       toast({
@@ -190,9 +177,35 @@ export default function DeadlinesPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Deadlines</h1>
         </div>
-        <div className="animate-pulse">
-          <div className="h-10 bg-muted rounded w-48 mb-4" />
-          <div className="h-96 bg-muted rounded" />
+        {/* Overdue alert skeleton */}
+        <div className="rounded-lg border p-4 animate-pulse">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-5 w-5 bg-muted rounded" />
+              <div className="space-y-1">
+                <div className="h-4 bg-muted rounded w-32" />
+                <div className="h-3 bg-muted rounded w-24" />
+              </div>
+            </div>
+            <div className="h-5 bg-muted rounded w-8" />
+          </div>
+        </div>
+        {/* Deadline list skeleton */}
+        <div className="space-y-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="rounded-lg border p-4 animate-pulse">
+              <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                  <div className="h-4 bg-muted rounded w-48" />
+                  <div className="h-3 bg-muted rounded w-32" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-5 bg-muted rounded w-16" />
+                  <div className="h-8 bg-muted rounded w-8" />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     )

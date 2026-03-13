@@ -33,6 +33,7 @@ export default function ReportsPage() {
   const [selectedPeriod, setSelectedPeriod] = useState('')
   const [activeTab, setActiveTab] = useState('trial-balance')
   const [entityType, setEntityType] = useState<string | null>(null)
+  const [isLoadingInit, setIsLoadingInit] = useState(true)
 
   async function fetchPeriods() {
     const res = await fetch('/api/bookkeeping/fiscal-periods')
@@ -56,8 +57,9 @@ export default function ReportsPage() {
   }
 
   useEffect(() => {
-    fetchPeriods()
-    fetchEntityType()
+    Promise.all([fetchPeriods(), fetchEntityType()]).finally(() => {
+      setIsLoadingInit(false)
+    })
   }, [])
 
   const isEnskildFirma = entityType === 'enskild_firma'
@@ -65,16 +67,45 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Rapporter</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Rapporter</h1>
           <p className="text-muted-foreground">
             Huvudbok, grundbok, kundreskontra, saldobalans, resultaträkning, balansräkning, momsdeklaration och mer
           </p>
         </div>
       </div>
 
-      <div className="flex items-end gap-4">
+      {isLoadingInit ? (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+            <div>
+              <div className="h-4 bg-muted rounded w-24 animate-pulse mb-1" />
+              <div className="h-10 bg-muted rounded w-64 animate-pulse" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="space-y-2">
+                <div className="h-3 bg-muted rounded w-16 animate-pulse" />
+                <div className="rounded-lg border p-1 space-y-1">
+                  <div className="h-8 bg-muted rounded animate-pulse" />
+                  <div className="h-8 bg-muted rounded animate-pulse" />
+                  <div className="h-8 bg-muted rounded animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
+          <Card>
+            <CardContent className="p-6 space-y-4">
+              <div className="h-5 bg-muted rounded w-32 animate-pulse" />
+              <div className="h-64 bg-muted rounded animate-pulse" />
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+      <>
+      <div className="flex flex-col sm:flex-row sm:items-end gap-4">
         <div>
           <Label>Räkenskapsår</Label>
           <select
@@ -104,7 +135,37 @@ export default function ReportsPage() {
 
       {selectedPeriod ? (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
+          {/* Mobile: compact select dropdown */}
+          <div className="sm:hidden mb-2">
+            <select
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <optgroup label="Bokslut">
+                <option value="trial-balance">Saldobalans</option>
+                <option value="income-statement">Resultaträkning</option>
+                <option value="balance-sheet">Balansräkning</option>
+              </optgroup>
+              <optgroup label="Skatt & moms">
+                <option value="vat-declaration">Momsdeklaration</option>
+                {isEnskildFirma && <option value="ne-declaration">NE-bilaga</option>}
+                {isAktiebolag && <option value="ink2-declaration">INK2</option>}
+              </optgroup>
+              <optgroup label="Huvudböcker">
+                <option value="huvudbok">Huvudbok</option>
+                <option value="grundbok">Grundbok</option>
+                <option value="kundreskontra">Kundreskontra</option>
+                <option value="supplier-ledger">Leverantörsreskontra</option>
+              </optgroup>
+              <optgroup label="Avstämning">
+                <option value="bank-reconciliation">Bankavstämning</option>
+              </optgroup>
+            </select>
+          </div>
+
+          {/* Desktop: grid tab navigation */}
+          <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
             {/* Bokslut (Financial Statements) */}
             <div className="space-y-1">
               <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-[0.08em] px-1">
@@ -224,6 +285,8 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       )}
+      </>
+      )}
     </div>
   )
 }
@@ -303,7 +366,7 @@ function TrialBalanceView({ periodId }: { periodId: string }) {
           </div>
         </CardHeader>
         <CardContent>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto -mx-2 px-2"><table className="w-full text-sm min-w-[600px]">
             <thead>
               <tr className="border-b text-left text-muted-foreground">
                 <th className="py-2 w-20">Konto</th>
@@ -351,7 +414,7 @@ function TrialBalanceView({ periodId }: { periodId: string }) {
               </td>
             </tr>
           </tfoot>
-        </table>
+        </table></div>
       </CardContent>
     </Card>
     </div>
@@ -635,7 +698,7 @@ function ReportSectionTable({
       {sections.map((section) => (
         <div key={section.title}>
           <h4 className="text-sm font-semibold text-muted-foreground mb-1">{section.title}</h4>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto -mx-2 px-2"><table className="w-full text-sm min-w-[400px]">
             <tbody>
               {section.rows.map((row) => (
                 <tr key={row.account_number} className="border-b last:border-0">
@@ -647,7 +710,7 @@ function ReportSectionTable({
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
           <div className="flex justify-between text-sm font-medium border-t pt-1 mt-1">
             <span>{section.title}</span>
             <span>
@@ -838,7 +901,7 @@ function VatDeclarationView() {
                 {/* Utgående moms */}
                 <div>
                   <h4 className="font-semibold mb-3">Utgående moms (försäljning)</h4>
-                  <table className="w-full text-sm">
+                  <div className="overflow-x-auto -mx-2 px-2"><table className="w-full text-sm min-w-[400px]">
                     <tbody>
                       {data.rutor.ruta05 > 0 && (
                         <tr className="border-b">
@@ -890,13 +953,13 @@ function VatDeclarationView() {
                         </td>
                       </tr>
                     </tfoot>
-                  </table>
+                  </table></div>
                 </div>
 
                 {/* Ingående moms */}
                 <div>
                   <h4 className="font-semibold mb-3">Ingående moms (avdragsgill)</h4>
-                  <table className="w-full text-sm">
+                  <div className="overflow-x-auto -mx-2 px-2"><table className="w-full text-sm min-w-[400px]">
                     <tbody>
                       <tr className="border-b">
                         <td className="py-2">
@@ -928,7 +991,7 @@ function VatDeclarationView() {
                         <td className="py-2 text-right">{formatAmount(data.rutor.ruta48)} kr</td>
                       </tr>
                     </tfoot>
-                  </table>
+                  </table></div>
                 </div>
               </div>
 
@@ -1126,7 +1189,7 @@ function SupplierLedgerView({ periodId }: { periodId: string }) {
             <CardTitle>Ålderfördelning per leverantör</CardTitle>
           </CardHeader>
           <CardContent>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto -mx-2 px-2"><table className="w-full text-sm min-w-[500px]">
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
                   <th className="py-2">Leverantör</th>
@@ -1162,7 +1225,7 @@ function SupplierLedgerView({ periodId }: { periodId: string }) {
                   <td className="py-2 text-right">{formatAmount(ledger.total_outstanding)}</td>
                 </tr>
               </tfoot>
-            </table>
+            </table></div>
           </CardContent>
         </Card>
       )}
@@ -1343,7 +1406,7 @@ function GeneralLedgerView({ periodId }: { periodId: string }) {
             </div>
           </CardHeader>
           <CardContent>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto -mx-2 px-2"><table className="w-full text-sm min-w-[500px]">
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
                   <th className="py-2 w-16">Ver.nr</th>
@@ -1380,7 +1443,7 @@ function GeneralLedgerView({ periodId }: { periodId: string }) {
                   <td className="py-2 text-right font-mono">{formatAmount(account.closing_balance)}</td>
                 </tr>
               </tfoot>
-            </table>
+            </table></div>
           </CardContent>
         </Card>
       ))}
@@ -1498,7 +1561,7 @@ function JournalRegisterView({ periodId }: { periodId: string }) {
           <CardTitle>Grundbok (registreringsordning)</CardTitle>
         </CardHeader>
         <CardContent>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto -mx-2 px-2"><table className="w-full text-sm min-w-[500px]">
             <thead>
               <tr className="border-b text-left text-muted-foreground">
                 <th className="py-2 w-8"></th>
@@ -1568,7 +1631,7 @@ function JournalRegisterView({ periodId }: { periodId: string }) {
                 <td className="py-2 text-right">{formatAmount(data.total_credit)}</td>
               </tr>
             </tfoot>
-          </table>
+          </table></div>
         </CardContent>
       </Card>
     </div>
@@ -1724,7 +1787,7 @@ function ARLedgerView({ periodId }: { periodId: string }) {
             <CardTitle>Ålderfördelning per kund</CardTitle>
           </CardHeader>
           <CardContent>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto -mx-2 px-2"><table className="w-full text-sm min-w-[500px]">
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
                   <th className="py-2 w-8"></th>
@@ -1797,7 +1860,7 @@ function ARLedgerView({ periodId }: { periodId: string }) {
                   <td className="py-2 text-right">{formatAmount(ledger.total_outstanding)}</td>
                 </tr>
               </tfoot>
-            </table>
+            </table></div>
           </CardContent>
         </Card>
       )}

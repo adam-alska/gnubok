@@ -433,136 +433,213 @@ export default function NewInvoicePage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {fields.map((field, index) => (
-                    <div key={field.id} className="grid gap-4 md:grid-cols-12 items-start">
-                      <div className="md:col-span-3 space-y-2">
-                        <Label>Beskrivning</Label>
-                        <Controller
-                          name={`items.${index}.description`}
-                          control={control}
-                          render={({ field }) => (
+                  {fields.map((field, index) => {
+                    const lineTotal = (watchItems[index]?.quantity || 0) * (watchItems[index]?.unit_price || 0)
+                    const lineVat = Math.round(lineTotal * (watchItems[index]?.vat_rate ?? 25) / 100 * 100) / 100
+                    return (
+                      <div key={field.id}>
+                        {/* Desktop: 12-col grid */}
+                        <div className="hidden md:grid gap-4 md:grid-cols-12 items-start">
+                          <div className="md:col-span-3 space-y-2">
+                            <Label>Beskrivning</Label>
                             <Input
                               placeholder="T.ex. Instagram-kampanj"
-                              value={field.value}
-                              onChange={field.onChange}
-                              onBlur={field.onBlur}
-                              ref={field.ref}
+                              {...register(`items.${index}.description`)}
                             />
-                          )}
-                        />
-                        {errors.items?.[index]?.description && (
-                          <p className="text-sm text-destructive">
-                            {errors.items[index].description?.message}
-                          </p>
-                        )}
-                      </div>
-                      <div className="md:col-span-2 space-y-2">
-                        <Label>Antal</Label>
-                        <Controller
-                          name={`items.${index}.quantity`}
-                          control={control}
-                          render={({ field }) => (
+                            {errors.items?.[index]?.description && (
+                              <p className="text-sm text-destructive">
+                                {errors.items[index].description?.message}
+                              </p>
+                            )}
+                          </div>
+                          <div className="md:col-span-2 space-y-2">
+                            <Label>Antal</Label>
                             <Input
-                              type="text"
-                              inputMode="decimal"
-                              value={field.value}
-                              onChange={(e) => {
-                                const v = e.target.value
-                                if (v === '' || /^[0-9]*[.,]?[0-9]*$/.test(v)) {
-                                  field.onChange(v === '' ? 0 : Number(v.replace(',', '.')))
-                                }
-                              }}
-                              onBlur={field.onBlur}
-                              ref={field.ref}
+                              type="number"
+                              step="0.01"
+                              {...register(`items.${index}.quantity`, { valueAsNumber: true })}
                             />
-                          )}
-                        />
-                      </div>
-                      <div className="md:col-span-2 space-y-2">
-                        <Label>Enhet</Label>
-                        <Controller
-                          name={`items.${index}.unit`}
-                          control={control}
-                          render={({ field }) => (
-                            <Select value={field.value} onValueChange={field.onChange}>
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {units.map((unit) => (
-                                  <SelectItem key={unit} value={unit}>
-                                    {unit}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
-                        />
-                      </div>
-                      <div className="md:col-span-2 space-y-2">
-                        <Label>à-pris</Label>
-                        <Controller
-                          name={`items.${index}.unit_price`}
-                          control={control}
-                          render={({ field }) => (
+                          </div>
+                          <div className="md:col-span-2 space-y-2">
+                            <Label>Enhet</Label>
+                            <Controller
+                              name={`items.${index}.unit`}
+                              control={control}
+                              render={({ field }) => (
+                                <Select value={field.value} onValueChange={field.onChange}>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {units.map((unit) => (
+                                      <SelectItem key={unit} value={unit}>
+                                        {unit}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            />
+                          </div>
+                          <div className="md:col-span-2 space-y-2">
+                            <Label>à-pris</Label>
                             <Input
-                              type="text"
-                              inputMode="decimal"
-                              value={field.value}
-                              onChange={(e) => {
-                                const v = e.target.value
-                                if (v === '' || /^[0-9]*[.,]?[0-9]*$/.test(v)) {
-                                  field.onChange(v === '' ? 0 : Number(v.replace(',', '.')))
-                                }
-                              }}
-                              onBlur={field.onBlur}
-                              ref={field.ref}
+                              type="number"
+                              step="any"
+                              {...register(`items.${index}.unit_price`, { valueAsNumber: true })}
                             />
-                          )}
-                        />
-                      </div>
-                      <div className="md:col-span-2 space-y-2">
-                        <Label>Moms</Label>
-                        <Controller
-                          name={`items.${index}.vat_rate`}
-                          control={control}
-                          render={({ field }) => (
-                            <Select
-                              value={String(field.value ?? 25)}
-                              onValueChange={(v) => field.onChange(Number(v))}
-                              disabled={isRateLocked}
+                          </div>
+                          <div className="md:col-span-2 space-y-2">
+                            <Label>Moms</Label>
+                            <Controller
+                              name={`items.${index}.vat_rate`}
+                              control={control}
+                              render={({ field }) => (
+                                <Select
+                                  value={String(field.value ?? 25)}
+                                  onValueChange={(v) => field.onChange(Number(v))}
+                                  disabled={isRateLocked}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {availableRates.map((opt) => (
+                                      <SelectItem key={opt.rate} value={String(opt.rate)}>
+                                        {opt.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            />
+                          </div>
+                          <div className="md:col-span-1 flex items-end">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => remove(index)}
+                              disabled={fields.length === 1}
                             >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {availableRates.map((opt) => (
-                                  <SelectItem key={opt.rate} value={String(opt.rate)}>
-                                    {opt.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Mobile: compact card layout */}
+                        <div className="md:hidden rounded-lg border bg-card p-4 space-y-3 relative">
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1 space-y-1">
+                              <Label className="text-xs text-muted-foreground">Beskrivning</Label>
+                              <Input
+                                placeholder="T.ex. Instagram-kampanj"
+                                {...register(`items.${index}.description`)}
+                              />
+                              {errors.items?.[index]?.description && (
+                                <p className="text-sm text-destructive">
+                                  {errors.items[index].description?.message}
+                                </p>
+                              )}
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="shrink-0 min-h-[44px] min-w-[44px] -mr-2 -mt-1"
+                              onClick={() => remove(index)}
+                              disabled={fields.length === 1}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Antal</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                inputMode="decimal"
+                                {...register(`items.${index}.quantity`, { valueAsNumber: true })}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Enhet</Label>
+                              <Controller
+                                name={`items.${index}.unit`}
+                                control={control}
+                                render={({ field }) => (
+                                  <Select value={field.value} onValueChange={field.onChange}>
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {units.map((unit) => (
+                                        <SelectItem key={unit} value={unit}>
+                                          {unit}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">à-pris</Label>
+                              <Input
+                                type="number"
+                                step="any"
+                                inputMode="decimal"
+                                {...register(`items.${index}.unit_price`, { valueAsNumber: true })}
+                              />
+                            </div>
+                          </div>
+                          {isRateLocked ? (
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Moms</Label>
+                              <p className="text-sm py-2">
+                                {availableRates.find(r => r.rate === (watchItems[index]?.vat_rate ?? 25))?.label ?? `${watchItems[index]?.vat_rate ?? 25}%`}
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Moms</Label>
+                              <Controller
+                                name={`items.${index}.vat_rate`}
+                                control={control}
+                                render={({ field }) => (
+                                  <Select
+                                    value={String(field.value ?? 25)}
+                                    onValueChange={(v) => field.onChange(Number(v))}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {availableRates.map((opt) => (
+                                        <SelectItem key={opt.rate} value={String(opt.rate)}>
+                                          {opt.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                              />
+                            </div>
                           )}
-                        />
+                          <div className="flex justify-between text-sm pt-1 border-t border-border/40">
+                            <span className="text-muted-foreground">Rad {index + 1}</span>
+                            <span className="font-medium tabular-nums">{formatCurrency(lineTotal + lineVat, watchCurrency)}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="md:col-span-1 flex items-end">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => remove(index)}
-                          disabled={fields.length === 1}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
 
                   <Button
                     type="button"
                     variant="outline"
+                    className="w-full md:w-auto"
                     onClick={() =>
                       append({ description: '', quantity: 1, unit: 'st', unit_price: 0, vat_rate: availableRates[0]?.rate ?? 25 })
                     }
@@ -699,8 +776,21 @@ export default function NewInvoicePage() {
               </CardContent>
             </Card>
 
-            {/* Actions */}
-            <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
+            {/* Actions — desktop only */}
+            <Button type="submit" className="w-full hidden lg:block" size="lg" disabled={isSubmitting}>
+              Granska & skapa
+            </Button>
+          </div>
+        </div>
+
+        {/* Mobile sticky total bar */}
+        <div className="lg:hidden fixed left-0 right-0 z-40 bg-card/98 backdrop-blur-sm border-t border-border/40 px-5 py-3" style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}>
+          <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Totalt</p>
+              <p className="text-lg font-bold tabular-nums">{formatCurrency(total, watchCurrency)}</p>
+            </div>
+            <Button type="submit" disabled={isSubmitting}>
               Granska & skapa
             </Button>
           </div>
@@ -756,7 +846,7 @@ export default function NewInvoicePage() {
 
       {/* Create customer dialog */}
       <Dialog open={isCreateCustomerOpen} onOpenChange={setIsCreateCustomerOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl max-h-[95dvh] sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Lägg till kund</DialogTitle>
           </DialogHeader>

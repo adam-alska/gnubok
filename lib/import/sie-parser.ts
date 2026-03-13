@@ -41,6 +41,17 @@ const CP437_MAP: Record<number, string> = {
   0x9b: 'ø',  // ø
 }
 
+// Windows-1252 bytes for Swedish characters (superset of ISO-8859-1)
+// These bytes are NOT in the CP437 map, so they need separate detection.
+const WIN1252_SWEDISH_BYTES = new Set([
+  0xe5, // å
+  0xe4, // ä
+  0xf6, // ö
+  0xc5, // Å
+  0xc4, // Ä
+  0xd6, // Ö
+])
+
 /**
  * Detect the encoding of a SIE file by looking for Swedish characters
  */
@@ -52,10 +63,11 @@ export function detectEncoding(buffer: ArrayBuffer): SIEEncoding {
     return 'utf8'
   }
 
-  // Look for CP437 Swedish characters in first 1000 bytes
+  // Look for encoding-specific Swedish characters in first 1000 bytes
   const sampleSize = Math.min(bytes.length, 1000)
   let cp437Count = 0
   let utf8Count = 0
+  let win1252Count = 0
 
   for (let i = 0; i < sampleSize; i++) {
     const byte = bytes[i]
@@ -63,6 +75,11 @@ export function detectEncoding(buffer: ArrayBuffer): SIEEncoding {
     // Check for CP437 Swedish characters
     if (CP437_MAP[byte]) {
       cp437Count++
+    }
+
+    // Check for Windows-1252 Swedish characters
+    if (WIN1252_SWEDISH_BYTES.has(byte)) {
+      win1252Count++
     }
 
     // Check for UTF-8 multi-byte sequences for Swedish chars
@@ -75,7 +92,10 @@ export function detectEncoding(buffer: ArrayBuffer): SIEEncoding {
     }
   }
 
-  return utf8Count > cp437Count ? 'utf8' : 'cp437'
+  if (utf8Count > cp437Count && utf8Count > win1252Count) return 'utf8'
+  if (cp437Count > win1252Count) return 'cp437'
+  if (win1252Count > 0) return 'windows1252'
+  return 'cp437'
 }
 
 /**
@@ -84,6 +104,11 @@ export function detectEncoding(buffer: ArrayBuffer): SIEEncoding {
 export function decodeBuffer(buffer: ArrayBuffer, encoding: SIEEncoding): string {
   if (encoding === 'utf8') {
     const decoder = new TextDecoder('utf-8')
+    return decoder.decode(buffer)
+  }
+
+  if (encoding === 'windows1252') {
+    const decoder = new TextDecoder('windows-1252')
     return decoder.decode(buffer)
   }
 
@@ -123,7 +148,14 @@ function parseSIEDate(dateStr: string): Date | null {
     return null
   }
 
-  return new Date(year, month, day)
+  const date = new Date(year, month, day)
+
+  // Reject invalid dates that auto-roll (e.g. Feb 30 → Mar 2)
+  if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) {
+    return null
+  }
+
+  return date
 }
 
 /**
@@ -146,8 +178,9 @@ function parseStringField(field: string): string {
  */
 function parseNumberField(field: string): number {
   if (!field) return 0
-  // SIE uses dot as decimal separator
-  return parseFloat(field.replace(',', '.')) || 0
+  // Strip quotes and use dot as decimal separator
+  const cleaned = parseStringField(field)
+  return parseFloat(cleaned.replace(',', '.')) || 0
 }
 
 /**
@@ -397,7 +430,14 @@ export function parseSIEFile(content: string): ParsedSIEFile {
           // #IB yearIndex accountNumber amount [quantity]
           const yearIndex = parseInt(fields[1], 10)
           const account = fields[2]
-          const amount = parseNumberField(fields[3])
+          const amountStr = fields[3]
+
+          if (!amountStr || amountStr.trim() === '') {
+            addIssue(issues, 'warning', lineNum, 'Missing amount in #IB, skipping line', tag)
+            break
+          }
+
+          const amount = parseNumberField(amountStr)
           const quantity = fields[4] ? parseNumberField(fields[4]) : undefined
 
           if (account) {
@@ -410,7 +450,14 @@ export function parseSIEFile(content: string): ParsedSIEFile {
           // #UB yearIndex accountNumber amount [quantity]
           const yearIndex = parseInt(fields[1], 10)
           const account = fields[2]
-          const amount = parseNumberField(fields[3])
+          const amountStr = fields[3]
+
+          if (!amountStr || amountStr.trim() === '') {
+            addIssue(issues, 'warning', lineNum, 'Missing amount in #UB, skipping line', tag)
+            break
+          }
+
+          const amount = parseNumberField(amountStr)
           const quantity = fields[4] ? parseNumberField(fields[4]) : undefined
 
           if (account) {
@@ -423,7 +470,14 @@ export function parseSIEFile(content: string): ParsedSIEFile {
           // #RES yearIndex accountNumber amount [quantity]
           const yearIndex = parseInt(fields[1], 10)
           const account = fields[2]
-          const amount = parseNumberField(fields[3])
+          const amountStr = fields[3]
+
+          if (!amountStr || amountStr.trim() === '') {
+            addIssue(issues, 'warning', lineNum, 'Missing amount in #RES, skipping line', tag)
+            break
+          }
+
+          const amount = parseNumberField(amountStr)
           const quantity = fields[4] ? parseNumberField(fields[4]) : undefined
 
           if (account) {
@@ -434,12 +488,13 @@ export function parseSIEFile(content: string): ParsedSIEFile {
 
         case 'VER': {
           // #VER series number date "description" [regdate] [signature]
+          // Some programs quote all fields, so strip quotes from number/date too
           const series = parseStringField(fields[1])
-          const number = parseInt(fields[2], 10)
-          const date = parseSIEDate(fields[3])
+          const number = parseInt(parseStringField(fields[2]), 10)
+          const date = parseSIEDate(parseStringField(fields[3]))
           const description = parseStringField(fields[4])
 
-          if (series && !isNaN(number) && date) {
+          if (!isNaN(number) && date) {
             currentVoucher = {
               series,
               number,
@@ -450,7 +505,7 @@ export function parseSIEFile(content: string): ParsedSIEFile {
 
             // Optional registration date and signature
             if (fields[5]) {
-              currentVoucher.registrationDate = parseSIEDate(fields[5]) || undefined
+              currentVoucher.registrationDate = parseSIEDate(parseStringField(fields[5])) || undefined
             }
             if (fields[6]) {
               currentVoucher.signature = parseStringField(fields[6])
@@ -470,11 +525,17 @@ export function parseSIEFile(content: string): ParsedSIEFile {
 
           // Parse account and skip object list (in braces)
           let fieldIndex = 1
-          const account = fields[fieldIndex++]
+          const account = parseStringField(fields[fieldIndex++])
 
           // Skip object list if present (now a single field thanks to brace-aware splitting)
           if (fields[fieldIndex]?.startsWith('{')) {
             fieldIndex++
+          }
+
+          const transAmountStr = fields[fieldIndex]
+          if (!transAmountStr || transAmountStr.trim() === '') {
+            addIssue(issues, 'warning', lineNum, 'Missing amount in #TRANS, skipping line', tag)
+            break
           }
 
           const amount = parseNumberField(fields[fieldIndex++])
@@ -486,7 +547,7 @@ export function parseSIEFile(content: string): ParsedSIEFile {
 
           // Optional fields
           if (fields[fieldIndex]) {
-            transLine.date = parseSIEDate(fields[fieldIndex++]) || undefined
+            transLine.date = parseSIEDate(parseStringField(fields[fieldIndex++])) || undefined
           }
           if (fields[fieldIndex]) {
             transLine.description = parseStringField(fields[fieldIndex++])

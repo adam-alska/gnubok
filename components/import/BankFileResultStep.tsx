@@ -30,7 +30,7 @@ export default function BankFileResultStep({
           <CardTitle className="flex items-center gap-2">
             {isSuccess ? (
               <>
-                <CheckCircle className="h-6 w-6 text-muted-foreground" />
+                <CheckCircle className="h-6 w-6 text-success" />
                 Import genomförd
               </>
             ) : (
@@ -97,21 +97,19 @@ export default function BankFileResultStep({
       )}
 
       {/* Actions */}
-      <div className="flex justify-between">
-        <Button variant="outline" onClick={onNewImport}>
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+        <Button variant="outline" className="min-h-11" onClick={onNewImport}>
           <RotateCcw className="mr-2 h-4 w-4" />
           Ny import
         </Button>
-        <div className="flex gap-2">
-          {isSuccess && (
-            <Button asChild>
-              <Link href="/transactions">
-                Visa transaktioner
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          )}
-        </div>
+        {isSuccess && (
+          <Button className="min-h-11" asChild>
+            <Link href="/transactions">
+              Visa transaktioner
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
+        )}
       </div>
     </div>
   )

@@ -168,7 +168,7 @@ export default function CustomerForm({
       </div>
 
       {/* Contact */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="email">E-post</Label>
           <Input
@@ -202,7 +202,7 @@ export default function CustomerForm({
             {...register('address_line1')}
           />
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label htmlFor="postal_code">Postnummer</Label>
             <Input

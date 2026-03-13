@@ -91,7 +91,7 @@ export default function TransactionBookingDialog({
       }
       onOpenChange(o)
     }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[95dvh] sm:max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Bokför transaktion</DialogTitle>
           <DialogDescription>

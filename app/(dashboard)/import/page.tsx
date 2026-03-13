@@ -38,6 +38,7 @@ import type {
   ParseIssue,
 } from '@/lib/import/types'
 import type { BASAccount } from '@/types'
+import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
 
 // ============================================================
 // Bank File Import Wizard Steps
@@ -733,16 +734,21 @@ type ImportMode = null | 'psd2' | 'bank' | 'sie'
 
 export default function ImportPage() {
   const [mode, setMode] = useState<ImportMode>(null)
-  const [hasBankingExtension, setHasBankingExtension] = useState(false)
+  // If extension isn't compiled in, we know synchronously it's unavailable
+  const bankingCompiledIn = ENABLED_EXTENSION_IDS.has('enable-banking')
+  const [hasBankingExtension, setHasBankingExtension] = useState<boolean | null>(
+    bankingCompiledIn ? null : false
+  )
 
   useEffect(() => {
+    if (!bankingCompiledIn) return
     fetch('/api/extensions/toggles/general/enable-banking')
       .then(res => res.ok ? res.json() : null)
       .then(json => {
-        if (json?.data?.enabled) setHasBankingExtension(true)
+        setHasBankingExtension(json?.data?.enabled || false)
       })
-      .catch(() => {})
-  }, [])
+      .catch(() => setHasBankingExtension(false))
+  }, [bankingCompiledIn])
 
   return (
     <div className="space-y-6">
@@ -755,11 +761,26 @@ export default function ImportPage() {
       </div>
 
       {mode === null && (
-        <div className={`grid gap-4 ${hasBankingExtension ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
-          {hasBankingExtension && (
+        <div className={`grid gap-4 ${hasBankingExtension !== false ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+          {hasBankingExtension === null && (
+            <Card className="animate-pulse">
+              <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
+                <div className="h-12 w-12 rounded-full bg-muted" />
+                <div className="space-y-2 w-full flex flex-col items-center">
+                  <div className="h-5 bg-muted rounded w-24" />
+                  <div className="h-4 bg-muted rounded w-48" />
+                  <div className="h-4 bg-muted rounded w-40" />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          {hasBankingExtension === true && (
             <Card
-              className="cursor-pointer hover:border-primary/50 transition-colors border-primary/20 relative"
+              role="button"
+              tabIndex={0}
+              className="cursor-pointer hover:border-primary/50 active:scale-[0.98] transition-all border-primary/20 relative"
               onClick={() => setMode('psd2')}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMode('psd2') } }}
             >
               <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
                 <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
@@ -779,8 +800,11 @@ export default function ImportPage() {
           )}
 
           <Card
-            className="cursor-pointer hover:border-primary/50 transition-colors"
+            role="button"
+            tabIndex={0}
+            className="cursor-pointer hover:border-primary/50 active:scale-[0.98] transition-all"
             onClick={() => setMode('bank')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMode('bank') } }}
           >
             <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
               <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
@@ -799,8 +823,11 @@ export default function ImportPage() {
           </Card>
 
           <Card
-            className="cursor-pointer hover:border-primary/50 transition-colors"
+            role="button"
+            tabIndex={0}
+            className="cursor-pointer hover:border-primary/50 active:scale-[0.98] transition-all"
             onClick={() => setMode('sie')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMode('sie') } }}
           >
             <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
               <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">

@@ -61,18 +61,18 @@ export function InvoiceReviewContent({
   return (
     <div className="space-y-4">
       {/* Customer info */}
-      <div className="bg-muted rounded-lg p-4 flex items-center justify-between">
-        <div>
-          <p className="font-medium text-base">{customer.name}</p>
-          <p className="text-sm text-muted-foreground">{customer.email}</p>
+      <div className="bg-muted rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
+        <div className="min-w-0">
+          <p className="font-medium text-base truncate">{customer.name}</p>
+          <p className="text-sm text-muted-foreground truncate">{customer.email}</p>
         </div>
-        <Badge variant="outline">
+        <Badge variant="outline" className="self-start sm:self-auto shrink-0">
           {customerTypeLabel[customer.customer_type] || customer.customer_type}
         </Badge>
       </div>
 
       {/* Dates */}
-      <div className="grid grid-cols-2 gap-4 text-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
         <div>
           <span className="text-muted-foreground">Fakturadatum</span>
           <p className="font-medium">{invoiceDate}</p>
@@ -83,35 +83,51 @@ export function InvoiceReviewContent({
         </div>
       </div>
 
-      {/* Line items table */}
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b text-left text-muted-foreground">
-            <th className="py-2">Beskrivning</th>
-            <th className="py-2 w-16 text-right">Antal</th>
-            <th className="py-2 w-16 text-center">Enhet</th>
-            <th className="py-2 w-24 text-right">À-pris</th>
-            {showVatColumn && <th className="py-2 w-16 text-right">Moms</th>}
-            <th className="py-2 w-28 text-right">Belopp</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item, index) => (
-            <tr key={index} className="border-b last:border-0">
-              <td className="py-2">{item.description}</td>
-              <td className="py-2 text-right">{item.quantity}</td>
-              <td className="py-2 text-center">{item.unit}</td>
-              <td className="py-2 text-right">{formatCurrency(item.unit_price, currency)}</td>
-              {showVatColumn && (
-                <td className="py-2 text-right">{item.vat_rate ?? 0}%</td>
-              )}
-              <td className="py-2 text-right">
-                {formatCurrency(item.quantity * item.unit_price, currency)}
-              </td>
+      {/* Line items — table on desktop, cards on mobile */}
+      <div className="hidden sm:block">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left text-muted-foreground">
+              <th className="py-2">Beskrivning</th>
+              <th className="py-2 w-16 text-right">Antal</th>
+              <th className="py-2 w-16 text-center">Enhet</th>
+              <th className="py-2 w-24 text-right">À-pris</th>
+              {showVatColumn && <th className="py-2 w-16 text-right">Moms</th>}
+              <th className="py-2 w-28 text-right">Belopp</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {items.map((item, index) => (
+              <tr key={index} className="border-b last:border-0">
+                <td className="py-2">{item.description}</td>
+                <td className="py-2 text-right">{item.quantity}</td>
+                <td className="py-2 text-center">{item.unit}</td>
+                <td className="py-2 text-right">{formatCurrency(item.unit_price, currency)}</td>
+                {showVatColumn && (
+                  <td className="py-2 text-right">{item.vat_rate ?? 0}%</td>
+                )}
+                <td className="py-2 text-right">
+                  {formatCurrency(item.quantity * item.unit_price, currency)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="sm:hidden space-y-2">
+        {items.map((item, index) => (
+          <div key={index} className="border rounded-lg p-3 text-sm space-y-1.5">
+            <p className="font-medium">{item.description}</p>
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>{item.quantity} {item.unit} × {formatCurrency(item.unit_price, currency)}</span>
+              {showVatColumn && <span className="text-xs">({item.vat_rate ?? 0}% moms)</span>}
+            </div>
+            <p className="text-right font-medium">
+              {formatCurrency(item.quantity * item.unit_price, currency)}
+            </p>
+          </div>
+        ))}
+      </div>
 
       {/* Totals */}
       <div className="space-y-2 text-sm">
@@ -135,7 +151,7 @@ export function InvoiceReviewContent({
           </div>
         )}
         <Separator />
-        <div className="flex justify-between font-bold text-2xl">
+        <div className="flex justify-between font-bold text-xl sm:text-2xl">
           <span>Totalt</span>
           <span>{formatCurrency(total, currency)}</span>
         </div>

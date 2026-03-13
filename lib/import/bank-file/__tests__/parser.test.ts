@@ -8,6 +8,8 @@
 
 import { detectFileFormat, parseBankFile, generateExternalId, generateFileHash, getFormat, getAllFormats } from '../parser'
 import type { ParsedBankTransaction, BankFileFormatId } from '../types'
+import { parseGenericCSV } from '../formats/generic-csv'
+import { parseCSVLine } from '../formats/nordea'
 
 // ---------------------------------------------------------------------------
 // Test data — realistic CSV/XML content for each Swedish bank format
@@ -171,6 +173,22 @@ const EMPTY_FILE = ''
 
 const HEADER_ONLY_NORDEA = 'Datum,Transaktion,Kategori,Belopp,Saldo\n'
 
+const NORDEA_BUSINESS_CSV = [
+  'Bokföringsdag;Belopp;Avsändare;Mottagare;Namn;Rubrik;Saldo;Valuta',
+  '2024-01-15;-99,00;;SPOTIFY AB;SPOTIFY AB;Kortköp;12 345,67;SEK',
+  '2024-01-14;-432,50;;ICA MAXI;ICA MAXI LINDHAGEN;Kortköp;12 444,67;SEK',
+  '2024-01-13;25 000,00;ARBETSGIVAREN AB;;ARBETSGIVAREN AB;Löneutbetalning;12 877,17;SEK',
+].join('\n')
+
+const NORDEA_BUSINESS_CSV_SWEDISH_CHARS = [
+  'Bokföringsdag;Belopp;Avsändare;Mottagare;Namn;Rubrik;Saldo;Valuta',
+  '2024-03-01;-85,00;;GÖTEBORGS HAMNCAFÉ;GÖTEBORGS HAMNCAFÉ;Kortköp;5 000,00;SEK',
+  '2024-03-02;-249,00;;ÅHLENS CITY;ÅHLENS CITY;Kortköp;4 751,00;SEK',
+  '2024-03-03;1 200,00;ÄRLA GÅRD AB;;ÄRLA GÅRD AB;Betalning;5 951,00;SEK',
+].join('\n')
+
+const HEADER_ONLY_NORDEA_BUSINESS = 'Bokföringsdag;Belopp;Avsändare;Mottagare;Namn;Rubrik;Saldo;Valuta\n'
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -180,6 +198,18 @@ describe('detectFileFormat', () => {
     const format = detectFileFormat(NORDEA_CSV, 'transaktioner.csv')
     expect(format).not.toBeNull()
     expect(format!.id).toBe('nordea')
+  })
+
+  it('detects Nordea Business CSV from semicolon-delimited header with bokföringsdag and rubrik', () => {
+    const format = detectFileFormat(NORDEA_BUSINESS_CSV, 'PLUSGIROKONTO FTG 212 68 87-5.csv')
+    expect(format).not.toBeNull()
+    expect(format!.id).toBe('nordea_business')
+  })
+
+  it('does not confuse Nordea Business with SEB (SEB has valutadag)', () => {
+    const format = detectFileFormat(NORDEA_BUSINESS_CSV, 'export.csv')
+    expect(format).not.toBeNull()
+    expect(format!.id).toBe('nordea_business')
   })
 
   it('detects SEB CSV from semicolon-delimited header with bokföringsdag', () => {
@@ -367,6 +397,104 @@ describe('parseBankFile — Nordea format', () => {
     expect(result.date_from).toBeNull()
     expect(result.date_to).toBeNull()
     expect(result.stats.parsed_rows).toBe(0)
+  })
+})
+
+describe('parseBankFile — Nordea Business format', () => {
+  it('parses semicolon-delimited CSV with correct columns', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV, 'nordea_ftg.csv')
+
+    expect(result.format).toBe('nordea_business')
+    expect(result.format_name).toBe('Nordea Företag')
+    expect(result.transactions).toHaveLength(3)
+    expect(result.issues).toHaveLength(0)
+  })
+
+  it('correctly parses negative amounts', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV, 'nordea_ftg.csv')
+
+    const spotify = result.transactions[0]
+    expect(spotify.amount).toBe(-99)
+    expect(spotify.date).toBe('2024-01-15')
+    expect(spotify.currency).toBe('SEK')
+  })
+
+  it('correctly parses positive amounts with space thousands separator', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV, 'nordea_ftg.csv')
+
+    const salary = result.transactions[2]
+    expect(salary.amount).toBe(25000)
+    expect(salary.date).toBe('2024-01-13')
+  })
+
+  it('builds description from Namn and Rubrik columns', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV, 'nordea_ftg.csv')
+
+    const spotify = result.transactions[0]
+    expect(spotify.description).toBe('SPOTIFY AB — Kortköp')
+
+    const salary = result.transactions[2]
+    expect(salary.description).toBe('ARBETSGIVAREN AB — Löneutbetalning')
+  })
+
+  it('extracts counterparty from Mottagare (expense) or Avsändare (income)', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV, 'nordea_ftg.csv')
+
+    // Expense: counterparty from Mottagare
+    expect(result.transactions[0].counterparty).toBe('SPOTIFY AB')
+    // Income: counterparty from Avsändare
+    expect(result.transactions[2].counterparty).toBe('ARBETSGIVAREN AB')
+  })
+
+  it('parses balance field', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV, 'nordea_ftg.csv')
+
+    expect(result.transactions[0].balance).toBe(12345.67)
+    expect(result.transactions[2].balance).toBe(12877.17)
+  })
+
+  it('handles Swedish characters', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV_SWEDISH_CHARS, 'nordea_ftg.csv')
+
+    expect(result.transactions).toHaveLength(3)
+    expect(result.transactions[0].description).toContain('GÖTEBORGS HAMNCAFÉ')
+    expect(result.transactions[1].description).toContain('ÅHLENS CITY')
+    expect(result.transactions[2].description).toContain('ÄRLA GÅRD AB')
+  })
+
+  it('stores raw_line for each transaction', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV, 'nordea_ftg.csv')
+
+    result.transactions.forEach((tx) => {
+      expect(tx.raw_line).toBeDefined()
+      expect(tx.raw_line!.length).toBeGreaterThan(0)
+    })
+  })
+
+  it('handles header-only file with no data rows', () => {
+    const result = parseBankFile(HEADER_ONLY_NORDEA_BUSINESS, 'nordea_ftg.csv')
+
+    expect(result.format).toBe('nordea_business')
+    expect(result.transactions).toHaveLength(0)
+    expect(result.date_from).toBeNull()
+    expect(result.date_to).toBeNull()
+    expect(result.stats.parsed_rows).toBe(0)
+  })
+
+  it('calculates correct date range', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV, 'nordea_ftg.csv')
+
+    expect(result.date_from).toBe('2024-01-13')
+    expect(result.date_to).toBe('2024-01-15')
+  })
+
+  it('calculates correct income and expense stats', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV, 'nordea_ftg.csv')
+
+    expect(result.stats.total_income).toBe(25000)
+    expect(result.stats.total_expenses).toBe(-531.5)
+    expect(result.stats.parsed_rows).toBe(3)
+    expect(result.stats.skipped_rows).toBe(0)
   })
 })
 
@@ -1263,5 +1391,156 @@ describe('edge cases and robustness', () => {
 
     expect(result.transactions).toHaveLength(1)
     expect(result.transactions[0].amount).toBe(0)
+  })
+})
+
+// --- Fix 5: SEB duplicate condition removal ---
+
+describe('SEB detection — no duplicate conditions', () => {
+  it('detects SEB with bokföringsdag header', () => {
+    const content = 'Bokföringsdag;Valutadag;Text;Belopp;Saldo\n2024-01-15;2024-01-15;Test;-100,00;5000,00'
+    const format = detectFileFormat(content, 'seb.csv')
+    expect(format).not.toBeNull()
+    expect(format!.id).toBe('seb')
+  })
+
+  it('detects SEB with bokforingsdatum header (no diacritics)', () => {
+    const content = 'Bokforingsdatum;Valutadag;Text;Belopp;Saldo\n2024-01-15;2024-01-15;Test;-100,00;5000,00'
+    const format = detectFileFormat(content, 'seb.csv')
+    expect(format).not.toBeNull()
+    expect(format!.id).toBe('seb')
+  })
+})
+
+// --- Fix 6: Länsförsäkringar false positive prevention ---
+
+describe('Länsförsäkringar detection — false positive prevention', () => {
+  it('detects valid LF data rows with comma-decimal amounts', () => {
+    const format = detectFileFormat(LANSFORSAKRINGAR_CSV, 'lf.csv')
+    expect(format).not.toBeNull()
+    expect(format!.id).toBe('lansforsakringar')
+  })
+
+  it('detects LF header-less data with two dates and comma-decimal amount', () => {
+    const format = detectFileFormat(LANSFORSAKRINGAR_CSV_NO_HEADER, 'lf.csv')
+    expect(format).not.toBeNull()
+    expect(format!.id).toBe('lansforsakringar')
+  })
+
+  it('does not false-positive on generic semicolon CSV with two date columns but non-numeric 5th field', () => {
+    // This CSV has two date columns + 5 fields but the 5th field is not a number
+    const falsePositive = [
+      '"2024-01-15";"2024-01-15";"Typ";"Text";"not-a-number"',
+    ].join('\n')
+
+    const format = detectFileFormat(falsePositive, 'generic.csv')
+    // Should NOT detect as Länsförsäkringar
+    expect(format?.id).not.toBe('lansforsakringar')
+  })
+})
+
+// --- Fix 7: Generic CSV column bounds checking ---
+
+describe('parseGenericCSV — column bounds checking', () => {
+  it('skips rows with too few columns and adds warning', () => {
+    const content = [
+      'Date,Description,Amount',
+      '2024-01-15,Test,-100.00',
+      '2024-01-16,Short',         // Only 2 columns, mapping needs column 2 (amount)
+    ].join('\n')
+
+    const result = parseGenericCSV(content, {
+      date: 0,
+      description: 1,
+      amount: 2,
+      delimiter: ',',
+      decimal_separator: '.',
+      skip_rows: 1,
+      date_format: 'YYYY-MM-DD',
+    })
+
+    expect(result.transactions).toHaveLength(1)
+    expect(result.transactions[0].description).toBe('Test')
+    expect(result.stats.skipped_rows).toBe(1)
+    expect(result.issues.some((i) => i.message.includes('columns but mapping requires'))).toBe(true)
+  })
+
+  it('skips rows when mapping index exceeds field count', () => {
+    const content = [
+      'A,B',
+      'val1,val2',
+    ].join('\n')
+
+    const result = parseGenericCSV(content, {
+      date: 0,
+      description: 1,
+      amount: 5,  // Column 5 does not exist (only 2 columns)
+      delimiter: ',',
+      decimal_separator: '.',
+      skip_rows: 1,
+      date_format: 'YYYY-MM-DD',
+    })
+
+    expect(result.transactions).toHaveLength(0)
+    expect(result.stats.skipped_rows).toBe(1)
+    expect(result.issues).toHaveLength(1)
+  })
+
+  it('parses normally when all columns are within bounds', () => {
+    const content = [
+      'Date,Description,Amount',
+      '2024-01-15,SPOTIFY,-99.00',
+      '2024-01-16,SALARY,25000.00',
+    ].join('\n')
+
+    const result = parseGenericCSV(content, {
+      date: 0,
+      description: 1,
+      amount: 2,
+      delimiter: ',',
+      decimal_separator: '.',
+      skip_rows: 1,
+      date_format: 'YYYY-MM-DD',
+    })
+
+    expect(result.transactions).toHaveLength(2)
+    expect(result.stats.skipped_rows).toBe(0)
+    expect(result.issues).toHaveLength(0)
+  })
+})
+
+// --- Fix 8: parseCSVLine unclosed quote handling ---
+
+describe('parseCSVLine — unclosed quote handling', () => {
+  it('handles normal quoted fields correctly', () => {
+    const fields = parseCSVLine('"hello","world"', ',')
+    expect(fields).toEqual(['hello', 'world'])
+  })
+
+  it('handles escaped quotes (doubled) inside fields', () => {
+    const fields = parseCSVLine('"he said ""hi""",other', ',')
+    expect(fields).toEqual(['he said "hi"', 'other'])
+  })
+
+  it('produces a result even with unclosed quotes instead of hanging', () => {
+    // Unclosed quote: the parser should not hang or crash
+    const fields = parseCSVLine('"unclosed,field2,field3', ',')
+    // With unclosed quote, everything after the opening quote is one field
+    // The important thing is it doesn't crash and returns something
+    expect(fields.length).toBeGreaterThan(0)
+  })
+
+  it('preserves data with unclosed quote rather than losing it', () => {
+    const fields = parseCSVLine('normal,"unclosed value', ',')
+    // Should have at least the first field and whatever was accumulated
+    expect(fields.length).toBe(2)
+    expect(fields[0]).toBe('normal')
+    // The unclosed quoted field should still contain the text
+    expect(fields[1]).toContain('unclosed value')
+  })
+
+  it('handles semicolon delimiter with quotes', () => {
+    const fields = parseCSVLine('"2024-01-15";"SPOTIFY AB";"-99,00"', ';')
+    expect(fields).toEqual(['2024-01-15', 'SPOTIFY AB', '-99,00'])
   })
 })

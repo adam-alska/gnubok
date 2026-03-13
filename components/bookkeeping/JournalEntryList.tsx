@@ -138,9 +138,10 @@ export default function JournalEntryList({ periodId }: Props) {
             <Card key={entry.id}>
               <button
                 onClick={() => toggleExpand(entry.id)}
-                className="w-full flex items-center justify-between p-4 text-left hover:bg-muted/50 transition-colors"
+                className="w-full p-4 text-left hover:bg-muted/50 transition-colors min-h-[44px]"
               >
-                <div className="flex items-center gap-3 flex-1">
+                {/* Desktop: single row */}
+                <div className="hidden sm:flex items-center gap-3 flex-1">
                   {isExpanded ? (
                     <ChevronDown className="h-4 w-4 shrink-0" />
                   ) : (
@@ -153,7 +154,6 @@ export default function JournalEntryList({ periodId }: Props) {
                     {entry.entry_date}
                   </span>
                   <span className="flex-1 truncate">{entry.description}</span>
-                  {/* Attachment indicator */}
                   {attachmentCounts[entry.id] ? (
                     <span className="flex items-center gap-0.5 text-muted-foreground mr-1" title={`${attachmentCounts[entry.id]} underlag`}>
                       <Paperclip className="h-3.5 w-3.5" />
@@ -167,6 +167,37 @@ export default function JournalEntryList({ periodId }: Props) {
                     )
                   )}
                 </div>
+                {/* Mobile: two rows */}
+                <div className="sm:hidden">
+                  <div className="flex items-center gap-2">
+                    {isExpanded ? (
+                      <ChevronDown className="h-4 w-4 shrink-0" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 shrink-0" />
+                    )}
+                    <span className="font-mono text-sm text-muted-foreground">
+                      {entry.voucher_series}{entry.voucher_number}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {entry.entry_date}
+                    </span>
+                    <span className="ml-auto flex items-center gap-1">
+                      {attachmentCounts[entry.id] ? (
+                        <span className="flex items-center gap-0.5 text-muted-foreground" title={`${attachmentCounts[entry.id]} underlag`}>
+                          <Paperclip className="h-3.5 w-3.5" />
+                          <span className="text-xs">{attachmentCounts[entry.id]}</span>
+                        </span>
+                      ) : (
+                        NEEDS_ATTACHMENT.has(entry.source_type) && entry.status === 'posted' && (
+                          <span title="Underlag saknas">
+                            <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                          </span>
+                        )
+                      )}
+                    </span>
+                  </div>
+                  <p className="mt-1 ml-6 text-sm truncate">{entry.description}</p>
+                </div>
               </button>
 
               {isExpanded && (
@@ -174,59 +205,95 @@ export default function JournalEntryList({ periodId }: Props) {
                   {lines.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-2">Inga kontorader hittades för denna verifikation.</p>
                   ) : (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left text-muted-foreground">
-                        <th className="py-2 w-48">Konto</th>
-                        <th className="py-2">Beskrivning</th>
-                        <th className="py-2 w-28 text-right">Debet</th>
-                        <th className="py-2 w-28 text-right">Kredit</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                  <>
+                    {/* Mobile: stacked cards */}
+                    <div className="sm:hidden space-y-2">
                       {lines
                         .sort((a, b) => a.sort_order - b.sort_order)
                         .map((line) => (
-                          <tr key={line.id} className="border-b last:border-0">
-                            <td className="py-2"><AccountNumber number={line.account_number} showName /></td>
-                            <td className="py-2 text-muted-foreground">
-                              {line.line_description || ''}
-                            </td>
-                            <td className="py-2 text-right">
-                              {Number(line.debit_amount) > 0
-                                ? Number(line.debit_amount).toLocaleString('sv-SE', {
-                                    minimumFractionDigits: 2,
-                                  })
-                                : ''}
-                            </td>
-                            <td className="py-2 text-right">
-                              {Number(line.credit_amount) > 0
-                                ? Number(line.credit_amount).toLocaleString('sv-SE', {
-                                    minimumFractionDigits: 2,
-                                  })
-                                : ''}
-                            </td>
-                          </tr>
+                          <div key={line.id} className="flex items-center justify-between py-2 border-b last:border-0 gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm"><AccountNumber number={line.account_number} showName /></div>
+                              {line.line_description && (
+                                <p className="text-xs text-muted-foreground truncate">{line.line_description}</p>
+                              )}
+                            </div>
+                            <div className="text-right shrink-0 text-sm tabular-nums">
+                              {Number(line.debit_amount) > 0 && (
+                                <p>{Number(line.debit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} D</p>
+                              )}
+                              {Number(line.credit_amount) > 0 && (
+                                <p>{Number(line.credit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} K</p>
+                              )}
+                            </div>
+                          </div>
                         ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="font-semibold">
-                        <td colSpan={2} className="py-2">
-                          Summa
-                        </td>
-                        <td className="py-2 text-right">
-                          {lines
-                            .reduce((sum, l) => sum + (Number(l.debit_amount) || 0), 0)
-                            .toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="py-2 text-right">
-                          {lines
-                            .reduce((sum, l) => sum + (Number(l.credit_amount) || 0), 0)
-                            .toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
+                      <div className="flex justify-between font-semibold text-sm pt-1">
+                        <span>Summa</span>
+                        <div className="flex gap-3 tabular-nums">
+                          <span>D: {lines.reduce((sum, l) => sum + (Number(l.debit_amount) || 0), 0).toLocaleString('sv-SE', { minimumFractionDigits: 2 })}</span>
+                          <span>K: {lines.reduce((sum, l) => sum + (Number(l.credit_amount) || 0), 0).toLocaleString('sv-SE', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Desktop: table */}
+                    <div className="hidden sm:block">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-muted-foreground">
+                          <th className="py-2 w-48">Konto</th>
+                          <th className="py-2">Beskrivning</th>
+                          <th className="py-2 w-28 text-right">Debet</th>
+                          <th className="py-2 w-28 text-right">Kredit</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {lines
+                          .sort((a, b) => a.sort_order - b.sort_order)
+                          .map((line) => (
+                            <tr key={line.id} className="border-b last:border-0">
+                              <td className="py-2"><AccountNumber number={line.account_number} showName /></td>
+                              <td className="py-2 text-muted-foreground">
+                                {line.line_description || ''}
+                              </td>
+                              <td className="py-2 text-right">
+                                {Number(line.debit_amount) > 0
+                                  ? Number(line.debit_amount).toLocaleString('sv-SE', {
+                                      minimumFractionDigits: 2,
+                                    })
+                                  : ''}
+                              </td>
+                              <td className="py-2 text-right">
+                                {Number(line.credit_amount) > 0
+                                  ? Number(line.credit_amount).toLocaleString('sv-SE', {
+                                      minimumFractionDigits: 2,
+                                    })
+                                  : ''}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="font-semibold">
+                          <td colSpan={2} className="py-2">
+                            Summa
+                          </td>
+                          <td className="py-2 text-right">
+                            {lines
+                              .reduce((sum, l) => sum + (Number(l.debit_amount) || 0), 0)
+                              .toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-2 text-right">
+                            {lines
+                              .reduce((sum, l) => sum + (Number(l.credit_amount) || 0), 0)
+                              .toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                    </div>
+                  </>
                   )}
 
                   <JournalEntryAttachments

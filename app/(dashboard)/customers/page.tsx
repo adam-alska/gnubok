@@ -107,9 +107,9 @@ export default function CustomersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Kunder</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Kunder</h1>
           <p className="text-muted-foreground">
             Hantera dina kunder och deras faktureringsuppgifter
           </p>
@@ -121,7 +121,7 @@ export default function CustomersPage() {
               Ny kund
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-2xl max-h-[95dvh] sm:max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Lägg till kund</DialogTitle>
             </DialogHeader>

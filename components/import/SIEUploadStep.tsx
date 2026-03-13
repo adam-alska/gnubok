@@ -103,8 +103,10 @@ export default function SIEUploadStep({ onFileSelect, isLoading, error }: SIEUpl
               <div className="space-y-4">
                 <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
                 <div>
-                  <p className="font-medium">Dra och släpp SIE-fil här</p>
-                  <p className="text-sm text-muted-foreground">eller klicka för att välja fil</p>
+                  <p className="font-medium hidden sm:block">Dra och släpp SIE-fil här</p>
+                  <p className="font-medium sm:hidden">Tryck för att välja SIE-fil</p>
+                  <p className="text-sm text-muted-foreground hidden sm:block">eller klicka för att välja fil</p>
+                  <p className="text-sm text-muted-foreground sm:hidden">.sie eller .se-filer</p>
                 </div>
               </div>
             )}
