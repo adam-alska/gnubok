@@ -378,8 +378,6 @@ async function importVouchers(
 
   const preparedVouchers: PreparedVoucher[] = []
 
-  console.log(`[sie-import] Processing ${parsed.vouchers.length} vouchers, accountMap has ${accountMap.size} mappings`)
-
   for (const voucher of parsed.vouchers) {
     const lines: PreparedVoucher['lines'] = []
     let hasUnmappedAccount = false
@@ -461,7 +459,7 @@ async function importVouchers(
       continue
     }
 
-    // Validate balance — Fix 2: Tiered rounding with öresutjämning (3740)
+    // Validate balance — Fix 2: Tiered rounding with öresutjämning (3741)
     const totalDebit = lines.reduce((sum, l) => sum + l.debit_amount, 0)
     const totalCredit = lines.reduce((sum, l) => sum + l.credit_amount, 0)
     const balanceDiff = Math.round(Math.abs(totalDebit - totalCredit) * 100) / 100
@@ -518,60 +516,6 @@ async function importVouchers(
       unbalanced: results.skippedDetails.filter(d => d.reason === 'unbalanced'),
     }
 
-    console.log(`[sie-import] ── Skipped voucher summary ──`)
-    console.log(`[sie-import] Total: ${results.skippedDetails.length} skipped out of ${parsed.vouchers.length} (${preparedVouchers.length} will be imported)`)
-
-    if (byReason.unmapped.length > 0) {
-      const allUnmapped = new Set<string>()
-      byReason.unmapped.forEach(d => d.unmappedAccounts?.forEach(a => allUnmapped.add(a)))
-      console.log(`[sie-import] UNMAPPED (${byReason.unmapped.length}): accounts not in mapping: [${[...allUnmapped].sort().join(', ')}]`)
-      for (const d of byReason.unmapped) {
-        console.log(`[sie-import]   ${d.voucherId} ${d.date} unmapped=[${d.unmappedAccounts?.join(',')}] lines=${d.originalLineCount}→${d.mappedLineCount} "${d.description}"`)
-        for (const sl of d.sourceLines || []) {
-          const mapped = accountMap.has(sl.account) ? '✓' : '✗'
-          console.log(`[sie-import]     ${mapped} ${sl.account} ${sl.amount >= 0 ? '+' : ''}${sl.amount}`)
-        }
-      }
-    }
-
-    if (byReason.empty.length > 0) {
-      console.log(`[sie-import] EMPTY (${byReason.empty.length}):`)
-      for (const d of byReason.empty) {
-        console.log(`[sie-import]   ${d.voucherId} ${d.date} lines=${d.originalLineCount}→${d.mappedLineCount} "${d.description}"`)
-      }
-    }
-
-    if (byReason.singleLine.length > 0) {
-      console.log(`[sie-import] SINGLE-LINE (${byReason.singleLine.length}):`)
-      for (const d of byReason.singleLine) {
-        console.log(`[sie-import]   ${d.voucherId} ${d.date} lines=${d.originalLineCount}→${d.mappedLineCount} "${d.description}"`)
-      }
-    }
-
-    if (byReason.unbalanced.length > 0) {
-      const accountFrequency = new Map<string, number>()
-      for (const d of byReason.unbalanced) {
-        for (const sl of d.sourceLines || []) {
-          accountFrequency.set(sl.account, (accountFrequency.get(sl.account) || 0) + 1)
-        }
-      }
-      const topAccounts = [...accountFrequency.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10)
-        .map(([acc, count]) => `${acc}(×${count})`)
-
-      console.log(`[sie-import] UNBALANCED (${byReason.unbalanced.length}): diff range ${Math.min(...byReason.unbalanced.map(d => d.balanceDiff!))} – ${Math.max(...byReason.unbalanced.map(d => d.balanceDiff!))} SEK`)
-      console.log(`[sie-import]   Most frequent accounts in unbalanced: ${topAccounts.join(', ')}`)
-      for (const d of byReason.unbalanced) {
-        console.log(`[sie-import]   ${d.voucherId} ${d.date} diff=${d.balanceDiff} debit=${d.totalDebit} credit=${d.totalCredit} lines=${d.originalLineCount} "${d.description}"`)
-        for (const sl of d.sourceLines || []) {
-          const mapped = accountMap.has(sl.account) ? '✓' : '✗'
-          console.log(`[sie-import]     ${mapped} ${sl.account} ${sl.amount >= 0 ? '+' : ''}${sl.amount}`)
-        }
-      }
-    }
-
-    console.log(`[sie-import] ── End skip summary ──`)
   }
 
   // Compute per-account net movements from vouchers that will be imported.
@@ -759,7 +703,6 @@ async function createMigrationAdjustmentEntry(
   const hasRES = parsed.resultBalances.some((b) => b.yearIndex === 0)
 
   if (!hasUB && !hasRES) {
-    console.log('[sie-import] No UB/RES data in SIE file — skipping migration adjustment')
     return { entryId: null, deltaAccounts: 0, warnings }
   }
 
@@ -836,7 +779,6 @@ async function createMigrationAdjustmentEntry(
   }
 
   if (lines.length === 0) {
-    console.log('[sie-import] No UB/RES delta — imported movements match expected')
     return { entryId: null, deltaAccounts: 0, warnings }
   }
 
@@ -844,8 +786,6 @@ async function createMigrationAdjustmentEntry(
   const totalDebit = lines.reduce((sum, l) => sum + l.debit_amount, 0)
   const totalCredit = lines.reduce((sum, l) => sum + l.credit_amount, 0)
   const balanceDiff = Math.round(Math.abs(totalDebit - totalCredit) * 100) / 100
-
-  console.log(`[sie-import] Migration adjustment: ${lines.length} accounts, debit=${Math.round(totalDebit * 100) / 100}, credit=${Math.round(totalCredit * 100) / 100}, diff=${balanceDiff}`)
 
   if (balanceDiff > 0.005) {
     const roundedDiff = Math.round((totalDebit - totalCredit) * 100) / 100
@@ -886,8 +826,6 @@ async function createMigrationAdjustmentEntry(
     voucher_series: 'M',
     lines,
   })
-
-  console.log(`[sie-import] Created migration adjustment entry ${entry.id} with ${lines.length} lines`)
 
   return { entryId: entry.id, deltaAccounts: deltaAccountCount, warnings }
 }
@@ -1273,7 +1211,7 @@ export async function executeSIEImport(
         }
       }
 
-      // Ensure öresutjämning account 3740 exists in the user's chart
+      // Ensure öresutjämning account 3741 exists in the user's chart
       await ensureAccountExists(supabase, userId, '3741', 'Öresutjämning vid import')
 
       const voucherResults = await importVouchers(

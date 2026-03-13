@@ -1091,10 +1091,17 @@ export default function ArcimMigrationWorkspace(_props: WorkspaceComponentProps)
 
       await loadPreview(callbackConsentId)
     } else if (migrationStatus === 'error') {
+      const callbackProvider = url.searchParams.get('provider') as ArcimProvider | null
       url.searchParams.delete('migration')
+      url.searchParams.delete('provider')
       window.history.replaceState({}, '', url.pathname)
       setError('OAuth-anslutningen misslyckades. Försök igen.')
-      setStep('connect')
+      if (callbackProvider) {
+        setSelectedProvider(callbackProvider)
+        setStep('connect')
+      } else {
+        setStep('provider')
+      }
     }
   }, [loadPreview])
 

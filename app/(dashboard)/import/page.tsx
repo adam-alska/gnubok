@@ -740,6 +740,15 @@ type ImportMode = null | 'psd2' | 'bank' | 'sie' | 'migration'
 
 export default function ImportPage() {
   const [mode, setMode] = useState<ImportMode>(null)
+  const [userId, setUserId] = useState('')
+
+  // Fetch authenticated user ID for migration wizard
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserId(user.id)
+    })
+  }, [])
 
   // Auto-detect OAuth callback from migration extension
   useEffect(() => {
@@ -899,7 +908,7 @@ export default function ImportPage() {
       {mode === 'psd2' && <PSD2ConnectWizard />}
       {mode === 'bank' && <BankFileImportWizard />}
       {mode === 'sie' && <SIEImportWizard />}
-      {mode === 'migration' && <MigrationWizard userId="" />}
+      {mode === 'migration' && <MigrationWizard userId={userId} />}
     </div>
   )
 }
