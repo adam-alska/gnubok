@@ -507,17 +507,6 @@ async function importVouchers(
     })
   }
 
-  // Log detailed skip summary
-  if (results.skippedDetails.length > 0) {
-    const byReason = {
-      unmapped: results.skippedDetails.filter(d => d.reason === 'unmapped'),
-      empty: results.skippedDetails.filter(d => d.reason === 'zero_lines'),
-      singleLine: results.skippedDetails.filter(d => d.reason === 'single_line'),
-      unbalanced: results.skippedDetails.filter(d => d.reason === 'unbalanced'),
-    }
-
-  }
-
   // Compute per-account net movements from vouchers that will be imported.
   // Used for UB/RES reconciliation to generate migration adjustment entries.
   for (const v of preparedVouchers) {

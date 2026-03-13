@@ -4,6 +4,7 @@ import {
   startAuthorization,
   getASPSPs,
   deleteSession,
+  isSandboxMode,
   type ASPSP,
 } from './lib/api-client'
 import { syncAccountTransactions } from './lib/sync'
@@ -45,7 +46,7 @@ export const enableBankingExtension: Extension = {
             logo: aspsp.logo,
             bic: aspsp.bic,
           }))
-          return NextResponse.json({ banks })
+          return NextResponse.json({ banks, sandbox: isSandboxMode() })
         } catch (error) {
           log.error('Error fetching banks:', error)
           return NextResponse.json({
@@ -54,7 +55,8 @@ export const enableBankingExtension: Extension = {
               { name: 'SEB', country: 'SE', bic: 'ESSESESS' },
               { name: 'Swedbank', country: 'SE', bic: 'SWEDSESS' },
               { name: 'Handelsbanken', country: 'SE', bic: 'HANDSESS' },
-            ]
+            ],
+            sandbox: isSandboxMode(),
           })
         }
       },

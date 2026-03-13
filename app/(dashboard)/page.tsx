@@ -37,6 +37,7 @@ export default async function DashboardPage() {
     { data: settings },
     { count: customerCount },
     { count: invoiceCount },
+    { count: receiptCount },
     { count: transactionCount },
     { data: journalLines },
     { data: transactions },
@@ -48,12 +49,14 @@ export default async function DashboardPage() {
     { count: unmatchedTransactionsCount },
     { count: postedEntriesCount },
     { data: entriesWithDocs },
+    { data: recentReceiptActivity },
     { data: enabledToggles },
   ] = await Promise.all([
     supabase.from('profiles').select('full_name').eq('id', user.id).single(),
     supabase.from('company_settings').select('*').eq('user_id', user.id).single(),
     supabase.from('customers').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
     supabase.from('invoices').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+    supabase.from('receipts').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
     supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
     supabase.from('journal_entry_lines')
       .select('account_number, debit_amount, credit_amount, journal_entry:journal_entries!inner(entry_date, status)')
@@ -69,6 +72,7 @@ export default async function DashboardPage() {
     supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('user_id', user.id).lt('amount', 0).is('receipt_id', null),
     supabase.from('journal_entries').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'posted').in('source_type', needsDocSourceTypes),
     supabase.from('document_attachments').select('journal_entry_id').eq('user_id', user.id).eq('is_current_version', true).not('journal_entry_id', 'is', null),
+    supabase.from('receipts').select('created_at').eq('user_id', user.id).eq('status', 'confirmed').order('created_at', { ascending: false }).limit(30),
     supabase.from('extension_toggles').select('sector_slug, extension_slug').eq('user_id', user.id).eq('enabled', true),
   ])
 
@@ -169,11 +173,27 @@ export default async function DashboardPage() {
 
   const missingUnderlagCount = Math.max(0, (postedEntriesCount || 0) - uniqueEntriesWithDocs)
 
+  let streakCount = 0
+  if (recentReceiptActivity && recentReceiptActivity.length > 0) {
+    const todayDate = new Date()
+    todayDate.setHours(0, 0, 0, 0)
+
+    const activityDates = new Set(
+      recentReceiptActivity.map((r) => new Date(r.created_at).toISOString().split('T')[0])
+    )
+
+    const checkDate = new Date(todayDate)
+    while (activityDates.has(checkDate.toISOString().split('T')[0])) {
+      streakCount++
+      checkDate.setDate(checkDate.getDate() - 1)
+    }
+  }
+
   const receiptQueue: ReceiptQueueSummary = {
     unmatched_receipts_count: unmatchedReceiptsCount || 0,
     unmatched_transactions_count: unmatchedTransactionsCount || 0,
     pending_review_count: pendingReviewCount || 0,
-    streak_count: 0,
+    streak_count: streakCount,
   }
 
   return (

@@ -97,7 +97,6 @@ export function detectEncoding(buffer: ArrayBuffer): SIEEncoding {
   // Check for #FORMAT PC8 in the first 500 bytes (ASCII-safe, works regardless of encoding)
   const headerSize = Math.min(bytes.length, 500)
   const FORMAT_PC8 = [0x23, 0x46, 0x4f, 0x52, 0x4d, 0x41, 0x54, 0x20, 0x50, 0x43, 0x38]
-  // "#FORMAT PC8" as ASCII bytes
   for (let i = 0; i <= headerSize - FORMAT_PC8.length; i++) {
     let match = true
     for (let j = 0; j < FORMAT_PC8.length; j++) {
@@ -119,6 +118,16 @@ export function detectEncoding(buffer: ArrayBuffer): SIEEncoding {
 
   for (let i = 0; i < sampleSize; i++) {
     const byte = bytes[i]
+
+    // Check for CP437 Swedish characters
+    if (CP437_MAP[byte]) {
+      cp437Count++
+    }
+
+    // Check for Windows-1252 Swedish characters
+    if (WIN1252_SWEDISH_BYTES.has(byte)) {
+      win1252Count++
+    }
 
     // Check for UTF-8 multi-byte sequences for Swedish chars
     // Ä = C3 84, Å = C3 85, Ö = C3 96, ä = C3 A4, å = C3 A5, ö = C3 B6

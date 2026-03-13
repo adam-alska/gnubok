@@ -168,7 +168,14 @@ async function authenticatedFetch(
  * Get list of supported banks (ASPSPs) for a country
  */
 export async function getASPSPs(country: string = 'SE'): Promise<ASPSP[]> {
-  const response = await authenticatedFetch(`/aspsps?country=${country}`)
+  const psuType = process.env.ENABLE_BANKING_PSU_TYPE || 'business'
+  const isSandbox = ENABLE_BANKING_API_URL.includes('tilisy')
+  const params = new URLSearchParams({
+    country,
+    sandbox: String(isSandbox),
+    psu_type: psuType,
+  })
+  const response = await authenticatedFetch(`/aspsps?${params.toString()}`)
 
   if (!response.ok) {
     const error = await response.text()
@@ -444,6 +451,13 @@ export async function getTransactions(
 ): Promise<BankTransaction[]> {
   const transactions = await getAllTransactions(accountUid, fromDate, toDate)
   return transactions.map(tx => convertTransaction(tx, accountCurrency))
+}
+
+/**
+ * Whether the current configuration targets the sandbox API
+ */
+export function isSandboxMode(): boolean {
+  return ENABLE_BANKING_API_URL.includes('tilisy')
 }
 
 // Utility functions

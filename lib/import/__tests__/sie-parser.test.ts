@@ -493,7 +493,6 @@ describe('detectEncoding — range-based discrimination', () => {
     expect(encoding).toBe('utf8')
   })
 })
-
 describe('detectEncoding — Windows-1252', () => {
   it('detects Windows-1252 when Swedish chars use Win-1252 byte values', () => {
     // Build a buffer with Windows-1252 encoded Swedish text: "#FNAMN Företag"
