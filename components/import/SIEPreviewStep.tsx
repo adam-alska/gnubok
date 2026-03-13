@@ -13,6 +13,7 @@ import {
   XCircle,
   ArrowRight,
   BarChart3,
+  Info,
 } from 'lucide-react'
 import type { ImportPreview, ParseIssue } from '@/lib/import/types'
 
@@ -225,6 +226,16 @@ export default function SIEPreviewStep({
           </div>
         </CardContent>
       </Card>
+
+      {/* Excluded system accounts info */}
+      {preview.excludedSystemAccounts.length > 0 && (
+        <div className="flex items-start gap-2 rounded-lg border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+          <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <span>
+            {preview.excludedSystemAccounts.length} internt systemkonto från källsystemet exkluderades ({preview.excludedSystemAccounts.map((a) => a.number).join(', ')}) — inte bokföringskonton
+          </span>
+        </div>
+      )}
 
       {/* Create missing accounts */}
       {missingAccounts.length > 0 && (

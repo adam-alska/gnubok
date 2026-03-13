@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
-import { ArrowLeftRight, FileText, ArrowLeft, Landmark, Loader2 } from 'lucide-react'
+import { ArrowLeftRight, ArrowRightLeft, FileText, ArrowLeft, Landmark, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { BankSelector, type Bank } from '@/extensions/general/enable-banking/components/BankSelector'
 import { BankConnectionStatus } from '@/extensions/general/enable-banking/components/BankConnectionStatus'
@@ -39,6 +39,12 @@ import type {
 } from '@/lib/import/types'
 import type { BASAccount } from '@/types'
 import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
+import dynamic from 'next/dynamic'
+
+const MigrationWizard = dynamic(
+  () => import('@/components/extensions/general/ArcimMigrationWorkspace'),
+  { ssr: false, loading: () => <div className="flex items-center gap-3 text-muted-foreground p-6"><Loader2 className="h-5 w-5 animate-spin" />Laddar migreringsverktyg...</div> }
+)
 
 // ============================================================
 // Bank File Import Wizard Steps
@@ -730,15 +736,35 @@ function PSD2ConnectWizard() {
 // Import Page with Selection Cards
 // ============================================================
 
-type ImportMode = null | 'psd2' | 'bank' | 'sie'
+type ImportMode = null | 'psd2' | 'bank' | 'sie' | 'migration'
 
 export default function ImportPage() {
   const [mode, setMode] = useState<ImportMode>(null)
+  const [userId, setUserId] = useState('')
+
+  // Fetch authenticated user ID for migration wizard
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserId(user.id)
+    })
+  }, [])
+
+  // Auto-detect OAuth callback from migration extension
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('migration')) {
+      setMode('migration')
+    }
+  }, [])
   // If extension isn't compiled in, we know synchronously it's unavailable
   const bankingCompiledIn = ENABLED_EXTENSION_IDS.has('enable-banking')
   const [hasBankingExtension, setHasBankingExtension] = useState<boolean | null>(
     bankingCompiledIn ? null : false
   )
+
+  // Migration extension: show card when compiled in (no DB toggle needed,
+  // since the extensions marketplace is not exposed in the UI)
+  const hasMigrationExtension = ENABLED_EXTENSION_IDS.has('arcim-migration')
 
   useEffect(() => {
     if (!bankingCompiledIn) return
@@ -761,7 +787,7 @@ export default function ImportPage() {
       </div>
 
       {mode === null && (
-        <div className={`grid gap-4 ${hasBankingExtension !== false ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {hasBankingExtension === null && (
             <Card className="animate-pulse">
               <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
@@ -844,6 +870,31 @@ export default function ImportPage() {
               </p>
             </CardContent>
           </Card>
+
+          {hasMigrationExtension === true && (
+            <Card
+              role="button"
+              tabIndex={0}
+              className="cursor-pointer hover:border-primary/50 active:scale-[0.98] transition-all"
+              onClick={() => setMode('migration')}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMode('migration') } }}
+            >
+              <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
+                <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                  <ArrowRightLeft className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">Migrera från annat system</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Flytta bokföring, kunder, leverantörer och fakturor från Fortnox, Visma, Bokio, Björn Lundén eller Briox.
+                  </p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  SIE-data, kunder, leverantörer, fakturor
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
@@ -857,6 +908,7 @@ export default function ImportPage() {
       {mode === 'psd2' && <PSD2ConnectWizard />}
       {mode === 'bank' && <BankFileImportWizard />}
       {mode === 'sie' && <SIEImportWizard />}
+      {mode === 'migration' && <MigrationWizard userId={userId} />}
     </div>
   )
 }

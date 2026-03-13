@@ -7,7 +7,7 @@ import {
   decodeBuffer,
   calculateFileHash,
 } from '@/lib/import/sie-parser'
-import { suggestMappings, getMappingStats } from '@/lib/import/account-mapper'
+import { suggestMappings, getMappingStats, isSystemAccount } from '@/lib/import/account-mapper'
 import { generateImportPreview, checkDuplicateImport } from '@/lib/import/sie-import'
 import { BAS_REFERENCE } from '@/lib/bookkeeping/bas-data'
 import type { SIEAccountMappingRecord } from '@/lib/import/types'
@@ -78,6 +78,15 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
+    // Separate source-system internal accounts (e.g. Fortnox 0099) from
+    // real bookkeeping accounts. System accounts have no BAS equivalent and
+    // should not appear in the mapping step.
+    const excludedSystemAccounts = parsed.accounts
+      .filter((a) => isSystemAccount(a.number))
+      .map((a) => ({ number: a.number, name: a.name }))
+    const bookkeepingAccounts = parsed.accounts
+      .filter((a) => !isSystemAccount(a.number))
+
     // Fetch stored mappings from database
     const { data: storedMappings } = await supabase
       .from('sie_account_mappings')
@@ -88,13 +97,15 @@ export async function POST(request: Request) {
     // the user's active chart (~40 accounts). Accounts that match will be
     // auto-activated during the execute step.
     const mappings = suggestMappings(
-      parsed.accounts,
+      bookkeepingAccounts,
       BAS_REFERENCE,
       (storedMappings as SIEAccountMappingRecord[]) || undefined
     )
 
     // Generate preview
     const preview = generateImportPreview(parsed, mappings)
+    preview.excludedSystemAccounts = excludedSystemAccounts
+    preview.accountCount = bookkeepingAccounts.length
 
     // Calculate file hash for storage
     const fileHash = await calculateFileHash(content)

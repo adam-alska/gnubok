@@ -1016,7 +1016,6 @@ export interface CreateFiscalPeriodInput {
 export interface OnboardingProgress {
   hasCustomers: boolean
   hasInvoices: boolean
-  hasReceipts: boolean
   hasBankConnected: boolean
 }
 
