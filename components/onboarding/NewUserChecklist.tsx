@@ -25,7 +25,6 @@ interface NewUserChecklistProps {
   hasCustomers: boolean
   hasInvoices: boolean
   hasBankConnected: boolean
-  hasReceipts: boolean
   onDismiss?: () => void
   className?: string
 }
@@ -36,7 +35,6 @@ export default function NewUserChecklist({
   hasCustomers,
   hasInvoices,
   hasBankConnected,
-  hasReceipts,
   onDismiss,
   className,
 }: NewUserChecklistProps) {
@@ -77,13 +75,6 @@ export default function NewUserChecklist({
       description: 'Importera kontoutdrag från din bank',
       href: '/import',
       completed: hasBankConnected,
-    },
-    {
-      id: 'receipt',
-      label: 'Skanna ditt första kvitto',
-      description: 'Fotografera för automatisk bokföring',
-      href: '/receipts/scan',
-      completed: hasReceipts,
     },
   ]
 

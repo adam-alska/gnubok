@@ -383,7 +383,7 @@ describe('validateSIEFile', () => {
     expect(validation.errors.some((e) => e.includes('not balanced'))).toBe(true)
   })
 
-  it('adds warning for undefined account references', () => {
+  it('no longer warns about accounts referenced in #IB since parser auto-adds them', () => {
     const content = [
       '#FLAGGA 0',
       '#SIETYP 4',
@@ -394,9 +394,12 @@ describe('validateSIEFile', () => {
     ].join('\n')
 
     const parsed = parseSIEFile(content)
-    const validation = validateSIEFile(parsed)
+    // Parser now auto-adds 9999 to accounts list from #IB data
+    expect(parsed.accounts.map((a) => a.number)).toContain('9999')
 
-    expect(validation.warnings.some((w) => w.includes('9999') && w.includes('not defined'))).toBe(true)
+    const validation = validateSIEFile(parsed)
+    // No warning since account was auto-added by the parser
+    expect(validation.warnings.some((w) => w.includes('9999') && w.includes('not defined'))).toBe(false)
   })
 
   it('adds error for missing #RAR', () => {
@@ -436,6 +439,60 @@ describe('validateSIEFile', () => {
 
 // --- Fix 2: Windows-1252 encoding detection and decoding ---
 
+describe('detectEncoding — #FORMAT PC8 detection', () => {
+  it('returns cp437 when #FORMAT PC8 is present in the first 500 bytes', () => {
+    const text = '#FLAGGA 0\n#FORMAT PC8\n#SIETYP 4\n'
+    const encoder = new TextEncoder()
+    const buf = encoder.encode(text)
+    const encoding = detectEncoding(buf.buffer)
+    expect(encoding).toBe('cp437')
+  })
+
+  it('returns cp437 even when Win-1252 bytes follow #FORMAT PC8', () => {
+    // #FORMAT PC8 header should take priority over any byte analysis
+    const prefix = new TextEncoder().encode('#FORMAT PC8\n#FNAMN F')
+    const buf = new Uint8Array(prefix.length + 3)
+    buf.set(prefix)
+    buf[prefix.length] = 0xf6     // ö in Win-1252
+    buf[prefix.length + 1] = 0xe4 // ä in Win-1252
+    buf[prefix.length + 2] = 0xe5 // å in Win-1252
+    const encoding = detectEncoding(buf.buffer)
+    expect(encoding).toBe('cp437')
+  })
+})
+
+describe('detectEncoding — range-based discrimination', () => {
+  it('detects CP437 when bytes are in 0x80-0x9F range only', () => {
+    // 0x84=ä, 0x86=å, 0x94=ö in CP437 — all in 0x80-0x9F
+    const buf = new Uint8Array([0x23, 0x84, 0x86, 0x94, 0x84, 0x86])
+    const encoding = detectEncoding(buf.buffer)
+    expect(encoding).toBe('cp437')
+  })
+
+  it('detects Win-1252 when bytes are in 0xC0-0xFF range only', () => {
+    // 0xE4=ä, 0xE5=å, 0xF6=ö in Win-1252 — all in 0xC0-0xFF
+    const buf = new Uint8Array([0x23, 0xe4, 0xe5, 0xf6, 0xe4, 0xe5])
+    const encoding = detectEncoding(buf.buffer)
+    expect(encoding).toBe('windows1252')
+  })
+
+  it('does not double-count UTF-8 continuation bytes as CP437', () => {
+    // UTF-8: ä = C3 A4, å = C3 A5, ö = C3 B6
+    // Without skipping, 0xA4/0xA5/0xB6 are NOT in CP437 map so no false count,
+    // but 0x84/0x85 ARE in CP437 map — test that C3 84 (Ä in UTF-8) is not
+    // counted as CP437 0x84 (ä)
+    const buf = new Uint8Array([
+      0x23, // #
+      0xc3, 0x84, // Ä in UTF-8
+      0xc3, 0x85, // Å in UTF-8
+      0xc3, 0x96, // Ö in UTF-8
+      0xc3, 0xa4, // ä in UTF-8
+      0xc3, 0xa5, // å in UTF-8
+    ])
+    const encoding = detectEncoding(buf.buffer)
+    expect(encoding).toBe('utf8')
+  })
+})
 describe('detectEncoding — Windows-1252', () => {
   it('detects Windows-1252 when Swedish chars use Win-1252 byte values', () => {
     // Build a buffer with Windows-1252 encoded Swedish text: "#FNAMN Företag"
@@ -660,5 +717,84 @@ describe('parseSIEFile — missing amount handling', () => {
     expect(result.openingBalances).toHaveLength(1)
     expect(result.openingBalances[0].account).toBe('1930')
     expect(result.openingBalances[0].amount).toBe(100000)
+  })
+})
+
+// --- Fix B4: Account collection from transaction data ---
+
+describe('parseSIEFile — account collection from transaction data', () => {
+  it('adds accounts from #TRANS that are missing from #KONTO', () => {
+    const content = [
+      '#FLAGGA 0',
+      '#SIETYP 4',
+      '#FNAMN "Test"',
+      '#RAR 0 20240101 20241231',
+      '#KONTO 1510 "Kundfordringar"',
+      // 3001 is NOT defined in #KONTO but used in #TRANS
+      '#VER A 1 20240115 "Test"',
+      '{',
+      '#TRANS 1510 {} 10000.00',
+      '#TRANS 3001 {} -10000.00',
+      '}',
+    ].join('\n')
+
+    const result = parseSIEFile(content)
+    // Should have both 1510 (from #KONTO) and 3001 (from #TRANS)
+    expect(result.accounts.map((a) => a.number)).toContain('1510')
+    expect(result.accounts.map((a) => a.number)).toContain('3001')
+    // The auto-added account should have empty name
+    const added = result.accounts.find((a) => a.number === '3001')
+    expect(added?.name).toBe('')
+  })
+
+  it('adds accounts from #IB that are missing from #KONTO', () => {
+    const content = [
+      '#FLAGGA 0',
+      '#SIETYP 4',
+      '#FNAMN "Test"',
+      '#RAR 0 20240101 20241231',
+      '#KONTO 1510 "Kundfordringar"',
+      '#IB 0 1510 50000.00',
+      '#IB 0 2440 -50000.00',  // 2440 not in #KONTO
+    ].join('\n')
+
+    const result = parseSIEFile(content)
+    expect(result.accounts.map((a) => a.number)).toContain('2440')
+  })
+
+  it('does not duplicate accounts already in #KONTO', () => {
+    const content = [
+      '#FLAGGA 0',
+      '#SIETYP 4',
+      '#FNAMN "Test"',
+      '#RAR 0 20240101 20241231',
+      '#KONTO 1510 "Kundfordringar"',
+      '#KONTO 3001 "Försäljning"',
+      '#VER A 1 20240115 "Test"',
+      '{',
+      '#TRANS 1510 {} 10000.00',
+      '#TRANS 3001 {} -10000.00',
+      '}',
+    ].join('\n')
+
+    const result = parseSIEFile(content)
+    const count1510 = result.accounts.filter((a) => a.number === '1510').length
+    expect(count1510).toBe(1)
+  })
+
+  it('adds accounts from #UB and #RES that are missing from #KONTO', () => {
+    const content = [
+      '#FLAGGA 0',
+      '#SIETYP 4',
+      '#FNAMN "Test"',
+      '#RAR 0 20240101 20241231',
+      '#KONTO 1510 "Kundfordringar"',
+      '#UB 0 1930 100000.00',  // 1930 not in #KONTO
+      '#RES 0 3001 -50000.00', // 3001 not in #KONTO
+    ].join('\n')
+
+    const result = parseSIEFile(content)
+    expect(result.accounts.map((a) => a.number)).toContain('1930')
+    expect(result.accounts.map((a) => a.number)).toContain('3001')
   })
 })

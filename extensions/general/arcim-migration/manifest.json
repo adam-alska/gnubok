@@ -1,0 +1,19 @@
+{
+  "id": "arcim-migration",
+  "sector": "general",
+  "exportName": "arcimMigrationExtension",
+  "entryPoint": "@/extensions/general/arcim-migration",
+  "workspace": "@/components/extensions/general/ArcimMigrationWorkspace",
+  "requiredEnvVars": ["ARCIM_SYNC_GATEWAY_URL", "ARCIM_SYNC_API_KEY"],
+  "optionalEnvVars": [],
+  "npmDependencies": [],
+  "definition": {
+    "name": "Systemmigration (Arcim Sync)",
+    "category": "import",
+    "icon": "ArrowRightLeft",
+    "dataPattern": "manual",
+    "hasOwnData": false,
+    "description": "Migrera bokföring från Fortnox, Visma, Bokio, Björn Lundén eller Briox",
+    "longDescription": "Flytta all bokföringsdata från ditt gamla system till gnubok. Importerar kontoplan, verifikationer, kunder, leverantörer och öppna fakturor automatiskt via säker API-integration."
+  }
+}

@@ -81,7 +81,6 @@ export default async function DashboardPage() {
   const onboardingProgress: OnboardingProgress = {
     hasCustomers: (customerCount || 0) > 0,
     hasInvoices: (invoiceCount || 0) > 0,
-    hasReceipts: (receiptCount || 0) > 0,
     hasBankConnected: (transactionCount || 0) > 0,
   }
 

@@ -2,8 +2,10 @@
 import type { Extension } from '../types'
 import { enableBankingExtension } from '@/extensions/general/enable-banking'
 import { emailExtension } from '@/extensions/general/email'
+import { arcimMigrationExtension } from '@/extensions/general/arcim-migration'
 
 export const FIRST_PARTY_EXTENSIONS: Extension[] = [
   enableBankingExtension,
   emailExtension,
+  arcimMigrationExtension,
 ]

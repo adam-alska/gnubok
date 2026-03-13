@@ -25,6 +25,25 @@ export type MappableAccount = {
   account_name: string
 }
 
+// Group header accounts that should redirect to their posting sub-account.
+// These are BAS group headers not meant for direct posting.
+const GROUP_HEADER_REDIRECTS: Record<string, string> = {
+  '2640': '2641', // Ingående moms → Debiterad ingående moms
+}
+
+/**
+ * Check if an account is a source-system internal account that should be
+ * excluded from import. BAS accounts use classes 1-8 (1000-8999). Account
+ * numbers starting with 0 (e.g. Fortnox 0099) are internal system accounts
+ * with no BAS equivalent — they should be silently filtered out rather than
+ * forcing the user to map them.
+ */
+export function isSystemAccount(accountNumber: string): boolean {
+  if (!/^\d{4}$/.test(accountNumber)) return false
+  const num = parseInt(accountNumber, 10)
+  return num < 1000
+}
+
 /**
  * Check if an account number is in the valid BAS range (1000-8999).
  * Standard Swedish BAS accounts are 4-digit numbers in classes 1-8.
@@ -60,6 +79,23 @@ function findBestMatch(
   )
 
   if (exactMatch) {
+    // Redirect group header accounts to their posting sub-account
+    const redirect = GROUP_HEADER_REDIRECTS[exactMatch.account_number]
+    if (redirect) {
+      const redirectTarget = basAccounts.find((a) => a.account_number === redirect)
+      if (redirectTarget) {
+        return {
+          sourceAccount: source.number,
+          sourceName: source.name,
+          targetAccount: redirectTarget.account_number,
+          targetName: redirectTarget.account_name,
+          confidence: 1.0,
+          matchType: 'exact',
+          isOverride: false,
+        }
+      }
+    }
+
     return {
       sourceAccount: source.number,
       sourceName: source.name,
@@ -80,7 +116,7 @@ function findBestMatch(
       sourceName: source.name,
       targetAccount: source.number,
       targetName: source.name,
-      confidence: 0.9,
+      confidence: 0.7,
       matchType: 'bas_range',
       isOverride: false,
     }

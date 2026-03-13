@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import DashboardNav from '@/components/dashboard/DashboardNav'
 import { RecaptIdentify } from '@/components/RecaptIdentify'
+import { SentryIdentify } from '@/components/SentryIdentify'
 import { SandboxBanner } from '@/components/dashboard/SandboxBanner'
 import type { EntityType } from '@/types'
 
@@ -60,6 +61,7 @@ export default async function DashboardLayout({
           {children}
         </div>
       </main>
+      <SentryIdentify userId={user.id} email={user.email} />
       {!isSandbox && (
         <RecaptIdentify
           userId={user.id}

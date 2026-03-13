@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generateImportPreview } from '../sie-import'
+import { generateImportPreview, validateIBBalance, isBalanceSheetAccount } from '../sie-import'
 import type { ParsedSIEFile, AccountMapping } from '../types'
 
 // --- Helpers ---
@@ -219,5 +219,118 @@ describe('generateImportPreview', () => {
       expect(preview.issues[0].severity).toBe('warning')
       expect(preview.issues[1].severity).toBe('error')
     })
+  })
+})
+
+describe('validateIBBalance', () => {
+  it('returns 0 roundingAdjustment when IB is balanced', () => {
+    const parsed = makeParsedFile({
+      openingBalances: [
+        { yearIndex: 0, account: '1510', amount: 50000 },
+        { yearIndex: 0, account: '2440', amount: -50000 },
+      ],
+    })
+    const accountMap = new Map([['1510', '1510'], ['2440', '2440']])
+    const result = validateIBBalance(parsed, accountMap)
+
+    expect(result.roundingAdjustment).toBe(0)
+    expect(result.fileImbalance).toBe(0)
+    expect(result.excludedAccountsTotal).toBe(0)
+    expect(result.lines).toHaveLength(2)
+  })
+
+  it('returns rounding adjustment for imbalance <= 1 SEK', () => {
+    const parsed = makeParsedFile({
+      openingBalances: [
+        { yearIndex: 0, account: '1510', amount: 50000.50 },
+        { yearIndex: 0, account: '2440', amount: -50000 },
+      ],
+    })
+    const accountMap = new Map([['1510', '1510'], ['2440', '2440']])
+    const result = validateIBBalance(parsed, accountMap)
+
+    expect(result.roundingAdjustment).toBe(0.5)
+    expect(result.fileImbalance).toBe(0.5)
+  })
+
+  it('returns large adjustment for file-level imbalance (unallocated årets resultat)', () => {
+    // Simulates a Fortnox export where previous year result hasn't been allocated
+    // to equity — BS accounts don't balance because årets resultat is implicit
+    const parsed = makeParsedFile({
+      openingBalances: [
+        { yearIndex: 0, account: '1510', amount: 50100 },
+        { yearIndex: 0, account: '2440', amount: -50000 },
+      ],
+    })
+    const accountMap = new Map([['1510', '1510'], ['2440', '2440']])
+    const result = validateIBBalance(parsed, accountMap)
+
+    // The adjustment is 100 SEK — caller should book to 2099, never reject
+    expect(result.roundingAdjustment).toBe(100)
+    expect(result.fileImbalance).toBe(100)
+    expect(result.excludedAccountsTotal).toBe(0)
+  })
+
+  it('tracks excluded accounts separately from file imbalance (Fortnox system accounts)', () => {
+    // Simulates Fortnox 0099 carrying IB balance — file is balanced,
+    // but mapped accounts are not because 0099 is excluded from mapping
+    const parsed = makeParsedFile({
+      openingBalances: [
+        { yearIndex: 0, account: '1510', amount: 50000 },
+        { yearIndex: 0, account: '2440', amount: -150000 },
+        { yearIndex: 0, account: '0099', amount: 100000 },  // System account, not mapped
+      ],
+    })
+    const accountMap = new Map([['1510', '1510'], ['2440', '2440']])
+    const result = validateIBBalance(parsed, accountMap)
+
+    // File-level: 50000 + (-150000) + 100000 = 0, balanced
+    expect(result.fileImbalance).toBe(0)
+    // Mapped-level: 50000 debit, 150000 credit = -100000 diff
+    expect(result.roundingAdjustment).toBe(-100000)
+    // The excluded 0099 accounts for the entire difference
+    expect(result.excludedAccountsTotal).toBe(100000)
+    // Only 2 lines (0099 excluded)
+    expect(result.lines).toHaveLength(2)
+  })
+
+  it('ignores non-current-year balances', () => {
+    const parsed = makeParsedFile({
+      openingBalances: [
+        { yearIndex: 0, account: '1510', amount: 50000 },
+        { yearIndex: 0, account: '2440', amount: -50000 },
+        { yearIndex: -1, account: '1510', amount: 99999 }, // Previous year — ignored
+      ],
+    })
+    const accountMap = new Map([['1510', '1510'], ['2440', '2440']])
+    const result = validateIBBalance(parsed, accountMap)
+
+    expect(result.roundingAdjustment).toBe(0)
+    expect(result.lines).toHaveLength(2)
+  })
+})
+
+describe('isBalanceSheetAccount', () => {
+  it('returns true for class 1 (assets)', () => {
+    expect(isBalanceSheetAccount('1510')).toBe(true)
+    expect(isBalanceSheetAccount('1930')).toBe(true)
+  })
+
+  it('returns true for class 2 (liabilities/equity)', () => {
+    expect(isBalanceSheetAccount('2099')).toBe(true)
+    expect(isBalanceSheetAccount('2440')).toBe(true)
+  })
+
+  it('returns false for class 3 (revenue)', () => {
+    expect(isBalanceSheetAccount('3001')).toBe(false)
+    expect(isBalanceSheetAccount('3740')).toBe(false)
+  })
+
+  it('returns false for class 4-8 (expenses)', () => {
+    expect(isBalanceSheetAccount('4010')).toBe(false)
+    expect(isBalanceSheetAccount('5010')).toBe(false)
+    expect(isBalanceSheetAccount('6211')).toBe(false)
+    expect(isBalanceSheetAccount('7210')).toBe(false)
+    expect(isBalanceSheetAccount('8999')).toBe(false)
   })
 })
