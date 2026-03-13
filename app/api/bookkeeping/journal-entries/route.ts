@@ -22,14 +22,26 @@ export async function GET(request: Request) {
   const offset = parseInt(searchParams.get('offset') || '0')
   const dateFrom = searchParams.get('date_from')
   const dateTo = searchParams.get('date_to')
+  const sortDate = searchParams.get('sort_date') // 'asc' | 'desc'
+
+  const dateAscending = sortDate === 'asc'
 
   let query = supabase
     .from('journal_entries')
     .select('*, lines:journal_entry_lines(*)', { count: 'exact' })
     .eq('user_id', user.id)
-    .order('voucher_series', { ascending: true })
-    .order('voucher_number', { ascending: true })
-    .range(offset, offset + limit - 1)
+
+  if (sortDate === 'asc' || sortDate === 'desc') {
+    query = query
+      .order('entry_date', { ascending: dateAscending })
+      .order('voucher_number', { ascending: dateAscending })
+  } else {
+    query = query
+      .order('voucher_series', { ascending: true })
+      .order('voucher_number', { ascending: true })
+  }
+
+  query = query.range(offset, offset + limit - 1)
 
   if (periodId) {
     query = query.eq('fiscal_period_id', periodId)
