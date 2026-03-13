@@ -8,6 +8,7 @@ import {
   getMappingStats,
   applyMappingOverride,
   mappingsToMap,
+  isSystemAccount,
 } from '../account-mapper'
 
 // --- Helpers ---
@@ -54,6 +55,8 @@ const basAccounts: BASAccount[] = [
   makeBASAccount('1510', 'Kundfordringar'),
   makeBASAccount('1930', 'Företagskonto'),
   makeBASAccount('2440', 'Leverantörsskulder'),
+  makeBASAccount('2640', 'Ingående moms'),
+  makeBASAccount('2641', 'Debiterad ingående moms'),
   makeBASAccount('3001', 'Försäljning varor 25%'),
   makeBASAccount('3002', 'Försäljning varor 12%'),
   makeBASAccount('5010', 'Lokalhyra'),
@@ -94,7 +97,7 @@ describe('suggestMappings', () => {
     expect(result).toHaveLength(1)
     expect(result[0].targetAccount).toBe('3400')
     expect(result[0].targetName).toBe('Försäljning tjänster')
-    expect(result[0].confidence).toBe(0.9)
+    expect(result[0].confidence).toBe(0.7)
     expect(result[0].matchType).toBe('bas_range')
   })
 
@@ -105,7 +108,7 @@ describe('suggestMappings', () => {
     expect(result).toHaveLength(1)
     expect(result[0].targetAccount).toBe('1241')
     expect(result[0].targetName).toBe('Personbilar')
-    expect(result[0].confidence).toBe(0.9)
+    expect(result[0].confidence).toBe(0.7)
     expect(result[0].matchType).toBe('bas_range')
   })
 
@@ -164,9 +167,9 @@ describe('suggestMappings', () => {
     // Unmapped (confidence 0) should come first
     expect(result[0].sourceAccount).toBe('9999')
     expect(result[0].confidence).toBe(0)
-    // bas_range (confidence 0.9) next
+    // bas_range (confidence 0.7) next
     expect(result[1].sourceAccount).toBe('3400')
-    expect(result[1].confidence).toBe(0.9)
+    expect(result[1].confidence).toBe(0.7)
     // Exact matches (confidence 1.0) come last
     expect(result[2].confidence).toBe(1.0)
     expect(result[3].confidence).toBe(1.0)
@@ -193,13 +196,33 @@ describe('suggestMappings', () => {
     expect(result).toHaveLength(0)
   })
 
+  it('redirects group header account 2640 to posting account 2641', () => {
+    const source = [makeSIEAccount('2640', 'Ingående moms')]
+    const result = suggestMappings(source, basAccounts)
+
+    expect(result).toHaveLength(1)
+    expect(result[0].sourceAccount).toBe('2640')
+    expect(result[0].targetAccount).toBe('2641')
+    expect(result[0].targetName).toBe('Debiterad ingående moms')
+    expect(result[0].confidence).toBe(1.0)
+    expect(result[0].matchType).toBe('exact')
+  })
+
+  it('does not redirect 2641 (it is the posting account, not a group header)', () => {
+    const source = [makeSIEAccount('2641', 'Debiterad ingående moms')]
+    const result = suggestMappings(source, basAccounts)
+
+    expect(result).toHaveLength(1)
+    expect(result[0].targetAccount).toBe('2641')
+  })
+
   it('handles empty BAS accounts — bas_range fallback for valid accounts', () => {
     const source = [makeSIEAccount('1510', 'Kundfordringar')]
     const result = suggestMappings(source, [])
 
     expect(result).toHaveLength(1)
     expect(result[0].targetAccount).toBe('1510')
-    expect(result[0].confidence).toBe(0.9)
+    expect(result[0].confidence).toBe(0.7)
     expect(result[0].matchType).toBe('bas_range')
   })
 
@@ -360,8 +383,8 @@ describe('getMappingStats', () => {
     )
     const stats = getMappingStats(mappings)
 
-    // Average of (1.0 + 0.9) / 2 = 0.95
-    expect(stats.averageConfidence).toBe(0.95)
+    // Average of (1.0 + 0.7) / 2 = 0.85
+    expect(stats.averageConfidence).toBe(0.85)
   })
 
   it('returns 0 average confidence when nothing is mapped', () => {
@@ -444,5 +467,55 @@ describe('mappingsToMap', () => {
     expect(map.get('1510')).toBe('1510')
     expect(map.has('9999')).toBe(false)
     expect(map.size).toBe(1)
+  })
+})
+
+describe('isSystemAccount', () => {
+  it('returns true for Fortnox system account 0099', () => {
+    expect(isSystemAccount('0099')).toBe(true)
+  })
+
+  it('returns true for other 0xxx accounts', () => {
+    expect(isSystemAccount('0001')).toBe(true)
+    expect(isSystemAccount('0500')).toBe(true)
+    expect(isSystemAccount('0999')).toBe(true)
+  })
+
+  it('returns false for valid BAS accounts (1000-8999)', () => {
+    expect(isSystemAccount('1000')).toBe(false)
+    expect(isSystemAccount('1510')).toBe(false)
+    expect(isSystemAccount('3001')).toBe(false)
+    expect(isSystemAccount('8999')).toBe(false)
+  })
+
+  it('returns false for 9000+ accounts (handled separately as out-of-range)', () => {
+    expect(isSystemAccount('9000')).toBe(false)
+    expect(isSystemAccount('9999')).toBe(false)
+  })
+
+  it('returns false for non-4-digit numbers', () => {
+    expect(isSystemAccount('099')).toBe(false)
+    expect(isSystemAccount('00099')).toBe(false)
+    expect(isSystemAccount('abc')).toBe(false)
+    expect(isSystemAccount('')).toBe(false)
+  })
+
+  it('allows pre-filtering system accounts before suggestMappings', () => {
+    const allAccounts = [
+      makeSIEAccount('0099', 'Systemkonto'),
+      makeSIEAccount('1510', 'Kundfordringar'),
+      makeSIEAccount('1930', 'Företagskonto'),
+    ]
+
+    const bookkeepingAccounts = allAccounts.filter((a) => !isSystemAccount(a.number))
+    const excluded = allAccounts.filter((a) => isSystemAccount(a.number))
+
+    expect(bookkeepingAccounts).toHaveLength(2)
+    expect(excluded).toHaveLength(1)
+    expect(excluded[0].number).toBe('0099')
+
+    const mappings = suggestMappings(bookkeepingAccounts, basAccounts)
+    expect(mappings).toHaveLength(2)
+    expect(mappings.every((m) => m.targetAccount)).toBe(true)
   })
 })

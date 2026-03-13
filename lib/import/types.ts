@@ -39,6 +39,7 @@ export interface SIEHeader {
   // Fiscal year info
   fiscalYears: FiscalYearInfo[]    // #RAR
   currency: string                 // #VALUTA (default SEK)
+  kontoPlanType: string | null     // #KPTYP (e.g. 'BAS95', 'BAS96', 'EUBAS')
 }
 
 /**
@@ -189,6 +190,7 @@ export interface SIEImport {
   fiscal_period_id: string | null
   opening_balance_entry_id: string | null
   imported_at: string | null
+  migration_documentation: MigrationDocumentation | null
   created_at: string
   updated_at: string
 }
@@ -284,8 +286,63 @@ export interface ImportPreview {
     lowConfidence: number
   }
 
+  // Source-system accounts excluded from import (e.g. Fortnox 0099)
+  excludedSystemAccounts: { number: string; name: string }[]
+
   // Issues to review
   issues: ParseIssue[]
+}
+
+/**
+ * Structured systemdokumentation per BFNAR 2013:2 Chapter 9.
+ * Generated at the end of a SIE import and stored in sie_imports.migration_documentation.
+ */
+export interface MigrationDocumentation {
+  // Source system info
+  sourceSystem: string | null       // from #PROGRAM
+  sourceVersion: string | null
+  sieType: number
+  generatedDate: string | null      // from #GEN
+
+  // Import scope
+  fiscalYear: { start: string; end: string }
+  importedAt: string
+  importedBy: string                // user_id
+
+  // Account mapping
+  accountMappings: {
+    total: number
+    exact: number
+    basRange: number
+    manual: number
+    unmapped: number
+  }
+
+  // Voucher statistics
+  vouchers: {
+    total: number
+    imported: number
+    skippedUnbalanced: number
+    skippedUnmapped: number
+    skippedSingleLine: number
+    skippedEmpty: number
+  }
+
+  // Adjustments
+  openingBalanceRounding: number | null  // SEK amount if any
+  migrationAdjustment: {
+    created: boolean
+    deltaAccounts: number
+    entryId: string | null
+  }
+
+  // Voucher number mapping
+  voucherSeriesUsed: string
+  voucherNumberRange: { from: number; to: number } | null
+  voucherNumberMapping: Array<{
+    sourceId: string    // e.g. "A1"
+    targetNumber: number
+  }>
 }
 
 /**

@@ -252,7 +252,6 @@ export default function DashboardContent({ firstName, settings, summary, onboard
             hasCustomers={onboardingProgress.hasCustomers}
             hasInvoices={onboardingProgress.hasInvoices}
             hasBankConnected={onboardingProgress.hasBankConnected}
-            hasReceipts={onboardingProgress.hasReceipts}
           />
         </section>
       )}

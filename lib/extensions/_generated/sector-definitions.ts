@@ -30,5 +30,15 @@ export const EXTENSION_DEFINITIONS: Record<string, ExtensionDefinition[]> = {
                 "company_settings"
           ]
     },
+    {
+          "slug": "arcim-migration",
+          "name": "Systemmigration (Arcim Sync)",
+          "sector": "general",
+          "category": "import",
+          "icon": "ArrowRightLeft",
+          "dataPattern": "manual",
+          "description": "Migrera bokföring från Fortnox, Visma, Bokio, Björn Lundén eller Briox",
+          "longDescription": "Flytta all bokföringsdata från ditt gamla system till gnubok. Importerar kontoplan, verifikationer, kunder, leverantörer och öppna fakturor automatiskt via säker API-integration."
+    },
   ],
 }

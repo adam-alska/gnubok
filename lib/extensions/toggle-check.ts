@@ -13,6 +13,7 @@ const LEGACY_GENERAL_EXTENSIONS = [
   'ai-categorization',
   'ai-chat',
   'enable-banking',
+  'arcim-migration',
 ]
 
 export async function isExtensionEnabled(

@@ -24,21 +24,43 @@ import type {
   ValidationResult,
 } from './types'
 
-// CP437 to UTF-8 mapping for Swedish characters
-// CP437 was the standard encoding for DOS/early Windows
+// CP437 to UTF-8 mapping — full 0x80-0x9F range
+// CP437 was the standard encoding for DOS/early Windows (used by SIE #FORMAT PC8)
 const CP437_MAP: Record<number, string> = {
+  // 0x80-0x8F
+  0x80: 'Ç',  // Ç
+  0x81: 'ü',  // ü
+  0x82: 'é',  // é
+  0x83: 'â',  // â
+  0x84: 'ä',  // ä
+  0x85: 'à',  // à
+  0x86: 'å',  // å
+  0x87: 'ç',  // ç
+  0x88: 'ê',  // ê
+  0x89: 'ë',  // ë
+  0x8a: 'è',  // è
+  0x8b: 'ï',  // ï
+  0x8c: 'î',  // î
+  0x8d: 'ì',  // ì
   0x8e: 'Ä',  // Ä
   0x8f: 'Å',  // Å
-  0x99: 'Ö',  // Ö
-  0x84: 'ä',  // ä
-  0x86: 'å',  // å
-  0x94: 'ö',  // ö
-  0x81: 'ü',  // ü
-  0x9a: 'Ü',  // Ü
-  0x92: 'Æ',  // Æ (not common but in CP437)
+  // 0x90-0x9F
+  0x90: 'É',  // É
   0x91: 'æ',  // æ
+  0x92: 'Æ',  // Æ
+  0x93: 'ô',  // ô
+  0x94: 'ö',  // ö
+  0x95: 'ò',  // ò
+  0x96: 'û',  // û
+  0x97: 'ù',  // ù
+  0x98: 'ÿ',  // ÿ
+  0x99: 'Ö',  // Ö
+  0x9a: 'Ü',  // Ü
+  0x9b: 'ø',  // ø (Norwegian)
+  0x9c: '£',  // £
   0x9d: 'Ø',  // Ø (Norwegian)
-  0x9b: 'ø',  // ø
+  0x9e: '×',  // ×
+  0x9f: 'ƒ',  // ƒ
 }
 
 // Windows-1252 bytes for Swedish characters (superset of ISO-8859-1)
@@ -53,7 +75,16 @@ const WIN1252_SWEDISH_BYTES = new Set([
 ])
 
 /**
- * Detect the encoding of a SIE file by looking for Swedish characters
+ * Detect the encoding of a SIE file by looking for Swedish characters.
+ *
+ * Strategy:
+ * 1. UTF-8 BOM → utf8
+ * 2. `#FORMAT PC8` in raw bytes → cp437 (SIE standard header for CP437)
+ * 3. Range-based discrimination: CP437 Swedish chars live in 0x80-0x9F,
+ *    Windows-1252 Swedish chars live in 0xC0-0xFF. These ranges don't overlap,
+ *    so presence in one range rules out the other.
+ * 4. UTF-8 multi-byte sequences (0xC3 + continuation) are detected with proper
+ *    skipping of continuation bytes to avoid false CP437 counts.
  */
 export function detectEncoding(buffer: ArrayBuffer): SIEEncoding {
   const bytes = new Uint8Array(buffer)
@@ -63,24 +94,31 @@ export function detectEncoding(buffer: ArrayBuffer): SIEEncoding {
     return 'utf8'
   }
 
-  // Look for encoding-specific Swedish characters in first 1000 bytes
-  const sampleSize = Math.min(bytes.length, 1000)
-  let cp437Count = 0
-  let utf8Count = 0
-  let win1252Count = 0
+  // Check for #FORMAT PC8 in the first 500 bytes (ASCII-safe, works regardless of encoding)
+  const headerSize = Math.min(bytes.length, 500)
+  const FORMAT_PC8 = [0x23, 0x46, 0x4f, 0x52, 0x4d, 0x41, 0x54, 0x20, 0x50, 0x43, 0x38]
+  // "#FORMAT PC8" as ASCII bytes
+  for (let i = 0; i <= headerSize - FORMAT_PC8.length; i++) {
+    let match = true
+    for (let j = 0; j < FORMAT_PC8.length; j++) {
+      if (bytes[i + j] !== FORMAT_PC8[j]) {
+        match = false
+        break
+      }
+    }
+    if (match) {
+      return 'cp437'
+    }
+  }
+
+  // Scan sample for encoding-specific byte ranges
+  const sampleSize = Math.min(bytes.length, 2000)
+  let cp437Count = 0   // Swedish chars in 0x80-0x9F (CP437 range)
+  let utf8Count = 0     // Valid UTF-8 multi-byte Swedish sequences
+  let win1252Count = 0  // Swedish chars in 0xC0-0xFF (Win-1252 range)
 
   for (let i = 0; i < sampleSize; i++) {
     const byte = bytes[i]
-
-    // Check for CP437 Swedish characters
-    if (CP437_MAP[byte]) {
-      cp437Count++
-    }
-
-    // Check for Windows-1252 Swedish characters
-    if (WIN1252_SWEDISH_BYTES.has(byte)) {
-      win1252Count++
-    }
 
     // Check for UTF-8 multi-byte sequences for Swedish chars
     // Ä = C3 84, Å = C3 85, Ö = C3 96, ä = C3 A4, å = C3 A5, ö = C3 B6
@@ -88,7 +126,19 @@ export function detectEncoding(buffer: ArrayBuffer): SIEEncoding {
       const nextByte = bytes[i + 1]
       if ([0x84, 0x85, 0x96, 0xa4, 0xa5, 0xb6].includes(nextByte)) {
         utf8Count++
+        i++ // Skip continuation byte to avoid false CP437 count (e.g. 0x84 = ä in CP437)
+        continue
       }
+    }
+
+    // CP437 Swedish chars live in 0x80-0x9F
+    if (byte >= 0x80 && byte <= 0x9f && CP437_MAP[byte]) {
+      cp437Count++
+    }
+
+    // Windows-1252 Swedish chars live in 0xC0-0xFF
+    if (WIN1252_SWEDISH_BYTES.has(byte)) {
+      win1252Count++
     }
   }
 
@@ -277,6 +327,7 @@ export function parseSIEFile(content: string): ParsedSIEFile {
     address: null,
     fiscalYears: [],
     currency: 'SEK',
+    kontoPlanType: null,
   }
 
   const accounts: SIEAccount[] = []
@@ -375,6 +426,10 @@ export function parseSIEFile(content: string): ParsedSIEFile {
 
         case 'VALUTA':
           header.currency = parseStringField(fields[1]) || 'SEK'
+          break
+
+        case 'KPTYP':
+          header.kontoPlanType = parseStringField(fields[1])
           break
 
         case 'RAR': {
@@ -516,10 +571,16 @@ export function parseSIEFile(content: string): ParsedSIEFile {
           break
         }
 
-        case 'TRANS': {
-          // #TRANS accountNumber {objectList} amount [date] [description] [quantity] [signature]
+        case 'TRANS':
+        case 'RTRANS':
+        case 'BTRANS': {
+          // #TRANS/#RTRANS/#BTRANS accountNumber {objectList} amount [date] [description] [quantity] [signature]
+          // BTRANS = Added/corrected transaction lines (part of the voucher)
+          // RTRANS = Removed/reversed transaction lines (amounts already have correct sign)
+          // All three must be included for vouchers to balance correctly.
+          // Fortnox/Bokio/Visma only emit #TRANS — this is a no-op for those providers.
           if (!currentVoucher) {
-            addIssue(issues, 'error', lineNum, 'TRANS outside of VER block', tag)
+            addIssue(issues, 'error', lineNum, `${tag} outside of VER block`, tag)
             break
           }
 
@@ -534,7 +595,7 @@ export function parseSIEFile(content: string): ParsedSIEFile {
 
           const transAmountStr = fields[fieldIndex]
           if (!transAmountStr || transAmountStr.trim() === '') {
-            addIssue(issues, 'warning', lineNum, 'Missing amount in #TRANS, skipping line', tag)
+            addIssue(issues, 'warning', lineNum, `Missing amount in #${tag}, skipping line`, tag)
             break
           }
 
@@ -563,17 +624,9 @@ export function parseSIEFile(content: string): ParsedSIEFile {
           break
         }
 
-        case 'RTRANS':
-        case 'BTRANS':
-          // BTRANS = Balance transactions (preliminary/carried-forward balances)
-          // RTRANS = Reversed/corrected transactions
-          // These are supplementary lines and should NOT be included in balance validation
-          // or imported as regular transaction lines. Skip them.
-          break
-
         default:
           // Unknown tag - add info issue for notable ones
-          if (!['KSUMMA', 'BKOD', 'TAXAR', 'OMFATTN', 'KPTYP', 'DIM', 'OBJEKT', 'OIB', 'OUB', 'PBUDGET', 'PSALDO'].includes(tag)) {
+          if (!['KSUMMA', 'BKOD', 'TAXAR', 'OMFATTN', 'DIM', 'OBJEKT', 'OIB', 'OUB', 'PBUDGET', 'PSALDO'].includes(tag)) {
             addIssue(issues, 'info', lineNum, `Unknown tag: #${tag}`, tag)
           }
       }
@@ -586,6 +639,28 @@ export function parseSIEFile(content: string): ParsedSIEFile {
         tag
       )
     }
+  }
+
+  // Collect accounts referenced in balances and vouchers but missing from #KONTO
+  const definedAccountNumbers = new Set(accounts.map((a) => a.number))
+  const referencedAccounts = new Set<string>()
+
+  for (const balance of [...openingBalances, ...closingBalances, ...resultBalances]) {
+    if (balance.account && !definedAccountNumbers.has(balance.account)) {
+      referencedAccounts.add(balance.account)
+    }
+  }
+  for (const voucher of vouchers) {
+    for (const line of voucher.lines) {
+      if (line.account && !definedAccountNumbers.has(line.account)) {
+        referencedAccounts.add(line.account)
+      }
+    }
+  }
+
+  for (const accountNumber of referencedAccounts) {
+    accounts.push({ number: accountNumber, name: '' })
+    addIssue(issues, 'info', 0, `Account ${accountNumber} added from transaction data (not in #KONTO)`)
   }
 
   // Calculate statistics
@@ -635,6 +710,17 @@ export function validateSIEFile(parsed: ParsedSIEFile): ValidationResult {
   // Check for accounts
   if (parsed.accounts.length === 0) {
     warnings.push('No accounts found (#KONTO)')
+  }
+
+  // Warn if non-BAS kontoplan declared — mapping logic assumes BAS number ranges
+  if (parsed.header.kontoPlanType) {
+    const planType = parsed.header.kontoPlanType.toUpperCase()
+    const isBAS = planType.startsWith('BAS') || planType === 'EUBAS' || planType === 'EU-BAS'
+    if (!isBAS) {
+      warnings.push(
+        `Kontoplanstyp "${parsed.header.kontoPlanType}" är inte BAS-baserad. Alla kontomappningar bör granskas manuellt.`
+      )
+    }
   }
 
   // Check for unbalanced vouchers
