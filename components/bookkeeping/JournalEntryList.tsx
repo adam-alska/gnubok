@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { ChevronDown, ChevronRight, Paperclip, AlertTriangle } from 'lucide-react'
+import { ArrowDownNarrowWide, ArrowUpNarrowWide, ChevronDown, ChevronRight, Paperclip, AlertTriangle } from 'lucide-react'
 import { AccountNumber } from '@/components/ui/account-number'
 import JournalEntryAttachments from '@/components/bookkeeping/JournalEntryAttachments'
 import CorrectionEntryDialog from '@/components/bookkeeping/CorrectionEntryDialog'
@@ -34,6 +34,7 @@ export default function JournalEntryList({ periodId }: Props) {
   const [attachmentCounts, setAttachmentCounts] = useState<Record<string, number>>({})
   const [showMissingOnly, setShowMissingOnly] = useState(false)
   const [correctionEntry, setCorrectionEntry] = useState<JournalEntry | null>(null)
+  const [dateSortDir, setDateSortDir] = useState<'desc' | 'asc'>('desc')
   const pageSize = 20
 
   const fetchAttachmentCounts = useCallback(async (entryIds: string[]) => {
@@ -54,6 +55,7 @@ export default function JournalEntryList({ periodId }: Props) {
     const params = new URLSearchParams({
       limit: String(pageSize),
       offset: String(page * pageSize),
+      sort_date: dateSortDir,
     })
     if (periodId) params.set('period_id', periodId)
 
@@ -71,7 +73,7 @@ export default function JournalEntryList({ periodId }: Props) {
 
   useEffect(() => {
     fetchEntries()
-  }, [periodId, page])
+  }, [periodId, page, dateSortDir])
 
   const handleAttachmentCountChange = useCallback((entryId: string, count: number) => {
     setAttachmentCounts((prev) => ({ ...prev, [entryId]: count }))
@@ -112,21 +114,36 @@ export default function JournalEntryList({ periodId }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Missing attachment filter */}
-      <div className="flex items-center gap-2">
-        <Switch
-          id="missing-attachments"
-          checked={showMissingOnly}
-          onCheckedChange={setShowMissingOnly}
-        />
-        <Label htmlFor="missing-attachments" className="text-sm cursor-pointer">
-          Visa saknade underlag
-        </Label>
-        {showMissingOnly && (
-          <Badge variant="secondary" className="text-xs">
-            {filteredEntries.length}
-          </Badge>
-        )}
+      {/* Filters and sorting */}
+      <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Switch
+            id="missing-attachments"
+            checked={showMissingOnly}
+            onCheckedChange={setShowMissingOnly}
+          />
+          <Label htmlFor="missing-attachments" className="text-sm cursor-pointer">
+            Visa saknade underlag
+          </Label>
+          {showMissingOnly && (
+            <Badge variant="secondary" className="text-xs">
+              {filteredEntries.length}
+            </Badge>
+          )}
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1.5"
+          onClick={() => { setDateSortDir(dateSortDir === 'desc' ? 'asc' : 'desc'); setPage(0) }}
+        >
+          {dateSortDir === 'desc' ? (
+            <ArrowDownNarrowWide className="h-4 w-4" />
+          ) : (
+            <ArrowUpNarrowWide className="h-4 w-4" />
+          )}
+          <span className="text-xs">Datum {dateSortDir === 'desc' ? 'nyast först' : 'äldst först'}</span>
+        </Button>
       </div>
 
       <div className="space-y-2">
