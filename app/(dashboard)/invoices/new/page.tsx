@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useForm, useFieldArray, Controller } from 'react-hook-form'
@@ -69,6 +69,7 @@ export default function NewInvoicePage() {
   const [, setDefaultNotes] = useState<string | null>(null)
   const [isCreateCustomerOpen, setIsCreateCustomerOpen] = useState(false)
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false)
+  const pendingCustomerRef = useRef<Customer | null>(null)
 
   const {
     register,
@@ -106,6 +107,16 @@ export default function NewInvoicePage() {
   const watchCurrency = watch('currency')
   const watchCustomerId = watch('customer_id')
   const watchDocumentType = watch('document_type') as InvoiceDocumentType
+
+  // After customers state updates with the new customer, select it
+  useEffect(() => {
+    const pending = pendingCustomerRef.current
+    if (pending && customers.some((c) => c.id === pending.id)) {
+      setValue('customer_id', pending.id, { shouldValidate: true, shouldDirty: true })
+      setSelectedCustomer(pending)
+      pendingCustomerRef.current = null
+    }
+  }, [customers, setValue])
 
   useEffect(() => {
     fetchCustomers()
@@ -189,8 +200,8 @@ export default function NewInvoicePage() {
         title: 'Kund skapad',
         description: `${data.name} har lagts till`,
       })
-      setCustomers([...customers, result.data])
-      setValue('customer_id', result.data.id)
+      pendingCustomerRef.current = result.data
+      setCustomers(prev => [...prev, result.data])
       setIsCreateCustomerOpen(false)
     }
 
@@ -426,9 +437,18 @@ export default function NewInvoicePage() {
                     <div key={field.id} className="grid gap-4 md:grid-cols-12 items-start">
                       <div className="md:col-span-3 space-y-2">
                         <Label>Beskrivning</Label>
-                        <Input
-                          placeholder="T.ex. Instagram-kampanj"
-                          {...register(`items.${index}.description`)}
+                        <Controller
+                          name={`items.${index}.description`}
+                          control={control}
+                          render={({ field }) => (
+                            <Input
+                              placeholder="T.ex. Instagram-kampanj"
+                              value={field.value}
+                              onChange={field.onChange}
+                              onBlur={field.onBlur}
+                              ref={field.ref}
+                            />
+                          )}
                         />
                         {errors.items?.[index]?.description && (
                           <p className="text-sm text-destructive">
@@ -438,10 +458,24 @@ export default function NewInvoicePage() {
                       </div>
                       <div className="md:col-span-2 space-y-2">
                         <Label>Antal</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          {...register(`items.${index}.quantity`, { valueAsNumber: true })}
+                        <Controller
+                          name={`items.${index}.quantity`}
+                          control={control}
+                          render={({ field }) => (
+                            <Input
+                              type="text"
+                              inputMode="decimal"
+                              value={field.value}
+                              onChange={(e) => {
+                                const v = e.target.value
+                                if (v === '' || /^[0-9]*[.,]?[0-9]*$/.test(v)) {
+                                  field.onChange(v === '' ? 0 : Number(v.replace(',', '.')))
+                                }
+                              }}
+                              onBlur={field.onBlur}
+                              ref={field.ref}
+                            />
+                          )}
                         />
                       </div>
                       <div className="md:col-span-2 space-y-2">
@@ -467,10 +501,24 @@ export default function NewInvoicePage() {
                       </div>
                       <div className="md:col-span-2 space-y-2">
                         <Label>à-pris</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          {...register(`items.${index}.unit_price`, { valueAsNumber: true })}
+                        <Controller
+                          name={`items.${index}.unit_price`}
+                          control={control}
+                          render={({ field }) => (
+                            <Input
+                              type="text"
+                              inputMode="decimal"
+                              value={field.value}
+                              onChange={(e) => {
+                                const v = e.target.value
+                                if (v === '' || /^[0-9]*[.,]?[0-9]*$/.test(v)) {
+                                  field.onChange(v === '' ? 0 : Number(v.replace(',', '.')))
+                                }
+                              }}
+                              onBlur={field.onBlur}
+                              ref={field.ref}
+                            />
+                          )}
                         />
                       </div>
                       <div className="md:col-span-2 space-y-2">
