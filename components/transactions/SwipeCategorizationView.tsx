@@ -300,7 +300,7 @@ export default function SwipeCategorizationView({
           <div className="h-16 w-16 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-4">
             <Check className="h-8 w-8 text-success" />
           </div>
-          <h2 className="text-2xl font-bold">Klart!</h2>
+          <h2 className="font-display text-2xl font-medium">Klart!</h2>
           <p className="text-muted-foreground mt-2">
             Alla transaktioner är nu bokförda
           </p>
@@ -329,7 +329,7 @@ export default function SwipeCategorizationView({
         <Card className="mx-4 mt-3">
           <CardContent className="pt-4">
             <p className="font-medium">{currentTransaction.description}</p>
-            <p className="text-2xl font-bold mt-2">
+            <p className="font-display text-2xl font-medium tabular-nums mt-2">
               {formatCurrency(Math.abs(currentTransaction.amount), currentTransaction.currency)}
             </p>
           </CardContent>
@@ -397,7 +397,7 @@ export default function SwipeCategorizationView({
             <CardContent className="pt-4 space-y-1">
               <p className="font-medium">{currentTransaction.description}</p>
               <p className="text-sm text-muted-foreground">{formatDate(currentTransaction.date)}</p>
-              <p className="text-2xl font-bold mt-2">
+              <p className="font-display text-2xl font-medium tabular-nums mt-2">
                 {currentTransaction.amount > 0 ? '+' : ''}
                 {formatCurrency(currentTransaction.amount, currentTransaction.currency)}
               </p>

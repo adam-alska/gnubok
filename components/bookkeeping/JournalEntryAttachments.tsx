@@ -53,7 +53,7 @@ export default function JournalEntryAttachments({
       setDocuments(data || [])
       onCountChangeRef.current?.(data?.length || 0)
     } catch {
-      console.error('Failed to fetch documents')
+      // Non-critical — silently ignore
     } finally {
       setLoading(false)
     }
@@ -82,7 +82,7 @@ export default function JournalEntryAttachments({
         window.open(data.download_url, '_blank')
       }
     } catch {
-      console.error('Failed to get download URL')
+      // Non-critical — silently ignore
     }
   }
 
@@ -103,7 +103,7 @@ export default function JournalEntryAttachments({
           )
         }
       } catch {
-        console.error('Failed to get preview URL')
+        // Non-critical — silently ignore
         return
       }
     }
