@@ -47,8 +47,8 @@ export default function DeadlinesPage() {
       setOverdueInvoices({ count: overdueCount, total: overdueTotal })
     } catch {
       toast({
-        title: 'Fel',
-        description: 'Kunde inte hamta data',
+        title: 'Kunde inte ladda deadlines',
+        description: 'Kontrollera din anslutning och försök igen.',
         variant: 'destructive',
       })
     } finally {
@@ -83,8 +83,8 @@ export default function DeadlinesPage() {
       fetchData()
     } catch (error) {
       toast({
-        title: 'Fel',
-        description: error instanceof Error ? error.message : 'Kunde inte skapa deadline',
+        title: 'Kunde inte skapa deadline',
+        description: error instanceof Error ? error.message : 'Försök igen.',
         variant: 'destructive',
       })
       throw error
@@ -111,8 +111,8 @@ export default function DeadlinesPage() {
       fetchData()
     } catch (error) {
       toast({
-        title: 'Fel',
-        description: error instanceof Error ? error.message : 'Kunde inte uppdatera deadline',
+        title: 'Kunde inte uppdatera status',
+        description: error instanceof Error ? error.message : 'Försök igen.',
         variant: 'destructive',
       })
     }
@@ -139,8 +139,8 @@ export default function DeadlinesPage() {
       fetchData()
     } catch (error) {
       toast({
-        title: 'Fel',
-        description: error instanceof Error ? error.message : 'Kunde inte uppdatera deadline',
+        title: 'Kunde inte spara ändringar',
+        description: error instanceof Error ? error.message : 'Försök igen.',
         variant: 'destructive',
       })
     }
@@ -164,8 +164,8 @@ export default function DeadlinesPage() {
       fetchData()
     } catch (error) {
       toast({
-        title: 'Fel',
-        description: error instanceof Error ? error.message : 'Kunde inte ta bort deadline',
+        title: 'Kunde inte ta bort deadline',
+        description: error instanceof Error ? error.message : 'Försök igen.',
         variant: 'destructive',
       })
     }

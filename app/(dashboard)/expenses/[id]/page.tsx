@@ -46,7 +46,7 @@ export default function ExpenseDetailPage() {
     const res = await fetch(`/api/supplier-invoices/${params.id}`)
     const { data, error } = await res.json()
     if (error) {
-      toast({ title: 'Fel', description: error, variant: 'destructive' })
+      toast({ title: 'Kunde inte ladda utgift', description: error, variant: 'destructive' })
     } else {
       setInvoice(data)
       setPayAmount(String(data.remaining_amount))
@@ -76,7 +76,7 @@ export default function ExpenseDetailPage() {
     const res = await fetch(`/api/supplier-invoices/${params.id}/approve`, { method: 'POST' })
     const result = await res.json()
     if (!res.ok) {
-      toast({ title: 'Fel', description: result.error, variant: 'destructive' })
+      toast({ title: 'Kunde inte godkänna', description: result.error, variant: 'destructive' })
     } else {
       toast({ title: 'Godkänd', description: 'Utgiften har godkänts' })
       fetchInvoice()
@@ -93,7 +93,7 @@ export default function ExpenseDetailPage() {
     })
     const result = await res.json()
     if (!res.ok) {
-      toast({ title: 'Fel', description: result.error, variant: 'destructive' })
+      toast({ title: 'Betalning misslyckades', description: result.error, variant: 'destructive' })
     } else {
       toast({
         title: result.status === 'paid' ? 'Betald' : 'Delbetalning registrerad',
@@ -117,7 +117,7 @@ export default function ExpenseDetailPage() {
     const res = await fetch(`/api/supplier-invoices/${params.id}/credit`, { method: 'POST' })
     const result = await res.json()
     if (!res.ok) {
-      toast({ title: 'Fel', description: result.error, variant: 'destructive' })
+      toast({ title: 'Kunde inte kreditera', description: result.error, variant: 'destructive' })
     } else {
       toast({ title: 'Kreditfaktura registrerad' })
       fetchInvoice()
@@ -136,7 +136,7 @@ export default function ExpenseDetailPage() {
     const res = await fetch(`/api/supplier-invoices/${params.id}`, { method: 'DELETE' })
     const result = await res.json()
     if (!res.ok) {
-      toast({ title: 'Fel', description: result.error, variant: 'destructive' })
+      toast({ title: 'Kunde inte ta bort', description: result.error, variant: 'destructive' })
     } else {
       toast({ title: 'Borttagen' })
       router.push('/expenses')

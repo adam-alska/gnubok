@@ -56,8 +56,8 @@ export default function CustomersPage() {
 
     if (error) {
       toast({
-        title: 'Fel',
-        description: 'Kunde inte hämta kunder',
+        title: 'Kunde inte ladda kunder',
+        description: 'Kontrollera din anslutning och försök igen.',
         variant: 'destructive',
       })
     } else {

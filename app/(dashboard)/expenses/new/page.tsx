@@ -194,7 +194,7 @@ export default function NewExpensePage() {
 
   async function handleCreateSupplier() {
     if (!newSupplier.name.trim()) {
-      toast({ title: 'Fel', description: 'Ange leverantörsnamn', variant: 'destructive' })
+      toast({ title: 'Namn saknas', description: 'Ange ett namn för leverantören.', variant: 'destructive' })
       return
     }
     setIsCreatingSupplier(true)
@@ -231,11 +231,11 @@ export default function NewExpensePage() {
 
   function onSubmit(data: FormData) {
     if (!data.supplier_id) {
-      toast({ title: 'Fel', description: 'Välj en leverantör', variant: 'destructive' })
+      toast({ title: 'Leverantör saknas', description: 'Välj eller skapa en leverantör.', variant: 'destructive' })
       return
     }
     if (!data.supplier_invoice_number) {
-      toast({ title: 'Fel', description: 'Ange fakturanummer', variant: 'destructive' })
+      toast({ title: 'Fakturanummer saknas', description: 'Ange leverantörens fakturanummer.', variant: 'destructive' })
       return
     }
 
