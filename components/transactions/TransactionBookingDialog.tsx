@@ -64,8 +64,7 @@ export default function TransactionBookingDialog({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ journal_entry_id: journalEntryId }),
           })
-        } catch (linkErr) {
-          console.error('[TransactionBookingDialog] Failed to link document:', linkErr)
+        } catch {
           linkFailCount++
         }
       }

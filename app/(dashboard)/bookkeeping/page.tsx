@@ -16,9 +16,9 @@ export default function BookkeepingPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Bokföring</h1>
+          <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">Bokföring</h1>
           <p className="text-muted-foreground">
-            Verifikationer, kontoplan och manuella bokföringsorder
+            Skapa verifikationer, hantera kontoplanen och bifoga underlag
           </p>
         </div>
         <Button variant="outline" asChild className="w-full sm:w-auto">

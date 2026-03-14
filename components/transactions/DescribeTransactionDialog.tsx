@@ -417,7 +417,7 @@ export default function DescribeTransactionDialog({
         {step === 'pick' && describeResult && (
           <div className="space-y-4 min-h-0 flex flex-col">
             {describeResult.needs_more_detail && (
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm">
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 text-warning-foreground text-sm">
                 <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
                 <p>Resultaten är osäkra. Försök beskriv mer detaljerat för bättre träffar.</p>
               </div>
@@ -465,7 +465,7 @@ export default function DescribeTransactionDialog({
                         {aiSuggestion.warnings.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1.5">
                             {aiSuggestion.warnings.map((warning, i) => (
-                              <Badge key={i} variant="outline" className="text-[10px] px-1.5 py-0 text-amber-600 border-amber-300">
+                              <Badge key={i} variant="outline" className="text-[10px] px-1.5 py-0 text-warning-foreground border-warning/30">
                                 {warning}
                               </Badge>
                             ))}
@@ -538,12 +538,12 @@ export default function DescribeTransactionDialog({
                               </Badge>
                             )}
                             {template.deductibility === 'non_deductible' && (
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-amber-600 border-amber-300">
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-warning-foreground border-warning/30">
                                 Ej avdragsgill
                               </Badge>
                             )}
                             {template.deductibility === 'conditional' && (
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-amber-600 border-amber-300">
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-warning-foreground border-warning/30">
                                 Villkorligt avdrag
                               </Badge>
                             )}
@@ -551,7 +551,7 @@ export default function DescribeTransactionDialog({
                           {(template.deductibility_note_sv || template.special_rules_sv) && selectedTemplateId === template.template_id && (
                             <div className="mt-2 space-y-1">
                               {template.deductibility_note_sv && (
-                                <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                                <p className="text-[11px] text-warning-foreground">
                                   {template.deductibility_note_sv}
                                 </p>
                               )}

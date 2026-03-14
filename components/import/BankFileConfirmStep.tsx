@@ -67,7 +67,7 @@ export default function BankFileConfirmStep({
                 <FileText className="h-4 w-4" />
                 <span className="text-xs">Transaktioner</span>
               </div>
-              <p className="text-xl font-bold">{stats.parsed_rows}</p>
+              <p className="text-xl font-display font-medium tabular-nums">{stats.parsed_rows}</p>
             </div>
 
             <div className="p-4 bg-muted/50 rounded-lg">
@@ -84,7 +84,7 @@ export default function BankFileConfirmStep({
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
                 <span className="text-xs">Inkomster</span>
               </div>
-              <p className="text-xl font-bold">
+              <p className="text-xl font-display font-medium tabular-nums">
                 {formatCurrency(stats.total_income)}
               </p>
             </div>
@@ -93,7 +93,7 @@ export default function BankFileConfirmStep({
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
                 <span className="text-xs">Utgifter</span>
               </div>
-              <p className="text-xl font-bold">
+              <p className="text-xl font-display font-medium tabular-nums">
                 {formatCurrency(stats.total_expenses)}
               </p>
             </div>
@@ -102,7 +102,7 @@ export default function BankFileConfirmStep({
           {/* Additional info */}
           {refsCount > 0 && (
             <div className="flex flex-wrap gap-2">
-              <Badge variant="outline" className="text-blue-600 border-blue-300">
+              <Badge variant="outline" className="text-primary border-primary/30">
                 <Link2 className="mr-1 h-3 w-3" />
                 {refsCount} med OCR/referens
               </Badge>

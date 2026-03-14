@@ -165,11 +165,11 @@ export default function NewSupplierInvoicePage() {
 
   function onSubmit(data: FormData) {
     if (!data.supplier_id) {
-      toast({ title: 'Fel', description: 'Välj en leverantör', variant: 'destructive' })
+      toast({ title: 'Leverantör saknas', description: 'Välj en leverantör innan du fortsätter.', variant: 'destructive' })
       return
     }
     if (!data.supplier_invoice_number) {
-      toast({ title: 'Fel', description: 'Ange fakturanummer', variant: 'destructive' })
+      toast({ title: 'Fakturanummer saknas', description: 'Ange leverantörens fakturanummer.', variant: 'destructive' })
       return
     }
 
@@ -229,7 +229,7 @@ export default function NewSupplierInvoicePage() {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Registrera leverantörsfaktura</h1>
+          <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">Registrera leverantörsfaktura</h1>
           <p className="text-muted-foreground">
             Registrera en inkommande faktura (uppfyller BFL verifikationskrav)
           </p>

@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { cn, formatCurrency } from '@/lib/utils'
 import { UpcomingDeadlinesWidget } from '@/components/deadlines/UpcomingDeadlinesWidget'
 import { TaxTodoWidget } from '@/components/deadlines/TaxTodoWidget'
@@ -12,7 +11,7 @@ import {
   Receipt,
   ArrowLeftRight,
   ChevronDown,
-  ChevronUp,
+  ChevronRight,
   Camera,
   Users,
   Landmark,
@@ -22,7 +21,7 @@ import {
 import { getExtensionDefinition } from '@/lib/extensions/sectors'
 import { resolveIcon } from '@/lib/extensions/icon-resolver'
 import type { QuickActionDefinition } from '@/lib/extensions/types'
-import type { CompanySettings, EntityType, Deadline, ReceiptQueueSummary, OnboardingProgress } from '@/types'
+import type { CompanySettings, Deadline, ReceiptQueueSummary, OnboardingProgress } from '@/types'
 
 interface DashboardContentProps {
   firstName?: string | null
@@ -70,8 +69,6 @@ export default function DashboardContent({ firstName, settings, summary, onboard
     return () => window.removeEventListener('extension-toggle-changed', handler)
   }, [])
 
-  const entityType = (settings?.entity_type as EntityType) || 'enskild_firma'
-
   const formatLargeNumber = (amount: number) => {
     return new Intl.NumberFormat('sv-SE', {
       style: 'decimal',
@@ -80,15 +77,13 @@ export default function DashboardContent({ firstName, settings, summary, onboard
     }).format(amount)
   }
 
-  const isNewUser = onboardingProgress && !onboardingProgress.hasInvoices && !onboardingProgress.hasCustomers
-
   // Build alert items for "Att hantera" section
   const alertItems: React.ReactNode[] = []
 
   if (summary.overdueInvoicesCount > 0) {
     alertItems.push(
       <Link key="overdue" href="/invoices?status=unpaid" className="group">
-        <Card className="h-full border-l-2 border-l-destructive hover:bg-muted/20 transition-colors">
+        <Card className="h-full border-destructive/30 hover:bg-destructive/[0.03] transition-colors">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <Receipt className="h-4 w-4 text-destructive flex-shrink-0" />
@@ -108,7 +103,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
   if (summary.unpaidInvoicesCount > 0 && summary.overdueInvoicesCount < summary.unpaidInvoicesCount) {
     alertItems.push(
       <Link key="unpaid" href="/invoices?status=unpaid" className="group">
-        <Card className="h-full border-l-2 border-l-warning hover:bg-muted/20 transition-colors">
+        <Card className="h-full border-warning/30 hover:bg-warning/[0.03] transition-colors">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <Receipt className="h-4 w-4 text-warning-foreground flex-shrink-0" />
@@ -128,7 +123,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
   if (summary.uncategorizedCount > 0) {
     alertItems.push(
       <Link key="transactions" href="/transactions" className="group">
-        <Card className="h-full border-l-2 border-l-warning hover:bg-muted/20 transition-colors">
+        <Card className="h-full border-warning/30 hover:bg-warning/[0.03] transition-colors">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <ArrowLeftRight className="h-4 w-4 text-warning-foreground flex-shrink-0" />
@@ -148,7 +143,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
   if (summary.receiptQueue && (summary.receiptQueue.pending_review_count > 0 || summary.receiptQueue.unmatched_receipts_count > 0)) {
     alertItems.push(
       <Link key="receipts" href="/receipts" className="group">
-        <Card className="h-full border-l-2 border-l-primary hover:bg-muted/20 transition-colors">
+        <Card className="h-full border-primary/30 hover:bg-primary/[0.03] transition-colors">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <Camera className="h-4 w-4 text-primary flex-shrink-0" />
@@ -170,7 +165,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
   if (summary.missingUnderlagCount > 0) {
     alertItems.push(
       <Link key="missing-underlag" href="/bookkeeping?missingUnderlag=true" className="group">
-        <Card className="h-full border-l-2 border-l-warning hover:bg-muted/20 transition-colors">
+        <Card className="h-full border-warning/30 hover:bg-warning/[0.03] transition-colors">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <FileWarning className="h-4 w-4 text-warning-foreground flex-shrink-0" />
@@ -191,7 +186,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
     const conn = summary.expiringBankConnections[0]
     alertItems.push(
       <Link key="bank-expiry" href="/settings?tab=banking" className="group">
-        <Card className="h-full border-l-2 border-l-warning hover:bg-muted/20 transition-colors">
+        <Card className="h-full border-warning/30 hover:bg-warning/[0.03] transition-colors">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <Landmark className="h-4 w-4 text-warning-foreground flex-shrink-0" />
@@ -229,19 +224,21 @@ export default function DashboardContent({ firstName, settings, summary, onboard
     { href: '/transactions', icon: ArrowLeftRight, label: 'Transaktioner', desc: 'Bokför' },
   ]
 
+  const hour = new Date().getHours()
+  const greeting = hour < 5 ? 'God natt' : hour < 10 ? 'Godmorgon' : hour < 14 ? 'Hej' : hour < 18 ? 'God eftermiddag' : 'God kväll'
+
+  const passedDeadlinesCount = summary.deadlines.filter(d => !d.is_completed && new Date(d.due_date) <= new Date()).length
+  const pendingReceiptsCount = summary.receiptQueue
+    ? summary.receiptQueue.pending_review_count + summary.receiptQueue.unmatched_receipts_count
+    : 0
+  const todoCount = summary.uncategorizedCount + summary.overdueInvoicesCount + pendingReceiptsCount + passedDeadlinesCount
+
   return (
     <div className="stagger-enter">
       {/* Header */}
-      <header className="mb-10">
+      <header className="mb-12">
         <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">
-          {(() => {
-            const hour = new Date().getHours()
-            if (hour < 5) return 'God natt'
-            if (hour < 10) return 'Godmorgon'
-            if (hour < 14) return 'Hej'
-            if (hour < 18) return 'God eftermiddag'
-            return 'God kväll'
-          })()}{firstName ? `, ${firstName}` : ''}
+          {greeting}{firstName ? `, ${firstName}` : ''}
         </h1>
       </header>
 
@@ -257,100 +254,96 @@ export default function DashboardContent({ firstName, settings, summary, onboard
       )}
 
       {/* 4 Key Summary Cards */}
-      {(() => {
-        const passedDeadlinesCount = summary.deadlines.filter(d => !d.is_completed && new Date(d.due_date) <= new Date()).length
-        const pendingReceiptsCount = summary.receiptQueue
-          ? summary.receiptQueue.pending_review_count + summary.receiptQueue.unmatched_receipts_count
-          : 0
-        const todoCount = summary.uncategorizedCount + summary.overdueInvoicesCount + pendingReceiptsCount + passedDeadlinesCount
+      <section className="mb-10">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {/* Card 1: Resultat */}
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground mb-2">Resultat</p>
+              <p className={cn(
+                'font-display text-xl font-medium tabular-nums leading-tight',
+                summary.mtd.net >= 0 ? 'text-success' : 'text-destructive'
+              )}>
+                {formatLargeNumber(summary.mtd.net)}
+                <span className="text-sm ml-0.5 text-muted-foreground font-normal">kr</span>
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {formatCurrency(summary.ytd.net)} i år
+              </p>
+            </CardContent>
+          </Card>
 
-        return (
-          <section className="mb-10">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {/* Card 1: Resultat */}
-              <Card>
+          {/* Card 2: Att få betalt */}
+          <Link href="/invoices?status=unpaid">
+            <Card className="h-full hover:border-primary/50 transition-colors cursor-pointer">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <p className="text-xs text-muted-foreground mb-2">Att få betalt</p>
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" />
+                </div>
+                <p className="font-display text-xl font-medium tabular-nums leading-tight">
+                  {summary.unpaidInvoicesCount}
+                  <span className="text-sm ml-0.5 text-muted-foreground font-normal">st</span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formatCurrency(summary.unpaidInvoicesTotal)}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          {/* Card 3: Banksaldo */}
+          {summary.bankBalance !== null ? (
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground mb-2">Banksaldo</p>
+                <p className="font-display text-xl font-medium tabular-nums leading-tight">
+                  {formatLargeNumber(summary.bankBalance)}
+                  <span className="text-sm ml-0.5 text-muted-foreground font-normal">kr</span>
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Link href="/import">
+              <Card className="h-full hover:border-primary/50 transition-colors cursor-pointer">
                 <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground mb-2">Resultat</p>
-                  <p className={cn(
-                    'font-display text-xl font-medium tabular-nums leading-tight',
-                    summary.mtd.net >= 0 ? 'text-success' : 'text-destructive'
-                  )}>
-                    {formatLargeNumber(summary.mtd.net)}
-                    <span className="text-sm ml-0.5 text-muted-foreground font-normal">kr</span>
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    {formatCurrency(summary.ytd.net)} i år
-                  </p>
+                  <div className="flex items-start justify-between">
+                    <p className="text-xs text-muted-foreground mb-2">Banksaldo</p>
+                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" />
+                  </div>
+                  <p className="text-sm font-medium text-primary">Koppla bank</p>
+                  <p className="text-xs text-muted-foreground mt-1">Importera transaktioner</p>
                 </CardContent>
               </Card>
+            </Link>
+          )}
 
-              {/* Card 2: Att få betalt */}
-              <Link href="/invoices?status=unpaid">
-                <Card className="h-full hover:border-primary/50 transition-colors">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-2">Att få betalt</p>
-                    <p className="font-display text-xl font-medium tabular-nums leading-tight">
-                      {summary.unpaidInvoicesCount}
+          {/* Card 4: Att göra */}
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground mb-2">Att göra</p>
+              <div role="status" aria-live="polite">
+                {todoCount > 0 ? (
+                  <>
+                    <p className="font-display text-xl font-medium tabular-nums leading-tight text-warning-foreground">
+                      {todoCount}
                       <span className="text-sm ml-0.5 text-muted-foreground font-normal">st</span>
                     </p>
-                    <p className="text-[11px] text-muted-foreground mt-1">
-                      {formatCurrency(summary.unpaidInvoicesTotal)}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Behöver åtgärdas
                     </p>
-                  </CardContent>
-                </Card>
-              </Link>
-
-              {/* Card 3: Banksaldo */}
-              {summary.bankBalance !== null ? (
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-2">Banksaldo</p>
-                    <p className="font-display text-xl font-medium tabular-nums leading-tight">
-                      {formatLargeNumber(summary.bankBalance)}
-                      <span className="text-sm ml-0.5 text-muted-foreground font-normal">kr</span>
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Link href="/import">
-                  <Card className="h-full hover:border-primary/50 transition-colors">
-                    <CardContent className="p-4">
-                      <p className="text-xs text-muted-foreground mb-2">Banksaldo</p>
-                      <p className="text-sm font-medium text-primary">Koppla bank</p>
-                      <p className="text-[11px] text-muted-foreground mt-1">Importera transaktioner</p>
-                    </CardContent>
-                  </Card>
-                </Link>
-              )}
-
-              {/* Card 4: Att göra */}
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground mb-2">Att göra</p>
-                  {todoCount > 0 ? (
-                    <>
-                      <p className="font-display text-xl font-medium tabular-nums leading-tight text-warning-foreground">
-                        {todoCount}
-                        <span className="text-sm ml-0.5 text-muted-foreground font-normal">st</span>
-                      </p>
-                      <p className="text-[11px] text-muted-foreground mt-1">
-                        Åtgärder att hantera
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-1.5">
-                        <CheckCircle2 className="h-4 w-4 text-success" />
-                        <p className="text-sm font-medium text-success">Allt klart!</p>
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </section>
-        )
-      })()}
+                  </>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="h-4 w-4 text-success" />
+                    <p className="text-sm font-medium text-success">Allt klart!</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
 
       {/* Quick actions */}
       <section id="quick-actions" className="mb-10">
@@ -361,7 +354,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
             return (
               <Link key={action.href} href={action.href} className="group">
                 <div className={cn(
-                  'flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors duration-150',
+                  'flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors duration-150 active:scale-[0.98]',
                   action.accent
                     ? 'border-primary/20 bg-primary/[0.03] hover:bg-primary/[0.06]'
                     : 'border-border/40 hover:bg-muted/30'
@@ -374,7 +367,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
                       )} />
                       {action.label}
                     </p>
-                    <p className="text-xs text-muted-foreground truncate hidden md:block">{action.desc}</p>
+                    <p className="text-xs text-muted-foreground truncate md:block">{action.desc}</p>
                   </div>
                 </div>
               </Link>
@@ -386,13 +379,13 @@ export default function DashboardContent({ firstName, settings, summary, onboard
             if (action.href) {
               return (
                 <Link key={action.key} href={action.href} className="group">
-                  <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/40 hover:bg-muted/30 transition-colors duration-150">
+                  <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/40 hover:bg-muted/30 active:scale-[0.98] transition-colors duration-150">
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate flex items-center gap-1.5">
                         <Icon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
                         {action.label}
                       </p>
-                      <p className="text-xs text-muted-foreground truncate hidden md:block">{action.description}</p>
+                      <p className="text-xs text-muted-foreground truncate md:block">{action.description}</p>
                     </div>
                   </div>
                 </Link>
@@ -404,13 +397,13 @@ export default function DashboardContent({ firstName, settings, summary, onboard
                 onClick={() => window.dispatchEvent(new Event(action.event!))}
                 className="group text-left"
               >
-                <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/40 hover:bg-muted/30 transition-colors duration-150">
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/40 hover:bg-muted/30 active:scale-[0.98] transition-colors duration-150">
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate flex items-center gap-1.5">
                       <Icon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
                       {action.label}
                     </p>
-                    <p className="text-xs text-muted-foreground truncate hidden md:block">{action.description}</p>
+                    <p className="text-xs text-muted-foreground truncate md:block">{action.description}</p>
                   </div>
                 </div>
               </button>
@@ -423,16 +416,18 @@ export default function DashboardContent({ firstName, settings, summary, onboard
       {alertItems.length > 0 && (
         <section id="alerts-section" className="mb-10">
           <h2 className="font-display text-lg font-medium mb-4">Att hantera</h2>
-          <div className="grid gap-3 md:grid-cols-2">
+          <div id="alerts-list" className="grid gap-3 md:grid-cols-2">
             {visibleAlerts}
           </div>
-          {hasMoreAlerts && !showAllAlerts && (
+          {hasMoreAlerts && (
             <button
-              onClick={() => setShowAllAlerts(true)}
-              className="mt-3 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+              onClick={() => setShowAllAlerts(!showAllAlerts)}
+              aria-expanded={showAllAlerts}
+              aria-controls="alerts-list"
+              className="mt-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
             >
-              Visa alla ({alertItems.length})
-              <ChevronDown className="h-3 w-3" />
+              {showAllAlerts ? 'Visa färre' : `Visa alla (${alertItems.length})`}
+              <ChevronDown className={cn('h-3 w-3 transition-transform', showAllAlerts && 'rotate-180')} />
             </button>
           )}
         </section>
@@ -440,7 +435,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
 
       {/* Upcoming deadlines — always visible */}
       {summary.deadlines && summary.deadlines.length > 0 && (
-        <section className="mb-10">
+        <section className="mb-8">
           <UpcomingDeadlinesWidget deadlines={summary.deadlines} maxItems={8} />
         </section>
       )}
@@ -452,27 +447,19 @@ export default function DashboardContent({ firstName, settings, summary, onboard
         </section>
       )}
 
-
       {/* Collapsible details section */}
       <button
         onClick={() => setShowMore(!showMore)}
-        className="mb-6 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
+        aria-expanded={showMore}
+        aria-controls="details-section"
+        className="mb-6 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
       >
-        {showMore ? (
-          <>
-            Dölj detaljer
-            <ChevronUp className="h-3.5 w-3.5" />
-          </>
-        ) : (
-          <>
-            Visa detaljer
-            <ChevronDown className="h-3.5 w-3.5" />
-          </>
-        )}
+        {showMore ? 'Dölj detaljer' : 'Visa detaljer'}
+        <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', showMore && 'rotate-180')} />
       </button>
 
       {showMore && (
-        <div>
+        <div id="details-section">
           {/* Uncategorized transactions warning */}
           {summary.uncategorizedCount > 0 && (summary.uncategorizedIncome > 0 || summary.uncategorizedExpenses > 0) && (
             <section className="mb-10">

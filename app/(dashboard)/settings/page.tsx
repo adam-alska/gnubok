@@ -196,8 +196,8 @@ export default function SettingsPage() {
       setSettings({ ...settings, ...updates } as typeof settings)
     } catch (error) {
       toast({
-        title: 'Fel',
-        description: error instanceof Error ? error.message : 'Kunde inte spara inställningar',
+        title: 'Kunde inte spara inställningar',
+        description: error instanceof Error ? error.message : 'Försök igen.',
         variant: 'destructive',
       })
     }
@@ -229,8 +229,8 @@ export default function SettingsPage() {
       router.push('/login')
     } catch (error) {
       toast({
-        title: 'Fel',
-        description: error instanceof Error ? error.message : 'Kunde inte radera kontot',
+        title: 'Kunde inte radera kontot',
+        description: error instanceof Error ? error.message : 'Försök igen.',
         variant: 'destructive',
       })
       setIsDeleting(false)
@@ -284,7 +284,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Inställningar</h1>
+        <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">Inställningar</h1>
         <p className="text-muted-foreground">
           Hantera dina företags- och kontoinställningar
         </p>

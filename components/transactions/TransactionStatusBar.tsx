@@ -34,14 +34,14 @@ export default function TransactionStatusBar({
       {/* Header with title + actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Transaktioner</h1>
+          <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">Transaktioner</h1>
           {uncategorizedCount > 0 && mode === 'inbox' && (
             <p className="text-muted-foreground mt-1">
               <span className="text-foreground font-semibold">{uncategorizedCount}</span> att bokföra
               {invoiceMatchCount > 0 && (
                 <span className="ml-2">
-                  · <FileText className="inline h-3.5 w-3.5 text-blue-500" />{' '}
-                  <span className="text-blue-600">{invoiceMatchCount} fakturamatchningar</span>
+                  · <FileText className="inline h-3.5 w-3.5 text-primary" />{' '}
+                  <span className="text-foreground font-semibold">{invoiceMatchCount} fakturamatchningar</span>
                 </span>
               )}
             </p>
@@ -67,7 +67,7 @@ export default function TransactionStatusBar({
                 disabled={isLoadingSuggestions}
               >
                 <Sparkles className="mr-2 h-4 w-4" />
-                {isLoadingSuggestions ? 'Laddar...' : 'Bokför alla'}
+                {isLoadingSuggestions ? 'Laddar...' : 'Gå igenom alla'}
               </Button>
               <Button
                 variant={isBatchMode ? 'default' : 'outline'}

@@ -43,8 +43,8 @@ export default function SuppliersPage() {
 
     if (error) {
       toast({
-        title: 'Fel',
-        description: 'Kunde inte hämta leverantörer',
+        title: 'Kunde inte ladda leverantörer',
+        description: 'Kontrollera din anslutning och försök igen.',
         variant: 'destructive',
       })
     } else {
@@ -71,8 +71,8 @@ export default function SuppliersPage() {
     if (!response.ok) {
       const fieldErrors = result.errors?.map((e: { field: string; message: string }) => `${e.field}: ${e.message}`).join(', ')
       toast({
-        title: 'Fel',
-        description: fieldErrors || result.error || 'Kunde inte skapa leverantör',
+        title: 'Kunde inte skapa leverantör',
+        description: fieldErrors || result.error || 'Försök igen.',
         variant: 'destructive',
       })
     } else {
@@ -97,7 +97,7 @@ export default function SuppliersPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Leverantörer</h1>
+          <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">Leverantörer</h1>
           <p className="text-muted-foreground">
             Hantera dina leverantörer och deras betalningsuppgifter
           </p>

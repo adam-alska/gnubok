@@ -107,6 +107,7 @@ export function EmptyCustomers({ onAction }: { onAction?: () => void } = {}) {
       title="Inga kunder ännu"
       description="Lägg till dina kunder för att enkelt skapa fakturor och hålla koll på betalningar."
       actionLabel="Lägg till kund"
+      actionHref={onAction ? undefined : '/customers/new'}
       onAction={onAction}
     />
   )
@@ -117,11 +118,9 @@ export function EmptyTransactions() {
     <EmptyState
       icon={ArrowLeftRight}
       title="Inga transaktioner"
-      description="Importera kontoutdrag från din bank eller lägg till transaktioner manuellt."
+      description="Importera kontoutdrag från din bank för att automatiskt bokföra och få koll på ekonomin."
       actionLabel="Importera transaktioner"
       actionHref="/import"
-      secondaryActionLabel="Lägg till manuellt"
-      secondaryActionHref="/transactions/new"
     />
   )
 }

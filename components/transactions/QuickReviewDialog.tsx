@@ -157,11 +157,7 @@ export default function QuickReviewDialog({
         {/* Transaction summary */}
         <div className="flex items-center gap-3 rounded-lg border p-3">
           <div
-            className={`h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-              isIncome
-                ? 'bg-success/10 text-success'
-                : 'bg-destructive/10 text-destructive'
-            }`}
+            className={`h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 ${isIncome ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}
           >
             {isIncome ? (
               <ArrowUpRight className="h-4 w-4" />
@@ -202,8 +198,8 @@ export default function QuickReviewDialog({
 
         {/* Template special rules */}
         {template?.special_rules_sv && (
-          <div className="rounded-lg border border-amber-300/50 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2">
-            <p className="text-xs text-amber-800 dark:text-amber-300 leading-snug">
+          <div className="rounded-lg border border-warning/30 bg-warning/[0.03] px-3 py-2">
+            <p className="text-xs text-warning-foreground leading-snug">
               {template.special_rules_sv}
             </p>
           </div>
@@ -211,8 +207,8 @@ export default function QuickReviewDialog({
 
         {/* Deductibility note */}
         {template?.deductibility_note_sv && (
-          <div className="rounded-lg border border-blue-300/50 bg-blue-50/50 dark:bg-blue-950/20 px-3 py-2">
-            <p className="text-xs text-blue-800 dark:text-blue-300 leading-snug">
+          <div className="rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2">
+            <p className="text-xs text-foreground leading-snug">
               {template.deductibility_note_sv}
             </p>
           </div>
@@ -220,10 +216,10 @@ export default function QuickReviewDialog({
 
         {/* Reverse charge warning */}
         {template?.requires_vat_registration_data && (
-          <div className="rounded-lg border border-amber-400/50 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2">
+          <div className="rounded-lg border border-warning/30 bg-warning/[0.03] px-3 py-2">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="h-3.5 w-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-800 dark:text-amber-300 leading-snug">
+              <AlertTriangle className="h-3.5 w-3.5 text-warning-foreground flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-warning-foreground leading-snug">
                 Omvänd skattskyldighet kräver leverantörens momsregistreringsnummer och land.
               </p>
             </div>

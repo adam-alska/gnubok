@@ -47,7 +47,7 @@ export default function InboxZeroState({ hasTransactions, onCreateTransaction }:
         <div className="h-16 w-16 rounded-full bg-success/10 flex items-center justify-center mb-4">
           <Check className="h-8 w-8 text-success" />
         </div>
-        <h3 className="text-lg font-bold">Alla transaktioner bokförda!</h3>
+        <h3 className="text-lg font-medium">Alla transaktioner bokförda!</h3>
         <p className="text-muted-foreground text-center mt-1 max-w-sm">
           Bra jobbat! Alla dina transaktioner är bokförda. Importera fler eller växla till historik.
         </p>

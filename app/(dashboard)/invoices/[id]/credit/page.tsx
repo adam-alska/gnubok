@@ -51,8 +51,8 @@ export default function CreateCreditNotePage({ params }: { params: Promise<{ id:
 
     if (error || !data) {
       toast({
-        title: 'Fel',
-        description: 'Kunde inte hämta faktura',
+        title: 'Kunde inte ladda faktura',
+        description: 'Fakturan hittades inte.',
         variant: 'destructive',
       })
       router.push('/invoices')
@@ -120,8 +120,8 @@ export default function CreateCreditNotePage({ params }: { params: Promise<{ id:
       router.push(`/invoices/${creditNote.id}`)
     } catch (error) {
       toast({
-        title: 'Fel',
-        description: error instanceof Error ? error.message : 'Kunde inte skapa kreditfaktura',
+        title: 'Kunde inte skapa kreditfaktura',
+        description: error instanceof Error ? error.message : 'Försök igen.',
         variant: 'destructive',
       })
     }
@@ -151,7 +151,7 @@ export default function CreateCreditNotePage({ params }: { params: Promise<{ id:
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Skapa kreditfaktura</h1>
+          <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">Skapa kreditfaktura</h1>
           <p className="text-muted-foreground">
             Krediterar faktura {invoice.invoice_number}
           </p>

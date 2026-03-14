@@ -706,7 +706,7 @@ export default function Step3TaxRegistration({
                       : 'Intäkter och kostnader bokförs först när betalningen faktiskt sker. Enklare att hantera men ger en mindre exakt bild av verksamhetens ekonomi vid varje given tidpunkt.'}
                   </p>
                   {entityType === 'aktiebolag' && (
-                    <p className="text-xs text-amber-700 bg-amber-50 rounded px-2 py-1">
+                    <p className="text-xs text-warning-foreground bg-warning/10 rounded px-2 py-1">
                       Aktiebolag med omsättning över 3 MSEK per år måste använda faktureringsmetoden.
                     </p>
                   )}

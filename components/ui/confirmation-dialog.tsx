@@ -56,9 +56,9 @@ export function ConfirmationDialog({
 
         <div className="border-t px-4 sm:px-6 py-3 sm:py-4 space-y-3 sm:space-y-4 shrink-0">
           {warningText && (
-            <div className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3">
-              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-              <p className="text-sm text-amber-800 dark:text-amber-300">{warningText}</p>
+            <div className="flex items-start gap-2 rounded-lg bg-warning/10 border border-warning/30 p-3">
+              <AlertTriangle className="h-4 w-4 text-warning-foreground mt-0.5 shrink-0" />
+              <p className="text-sm text-warning-foreground">{warningText}</p>
             </div>
           )}
 

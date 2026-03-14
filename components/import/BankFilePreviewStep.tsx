@@ -48,7 +48,7 @@ export default function BankFilePreviewStep({
               <FileText className="h-4 w-4" />
               <span className="text-sm">Transaktioner</span>
             </div>
-            <p className="text-2xl font-bold">{stats.parsed_rows}</p>
+            <p className="text-2xl font-display font-medium tabular-nums">{stats.parsed_rows}</p>
             {stats.skipped_rows > 0 && (
               <p className="text-xs text-muted-foreground mt-1">
                 {stats.skipped_rows} rader hoppades över
@@ -75,7 +75,7 @@ export default function BankFilePreviewStep({
               <TrendingUp className="h-4 w-4" />
               <span className="text-sm">Inkomster</span>
             </div>
-            <p className="text-lg font-bold">
+            <p className="text-lg font-display font-medium tabular-nums">
               {formatCurrency(stats.total_income)}
             </p>
           </CardContent>
@@ -87,7 +87,7 @@ export default function BankFilePreviewStep({
               <TrendingDown className="h-4 w-4" />
               <span className="text-sm">Utgifter</span>
             </div>
-            <p className="text-lg font-bold">
+            <p className="text-lg font-display font-medium tabular-nums">
               {formatCurrency(stats.total_expenses)}
             </p>
           </CardContent>

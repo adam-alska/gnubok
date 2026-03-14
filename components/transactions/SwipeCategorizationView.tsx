@@ -300,7 +300,7 @@ export default function SwipeCategorizationView({
           <div className="h-16 w-16 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-4">
             <Check className="h-8 w-8 text-success" />
           </div>
-          <h2 className="text-2xl font-bold">Klart!</h2>
+          <h2 className="font-display text-2xl font-medium">Klart!</h2>
           <p className="text-muted-foreground mt-2">
             Alla transaktioner är nu bokförda
           </p>
@@ -329,7 +329,7 @@ export default function SwipeCategorizationView({
         <Card className="mx-4 mt-3">
           <CardContent className="pt-4">
             <p className="font-medium">{currentTransaction.description}</p>
-            <p className="text-2xl font-bold mt-2">
+            <p className="font-display text-2xl font-medium tabular-nums mt-2">
               {formatCurrency(Math.abs(currentTransaction.amount), currentTransaction.currency)}
             </p>
           </CardContent>
@@ -397,7 +397,7 @@ export default function SwipeCategorizationView({
             <CardContent className="pt-4 space-y-1">
               <p className="font-medium">{currentTransaction.description}</p>
               <p className="text-sm text-muted-foreground">{formatDate(currentTransaction.date)}</p>
-              <p className="text-2xl font-bold mt-2">
+              <p className="font-display text-2xl font-medium tabular-nums mt-2">
                 {currentTransaction.amount > 0 ? '+' : ''}
                 {formatCurrency(currentTransaction.amount, currentTransaction.currency)}
               </p>
@@ -428,8 +428,8 @@ export default function SwipeCategorizationView({
 
           {/* Template special rules warning */}
           {selectedTemplate?.special_rules_sv && (
-            <div className="rounded-lg border border-amber-300/50 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2.5">
-              <p className="text-xs text-amber-800 dark:text-amber-300 leading-snug">
+            <div className="rounded-lg border border-warning/30 bg-warning/[0.03] px-3 py-2.5">
+              <p className="text-xs text-warning-foreground leading-snug">
                 {selectedTemplate.special_rules_sv}
               </p>
             </div>
@@ -437,8 +437,8 @@ export default function SwipeCategorizationView({
 
           {/* Deductibility note */}
           {selectedTemplate?.deductibility_note_sv && (
-            <div className="rounded-lg border border-blue-300/50 bg-blue-50/50 dark:bg-blue-950/20 px-3 py-2.5">
-              <p className="text-xs text-blue-800 dark:text-blue-300 leading-snug">
+            <div className="rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
+              <p className="text-xs text-foreground leading-snug">
                 {selectedTemplate.deductibility_note_sv}
               </p>
             </div>
@@ -446,10 +446,10 @@ export default function SwipeCategorizationView({
 
           {/* Reverse charge VAT registration warning */}
           {selectedTemplate?.requires_vat_registration_data && (
-            <div className="rounded-lg border border-amber-400/50 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2.5">
+            <div className="rounded-lg border border-warning/30 bg-warning/[0.03] px-3 py-2.5">
               <div className="flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-amber-800 dark:text-amber-300 leading-snug">
+                <AlertTriangle className="h-4 w-4 text-warning-foreground flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-warning-foreground leading-snug">
                   Omvänd skattskyldighet kräver leverantörens momsregistreringsnummer och land.
                 </p>
               </div>
@@ -509,11 +509,11 @@ export default function SwipeCategorizationView({
 
           {/* Document upload / pre-attached document */}
           {pendingInboxItemId && currentTransaction.matched_inbox_item?.document_id ? (
-            <div className="rounded-lg border bg-blue-500/5 border-blue-500/30 px-3 py-2.5">
+            <div className="rounded-lg border bg-success/5 border-success/30 px-3 py-2.5">
               <div className="flex items-center gap-2">
-                <Paperclip className="h-4 w-4 text-blue-600" />
+                <Paperclip className="h-4 w-4 text-success" />
                 <span className="text-sm font-medium">Underlag bifogat</span>
-                <Check className="h-4 w-4 text-blue-600" />
+                <Check className="h-4 w-4 text-success" />
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Dokumentet från inkorgen länkas automatiskt till verifikationen.
@@ -585,7 +585,7 @@ export default function SwipeCategorizationView({
   }
 
   return (
-    <div className="fixed inset-0 bg-background z-50 flex flex-col">
+    <div className="fixed inset-0 bg-background z-50 flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b">
         <Button variant="ghost" size="icon" onClick={onClose}>
@@ -701,9 +701,9 @@ export default function SwipeCategorizationView({
 
                 {/* Document Match from Inbox */}
                 {currentTransaction.matched_inbox_item && (
-                  <div className="p-4 rounded-lg border-2 border-blue-500/40 bg-blue-500/5 space-y-2">
+                  <div className="p-4 rounded-lg border-2 border-primary/40 bg-primary/5 space-y-2">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                      <div className="flex items-center gap-2 text-primary">
                         <Paperclip className="h-5 w-5" />
                         <span className="font-semibold text-sm">
                           {currentTransaction.matched_inbox_item.document_type === 'receipt'
@@ -714,7 +714,7 @@ export default function SwipeCategorizationView({
                         </span>
                       </div>
                       {currentTransaction.matched_inbox_item.match_confidence != null && (
-                        <Badge variant="outline" className="text-blue-600 border-blue-500">
+                        <Badge variant="outline" className="text-primary border-primary">
                           {Math.round(currentTransaction.matched_inbox_item.match_confidence * 100)}%
                         </Badge>
                       )}
@@ -740,7 +740,7 @@ export default function SwipeCategorizationView({
                         )
                       })()}
                       {currentTransaction.matched_inbox_item.suggested_template_id && (
-                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                        <p className="text-xs text-primary mt-1">
                           Mall: {currentTransaction.matched_inbox_item.suggested_template_id}
                         </p>
                       )}
@@ -789,13 +789,15 @@ export default function SwipeCategorizationView({
 
           {/* Document template match — primary action when inbox item has a suggested template */}
           {currentTransaction.matched_inbox_item?.suggested_template_id && (() => {
-            const tmplId = currentTransaction.matched_inbox_item!.suggested_template_id!
+            const inboxItem = currentTransaction.matched_inbox_item
+            if (!inboxItem?.suggested_template_id) return null
+            const tmplId = inboxItem.suggested_template_id
             const template = getTemplateById(tmplId)
             if (!template) return null
             return (
               <Button
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={() => handleTemplateSelect(tmplId, currentTransaction.matched_inbox_item!.id)}
+                className="w-full"
+                onClick={() => handleTemplateSelect(tmplId, inboxItem.id)}
                 disabled={isProcessing}
               >
                 <Paperclip className="mr-2 h-4 w-4" />

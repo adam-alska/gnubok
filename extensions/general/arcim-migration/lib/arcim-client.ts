@@ -135,12 +135,13 @@ async function fetchAllPages<T>(
   consentId: string,
   resource: string,
   params?: Record<string, string>,
-  pageSize: number = 100
+  pageSize: number = 100,
+  maxPages: number = 500
 ): Promise<T[]> {
   const all: T[] = []
   let page = 1
 
-  while (true) {
+  while (page <= maxPages) {
     const query = new URLSearchParams({
       page: String(page),
       pageSize: String(pageSize),

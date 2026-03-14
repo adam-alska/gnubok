@@ -56,8 +56,8 @@ export default function CustomersPage() {
 
     if (error) {
       toast({
-        title: 'Fel',
-        description: 'Kunde inte hämta kunder',
+        title: 'Kunde inte ladda kunder',
+        description: 'Kontrollera din anslutning och försök igen.',
         variant: 'destructive',
       })
     } else {
@@ -83,8 +83,8 @@ export default function CustomersPage() {
 
     if (!response.ok) {
       toast({
-        title: 'Fel',
-        description: result.error || 'Kunde inte skapa kund',
+        title: 'Kunde inte skapa kund',
+        description: result.error || 'Försök igen.',
         variant: 'destructive',
       })
     } else {
@@ -109,7 +109,7 @@ export default function CustomersPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Kunder</h1>
+          <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">Kunder</h1>
           <p className="text-muted-foreground">
             Hantera dina kunder och deras faktureringsuppgifter
           </p>

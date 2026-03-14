@@ -58,7 +58,7 @@ export default function ImportResultStep({ result, onNewImport }: ImportResultSt
                 <FileText className="h-4 w-4" />
                 <span className="text-sm">Verifikationer skapade</span>
               </div>
-              <p className="text-2xl font-bold">{result.journalEntriesCreated}</p>
+              <p className="text-2xl font-display font-medium tabular-nums">{result.journalEntriesCreated}</p>
             </CardContent>
           </Card>
 
@@ -67,7 +67,7 @@ export default function ImportResultStep({ result, onNewImport }: ImportResultSt
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
                 <span className="text-sm">Räkenskapsår</span>
               </div>
-              <div className="text-2xl font-bold">
+              <div className="text-2xl font-display font-medium">
                 {result.fiscalPeriodId ? (
                   <Badge variant="default" className="bg-success">Skapat</Badge>
                 ) : (
@@ -82,7 +82,7 @@ export default function ImportResultStep({ result, onNewImport }: ImportResultSt
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
                 <span className="text-sm">Ingående balanser</span>
               </div>
-              <div className="text-2xl font-bold">
+              <div className="text-2xl font-display font-medium">
                 {result.openingBalanceEntryId ? (
                   <Badge variant="default" className="bg-success">Importerade</Badge>
                 ) : (

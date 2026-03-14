@@ -9,9 +9,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { Deadline, DeadlineStatus } from '@/types'
 import {
   getUpcomingDeadlines,
-  PRIORITY_LABELS,
   STATUS_LABELS,
-  STATUS_COLORS,
 } from '@/lib/calendar/utils'
 import { Calendar, ChevronRight, AlertTriangle, Clock, Check, Send, Loader2 } from 'lucide-react'
 
@@ -125,18 +123,23 @@ export function UpcomingDeadlinesWidget({ deadlines, maxItems = 5, onStatusChang
       <CardContent className="space-y-2">
         {displayDeadlines.map((deadline) => {
           const isUpdating = updatingId === deadline.id
-          const statusColors = STATUS_COLORS[deadline.status] || STATUS_COLORS.upcoming
 
           return (
             <div
               key={deadline.id}
-              className={`flex items-center justify-between p-2 rounded-lg border ${statusColors.border} ${statusColors.bg}`}
+              className={`flex items-center justify-between p-2 rounded-lg ${
+                deadline.status === 'overdue'
+                  ? 'bg-destructive/5 border border-destructive/30'
+                  : deadline.status === 'action_needed'
+                  ? 'bg-warning/5 border border-warning/20'
+                  : ''
+              }`}
             >
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 {deadline.status === 'overdue' ? (
                   <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0" />
                 ) : deadline.status === 'action_needed' ? (
-                  <Clock className="h-4 w-4 text-orange-600 flex-shrink-0" />
+                  <Clock className="h-4 w-4 text-warning-foreground flex-shrink-0" />
                 ) : (
                   <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 )}
@@ -167,15 +170,15 @@ export function UpcomingDeadlinesWidget({ deadlines, maxItems = 5, onStatusChang
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 px-2"
+                    className="h-9 px-2.5"
                     disabled={isUpdating}
                     onClick={() => handleStatusChange(deadline.id, 'submitted')}
                     title="Markera som inskickad"
                   >
                     {isUpdating ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
-                      <Send className="h-3 w-3" />
+                      <Send className="h-3.5 w-3.5" />
                     )}
                   </Button>
                 )}
@@ -184,15 +187,15 @@ export function UpcomingDeadlinesWidget({ deadlines, maxItems = 5, onStatusChang
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 px-2"
+                    className="h-9 px-2.5"
                     disabled={isUpdating}
                     onClick={() => handleStatusChange(deadline.id, 'confirmed')}
                     title="Markera som bekräftad"
                   >
                     {isUpdating ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
-                      <Check className="h-3 w-3" />
+                      <Check className="h-3.5 w-3.5" />
                     )}
                   </Button>
                 )}

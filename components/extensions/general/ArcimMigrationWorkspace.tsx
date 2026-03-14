@@ -424,10 +424,10 @@ function PreviewStep({
           )}
 
           {preview && !preview.sieAvailable && !isLoading && (
-            <div className="flex gap-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
-              <Info className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <div className="flex gap-3 rounded-lg border border-warning/30 bg-warning/10 p-4">
+              <Info className="mt-0.5 h-5 w-5 shrink-0 text-warning-foreground" />
               <div>
-                <p className="text-sm font-medium text-amber-700">SIE-hämtning inte tillgänglig</p>
+                <p className="text-sm font-medium text-warning-foreground">SIE-hämtning inte tillgänglig</p>
                 <p className="text-xs text-muted-foreground">
                   SIE-hämtning är inte tillgänglig för denna leverantör ännu. Du kan importera SIE-filen manuellt via SIE-importen.
                 </p>
@@ -922,7 +922,7 @@ function ResultRow({
       <p className="text-sm text-muted-foreground">{value}</p>
       {detail && <p className="text-xs text-muted-foreground">{detail}</p>}
       {warnings && warnings.length > 0 && (
-        <p className="mt-1 text-xs text-amber-600">{warnings.join('. ')}</p>
+        <p className="mt-1 text-xs text-warning-foreground">{warnings.join('. ')}</p>
       )}
       {errors && errors.length > 0 && (
         <details className="mt-1">
@@ -1215,7 +1215,7 @@ export default function ArcimMigrationWorkspace(_props: WorkspaceComponentProps)
 
           if (!result.success && result.errors.length > 0) {
             // Log but don't fail — continue with API import
-            console.warn('SIE import warnings:', result.errors)
+            // Non-critical — continue with API import
           }
         }
       }

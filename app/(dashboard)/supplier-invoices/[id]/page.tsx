@@ -55,7 +55,7 @@ export default function SupplierInvoiceDetailPage() {
     const res = await fetch(`/api/supplier-invoices/${params.id}`)
     const { data, error } = await res.json()
     if (error) {
-      toast({ title: 'Fel', description: error, variant: 'destructive' })
+      toast({ title: 'Kunde inte ladda leverantörsfaktura', description: error, variant: 'destructive' })
     } else {
       setInvoice(data)
       setPayAmount(String(data.remaining_amount))
@@ -72,7 +72,7 @@ export default function SupplierInvoiceDetailPage() {
     const res = await fetch(`/api/supplier-invoices/${params.id}/approve`, { method: 'POST' })
     const result = await res.json()
     if (!res.ok) {
-      toast({ title: 'Fel', description: result.error, variant: 'destructive' })
+      toast({ title: 'Godkännande misslyckades', description: result.error, variant: 'destructive' })
     } else {
       toast({ title: 'Godkänd', description: 'Fakturan har godkänts' })
       fetchInvoice()
@@ -89,7 +89,7 @@ export default function SupplierInvoiceDetailPage() {
     })
     const result = await res.json()
     if (!res.ok) {
-      toast({ title: 'Fel', description: result.error, variant: 'destructive' })
+      toast({ title: 'Betalning misslyckades', description: result.error, variant: 'destructive' })
     } else {
       toast({
         title: result.status === 'paid' ? 'Betald' : 'Delbetalning registrerad',
@@ -113,7 +113,7 @@ export default function SupplierInvoiceDetailPage() {
     const res = await fetch(`/api/supplier-invoices/${params.id}/credit`, { method: 'POST' })
     const result = await res.json()
     if (!res.ok) {
-      toast({ title: 'Fel', description: result.error, variant: 'destructive' })
+      toast({ title: 'Kreditering misslyckades', description: result.error, variant: 'destructive' })
     } else {
       toast({ title: 'Kreditfaktura registrerad' })
       fetchInvoice()
@@ -132,7 +132,7 @@ export default function SupplierInvoiceDetailPage() {
     const res = await fetch(`/api/supplier-invoices/${params.id}`, { method: 'DELETE' })
     const result = await res.json()
     if (!res.ok) {
-      toast({ title: 'Fel', description: result.error, variant: 'destructive' })
+      toast({ title: 'Kunde inte ta bort faktura', description: result.error, variant: 'destructive' })
     } else {
       toast({ title: 'Borttagen' })
       router.push('/supplier-invoices')
@@ -172,7 +172,7 @@ export default function SupplierInvoiceDetailPage() {
           </Button>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              <h1 className="font-display text-2xl sm:text-3xl font-medium tracking-tight">
                 Ankomst #{invoice.arrival_number}
               </h1>
               <Badge className={statusColors[invoice.status] || ''}>

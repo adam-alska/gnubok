@@ -115,7 +115,7 @@ export function NEDeclarationView({ periodId }: { periodId: string }) {
                 <CardTitle>
                   {data.companyInfo.companyName}
                 </CardTitle>
-                <Badge className="bg-blue-100 text-blue-800">
+                <Badge className="bg-primary/10 text-primary">
                   {data.fiscalYear.name}
                 </Badge>
               </div>
@@ -207,10 +207,10 @@ export function NEDeclarationView({ periodId }: { periodId: string }) {
               <div className="flex justify-between items-center">
                 <div>
                   <span className="font-mono text-xs bg-muted px-1 rounded mr-2">R11</span>
-                  <span className="font-bold text-xl">Årets resultat</span>
+                  <span className="font-display font-medium text-xl">Årets resultat</span>
                 </div>
                 <span
-                  className={`text-2xl font-bold ${
+                  className={`font-display text-2xl font-medium tabular-nums ${
                     data.rutor.R11 >= 0 ? 'text-success' : 'text-destructive'
                   }`}
                 >

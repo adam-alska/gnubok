@@ -76,6 +76,10 @@ export default function TransactionsPage() {
   // Entity type for tooltip context
   const [entityType, setEntityType] = useState<string>('enskild_firma')
 
+  // Pagination
+  const [hasMore, setHasMore] = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+
   // Set of transaction IDs that are animating out (just categorized)
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set())
 
@@ -93,15 +97,18 @@ export default function TransactionsPage() {
     })
   const transactionsWithMatches = transactions.filter((t) => t.potential_invoice && !t.invoice_id)
 
+  const PAGE_SIZE = 200
+
   async function fetchTransactions() {
     setIsLoading(true)
     const { data: txData, error: txError } = await supabase
       .from('transactions')
       .select('*')
       .order('date', { ascending: false })
+      .limit(PAGE_SIZE)
 
     if (txError) {
-      toast({ title: 'Fel', description: 'Kunde inte hämta transaktioner', variant: 'destructive' })
+      toast({ title: 'Kunde inte ladda transaktioner', description: 'Kontrollera din anslutning och försök igen.', variant: 'destructive' })
       setIsLoading(false)
       return
     }
@@ -149,7 +156,69 @@ export default function TransactionsPage() {
     }))
 
     setTransactions(transactionsWithInvoices)
+    setHasMore((txData || []).length >= PAGE_SIZE)
     setIsLoading(false)
+  }
+
+  async function loadMoreTransactions() {
+    setIsLoadingMore(true)
+    const offset = transactions.length
+    const { data: txData, error: txError } = await supabase
+      .from('transactions')
+      .select('*')
+      .order('date', { ascending: false })
+      .range(offset, offset + PAGE_SIZE - 1)
+
+    if (txError || !txData) {
+      setIsLoadingMore(false)
+      return
+    }
+
+    setHasMore(txData.length >= PAGE_SIZE)
+
+    const potentialInvoiceIds = txData
+      .filter((t) => t.potential_invoice_id)
+      .map((t) => t.potential_invoice_id)
+
+    const unbookedTxIds = txData
+      .filter((t) => !t.journal_entry_id && t.is_business === null)
+      .map((t) => t.id)
+
+    const [invoiceResult, inboxResult] = await Promise.all([
+      potentialInvoiceIds.length > 0
+        ? supabase.from('invoices').select('*, customer:customers(*)').in('id', potentialInvoiceIds)
+        : Promise.resolve({ data: null }),
+      unbookedTxIds.length > 0
+        ? supabase.from('invoice_inbox_items').select('*').in('matched_transaction_id', unbookedTxIds).in('status', ['ready', 'processing'])
+        : Promise.resolve({ data: null }),
+    ])
+
+    let invoiceMap: Record<string, Invoice & { customer?: Customer }> = {}
+    if (invoiceResult.data) {
+      invoiceMap = invoiceResult.data.reduce((acc, inv) => {
+        acc[inv.id] = inv
+        return acc
+      }, {} as Record<string, Invoice & { customer?: Customer }>)
+    }
+
+    let inboxItemMap: Record<string, InvoiceInboxItem> = {}
+    if (inboxResult.data) {
+      inboxItemMap = inboxResult.data.reduce((acc, item) => {
+        if (item.matched_transaction_id) {
+          acc[item.matched_transaction_id] = item as InvoiceInboxItem
+        }
+        return acc
+      }, {} as Record<string, InvoiceInboxItem>)
+    }
+
+    const newTransactions: TransactionWithInvoice[] = txData.map((t) => ({
+      ...t,
+      potential_invoice: t.potential_invoice_id ? invoiceMap[t.potential_invoice_id] : undefined,
+      matched_inbox_item: inboxItemMap[t.id] || undefined,
+    }))
+
+    setTransactions((prev) => [...prev, ...newTransactions])
+    setIsLoadingMore(false)
   }
 
   async function fetchCategorySuggestions(txIds: string[]) {
@@ -161,6 +230,7 @@ export default function TransactionsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transaction_ids: txIds }),
       })
+      if (!response.ok) throw new Error('Failed to fetch suggestions')
       const data = await response.json()
       if (data.suggestions) {
         setCategorySuggestions(data.suggestions)
@@ -227,7 +297,7 @@ export default function TransactionsPage() {
 
       const result = await response.json()
       if (!response.ok) {
-        toast({ title: 'Fel', description: result.error || 'Kunde inte uppdatera transaktion', variant: 'destructive' })
+        toast({ title: 'Kategorisering misslyckades', description: result.error || 'Försök igen.', variant: 'destructive' })
         setProcessingId(null)
         return null
       }
@@ -254,10 +324,10 @@ export default function TransactionsPage() {
                   toast({ title: 'Ångrad', description: 'Kategorisering har ångrats' })
                 } else {
                   const errData = await undoRes.json()
-                  toast({ title: 'Kunde inte ångra', description: errData.error || 'Något gick fel', variant: 'destructive' })
+                  toast({ title: 'Kunde inte ångra', description: errData.error || 'Kategoriseringen kunde inte ångras. Försök igen.', variant: 'destructive' })
                 }
               } catch {
-                toast({ title: 'Kunde inte ångra', description: 'Något gick fel', variant: 'destructive' })
+                toast({ title: 'Kunde inte ångra', description: 'Kategoriseringen kunde inte ångras. Försök igen.', variant: 'destructive' })
               }
             }}>
               Ångra
@@ -290,7 +360,7 @@ export default function TransactionsPage() {
 
       return result.journal_entry_id || null
     } catch {
-      toast({ title: 'Fel', description: 'Något gick fel vid bokföring', variant: 'destructive' })
+      toast({ title: 'Bokföring misslyckades', description: 'Transaktionen kunde inte bokföras. Försök igen.', variant: 'destructive' })
       setProcessingId(null)
       return null
     }
@@ -312,7 +382,7 @@ export default function TransactionsPage() {
       })
       const result = await response.json()
       if (!response.ok) {
-        toast({ title: 'Fel', description: result.error || 'Kunde inte matcha faktura', variant: 'destructive' })
+        toast({ title: 'Fakturamatchning misslyckades', description: result.error || 'Försök igen.', variant: 'destructive' })
         setIsConfirmingMatch(false)
         return
       }
@@ -350,7 +420,7 @@ export default function TransactionsPage() {
         setIsConfirmingMatch(false)
       }, 350)
     } catch {
-      toast({ title: 'Fel', description: 'Något gick fel vid matchning', variant: 'destructive' })
+      toast({ title: 'Matchning misslyckades', description: 'Transaktionen kunde inte matchas med fakturan. Försök igen.', variant: 'destructive' })
       setIsConfirmingMatch(false)
     }
   }
@@ -364,7 +434,7 @@ export default function TransactionsPage() {
       })
       const result = await response.json()
       if (!response.ok) {
-        toast({ title: 'Fel', description: result.error || 'Kunde inte matcha faktura', variant: 'destructive' })
+        toast({ title: 'Fakturamatchning misslyckades', description: result.error || 'Försök igen.', variant: 'destructive' })
         return false
       }
 
@@ -390,7 +460,7 @@ export default function TransactionsPage() {
       toast({ title: 'Faktura matchad', description: `Faktura ${invoiceNumber} markerad som betald` })
       return true
     } catch {
-      toast({ title: 'Fel', description: 'Något gick fel vid matchning', variant: 'destructive' })
+      toast({ title: 'Matchning misslyckades', description: 'Transaktionen kunde inte matchas med fakturan. Försök igen.', variant: 'destructive' })
       return false
     }
   }
@@ -399,7 +469,7 @@ export default function TransactionsPage() {
     setIsCreating(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      toast({ title: 'Fel', description: 'Du måste vara inloggad', variant: 'destructive' })
+      toast({ title: 'Inloggning krävs', description: 'Du måste vara inloggad för att lägga till transaktioner.', variant: 'destructive' })
       setIsCreating(false)
       return
     }
@@ -420,7 +490,7 @@ export default function TransactionsPage() {
       .single()
 
     if (error) {
-      toast({ title: 'Fel', description: error.message, variant: 'destructive' })
+      toast({ title: 'Kunde inte skapa transaktion', description: error.message, variant: 'destructive' })
     } else {
       toast({ title: 'Transaktion tillagd', description: `${data.description} har lagts till` })
       setTransactions([transaction, ...transactions])
@@ -719,23 +789,39 @@ export default function TransactionsPage() {
           transactions={transactions}
           onOpenMatchDialog={openMatchDialog}
           onOpenCategoryDialog={openCategoryDialog}
+          hasMore={hasMore}
+          isLoadingMore={isLoadingMore}
+          onLoadMore={loadMoreTransactions}
         />
       )}
 
       {/* Batch mode floating action bar */}
       {isBatchMode && selectedIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-background border rounded-xl shadow-lg px-4 py-3">
-          <Badge variant="secondary">{selectedIds.size} valda</Badge>
-          <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
-            <X className="mr-1 h-3 w-3" />
-            Avmarkera
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleBatchMarkPrivate}>
-            Markera som privat
-          </Button>
-          <Button size="sm" onClick={() => setShowBatchSelector(true)}>
-            Bokför {selectedIds.size} st
-          </Button>
+        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-background border rounded-xl shadow-lg px-4 py-3">
+          {batchProgress ? (
+            <>
+              <Badge variant="secondary">
+                {batchProgress.done}/{batchProgress.total}
+              </Badge>
+              <p className="text-sm text-muted-foreground">
+                Bokför {batchProgress.done} av {batchProgress.total}...
+              </p>
+            </>
+          ) : (
+            <>
+              <Badge variant="secondary">{selectedIds.size} valda</Badge>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+                <X className="mr-1 h-3 w-3" />
+                Avmarkera
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleBatchMarkPrivate}>
+                Markera som privat
+              </Button>
+              <Button size="sm" onClick={() => setShowBatchSelector(true)}>
+                Bokför {selectedIds.size} st
+              </Button>
+            </>
+          )}
         </div>
       )}
 

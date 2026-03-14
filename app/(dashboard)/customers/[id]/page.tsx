@@ -84,8 +84,8 @@ export default function CustomerDetailPage({
       setCustomer(data)
     } catch {
       toast({
-        title: 'Fel',
-        description: 'Kunde inte hitta kunden',
+        title: 'Kunde inte ladda kund',
+        description: 'Kunden hittades inte.',
         variant: 'destructive',
       })
       router.push('/customers')
@@ -115,8 +115,8 @@ export default function CustomerDetailPage({
       fetchCustomer()
     } catch {
       toast({
-        title: 'Fel',
-        description: 'Kunde inte uppdatera kunden',
+        title: 'Kunde inte uppdatera kund',
+        description: 'Försök igen.',
         variant: 'destructive',
       })
     } finally {
@@ -150,8 +150,8 @@ export default function CustomerDetailPage({
       router.push('/customers')
     } catch {
       toast({
-        title: 'Fel',
-        description: 'Kunde inte ta bort kunden',
+        title: 'Kunde inte ta bort kund',
+        description: 'Försök igen.',
         variant: 'destructive',
       })
     }
@@ -196,7 +196,7 @@ export default function CustomerDetailPage({
               <Icon className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">{customer.name}</h1>
+              <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">{customer.name}</h1>
               <Badge variant="secondary">{customerTypeLabels[customer.customer_type]}</Badge>
             </div>
           </div>
@@ -346,7 +346,7 @@ export default function CustomerDetailPage({
                       {formatCurrency(invoice.total, invoice.currency)}
                     </span>
                     <Badge variant={invoice.payment_status === 'paid' ? 'success' : 'secondary'}>
-                      {invoice.payment_status === 'paid' ? 'Betald' : invoice.payment_status === 'overdue' ? 'Försenad' : 'Obetald'}
+                      {invoice.payment_status === 'paid' ? 'Betald' : invoice.payment_status === 'overdue' ? 'Förfallen' : 'Obetald'}
                     </Badge>
                   </div>
                 </Link>

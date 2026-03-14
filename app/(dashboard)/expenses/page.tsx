@@ -75,7 +75,7 @@ export default function ExpensesPage() {
       .order('due_date', { ascending: true })
 
     if (error) {
-      toast({ title: 'Fel', description: 'Kunde inte hämta utgifter', variant: 'destructive' })
+      toast({ title: 'Kunde inte ladda utgifter', description: 'Kontrollera din anslutning och försök igen.', variant: 'destructive' })
     } else {
       setInvoices(data || [])
     }
@@ -134,7 +134,7 @@ export default function ExpensesPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Att betala</p>
-                <p className="text-2xl font-bold tabular-nums">{formatCurrency(stats.unpaidAmount)}</p>
+                <p className="font-display text-2xl font-medium tabular-nums">{formatCurrency(stats.unpaidAmount)}</p>
                 <p className="text-xs text-muted-foreground">{stats.unpaidCount} utgifter</p>
               </div>
             </div>
@@ -150,13 +150,13 @@ export default function ExpensesPage() {
                 {stats.overdueCount > 0 ? (
                   <>
                     <p className="text-sm text-muted-foreground">Förfallet</p>
-                    <p className="text-2xl font-bold tabular-nums text-destructive">{formatCurrency(stats.overdueAmount)}</p>
+                    <p className="font-display text-2xl font-medium tabular-nums text-destructive">{formatCurrency(stats.overdueAmount)}</p>
                     <p className="text-xs text-muted-foreground">{stats.overdueCount} utgifter</p>
                   </>
                 ) : (
                   <>
                     <p className="text-sm text-muted-foreground">Totalt antal</p>
-                    <p className="text-2xl font-bold tabular-nums">{invoices.length}</p>
+                    <p className="font-display text-2xl font-medium tabular-nums">{invoices.length}</p>
                   </>
                 )}
               </div>

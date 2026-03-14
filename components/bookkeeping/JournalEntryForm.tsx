@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
 import { Plus, Trash2, AlertTriangle } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
@@ -196,8 +197,7 @@ export default function JournalEntryForm({
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ journal_entry_id: journalEntryId }),
             })
-          } catch (linkErr) {
-            console.error('[JournalEntryForm] Failed to link document:', linkErr)
+          } catch {
             linkFailCount++
           }
         }
@@ -233,17 +233,18 @@ export default function JournalEntryForm({
       <div className={`grid gap-4 grid-cols-1 ${embedded && initialDate ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
         <div>
           <Label>Räkenskapsår</Label>
-          <select
-            value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value)}
-            className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
-          >
-            {periods.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+            <SelectTrigger className="mt-1">
+              <SelectValue placeholder="Välj period" />
+            </SelectTrigger>
+            <SelectContent>
+              {periods.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         {!(embedded && initialDate) && (
           <div>
@@ -514,12 +515,12 @@ export default function JournalEntryForm({
         }}
         isSubmitting={false}
         title="Underlag saknas"
-        warningText="Ingen verifikation har bifogats. Enligt bokföringslagen (BFL) krävs underlag för varje bokföringspost."
-        confirmLabel="Fortsätt ändå"
+        warningText="Inget underlag har bifogats. Enligt bokföringslagen (BFL) krävs underlag för varje bokföringspost."
+        confirmLabel="Bokför utan underlag"
       >
-        <div className="flex items-start gap-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4">
-          <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-          <div className="text-sm text-amber-800 dark:text-amber-300">
+        <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-4">
+          <AlertTriangle className="h-5 w-5 text-warning-foreground mt-0.5 shrink-0" />
+          <div className="text-sm text-warning-foreground">
             <p className="font-medium mb-1">Inget underlag bifogat</p>
             <p>
               Enligt bokföringslagen (BFL 5 kap. 6-7 §§) ska varje bokföringspost ha en verifikation som

@@ -39,7 +39,7 @@ export default function SupplierDetailPage() {
     const res = await fetch(`/api/suppliers/${params.id}`)
     const { data, error } = await res.json()
     if (error) {
-      toast({ title: 'Fel', description: error, variant: 'destructive' })
+      toast({ title: 'Kunde inte ladda leverantör', description: error, variant: 'destructive' })
     } else {
       setSupplier(data)
     }
@@ -69,7 +69,7 @@ export default function SupplierDetailPage() {
     const result = await res.json()
     if (!res.ok) {
       const fieldErrors = result.errors?.map((e: { field: string; message: string }) => `${e.field}: ${e.message}`).join(', ')
-      toast({ title: 'Fel', description: fieldErrors || result.error || 'Kunde inte uppdatera leverantör', variant: 'destructive' })
+      toast({ title: 'Kunde inte uppdatera leverantör', description: fieldErrors || result.error || 'Försök igen.', variant: 'destructive' })
     } else {
       toast({ title: 'Sparat', description: 'Leverantören har uppdaterats' })
       setSupplier({ ...result.data, stats: supplier?.stats })
@@ -90,7 +90,7 @@ export default function SupplierDetailPage() {
     const res = await fetch(`/api/suppliers/${params.id}`, { method: 'DELETE' })
     const result = await res.json()
     if (!res.ok) {
-      toast({ title: 'Fel', description: result.error, variant: 'destructive' })
+      toast({ title: 'Kunde inte ta bort leverantör', description: result.error, variant: 'destructive' })
     } else {
       toast({ title: 'Borttagen', description: 'Leverantören har tagits bort' })
       router.push('/suppliers')
@@ -145,7 +145,7 @@ export default function SupplierDetailPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">{supplier.name}</h1>
+            <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">{supplier.name}</h1>
             <p className="text-muted-foreground">
               {supplierTypeLabels[supplier.supplier_type]}
               {supplier.org_number && ` | Org.nr: ${supplier.org_number}`}
@@ -170,7 +170,7 @@ export default function SupplierDetailPage() {
             <CardTitle className="text-sm text-muted-foreground">Utestående</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{formatAmount(supplier.stats?.total_outstanding || 0)} kr</p>
+            <p className="font-display text-2xl font-medium tabular-nums">{formatAmount(supplier.stats?.total_outstanding || 0)} kr</p>
           </CardContent>
         </Card>
         <Card>
@@ -178,7 +178,7 @@ export default function SupplierDetailPage() {
             <CardTitle className="text-sm text-muted-foreground">Totalt betalt</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{formatAmount(supplier.stats?.total_paid || 0)} kr</p>
+            <p className="font-display text-2xl font-medium tabular-nums">{formatAmount(supplier.stats?.total_paid || 0)} kr</p>
           </CardContent>
         </Card>
         <Card>
@@ -186,7 +186,7 @@ export default function SupplierDetailPage() {
             <CardTitle className="text-sm text-muted-foreground">Antal fakturor</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{supplier.stats?.invoice_count || 0}</p>
+            <p className="font-display text-2xl font-medium tabular-nums">{supplier.stats?.invoice_count || 0}</p>
           </CardContent>
         </Card>
       </div>

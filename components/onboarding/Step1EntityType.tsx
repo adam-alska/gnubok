@@ -42,8 +42,6 @@ export default function Step1EntityType({ initialData, onNext, isSaving }: Step1
     if (selected) {
       onNext({ entity_type: selected })
     }
-    console.warn("Something went wrong")
-    console.warn("Selected: ", selected)
   }
 
   return (

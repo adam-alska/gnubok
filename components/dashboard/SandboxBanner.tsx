@@ -18,19 +18,19 @@ export function SandboxBanner() {
   }
 
   return (
-    <div className="relative z-50 flex items-center justify-center gap-3 bg-amber-500/90 px-4 py-2 text-sm text-amber-950">
+    <div className="relative z-50 flex items-center justify-center gap-3 bg-warning px-4 py-2 text-sm text-warning-foreground">
       <span className="font-medium">
         Sandlådemiljö — dina data raderas automatiskt efter 24 timmar
       </span>
       <button
         onClick={handleCreateAccount}
-        className="rounded-md bg-amber-950/15 px-3 py-0.5 text-xs font-semibold hover:bg-amber-950/25 transition-colors"
+        className="rounded-md bg-warning-foreground/15 px-3 py-0.5 text-xs font-semibold hover:bg-warning-foreground/25 transition-colors"
       >
         Skapa konto
       </button>
       <button
         onClick={() => setDismissed(true)}
-        className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-0.5 hover:bg-amber-950/15 transition-colors"
+        className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-0.5 hover:bg-warning-foreground/15 transition-colors"
         aria-label="Stäng"
       >
         <X className="h-3.5 w-3.5" />
