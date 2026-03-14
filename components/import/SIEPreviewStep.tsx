@@ -107,7 +107,7 @@ export default function SIEPreviewStep({
               <FileText className="h-4 w-4" />
               <span className="text-sm">Konton</span>
             </div>
-            <p className="text-2xl font-bold">{preview.accountCount}</p>
+            <p className="text-2xl font-display font-medium tabular-nums">{preview.accountCount}</p>
           </CardContent>
         </Card>
 
@@ -117,7 +117,7 @@ export default function SIEPreviewStep({
               <BarChart3 className="h-4 w-4" />
               <span className="text-sm">Verifikationer</span>
             </div>
-            <p className="text-2xl font-bold">{preview.voucherCount}</p>
+            <p className="text-2xl font-display font-medium tabular-nums">{preview.voucherCount}</p>
           </CardContent>
         </Card>
 
@@ -126,7 +126,7 @@ export default function SIEPreviewStep({
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <span className="text-sm">Transaktionsrader</span>
             </div>
-            <p className="text-2xl font-bold">{preview.transactionLineCount}</p>
+            <p className="text-2xl font-display font-medium tabular-nums">{preview.transactionLineCount}</p>
           </CardContent>
         </Card>
 
@@ -135,7 +135,7 @@ export default function SIEPreviewStep({
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <span className="text-sm">IB Summa</span>
             </div>
-            <p className="text-2xl font-bold">{formatCurrency(preview.openingBalanceTotal)}</p>
+            <p className="text-2xl font-display font-medium tabular-nums">{formatCurrency(preview.openingBalanceTotal)}</p>
           </CardContent>
         </Card>
       </div>

@@ -1215,7 +1215,7 @@ export default function ArcimMigrationWorkspace(_props: WorkspaceComponentProps)
 
           if (!result.success && result.errors.length > 0) {
             // Log but don't fail — continue with API import
-            console.warn('SIE import warnings:', result.errors)
+            // Non-critical — continue with API import
           }
         }
       }
