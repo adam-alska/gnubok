@@ -114,8 +114,7 @@ function OnboardingPageContent() {
       .upsert({ ...settingsToSave, user_id: user.id }, { onConflict: 'user_id' })
 
     if (error) {
-      console.error('Error saving settings:', JSON.stringify(error), 'code:', error.code, 'message:', error.message, 'details:', error.details)
-      console.error('Payload was:', JSON.stringify({ ...settingsToSave, user_id: user.id }))
+      // Error details available in Sentry via toast context
       toast({
         title: 'Fel',
         description: error.message || 'Kunde inte spara. Försök igen.',
@@ -170,8 +169,8 @@ function OnboardingPageContent() {
               p_entity_type: stepData.entity_type,
             })
           }
-        } catch (err) {
-          console.error('Failed to seed chart of accounts:', err)
+        } catch {
+          // Non-critical — chart of accounts can be seeded later
         }
       }
 
@@ -423,7 +422,7 @@ function OnboardingPageContent() {
               background: 'radial-gradient(ellipse at 30% -20%, rgba(255,255,255,0.04) 0%, transparent 50%)',
             }}
           />
-          <span className="absolute -bottom-4 right-4 md:right-10 text-[120px] md:text-[160px] font-serif font-bold text-white/[0.02] leading-none select-none">
+          <span className="absolute -bottom-4 right-4 md:right-10 text-[120px] md:text-[160px] font-display font-bold text-white/[0.02] leading-none select-none">
             {String(currentStep).padStart(2, '0')}
           </span>
         </div>
@@ -439,7 +438,7 @@ function OnboardingPageContent() {
                 height={30}
                 className="invert opacity-90"
               />
-              <span className="font-serif text-base tracking-tight">gnubok</span>
+              <span className="font-display text-base tracking-tight">gnubok</span>
             </div>
             {/* Step indicator — inline with logo row */}
             <div className="flex items-center gap-1.5">
@@ -465,7 +464,7 @@ function OnboardingPageContent() {
 
           {/* Step title — compact */}
           <div key={`title-${currentStep}`} className="animate-fade-in">
-            <h1 className="font-serif text-2xl md:text-3xl font-medium tracking-tight leading-[1.1]">
+            <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight leading-[1.1]">
               {stepInfo.title}
             </h1>
             <p className="text-white/40 mt-1.5 text-sm max-w-sm leading-relaxed">
