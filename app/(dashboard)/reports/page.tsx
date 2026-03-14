@@ -71,7 +71,7 @@ export default function ReportsPage() {
         <div>
           <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">Rapporter</h1>
           <p className="text-muted-foreground">
-            Huvudbok, grundbok, kundreskontra, saldobalans, resultaträkning, balansräkning, momsdeklaration och mer
+            Generera skattedeklarationer, resultaträkningar och exportera till Skatteverket
           </p>
         </div>
       </div>

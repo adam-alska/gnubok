@@ -11,6 +11,7 @@ import {
   Receipt,
   ArrowLeftRight,
   ChevronDown,
+  ChevronRight,
   Camera,
   Users,
   Landmark,
@@ -274,9 +275,12 @@ export default function DashboardContent({ firstName, settings, summary, onboard
 
           {/* Card 2: Att få betalt */}
           <Link href="/invoices?status=unpaid">
-            <Card className="h-full hover:border-primary/50 transition-colors">
+            <Card className="h-full hover:border-primary/50 transition-colors cursor-pointer">
               <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground mb-2">Att få betalt</p>
+                <div className="flex items-start justify-between">
+                  <p className="text-xs text-muted-foreground mb-2">Att få betalt</p>
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" />
+                </div>
                 <p className="font-display text-xl font-medium tabular-nums leading-tight">
                   {summary.unpaidInvoicesCount}
                   <span className="text-sm ml-0.5 text-muted-foreground font-normal">st</span>
@@ -301,9 +305,12 @@ export default function DashboardContent({ firstName, settings, summary, onboard
             </Card>
           ) : (
             <Link href="/import">
-              <Card className="h-full hover:border-primary/50 transition-colors">
+              <Card className="h-full hover:border-primary/50 transition-colors cursor-pointer">
                 <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground mb-2">Banksaldo</p>
+                  <div className="flex items-start justify-between">
+                    <p className="text-xs text-muted-foreground mb-2">Banksaldo</p>
+                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" />
+                  </div>
                   <p className="text-sm font-medium text-primary">Koppla bank</p>
                   <p className="text-xs text-muted-foreground mt-1">Importera transaktioner</p>
                 </CardContent>
