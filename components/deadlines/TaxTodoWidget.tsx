@@ -138,7 +138,13 @@ export function TaxTodoWidget({ deadlines, onStatusChange }: TaxTodoWidgetProps)
           return (
             <div
               key={deadline.id}
-              className="p-3 rounded-lg"
+              className={`p-3 rounded-lg ${
+                isOverdue
+                  ? 'bg-destructive/5 border border-destructive/30'
+                  : isActionNeeded
+                  ? 'bg-warning/5 border border-warning/20'
+                  : ''
+              }`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-start gap-2 min-w-0 flex-1">

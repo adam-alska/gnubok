@@ -127,7 +127,13 @@ export function UpcomingDeadlinesWidget({ deadlines, maxItems = 5, onStatusChang
           return (
             <div
               key={deadline.id}
-              className="flex items-center justify-between p-2 rounded-lg"
+              className={`flex items-center justify-between p-2 rounded-lg ${
+                deadline.status === 'overdue'
+                  ? 'bg-destructive/5 border border-destructive/30'
+                  : deadline.status === 'action_needed'
+                  ? 'bg-warning/5 border border-warning/20'
+                  : ''
+              }`}
             >
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 {deadline.status === 'overdue' ? (

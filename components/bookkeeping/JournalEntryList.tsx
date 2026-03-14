@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { ChevronDown, ChevronRight, Paperclip, AlertTriangle, Loader2, BookOpen } from 'lucide-react'
+import { ArrowDownNarrowWide, ArrowUpNarrowWide, ChevronDown, ChevronRight, Paperclip, AlertTriangle, Loader2, BookOpen, X } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 import { AccountNumber } from '@/components/ui/account-number'
 import JournalEntryAttachments from '@/components/bookkeeping/JournalEntryAttachments'
 import CorrectionEntryDialog from '@/components/bookkeeping/CorrectionEntryDialog'
@@ -34,7 +35,14 @@ export default function JournalEntryList({ periodId }: Props) {
   const [attachmentCounts, setAttachmentCounts] = useState<Record<string, number>>({})
   const [showMissingOnly, setShowMissingOnly] = useState(false)
   const [correctionEntry, setCorrectionEntry] = useState<JournalEntry | null>(null)
+  const [dateSortDir, setDateSortDir] = useState<'desc' | 'asc'>('desc')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [dateFromInput, setDateFromInput] = useState('')
+  const [dateToInput, setDateToInput] = useState('')
   const pageSize = 20
+
+  const isValidDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(Date.parse(v))
 
   const fetchAttachmentCounts = useCallback(async (entryIds: string[]) => {
     if (entryIds.length === 0) return
@@ -54,8 +62,11 @@ export default function JournalEntryList({ periodId }: Props) {
     const params = new URLSearchParams({
       limit: String(pageSize),
       offset: String(page * pageSize),
+      sort_date: dateSortDir,
     })
     if (periodId) params.set('period_id', periodId)
+    if (dateFrom) params.set('date_from', dateFrom)
+    if (dateTo) params.set('date_to', dateTo)
 
     const res = await fetch(`/api/bookkeeping/journal-entries?${params}`)
     if (!res.ok) {
@@ -75,7 +86,7 @@ export default function JournalEntryList({ periodId }: Props) {
 
   useEffect(() => {
     fetchEntries()
-  }, [periodId, page])
+  }, [periodId, page, dateSortDir, dateFrom, dateTo])
 
   const handleAttachmentCountChange = useCallback((entryId: string, count: number) => {
     setAttachmentCounts((prev) => ({ ...prev, [entryId]: count }))
@@ -123,21 +134,80 @@ export default function JournalEntryList({ periodId }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Missing attachment filter */}
-      <div className="flex items-center gap-2">
-        <Switch
-          id="missing-attachments"
-          checked={showMissingOnly}
-          onCheckedChange={setShowMissingOnly}
-        />
-        <Label htmlFor="missing-attachments" className="text-sm cursor-pointer">
-          Visa saknade underlag
-        </Label>
-        {showMissingOnly && (
-          <Badge variant="secondary" className="text-xs">
-            {filteredEntries.length}
-          </Badge>
-        )}
+      {/* Filters and sorting */}
+      <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Switch
+            id="missing-attachments"
+            checked={showMissingOnly}
+            onCheckedChange={setShowMissingOnly}
+          />
+          <Label htmlFor="missing-attachments" className="text-sm cursor-pointer">
+            Visa saknade underlag
+          </Label>
+          {showMissingOnly && (
+            <Badge variant="secondary" className="text-xs">
+              {filteredEntries.length}
+            </Badge>
+          )}
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1.5"
+          onClick={() => { setDateSortDir(dateSortDir === 'desc' ? 'asc' : 'desc'); setPage(0) }}
+        >
+          {dateSortDir === 'desc' ? (
+            <ArrowDownNarrowWide className="h-4 w-4" />
+          ) : (
+            <ArrowUpNarrowWide className="h-4 w-4" />
+          )}
+          <span className="text-xs">Datum {dateSortDir === 'desc' ? 'nyast först' : 'äldst först'}</span>
+        </Button>
+        <div className="flex items-center gap-1.5">
+          <Input
+            type="text"
+            placeholder="Från YYYY-MM-DD"
+            value={dateFromInput}
+            onChange={(e) => setDateFromInput(e.target.value)}
+            onBlur={() => {
+              const v = dateFromInput.trim()
+              const next = v === '' ? '' : isValidDate(v) ? v : dateFrom
+              setDateFromInput(next)
+              if (next !== dateFrom) { setDateFrom(next); setPage(0) }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+            }}
+            className="h-8 w-[145px] text-xs"
+          />
+          <Input
+            type="text"
+            placeholder="Till YYYY-MM-DD"
+            value={dateToInput}
+            onChange={(e) => setDateToInput(e.target.value)}
+            onBlur={() => {
+              const v = dateToInput.trim()
+              const next = v === '' ? '' : isValidDate(v) ? v : dateTo
+              setDateToInput(next)
+              if (next !== dateTo) { setDateTo(next); setPage(0) }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+            }}
+            className="h-8 w-[145px] text-xs"
+          />
+          {(dateFrom || dateTo) && (
+            <button
+              type="button"
+              onClick={() => { setDateFrom(''); setDateTo(''); setDateFromInput(''); setDateToInput(''); setPage(0) }}
+              className="p-1 rounded-sm hover:bg-muted text-muted-foreground"
+              title="Rensa datumfilter"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="space-y-2">
