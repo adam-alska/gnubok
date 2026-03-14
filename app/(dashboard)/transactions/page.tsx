@@ -180,23 +180,41 @@ export default function TransactionsPage() {
       .filter((t) => t.potential_invoice_id)
       .map((t) => t.potential_invoice_id)
 
+    const unbookedTxIds = txData
+      .filter((t) => !t.journal_entry_id && t.is_business === null)
+      .map((t) => t.id)
+
+    const [invoiceResult, inboxResult] = await Promise.all([
+      potentialInvoiceIds.length > 0
+        ? supabase.from('invoices').select('*, customer:customers(*)').in('id', potentialInvoiceIds)
+        : Promise.resolve({ data: null }),
+      unbookedTxIds.length > 0
+        ? supabase.from('invoice_inbox_items').select('*').in('matched_transaction_id', unbookedTxIds).in('status', ['ready', 'processing'])
+        : Promise.resolve({ data: null }),
+    ])
+
     let invoiceMap: Record<string, Invoice & { customer?: Customer }> = {}
-    if (potentialInvoiceIds.length > 0) {
-      const { data: invoices } = await supabase
-        .from('invoices')
-        .select('*, customer:customers(*)')
-        .in('id', potentialInvoiceIds)
-      if (invoices) {
-        invoiceMap = invoices.reduce((acc, inv) => {
-          acc[inv.id] = inv
-          return acc
-        }, {} as Record<string, Invoice & { customer?: Customer }>)
-      }
+    if (invoiceResult.data) {
+      invoiceMap = invoiceResult.data.reduce((acc, inv) => {
+        acc[inv.id] = inv
+        return acc
+      }, {} as Record<string, Invoice & { customer?: Customer }>)
+    }
+
+    let inboxItemMap: Record<string, InvoiceInboxItem> = {}
+    if (inboxResult.data) {
+      inboxItemMap = inboxResult.data.reduce((acc, item) => {
+        if (item.matched_transaction_id) {
+          acc[item.matched_transaction_id] = item as InvoiceInboxItem
+        }
+        return acc
+      }, {} as Record<string, InvoiceInboxItem>)
     }
 
     const newTransactions: TransactionWithInvoice[] = txData.map((t) => ({
       ...t,
       potential_invoice: t.potential_invoice_id ? invoiceMap[t.potential_invoice_id] : undefined,
+      matched_inbox_item: inboxItemMap[t.id] || undefined,
     }))
 
     setTransactions((prev) => [...prev, ...newTransactions])
