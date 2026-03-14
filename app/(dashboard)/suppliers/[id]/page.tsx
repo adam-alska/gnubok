@@ -39,7 +39,7 @@ export default function SupplierDetailPage() {
     const res = await fetch(`/api/suppliers/${params.id}`)
     const { data, error } = await res.json()
     if (error) {
-      toast({ title: 'Fel', description: error, variant: 'destructive' })
+      toast({ title: 'Kunde inte ladda leverantör', description: error, variant: 'destructive' })
     } else {
       setSupplier(data)
     }
@@ -69,7 +69,7 @@ export default function SupplierDetailPage() {
     const result = await res.json()
     if (!res.ok) {
       const fieldErrors = result.errors?.map((e: { field: string; message: string }) => `${e.field}: ${e.message}`).join(', ')
-      toast({ title: 'Fel', description: fieldErrors || result.error || 'Kunde inte uppdatera leverantör', variant: 'destructive' })
+      toast({ title: 'Kunde inte uppdatera leverantör', description: fieldErrors || result.error || 'Försök igen.', variant: 'destructive' })
     } else {
       toast({ title: 'Sparat', description: 'Leverantören har uppdaterats' })
       setSupplier({ ...result.data, stats: supplier?.stats })
@@ -90,7 +90,7 @@ export default function SupplierDetailPage() {
     const res = await fetch(`/api/suppliers/${params.id}`, { method: 'DELETE' })
     const result = await res.json()
     if (!res.ok) {
-      toast({ title: 'Fel', description: result.error, variant: 'destructive' })
+      toast({ title: 'Kunde inte ta bort leverantör', description: result.error, variant: 'destructive' })
     } else {
       toast({ title: 'Borttagen', description: 'Leverantören har tagits bort' })
       router.push('/suppliers')

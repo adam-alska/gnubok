@@ -165,11 +165,11 @@ export default function NewSupplierInvoicePage() {
 
   function onSubmit(data: FormData) {
     if (!data.supplier_id) {
-      toast({ title: 'Fel', description: 'Välj en leverantör', variant: 'destructive' })
+      toast({ title: 'Leverantör saknas', description: 'Välj en leverantör innan du fortsätter.', variant: 'destructive' })
       return
     }
     if (!data.supplier_invoice_number) {
-      toast({ title: 'Fel', description: 'Ange fakturanummer', variant: 'destructive' })
+      toast({ title: 'Fakturanummer saknas', description: 'Ange leverantörens fakturanummer.', variant: 'destructive' })
       return
     }
 

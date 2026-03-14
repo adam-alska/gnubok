@@ -83,8 +83,8 @@ export default function CustomersPage() {
 
     if (!response.ok) {
       toast({
-        title: 'Fel',
-        description: result.error || 'Kunde inte skapa kund',
+        title: 'Kunde inte skapa kund',
+        description: result.error || 'Försök igen.',
         variant: 'destructive',
       })
     } else {

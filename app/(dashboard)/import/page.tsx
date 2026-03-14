@@ -438,7 +438,7 @@ function SIEImportWizard() {
       const data = await res.json()
 
       if (!res.ok) {
-        toast({ title: 'Fel', description: data.error || 'Kunde inte skapa konton', variant: 'destructive' })
+        toast({ title: 'Kunde inte skapa konton', description: data.error || 'Försök igen.', variant: 'destructive' })
         return
       }
 
@@ -463,7 +463,7 @@ function SIEImportWizard() {
         }
       }
     } catch (err) {
-      toast({ title: 'Fel', description: err instanceof Error ? err.message : 'Kunde inte skapa konton', variant: 'destructive' })
+      toast({ title: 'Kunde inte skapa konton', description: err instanceof Error ? err.message : 'Försök igen.', variant: 'destructive' })
     } finally {
       setIsCreatingAccounts(false)
     }
@@ -601,8 +601,8 @@ function PSD2ConnectWizard() {
       window.location.href = data.authorization_url
     } catch (error) {
       toast({
-        title: 'Fel',
-        description: error instanceof Error ? error.message : 'Kunde inte ansluta bank',
+        title: 'Kunde inte ansluta bank',
+        description: error instanceof Error ? error.message : 'Försök igen.',
         variant: 'destructive',
       })
       setIsConnecting(false)
@@ -634,8 +634,8 @@ function PSD2ConnectWizard() {
       fetchConnections()
     } catch (error) {
       toast({
-        title: 'Fel',
-        description: error instanceof Error ? error.message : 'Synkronisering misslyckades',
+        title: 'Synkronisering misslyckades',
+        description: error instanceof Error ? error.message : 'Försök igen.',
         variant: 'destructive',
       })
     }
@@ -671,8 +671,8 @@ function PSD2ConnectWizard() {
       fetchConnections()
     } catch (error) {
       toast({
-        title: 'Fel',
-        description: error instanceof Error ? error.message : 'Kunde inte koppla bort bank',
+        title: 'Kunde inte koppla bort bank',
+        description: error instanceof Error ? error.message : 'Försök igen.',
         variant: 'destructive',
       })
     }

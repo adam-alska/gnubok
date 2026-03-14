@@ -196,8 +196,8 @@ export default function SettingsPage() {
       setSettings({ ...settings, ...updates } as typeof settings)
     } catch (error) {
       toast({
-        title: 'Fel',
-        description: error instanceof Error ? error.message : 'Kunde inte spara inställningar',
+        title: 'Kunde inte spara inställningar',
+        description: error instanceof Error ? error.message : 'Försök igen.',
         variant: 'destructive',
       })
     }
@@ -229,8 +229,8 @@ export default function SettingsPage() {
       router.push('/login')
     } catch (error) {
       toast({
-        title: 'Fel',
-        description: error instanceof Error ? error.message : 'Kunde inte radera kontot',
+        title: 'Kunde inte radera kontot',
+        description: error instanceof Error ? error.message : 'Försök igen.',
         variant: 'destructive',
       })
       setIsDeleting(false)

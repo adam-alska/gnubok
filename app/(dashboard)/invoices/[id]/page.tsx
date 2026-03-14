@@ -90,8 +90,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
     if (error || !data) {
       toast({
-        title: 'Fel',
-        description: 'Kunde inte hämta faktura',
+        title: 'Kunde inte ladda faktura',
+        description: 'Fakturan hittades inte.',
         variant: 'destructive',
       })
       router.push('/invoices')
@@ -211,8 +211,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       fetchInvoice()
     } catch (error) {
       toast({
-        title: 'Fel',
-        description: error instanceof Error ? error.message : 'Kunde inte uppdatera status',
+        title: 'Statusuppdatering misslyckades',
+        description: error instanceof Error ? error.message : 'Försök igen.',
         variant: 'destructive',
       })
     }
@@ -255,8 +255,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       fetchInvoice()
     } catch (error) {
       toast({
-        title: 'Fel',
-        description: error instanceof Error ? error.message : 'Kunde inte skicka fakturan',
+        title: 'Kunde inte skicka faktura',
+        description: error instanceof Error ? error.message : 'Försök igen.',
         variant: 'destructive',
       })
     }
@@ -287,8 +287,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       router.push(`/invoices/${data.data.id}`)
     } catch (error) {
       toast({
-        title: 'Fel',
-        description: error instanceof Error ? error.message : 'Kunde inte konvertera',
+        title: 'Konvertering misslyckades',
+        description: error instanceof Error ? error.message : 'Försök igen.',
         variant: 'destructive',
       })
     }
@@ -324,8 +324,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       })
     } catch (error) {
       toast({
-        title: 'Fel',
-        description: error instanceof Error ? error.message : 'Kunde inte ladda ner PDF',
+        title: 'Kunde inte ladda ner PDF',
+        description: error instanceof Error ? error.message : 'Försök igen.',
         variant: 'destructive',
       })
     }

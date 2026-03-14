@@ -168,8 +168,8 @@ export default function NewInvoicePage() {
 
     if (error) {
       toast({
-        title: 'Fel',
-        description: 'Kunde inte hämta kunder',
+        title: 'Kunde inte ladda kunder',
+        description: 'Kontrollera din anslutning och försök igen.',
         variant: 'destructive',
       })
     } else {
@@ -191,8 +191,8 @@ export default function NewInvoicePage() {
 
     if (!response.ok) {
       toast({
-        title: 'Fel',
-        description: result.error || 'Kunde inte skapa kund',
+        title: 'Kunde inte skapa kund',
+        description: result.error || 'Försök igen.',
         variant: 'destructive',
       })
     } else {

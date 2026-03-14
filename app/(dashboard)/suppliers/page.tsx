@@ -43,8 +43,8 @@ export default function SuppliersPage() {
 
     if (error) {
       toast({
-        title: 'Fel',
-        description: 'Kunde inte hämta leverantörer',
+        title: 'Kunde inte ladda leverantörer',
+        description: 'Kontrollera din anslutning och försök igen.',
         variant: 'destructive',
       })
     } else {
@@ -71,8 +71,8 @@ export default function SuppliersPage() {
     if (!response.ok) {
       const fieldErrors = result.errors?.map((e: { field: string; message: string }) => `${e.field}: ${e.message}`).join(', ')
       toast({
-        title: 'Fel',
-        description: fieldErrors || result.error || 'Kunde inte skapa leverantör',
+        title: 'Kunde inte skapa leverantör',
+        description: fieldErrors || result.error || 'Försök igen.',
         variant: 'destructive',
       })
     } else {

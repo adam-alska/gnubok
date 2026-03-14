@@ -84,8 +84,8 @@ export default function CustomerDetailPage({
       setCustomer(data)
     } catch {
       toast({
-        title: 'Fel',
-        description: 'Kunde inte hitta kunden',
+        title: 'Kunde inte ladda kund',
+        description: 'Kunden hittades inte.',
         variant: 'destructive',
       })
       router.push('/customers')
@@ -115,8 +115,8 @@ export default function CustomerDetailPage({
       fetchCustomer()
     } catch {
       toast({
-        title: 'Fel',
-        description: 'Kunde inte uppdatera kunden',
+        title: 'Kunde inte uppdatera kund',
+        description: 'Försök igen.',
         variant: 'destructive',
       })
     } finally {
@@ -150,8 +150,8 @@ export default function CustomerDetailPage({
       router.push('/customers')
     } catch {
       toast({
-        title: 'Fel',
-        description: 'Kunde inte ta bort kunden',
+        title: 'Kunde inte ta bort kund',
+        description: 'Försök igen.',
         variant: 'destructive',
       })
     }

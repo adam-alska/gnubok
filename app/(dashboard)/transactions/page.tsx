@@ -279,7 +279,7 @@ export default function TransactionsPage() {
 
       const result = await response.json()
       if (!response.ok) {
-        toast({ title: 'Fel', description: result.error || 'Kunde inte uppdatera transaktion', variant: 'destructive' })
+        toast({ title: 'Kategorisering misslyckades', description: result.error || 'Försök igen.', variant: 'destructive' })
         setProcessingId(null)
         return null
       }
@@ -364,7 +364,7 @@ export default function TransactionsPage() {
       })
       const result = await response.json()
       if (!response.ok) {
-        toast({ title: 'Fel', description: result.error || 'Kunde inte matcha faktura', variant: 'destructive' })
+        toast({ title: 'Fakturamatchning misslyckades', description: result.error || 'Försök igen.', variant: 'destructive' })
         setIsConfirmingMatch(false)
         return
       }
@@ -416,7 +416,7 @@ export default function TransactionsPage() {
       })
       const result = await response.json()
       if (!response.ok) {
-        toast({ title: 'Fel', description: result.error || 'Kunde inte matcha faktura', variant: 'destructive' })
+        toast({ title: 'Fakturamatchning misslyckades', description: result.error || 'Försök igen.', variant: 'destructive' })
         return false
       }
 
@@ -451,7 +451,7 @@ export default function TransactionsPage() {
     setIsCreating(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      toast({ title: 'Fel', description: 'Du måste vara inloggad', variant: 'destructive' })
+      toast({ title: 'Inloggning krävs', description: 'Du måste vara inloggad för att lägga till transaktioner.', variant: 'destructive' })
       setIsCreating(false)
       return
     }
@@ -472,7 +472,7 @@ export default function TransactionsPage() {
       .single()
 
     if (error) {
-      toast({ title: 'Fel', description: error.message, variant: 'destructive' })
+      toast({ title: 'Kunde inte skapa transaktion', description: error.message, variant: 'destructive' })
     } else {
       toast({ title: 'Transaktion tillagd', description: `${data.description} har lagts till` })
       setTransactions([transaction, ...transactions])
