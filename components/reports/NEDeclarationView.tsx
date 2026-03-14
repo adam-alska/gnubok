@@ -115,7 +115,7 @@ export function NEDeclarationView({ periodId }: { periodId: string }) {
                 <CardTitle>
                   {data.companyInfo.companyName}
                 </CardTitle>
-                <Badge className="bg-blue-100 text-blue-800">
+                <Badge className="bg-primary/10 text-primary">
                   {data.fiscalYear.name}
                 </Badge>
               </div>

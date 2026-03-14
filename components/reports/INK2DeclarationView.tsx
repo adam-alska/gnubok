@@ -50,9 +50,9 @@ export function INK2DeclarationView({ periodId }: { periodId: string }) {
           <CardTitle className="text-lg">INK2 (Aktiebolag)</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-start gap-2 mb-4 p-3 bg-blue-50 rounded-md">
-            <Info className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
-            <p className="text-sm text-blue-800">
+          <div className="flex items-start gap-2 mb-4 p-3 bg-primary/10 rounded-md">
+            <Info className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+            <p className="text-sm text-primary">
               INK2 visar det bokföringsmässiga resultatet baserat på din bokföring.
               Skattemässiga justeringar (ej avdragsgilla kostnader, periodiseringsfonder m.m.)
               hanteras av din revisor/redovisningskonsult.
@@ -106,7 +106,7 @@ export function INK2DeclarationView({ periodId }: { periodId: string }) {
                 <CardTitle>
                   {data.companyInfo.companyName}
                 </CardTitle>
-                <Badge className="bg-blue-100 text-blue-800">
+                <Badge className="bg-primary/10 text-primary">
                   {data.fiscalYear.name}
                 </Badge>
               </div>

@@ -123,7 +123,7 @@ export default function NewUserChecklist({
   return (
     <Card
       className={cn(
-        'transition-all duration-300',
+        'transition-[opacity,transform] duration-300',
         isAnimatingOut && 'opacity-0 scale-95',
         className
       )}

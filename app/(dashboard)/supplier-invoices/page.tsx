@@ -73,7 +73,7 @@ export default function SupplierInvoicesPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Leverantörsfakturor</h1>
+          <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">Leverantörsfakturor</h1>
           <p className="text-muted-foreground">
             Registrera och hantera inkommande fakturor
           </p>
@@ -112,7 +112,7 @@ export default function SupplierInvoicesPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">{formatAmount(totalUnpaid)} kr</p>
+                <p className="font-display text-2xl font-medium tabular-nums">{formatAmount(totalUnpaid)} kr</p>
                 <p className="text-xs text-muted-foreground">
                   {invoices.filter((i) => !['paid', 'credited'].includes(i.status)).length} fakturor
                 </p>
@@ -126,7 +126,7 @@ export default function SupplierInvoicesPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold text-destructive">{formatAmount(overdueAmount)} kr</p>
+                <p className="font-display text-2xl font-medium tabular-nums text-destructive">{formatAmount(overdueAmount)} kr</p>
                 <p className="text-xs text-muted-foreground">{overdueCount} fakturor</p>
               </CardContent>
             </Card>
@@ -138,7 +138,7 @@ export default function SupplierInvoicesPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">{invoices.length}</p>
+                <p className="font-display text-2xl font-medium tabular-nums">{invoices.length}</p>
               </CardContent>
             </Card>
           </>

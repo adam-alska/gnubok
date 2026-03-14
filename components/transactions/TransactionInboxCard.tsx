@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import { ArrowUpRight, ArrowDownRight, FileText, Loader2, MessageSquareText, Paperclip } from 'lucide-react'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/info-tooltip'
 import { formatAccountWithName } from '@/lib/bookkeeping/client-account-names'
@@ -71,9 +71,9 @@ export default function TransactionInboxCard({
   return (
     <motion.div
       layout
-      initial={{ opacity: 1, height: 'auto' }}
-      exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-      transition={{ duration: 0.3, ease: 'easeInOut' }}
+      initial={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95, x: -16 }}
+      transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
       onAnimationComplete={(definition) => {
         // Only call on exit animation
         if (typeof definition === 'object' && 'opacity' in definition && definition.opacity === 0) {
@@ -82,11 +82,12 @@ export default function TransactionInboxCard({
       }}
     >
       <Card
-        className={`transition-colors ${
-          hasInvoiceMatch || hasSupplierInvoiceMatch ? 'border-blue-500/50' : 'border-warning/50'
-        } ${isSelected ? 'border-primary bg-primary/[0.02]' : ''} ${
-          isDisabled ? 'opacity-50' : ''
-        }`}
+        className={cn(
+          'transition-colors',
+          hasInvoiceMatch || hasSupplierInvoiceMatch ? 'border-primary/50' : 'border-warning/50',
+          isSelected && 'border-primary bg-primary/[0.02]',
+          isDisabled && 'opacity-50'
+        )}
         onClick={showCheckbox ? () => onToggleSelect(transaction.id) : undefined}
       >
         <CardContent className="py-4">
@@ -102,11 +103,8 @@ export default function TransactionInboxCard({
                 />
               )}
               <div
-                className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  isIncome
-                    ? 'bg-success/10 text-success'
-                    : 'bg-destructive/10 text-destructive'
-                }`}
+                className={`h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 ${isIncome ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}
+                aria-hidden="true"
               >
                 {isIncome ? (
                   <ArrowUpRight className="h-5 w-5" />
@@ -131,7 +129,7 @@ export default function TransactionInboxCard({
 
             {/* Right: amount */}
             <div className="text-right flex-shrink-0">
-              <p className={`font-medium ${isIncome ? 'text-success' : ''}`}>
+              <p className={cn('font-medium tabular-nums', isIncome && 'text-success')}>
                 {isIncome ? '+' : ''}
                 {formatCurrency(transaction.amount, transaction.currency)}
               </p>
@@ -151,14 +149,14 @@ export default function TransactionInboxCard({
                 <Button
                   size="sm"
                   variant="default"
-                  className="h-8 text-xs"
+                  className="h-9 text-xs max-w-full truncate"
                   onClick={() => onOpenMatchDialog(transaction)}
                   disabled={isProcessing || isDisabled}
                 >
                   {isProcessing ? (
-                    <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                    <Loader2 className="mr-1.5 h-3 w-3 animate-spin flex-shrink-0" />
                   ) : (
-                    <FileText className="mr-1.5 h-3 w-3" />
+                    <FileText className="mr-1.5 h-3 w-3 flex-shrink-0" />
                   )}
                   Matcha Faktura {transaction.potential_invoice!.invoice_number}
                 </Button>
@@ -166,14 +164,14 @@ export default function TransactionInboxCard({
                 <Button
                   size="sm"
                   variant="default"
-                  className="h-8 text-xs"
+                  className="h-9 text-xs max-w-full truncate"
                   onClick={() => onOpenMatchDialog(transaction)}
                   disabled={isProcessing || isDisabled}
                 >
                   {isProcessing ? (
-                    <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                    <Loader2 className="mr-1.5 h-3 w-3 animate-spin flex-shrink-0" />
                   ) : (
-                    <FileText className="mr-1.5 h-3 w-3" />
+                    <FileText className="mr-1.5 h-3 w-3 flex-shrink-0" />
                   )}
                   Matcha Leverantörsfaktura {transaction.potential_supplier_invoice!.supplier_invoice_number}
                 </Button>
@@ -186,7 +184,7 @@ export default function TransactionInboxCard({
                         key={ts.template_id}
                         size="sm"
                         variant={idx === 0 ? 'default' : 'outline'}
-                        className="h-8 text-xs"
+                        className="h-9 text-xs"
                         onClick={() => {
                           if (onOpenTemplateReview && tmpl) {
                             onOpenTemplateReview(transaction, ts.template_id)
@@ -211,7 +209,7 @@ export default function TransactionInboxCard({
                 <Button
                   size="sm"
                   variant="default"
-                  className="h-8 text-xs"
+                  className="h-9 text-xs"
                   onClick={() => handleSuggestionClick(topSuggestion)}
                   disabled={isProcessing || isDisabled}
                 >
@@ -237,7 +235,7 @@ export default function TransactionInboxCard({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-8 text-xs"
+                  className="h-9 text-xs"
                   onClick={() => onOpenDescribe(transaction)}
                   disabled={isProcessing || isDisabled}
                 >
@@ -250,13 +248,11 @@ export default function TransactionInboxCard({
               <Button
                 size="sm"
                 variant={!hasInvoiceMatch && !hasSupplierInvoiceMatch && !topSuggestion && (!templateSuggestions || templateSuggestions.length === 0) ? 'default' : 'outline'}
-                className="h-8 text-xs"
+                className="h-9 text-xs"
                 onClick={() => onOpenCategoryDialog(transaction)}
                 disabled={isProcessing || isDisabled}
               >
-                {!hasInvoiceMatch && !hasSupplierInvoiceMatch && !topSuggestion && (!templateSuggestions || templateSuggestions.length === 0)
-                  ? 'Välj mall...'
-                  : 'Välj mall...'}
+                Välj mall...
               </Button>
             </div>
           )}

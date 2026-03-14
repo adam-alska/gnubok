@@ -196,7 +196,7 @@ export default function CustomerDetailPage({
               <Icon className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">{customer.name}</h1>
+              <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">{customer.name}</h1>
               <Badge variant="secondary">{customerTypeLabels[customer.customer_type]}</Badge>
             </div>
           </div>

@@ -7,20 +7,25 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { getCategoryDisplayName } from '@/lib/tax/expense-warnings'
-import { Search, ArrowUpRight, ArrowDownRight, ArrowLeftRight, Check, Link2, FileText } from 'lucide-react'
-import type { TransactionWithInvoice } from './transaction-types'
-import type { HistoryFilter } from './transaction-types'
+import { Search, ArrowUpRight, ArrowDownRight, ArrowLeftRight, Check, Link2, FileText, Loader2 } from 'lucide-react'
+import type { TransactionWithInvoice, HistoryFilter } from './transaction-types'
 
 interface TransactionHistoryListProps {
   transactions: TransactionWithInvoice[]
   onOpenMatchDialog: (transaction: TransactionWithInvoice) => void
   onOpenCategoryDialog: (transaction: TransactionWithInvoice) => void
+  hasMore?: boolean
+  isLoadingMore?: boolean
+  onLoadMore?: () => void
 }
 
 export default function TransactionHistoryList({
   transactions,
   onOpenMatchDialog,
   onOpenCategoryDialog,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
 }: TransactionHistoryListProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [filter, setFilter] = useState<HistoryFilter>('all')
@@ -83,7 +88,11 @@ export default function TransactionHistoryList({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div
-                      className="h-10 w-10 rounded-full flex items-center justify-center bg-muted text-muted-foreground"
+                      className={`h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        transaction.amount > 0
+                          ? 'bg-success/10 text-success'
+                          : 'bg-destructive/10 text-destructive'
+                      }`}
                     >
                       {transaction.amount > 0 ? (
                         <ArrowUpRight className="h-5 w-5" />
@@ -115,7 +124,7 @@ export default function TransactionHistoryList({
                         {transaction.invoice_id && (
                           <>
                             <span>·</span>
-                            <Badge variant="outline" className="text-blue-600 border-blue-600">
+                            <Badge variant="outline" className="text-primary border-primary">
                               <Link2 className="h-3 w-3 mr-1" />
                               Kopplad till faktura
                             </Badge>
@@ -132,26 +141,26 @@ export default function TransactionHistoryList({
                         ) : transaction.is_business === null ? (
                           <>
                             <span>·</span>
-                            <Badge
-                              variant="outline"
-                              className="text-warning border-warning cursor-pointer hover:bg-warning/10"
+                            <button
+                              type="button"
+                              className="inline-flex items-center rounded-md border border-warning px-2.5 py-0.5 text-xs font-semibold text-warning-foreground hover:bg-warning/10 transition-colors"
                               onClick={() => onOpenCategoryDialog(transaction)}
                             >
                               Ej bokförd
-                            </Badge>
+                            </button>
                           </>
                         ) : null}
                         {transaction.potential_invoice && !transaction.invoice_id && (
                           <>
                             <span>·</span>
-                            <Badge
-                              variant="outline"
-                              className="text-blue-600 border-blue-600 cursor-pointer hover:bg-blue-50"
+                            <button
+                              type="button"
+                              className="inline-flex items-center rounded-md border border-primary px-2.5 py-0.5 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
                               onClick={() => onOpenMatchDialog(transaction)}
                             >
                               <FileText className="h-3 w-3 mr-1" />
                               Möjlig match: Faktura {transaction.potential_invoice.invoice_number}
-                            </Badge>
+                            </button>
                           </>
                         )}
                       </div>
@@ -162,14 +171,14 @@ export default function TransactionHistoryList({
                       <Button
                         size="sm"
                         variant="default"
-                        className="h-7 min-h-[44px] text-xs"
+                        className="h-10 text-xs"
                         onClick={() => onOpenCategoryDialog(transaction)}
                       >
                         Bokför
                       </Button>
                     )}
                     <div className="text-right">
-                      <p className="font-medium">
+                      <p className="font-medium tabular-nums">
                         {transaction.amount > 0 ? '+' : ''}
                         {formatCurrency(transaction.amount, transaction.currency)}
                       </p>
@@ -184,6 +193,24 @@ export default function TransactionHistoryList({
               </CardContent>
             </Card>
           ))}
+          {hasMore && onLoadMore && !searchTerm && (
+            <div className="flex justify-center pt-4">
+              <Button
+                variant="outline"
+                onClick={onLoadMore}
+                disabled={isLoadingMore}
+              >
+                {isLoadingMore ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Laddar...
+                  </>
+                ) : (
+                  'Ladda fler'
+                )}
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

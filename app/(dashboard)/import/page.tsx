@@ -780,7 +780,7 @@ export default function ImportPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Importera</h1>
+        <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">Importera</h1>
         <p className="text-muted-foreground">
           Importera banktransaktioner eller bokföringsdata till ditt företag
         </p>

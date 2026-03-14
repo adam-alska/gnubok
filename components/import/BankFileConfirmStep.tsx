@@ -102,7 +102,7 @@ export default function BankFileConfirmStep({
           {/* Additional info */}
           {refsCount > 0 && (
             <div className="flex flex-wrap gap-2">
-              <Badge variant="outline" className="text-blue-600 border-blue-300">
+              <Badge variant="outline" className="text-primary border-primary/30">
                 <Link2 className="mr-1 h-3 w-3" />
                 {refsCount} med OCR/referens
               </Badge>

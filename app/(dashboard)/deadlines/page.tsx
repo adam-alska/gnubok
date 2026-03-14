@@ -175,7 +175,7 @@ export default function DeadlinesPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Deadlines</h1>
+          <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">Deadlines</h1>
         </div>
         {/* Overdue alert skeleton */}
         <div className="rounded-lg border p-4 animate-pulse">
@@ -214,7 +214,7 @@ export default function DeadlinesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Deadlines</h1>
+        <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">Deadlines</h1>
       </div>
 
       {overdueInvoices.count > 0 && (

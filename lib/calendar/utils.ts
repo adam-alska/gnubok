@@ -265,12 +265,12 @@ export const STATUS_LABELS: Record<DeadlineStatus, string> = {
 
 // Status colors for styling
 export const STATUS_COLORS: Record<DeadlineStatus, { bg: string; text: string; border: string; dot: string }> = {
-  upcoming: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', dot: 'bg-blue-500' },
-  action_needed: { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', dot: 'bg-orange-500' },
-  in_progress: { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200', dot: 'bg-yellow-500' },
-  submitted: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', dot: 'bg-purple-500' },
-  confirmed: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200', dot: 'bg-green-500' },
-  overdue: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', dot: 'bg-red-500' }
+  upcoming: { bg: 'bg-primary/5', text: 'text-foreground', border: 'border-primary/20', dot: 'bg-primary' },
+  action_needed: { bg: 'bg-warning/10', text: 'text-warning-foreground', border: 'border-warning/30', dot: 'bg-warning' },
+  in_progress: { bg: 'bg-warning/5', text: 'text-warning-foreground', border: 'border-warning/20', dot: 'bg-warning' },
+  submitted: { bg: 'bg-primary/5', text: 'text-foreground', border: 'border-primary/20', dot: 'bg-primary' },
+  confirmed: { bg: 'bg-success/10', text: 'text-success', border: 'border-success/30', dot: 'bg-success' },
+  overdue: { bg: 'bg-destructive/5', text: 'text-destructive', border: 'border-destructive/30', dot: 'bg-destructive' }
 }
 
 // Get deadlines needing attention (action_needed or overdue)

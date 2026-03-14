@@ -99,7 +99,7 @@ function TemplateCard({ template, selected, onClick, compact }: TemplateCardProp
                 variant="secondary"
                 className={`text-[10px] px-1.5 py-0 ${
                   template.vat_treatment === 'reverse_charge'
-                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                    ? 'bg-warning/10 text-warning-foreground'
                     : ''
                 }`}
               >
@@ -107,7 +107,7 @@ function TemplateCard({ template, selected, onClick, compact }: TemplateCardProp
               </Badge>
             )}
             {template.requires_vat_registration_data && (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-400 text-amber-600 dark:text-amber-400 gap-0.5">
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-warning/30 text-warning-foreground gap-0.5">
                 <AlertTriangle className="h-2.5 w-2.5" />
                 Kräver momsreg.nr
               </Badge>

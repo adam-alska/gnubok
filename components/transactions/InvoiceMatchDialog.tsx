@@ -85,7 +85,7 @@ export default function InvoiceMatchDialog({
 
               const diff = Math.abs(txAmount - invAmount)
               return (
-                <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 text-warning-foreground">
                   <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
                   <div className="text-sm">
                     <p className="font-medium">Beloppen skiljer sig</p>

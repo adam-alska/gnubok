@@ -140,7 +140,7 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
             <nav className="flex-1 px-3" aria-label="Huvudnavigation">
               {/* Huvudmeny group */}
               <div className="mb-6">
-                <p className="px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-[0.08em]">
+                <p className="px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em]">
                   {groupLabels.main}
                 </p>
                 <div className="space-y-px">
@@ -160,7 +160,7 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                       >
                         <Icon className={cn(
                           "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
-                          active ? "text-primary" : "text-muted-foreground/70 group-hover:text-muted-foreground"
+                          active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
                         )} />
                         {item.label}
                       </Link>
@@ -171,7 +171,7 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
 
               {/* Finans group */}
               <div className="mb-6">
-                <p className="px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-[0.08em]">
+                <p className="px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em]">
                   {groupLabels.finans}
                 </p>
                 <div className="space-y-px">
@@ -194,7 +194,7 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                       >
                         <Icon className={cn(
                           "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
-                          active ? "text-primary" : "text-muted-foreground/70 group-hover:text-muted-foreground"
+                          active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
                         )} />
                         <span className="flex-1">{item.label}</span>
                         {badge !== null && (
@@ -212,7 +212,7 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
               <div className="mb-4">
                 <button
                   onClick={() => setManualOvrigtExpanded(!isOvrigtExpanded)}
-                  className="w-full flex items-center justify-between px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-[0.08em] hover:text-muted-foreground transition-colors"
+                  className="w-full flex items-center justify-between px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em] hover:text-muted-foreground transition-colors"
                 >
                   <span>{groupLabels.övrigt}</span>
                   <ChevronDown className={cn(
@@ -238,7 +238,7 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                         >
                           <Icon className={cn(
                             "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
-                            active ? "text-primary" : "text-muted-foreground/70 group-hover:text-muted-foreground"
+                            active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
                           )} />
                           {item.label}
                         </Link>

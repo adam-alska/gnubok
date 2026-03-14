@@ -177,7 +177,7 @@ export default function ExpenseDetailPage() {
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">
+              <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">
                 Utgift #{invoice.arrival_number}
               </h1>
               <Badge className={status.color}>

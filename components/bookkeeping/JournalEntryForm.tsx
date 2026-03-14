@@ -517,9 +517,9 @@ export default function JournalEntryForm({
         warningText="Ingen verifikation har bifogats. Enligt bokföringslagen (BFL) krävs underlag för varje bokföringspost."
         confirmLabel="Fortsätt ändå"
       >
-        <div className="flex items-start gap-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4">
-          <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-          <div className="text-sm text-amber-800 dark:text-amber-300">
+        <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-4">
+          <AlertTriangle className="h-5 w-5 text-warning-foreground mt-0.5 shrink-0" />
+          <div className="text-sm text-warning-foreground">
             <p className="font-medium mb-1">Inget underlag bifogat</p>
             <p>
               Enligt bokföringslagen (BFL 5 kap. 6-7 §§) ska varje bokföringspost ha en verifikation som

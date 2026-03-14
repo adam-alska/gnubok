@@ -537,7 +537,7 @@ export default function ChartOfAccountsManager() {
                               </td>
                               <td className="py-2 text-right">
                                 {account.is_activated ? (
-                                  <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+                                  <span className="inline-flex items-center gap-1 text-xs text-success">
                                     <CheckCircle2 className="h-3.5 w-3.5" />
                                     Aktiverat
                                   </span>

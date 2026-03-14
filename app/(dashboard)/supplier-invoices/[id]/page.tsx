@@ -172,7 +172,7 @@ export default function SupplierInvoiceDetailPage() {
           </Button>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              <h1 className="font-display text-2xl sm:text-3xl font-medium tracking-tight">
                 Ankomst #{invoice.arrival_number}
               </h1>
               <Badge className={statusColors[invoice.status] || ''}>

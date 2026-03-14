@@ -9,10 +9,10 @@
   --background: 0 0% 97%;
   --foreground: 0 0% 9%;
 
-  --card: 0 0% 100%;
+  --card: 0 0% 99%;
   --card-foreground: 0 0% 9%;
 
-  --popover: 0 0% 100%;
+  --popover: 0 0% 99%;
   --popover-foreground: 0 0% 9%;
 
   --primary: 0 0% 15%;
@@ -22,7 +22,7 @@
   --secondary-foreground: 0 0% 9%;
 
   --muted: 0 0% 92%;
-  --muted-foreground: 0 0% 45%;
+  --muted-foreground: 0 0% 40%;
 
   --accent: 0 0% 92%;
   --accent-foreground: 0 0% 9%;
@@ -336,4 +336,22 @@ input[type="number"] {
 .dark ::selection {
   background: hsl(var(--primary) / 0.3);
   color: hsl(var(--foreground));
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .stagger-enter > * {
+    animation: none;
+    opacity: 1;
+  }
+
+  .hover-lift:hover {
+    transform: none;
+  }
 }

@@ -162,7 +162,7 @@ export default function JournalEntryList({ periodId }: Props) {
                   ) : (
                     NEEDS_ATTACHMENT.has(entry.source_type) && entry.status === 'posted' && (
                       <span className="mr-1" title="Underlag saknas">
-                        <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                        <AlertTriangle className="h-3.5 w-3.5 text-warning-foreground" />
                       </span>
                     )
                   )}
@@ -190,7 +190,7 @@ export default function JournalEntryList({ periodId }: Props) {
                       ) : (
                         NEEDS_ATTACHMENT.has(entry.source_type) && entry.status === 'posted' && (
                           <span title="Underlag saknas">
-                            <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                            <AlertTriangle className="h-3.5 w-3.5 text-warning-foreground" />
                           </span>
                         )
                       )}

@@ -97,7 +97,7 @@ export default function SuppliersPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Leverantörer</h1>
+          <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">Leverantörer</h1>
           <p className="text-muted-foreground">
             Hantera dina leverantörer och deras betalningsuppgifter
           </p>

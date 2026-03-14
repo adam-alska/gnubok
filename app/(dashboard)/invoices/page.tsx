@@ -11,17 +11,18 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PageHeader } from '@/components/ui/page-header'
 import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { Plus, Search, Receipt, FileText, Send, CheckCircle, Clock, XCircle, ReceiptText, FileQuestion, Truck } from 'lucide-react'
 import { EmptyInvoices } from '@/components/ui/empty-state'
 import type { Invoice, InvoiceStatus } from '@/types'
 
 const statusConfig: Record<InvoiceStatus, { label: string; variant: 'default' | 'secondary' | 'success' | 'warning' | 'destructive'; icon: React.ElementType; borderColor: string }> = {
-  draft: { label: 'Utkast', variant: 'secondary', icon: FileText, borderColor: 'border-l-muted-foreground/30' },
-  sent: { label: 'Skickad', variant: 'default', icon: Send, borderColor: 'border-l-warning' },
-  paid: { label: 'Betald', variant: 'success', icon: CheckCircle, borderColor: 'border-l-success' },
-  overdue: { label: 'Förfallen', variant: 'destructive', icon: Clock, borderColor: 'border-l-destructive' },
-  cancelled: { label: 'Makulerad', variant: 'secondary', icon: XCircle, borderColor: 'border-l-muted-foreground/30' },
-  credited: { label: 'Krediterad', variant: 'secondary', icon: XCircle, borderColor: 'border-l-muted-foreground/30' },
+  draft: { label: 'Utkast', variant: 'secondary', icon: FileText, borderColor: 'border-muted-foreground/30' },
+  sent: { label: 'Skickad', variant: 'default', icon: Send, borderColor: 'border-warning/50' },
+  paid: { label: 'Betald', variant: 'success', icon: CheckCircle, borderColor: 'border-success/50' },
+  overdue: { label: 'Förfallen', variant: 'destructive', icon: Clock, borderColor: 'border-destructive/50' },
+  cancelled: { label: 'Makulerad', variant: 'secondary', icon: XCircle, borderColor: 'border-muted-foreground/30' },
+  credited: { label: 'Krediterad', variant: 'secondary', icon: XCircle, borderColor: 'border-muted-foreground/30' },
 }
 
 function getRelativeTimeLabel(dueDateStr: string, status: InvoiceStatus): { text: string; color: string } | null {
@@ -145,7 +146,7 @@ export default function InvoicesPage() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Totalt antal</p>
-                    <p className="text-2xl font-bold tabular-nums">{invoices.length}</p>
+                    <p className="font-display text-2xl font-medium tabular-nums">{invoices.length}</p>
                   </div>
                 </div>
               </CardContent>
@@ -159,7 +160,7 @@ export default function InvoicesPage() {
                   <div>
                     <p className="text-sm text-muted-foreground">Obetalda</p>
                     <div className="flex items-center gap-2">
-                      <p className="text-2xl font-bold tabular-nums">{stats.unpaid}</p>
+                      <p className="font-display text-2xl font-medium tabular-nums">{stats.unpaid}</p>
                       {stats.overdue > 0 && (
                         <Badge variant="destructive" className="text-xs">
                           {stats.overdue} förfallna
@@ -178,7 +179,7 @@ export default function InvoicesPage() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Att få in</p>
-                    <p className="text-2xl font-bold tabular-nums">{formatCurrency(stats.unpaidAmount)}</p>
+                    <p className="font-display text-2xl font-medium tabular-nums">{formatCurrency(stats.unpaidAmount)}</p>
                   </div>
                 </div>
               </CardContent>
@@ -262,11 +263,13 @@ export default function InvoicesPage() {
             const isDeliveryNote = docType === 'delivery_note'
             const StatusIcon = isCreditNote ? ReceiptText : isProforma ? FileQuestion : isDeliveryNote ? Truck : status.icon
             const relativeTime = invoice.due_date ? getRelativeTimeLabel(invoice.due_date, invoice.status) : null
-            const borderClass = isCreditNote ? 'border-l-4 border-l-destructive/50' : isProforma ? 'border-l-4 border-l-blue-400' : isDeliveryNote ? 'border-l-4 border-l-emerald-400' : `border-l-4 ${status.borderColor}`
-
             return (
               <Link key={invoice.id} href={`/invoices/${invoice.id}`}>
-                <Card className={`hover:border-primary/50 transition-colors cursor-pointer ${borderClass} ${invoice.status === 'overdue' ? 'ring-1 ring-destructive/20' : ''}`}>
+                <Card className={cn(
+                  'hover:border-primary/50 transition-colors cursor-pointer',
+                  isCreditNote ? 'border-destructive/30' : isProforma ? 'border-primary/30' : isDeliveryNote ? 'border-success/30' : status.borderColor,
+                  invoice.status === 'overdue' && 'ring-1 ring-destructive/20'
+                )}>
                   <CardContent className="py-4">
                     <div className="flex items-start gap-3 sm:gap-4 sm:items-center">
                       <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${isCreditNote ? 'bg-destructive/10' : 'bg-muted'}`}>
@@ -289,12 +292,12 @@ export default function InvoicesPage() {
                             </Badge>
                           )}
                           {isProforma && (
-                            <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+                            <Badge variant="secondary" className="text-xs bg-primary/10 text-primary">
                               Proforma
                             </Badge>
                           )}
                           {isDeliveryNote && (
-                            <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-700">
+                            <Badge variant="secondary" className="text-xs bg-success/10 text-success">
                               Följesedel
                             </Badge>
                           )}

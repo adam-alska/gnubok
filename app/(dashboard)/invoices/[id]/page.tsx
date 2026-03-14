@@ -363,12 +363,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           </Button>
           <div>
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{invoice.invoice_number}</h1>
+              <h1 className="font-display text-2xl sm:text-3xl font-medium tracking-tight">{invoice.invoice_number}</h1>
               {isProforma && (
-                <Badge variant="secondary" className="bg-blue-100 text-blue-700">Proforma</Badge>
+                <Badge variant="secondary" className="bg-primary/10 text-primary">Proforma</Badge>
               )}
               {isDeliveryNote && (
-                <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">Följesedel</Badge>
+                <Badge variant="secondary" className="bg-success/10 text-success">Följesedel</Badge>
               )}
               <Badge variant={status.variant as 'default' | 'secondary' | 'destructive'}>
                 <StatusIcon className="mr-1 h-3 w-3" />

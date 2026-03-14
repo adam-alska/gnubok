@@ -69,7 +69,7 @@ export default function ReportsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Rapporter</h1>
+          <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">Rapporter</h1>
           <p className="text-muted-foreground">
             Huvudbok, grundbok, kundreskontra, saldobalans, resultaträkning, balansräkning, momsdeklaration och mer
           </p>
@@ -1160,7 +1160,7 @@ function SupplierLedgerView({ periodId }: { periodId: string }) {
             <CardTitle className="text-sm text-muted-foreground">Totalt utestående</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{formatAmount(ledger.total_outstanding)} kr</p>
+            <p className="font-display text-2xl font-medium tabular-nums">{formatAmount(ledger.total_outstanding)} kr</p>
             <p className="text-xs text-muted-foreground">{ledger.unpaid_count} fakturor</p>
           </CardContent>
         </Card>
@@ -1169,7 +1169,7 @@ function SupplierLedgerView({ periodId }: { periodId: string }) {
             <CardTitle className="text-sm text-muted-foreground">Ej förfallet</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-success">{formatAmount(ledger.total_current)} kr</p>
+            <p className="font-display text-2xl font-medium tabular-nums text-success">{formatAmount(ledger.total_current)} kr</p>
           </CardContent>
         </Card>
         <Card>
@@ -1177,7 +1177,7 @@ function SupplierLedgerView({ periodId }: { periodId: string }) {
             <CardTitle className="text-sm text-muted-foreground">Förfallet</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-destructive">{formatAmount(ledger.total_overdue)} kr</p>
+            <p className="font-display text-2xl font-medium tabular-nums text-destructive">{formatAmount(ledger.total_overdue)} kr</p>
           </CardContent>
         </Card>
       </div>
@@ -1758,7 +1758,7 @@ function ARLedgerView({ periodId }: { periodId: string }) {
             <CardTitle className="text-sm text-muted-foreground">Totalt utestående</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{formatAmount(ledger.total_outstanding)} kr</p>
+            <p className="font-display text-2xl font-medium tabular-nums">{formatAmount(ledger.total_outstanding)} kr</p>
             <p className="text-xs text-muted-foreground">{ledger.unpaid_count} fakturor</p>
           </CardContent>
         </Card>
@@ -1767,7 +1767,7 @@ function ARLedgerView({ periodId }: { periodId: string }) {
             <CardTitle className="text-sm text-muted-foreground">Ej förfallet</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-success">{formatAmount(ledger.total_current)} kr</p>
+            <p className="font-display text-2xl font-medium tabular-nums text-success">{formatAmount(ledger.total_current)} kr</p>
           </CardContent>
         </Card>
         <Card>
@@ -1775,7 +1775,7 @@ function ARLedgerView({ periodId }: { periodId: string }) {
             <CardTitle className="text-sm text-muted-foreground">Förfallet</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-destructive">{formatAmount(ledger.total_overdue)} kr</p>
+            <p className="font-display text-2xl font-medium tabular-nums text-destructive">{formatAmount(ledger.total_overdue)} kr</p>
           </CardContent>
         </Card>
       </div>

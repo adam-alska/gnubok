@@ -406,3 +406,48 @@ Hosted on **Vercel**. Cron jobs in `vercel.json` (banking sync daily 05:00, dead
 
 ## Other
 Never create a NUL/nul file: \gnubok\NUL
+
+---
+
+## Design Context
+
+### Users
+
+Swedish sole traders (enskild firma) and small business owners (aktiebolag) who need to manage their own bookkeeping. They are not accountants — they are professionals (consultants, freelancers, shop owners) who want to stay compliant without hiring one. They use gnubok in short, focused sessions: sending an invoice, categorizing bank transactions, filing a VAT declaration. Speed and clarity matter — every second spent in the app is a second away from their real work.
+
+### Brand Personality
+
+**Minimal. Sharp. Efficient.**
+
+gnubok is the tool that makes accounting feel handled. It doesn't try to be fun — it earns trust through precision, clarity, and speed. The interface should feel like a well-made instrument: considered, quiet, and confident. Think Mercury's calm authority applied to Swedish bookkeeping.
+
+### Aesthetic Direction
+
+- **Palette**: Grayscale foundation with restrained semantic colors — sage green (success/balance), terracotta (errors/overdue), ochre (warnings/attention). No loud brand color. The absence of color *is* the brand.
+- **Typography**: Fraunces (serif) for display headings — adds warmth and distinction to an otherwise minimal interface. Geist (sans) for body — clean, modern, excellent for tabular data. Tabular numbers everywhere financial data appears.
+- **Surfaces**: White/near-white cards on light gray backgrounds. Subtle borders (60% opacity). Soft shadows that suggest depth without drama. Dark mode follows the same restraint.
+- **Spacing**: Generous whitespace. Let content breathe. Dense data (tables, ledgers) should use tighter spacing but never feel cramped.
+- **Motion**: Subtle and purposeful. Stagger animations for list entry, spring easing for interactive feedback. Never decorative — always communicates state change.
+- **Icons**: Lucide — consistent 15px in navigation, slightly larger in empty states and actions.
+- **Reference**: Mercury (banking) — calm, trustworthy, clean data presentation, financial precision.
+- **Anti-reference**: Enterprise software (SAP/Oracle density, overwhelming dashboards with 50 widgets, toolbar soup).
+
+### Design Principles
+
+1. **Clarity over cleverness.** Every element should be immediately understandable. Accounting is complex enough — the UI must never add confusion. Use familiar patterns, clear labels (in Swedish), and obvious hierarchy.
+
+2. **Earned minimalism.** Remove everything that doesn't serve the user's task. But don't strip away context that prevents errors — in accounting, a missing detail can mean a compliance violation. Minimal means *considered*, not *sparse*.
+
+3. **Numbers are first-class.** Financial data deserves typographic care: tabular-nums, proper alignment, adequate contrast, clear positive/negative distinction. A journal entry grid should feel as precise as a printed ledger.
+
+4. **Trust through consistency.** Same patterns, same spacing, same behavior everywhere. Buttons work the same way. Cards look the same way. When the user learns one screen, they've learned them all.
+
+5. **Speed is a feature.** Fast load, fast interaction, fast comprehension. Users are here to get a job done and leave. Optimize for the 90-second session: open app, categorize three transactions, close app.
+
+### Accessibility
+
+- Target: **WCAG AA** compliance
+- Minimum contrast ratio: 4.5:1 for text, 3:1 for UI components
+- All interactive elements keyboard-navigable with visible focus rings
+- Respect `prefers-reduced-motion` for users who disable animations
+- Color is never the sole indicator of state — always pair with icons, text, or shape
