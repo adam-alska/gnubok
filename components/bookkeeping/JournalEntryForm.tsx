@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
 import { Plus, Trash2, AlertTriangle } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
@@ -196,8 +197,7 @@ export default function JournalEntryForm({
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ journal_entry_id: journalEntryId }),
             })
-          } catch (linkErr) {
-            console.error('[JournalEntryForm] Failed to link document:', linkErr)
+          } catch {
             linkFailCount++
           }
         }
@@ -233,17 +233,18 @@ export default function JournalEntryForm({
       <div className={`grid gap-4 grid-cols-1 ${embedded && initialDate ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
         <div>
           <Label>Räkenskapsår</Label>
-          <select
-            value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value)}
-            className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
-          >
-            {periods.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+            <SelectTrigger className="mt-1">
+              <SelectValue placeholder="Välj period" />
+            </SelectTrigger>
+            <SelectContent>
+              {periods.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         {!(embedded && initialDate) && (
           <div>

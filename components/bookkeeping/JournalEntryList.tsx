@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { ChevronDown, ChevronRight, Paperclip, AlertTriangle } from 'lucide-react'
+import { ChevronDown, ChevronRight, Paperclip, AlertTriangle, Loader2, BookOpen } from 'lucide-react'
 import { AccountNumber } from '@/components/ui/account-number'
 import JournalEntryAttachments from '@/components/bookkeeping/JournalEntryAttachments'
 import CorrectionEntryDialog from '@/components/bookkeeping/CorrectionEntryDialog'
@@ -45,7 +45,7 @@ export default function JournalEntryList({ periodId }: Props) {
       const { data } = await res.json()
       setAttachmentCounts(data || {})
     } catch {
-      console.error('Failed to fetch attachment counts')
+      // Non-critical — silently ignore
     }
   }, [])
 
@@ -58,6 +58,10 @@ export default function JournalEntryList({ periodId }: Props) {
     if (periodId) params.set('period_id', periodId)
 
     const res = await fetch(`/api/bookkeeping/journal-entries?${params}`)
+    if (!res.ok) {
+      setLoading(false)
+      return
+    }
     const { data, count: total } = await res.json()
     const loadedEntries = data || []
     setEntries(loadedEntries)
@@ -84,8 +88,9 @@ export default function JournalEntryList({ periodId }: Props) {
   if (loading) {
     return (
       <Card>
-        <CardContent className="p-8 text-center text-muted-foreground">
-          Laddar verifikationer...
+        <CardContent className="flex flex-col items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mb-3" />
+          <p className="text-sm text-muted-foreground">Laddar verifikationer...</p>
         </CardContent>
       </Card>
     )
@@ -94,8 +99,14 @@ export default function JournalEntryList({ periodId }: Props) {
   if (entries.length === 0) {
     return (
       <Card>
-        <CardContent className="p-8 text-center text-muted-foreground">
-          Inga verifikationer hittades.
+        <CardContent className="flex flex-col items-center justify-center py-12">
+          <div className="p-4 rounded-full bg-muted mb-4">
+            <BookOpen className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-medium mb-1">Inga verifikationer</h3>
+          <p className="text-sm text-muted-foreground text-center max-w-sm">
+            Verifikationer skapas automatiskt vid fakturering och transaktionsbokföring, eller manuellt via fliken &quot;Ny verifikation&quot;.
+          </p>
         </CardContent>
       </Card>
     )
@@ -138,6 +149,7 @@ export default function JournalEntryList({ periodId }: Props) {
             <Card key={entry.id}>
               <button
                 onClick={() => toggleExpand(entry.id)}
+                aria-expanded={isExpanded}
                 className="w-full p-4 text-left hover:bg-muted/50 transition-colors min-h-[44px]"
               >
                 {/* Desktop: single row */}
@@ -257,14 +269,14 @@ export default function JournalEntryList({ periodId }: Props) {
                               <td className="py-2 text-muted-foreground">
                                 {line.line_description || ''}
                               </td>
-                              <td className="py-2 text-right">
+                              <td className="py-2 text-right tabular-nums">
                                 {Number(line.debit_amount) > 0
                                   ? Number(line.debit_amount).toLocaleString('sv-SE', {
                                       minimumFractionDigits: 2,
                                     })
                                   : ''}
                               </td>
-                              <td className="py-2 text-right">
+                              <td className="py-2 text-right tabular-nums">
                                 {Number(line.credit_amount) > 0
                                   ? Number(line.credit_amount).toLocaleString('sv-SE', {
                                       minimumFractionDigits: 2,

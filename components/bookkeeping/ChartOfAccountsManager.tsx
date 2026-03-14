@@ -152,6 +152,8 @@ export default function ChartOfAccountsManager() {
   }
 
   async function deleteAccount(account: BASAccount) {
+    const confirmed = window.confirm(`Vill du ta bort konto ${account.account_number} ${account.account_name}?`)
+    if (!confirmed) return
     setDeletingAccount(account.account_number)
     try {
       const res = await fetch(`/api/bookkeeping/accounts/${account.account_number}`, {
@@ -419,7 +421,7 @@ export default function ChartOfAccountsManager() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-7 w-7 min-h-[44px] min-w-[44px]"
+                                    className="h-10 w-10"
                                     onClick={() => setEditAccount(account)}
                                   >
                                     <Pencil className="h-3.5 w-3.5" />
@@ -428,7 +430,7 @@ export default function ChartOfAccountsManager() {
                                     <Button
                                       variant="ghost"
                                       size="icon"
-                                      className="h-7 w-7 min-h-[44px] min-w-[44px] text-destructive hover:text-destructive"
+                                      className="h-10 w-10 text-destructive hover:text-destructive"
                                       onClick={() => deleteAccount(account)}
                                       disabled={deletingAccount === account.account_number}
                                     >
@@ -545,7 +547,7 @@ export default function ChartOfAccountsManager() {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    className="h-7 text-xs"
+                                    className="h-9 text-xs"
                                     onClick={() => activateBASAccount(account.account_number)}
                                     disabled={activatingAccounts.has(account.account_number)}
                                   >
