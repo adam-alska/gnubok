@@ -75,7 +75,7 @@ export default function ExpensesPage() {
       .order('due_date', { ascending: true })
 
     if (error) {
-      toast({ title: 'Fel', description: 'Kunde inte hämta utgifter', variant: 'destructive' })
+      toast({ title: 'Kunde inte ladda utgifter', description: 'Kontrollera din anslutning och försök igen.', variant: 'destructive' })
     } else {
       setInvoices(data || [])
     }

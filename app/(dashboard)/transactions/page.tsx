@@ -108,7 +108,7 @@ export default function TransactionsPage() {
       .limit(PAGE_SIZE)
 
     if (txError) {
-      toast({ title: 'Fel', description: 'Kunde inte hämta transaktioner', variant: 'destructive' })
+      toast({ title: 'Kunde inte ladda transaktioner', description: 'Kontrollera din anslutning och försök igen.', variant: 'destructive' })
       setIsLoading(false)
       return
     }
@@ -306,10 +306,10 @@ export default function TransactionsPage() {
                   toast({ title: 'Ångrad', description: 'Kategorisering har ångrats' })
                 } else {
                   const errData = await undoRes.json()
-                  toast({ title: 'Kunde inte ångra', description: errData.error || 'Något gick fel', variant: 'destructive' })
+                  toast({ title: 'Kunde inte ångra', description: errData.error || 'Kategoriseringen kunde inte ångras. Försök igen.', variant: 'destructive' })
                 }
               } catch {
-                toast({ title: 'Kunde inte ångra', description: 'Något gick fel', variant: 'destructive' })
+                toast({ title: 'Kunde inte ångra', description: 'Kategoriseringen kunde inte ångras. Försök igen.', variant: 'destructive' })
               }
             }}>
               Ångra
@@ -342,7 +342,7 @@ export default function TransactionsPage() {
 
       return result.journal_entry_id || null
     } catch {
-      toast({ title: 'Fel', description: 'Något gick fel vid bokföring', variant: 'destructive' })
+      toast({ title: 'Bokföring misslyckades', description: 'Transaktionen kunde inte bokföras. Försök igen.', variant: 'destructive' })
       setProcessingId(null)
       return null
     }
@@ -402,7 +402,7 @@ export default function TransactionsPage() {
         setIsConfirmingMatch(false)
       }, 350)
     } catch {
-      toast({ title: 'Fel', description: 'Något gick fel vid matchning', variant: 'destructive' })
+      toast({ title: 'Matchning misslyckades', description: 'Transaktionen kunde inte matchas med fakturan. Försök igen.', variant: 'destructive' })
       setIsConfirmingMatch(false)
     }
   }
@@ -442,7 +442,7 @@ export default function TransactionsPage() {
       toast({ title: 'Faktura matchad', description: `Faktura ${invoiceNumber} markerad som betald` })
       return true
     } catch {
-      toast({ title: 'Fel', description: 'Något gick fel vid matchning', variant: 'destructive' })
+      toast({ title: 'Matchning misslyckades', description: 'Transaktionen kunde inte matchas med fakturan. Försök igen.', variant: 'destructive' })
       return false
     }
   }

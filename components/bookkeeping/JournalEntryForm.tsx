@@ -515,8 +515,8 @@ export default function JournalEntryForm({
         }}
         isSubmitting={false}
         title="Underlag saknas"
-        warningText="Ingen verifikation har bifogats. Enligt bokföringslagen (BFL) krävs underlag för varje bokföringspost."
-        confirmLabel="Fortsätt ändå"
+        warningText="Inget underlag har bifogats. Enligt bokföringslagen (BFL) krävs underlag för varje bokföringspost."
+        confirmLabel="Bokför utan underlag"
       >
         <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-4">
           <AlertTriangle className="h-5 w-5 text-warning-foreground mt-0.5 shrink-0" />

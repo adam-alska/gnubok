@@ -63,8 +63,8 @@ export default function InvoicesPage() {
 
     if (error) {
       toast({
-        title: 'Fel',
-        description: 'Kunde inte hämta fakturor',
+        title: 'Kunde inte ladda fakturor',
+        description: 'Kontrollera din anslutning och försök igen.',
         variant: 'destructive',
       })
     } else {
@@ -107,7 +107,7 @@ export default function InvoicesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Fakturor"
-        description="Skapa och hantera dina fakturor"
+        description="Skicka fakturor, följ betalningar och skapa kreditnotor"
         action={
           <Link href="/invoices/new">
             <Button>

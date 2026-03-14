@@ -346,7 +346,7 @@ export default function CustomerDetailPage({
                       {formatCurrency(invoice.total, invoice.currency)}
                     </span>
                     <Badge variant={invoice.payment_status === 'paid' ? 'success' : 'secondary'}>
-                      {invoice.payment_status === 'paid' ? 'Betald' : invoice.payment_status === 'overdue' ? 'Försenad' : 'Obetald'}
+                      {invoice.payment_status === 'paid' ? 'Betald' : invoice.payment_status === 'overdue' ? 'Förfallen' : 'Obetald'}
                     </Badge>
                   </div>
                 </Link>
