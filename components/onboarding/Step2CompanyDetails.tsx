@@ -67,7 +67,11 @@ export default function Step2CompanyDetails({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit(onNext)} className="space-y-4">
+          <form onSubmit={handleSubmit(onNext, (errs) => {
+            const fields = Object.keys(errs).join(', ')
+            console.error('[onboarding] step 2 validation failed:', fields, errs)
+            fetch('/api/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'step 2 validation failed', extra: { fields } }) }).catch(() => {})
+          })} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="company_name">
                 {isAB ? 'Företagsnamn' : 'Verksamhetsnamn (Eller ditt namn vid EF)'} *

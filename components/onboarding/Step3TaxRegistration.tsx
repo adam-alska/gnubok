@@ -271,7 +271,11 @@ export default function Step3TaxRegistration({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={handleSubmit(onSubmit, (errs) => {
+            const fields = Object.keys(errs).join(', ')
+            console.error('[onboarding] step 3 validation failed:', fields, errs)
+            fetch('/api/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'step 3 validation failed', extra: { fields } }) }).catch(() => {})
+          })} className="space-y-6">
             {/* F-skatt */}
             <div className="flex items-start space-x-3">
               <Controller
