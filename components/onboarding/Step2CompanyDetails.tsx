@@ -68,7 +68,9 @@ export default function Step2CompanyDetails({
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onNext, (errs) => {
-            console.error('[onboarding] step 2 validation failed:', Object.keys(errs).join(', '), errs)
+            const fields = Object.keys(errs).join(', ')
+            console.error('[onboarding] step 2 validation failed:', fields, errs)
+            fetch('/api/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'step 2 validation failed', extra: { fields } }) }).catch(() => {})
           })} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="company_name">

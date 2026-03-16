@@ -69,7 +69,9 @@ export default function Step6ConnectBank({
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onManualSubmit, (errs) => {
-            console.error('[onboarding] step 5 validation failed:', Object.keys(errs).join(', '), errs)
+            const fields = Object.keys(errs).join(', ')
+            console.error('[onboarding] step 5 validation failed:', fields, errs)
+            fetch('/api/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'step 5 validation failed', extra: { fields } }) }).catch(() => {})
           })} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="bank_name">Bank</Label>

@@ -40,7 +40,9 @@ export default function Step1EntityType({ initialData, onNext, isSaving }: Step1
 
   const handleNext = () => {
     if (!selected) {
-      console.error('[onboarding] step 1: fortsätt clicked without entity type selected')
+      const msg = 'step 1: fortsätt clicked without entity type selected'
+      console.error('[onboarding]', msg)
+      fetch('/api/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: msg }) }).catch(() => {})
       return
     }
     onNext({ entity_type: selected })

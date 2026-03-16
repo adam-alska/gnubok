@@ -47,9 +47,17 @@ export default function OnboardingPage() {
 
 const LOG = '[onboarding]'
 
-/** Log to console AND report to Sentry with onboarding context. */
+/** Log to browser console, Vercel server logs (via API), and Sentry. */
 function logError(message: string, extra?: Record<string, unknown>) {
   console.error(LOG, message, extra ?? '')
+
+  // Send to server so it appears in Vercel Logs
+  fetch('/api/log', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, extra }),
+  }).catch(() => {}) // fire-and-forget, never block the UI
+
   Sentry.captureMessage(`onboarding: ${message}`, {
     level: 'error',
     extra: { ...extra, component: 'onboarding' },
