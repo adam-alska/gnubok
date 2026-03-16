@@ -10,7 +10,7 @@
   "definition": {
     "name": "AI-kategorisering",
     "category": "operations",
-    "icon": "Sparkles",
+    "icon": "Wand",
     "dataPattern": "core",
     "readsCoreTables": ["transactions"],
     "description": "AI-drivna kategoriförslag för transaktioner",

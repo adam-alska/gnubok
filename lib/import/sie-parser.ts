@@ -140,15 +140,6 @@ export function detectEncoding(buffer: ArrayBuffer): SIEEncoding {
       }
     }
 
-    // CP437 Swedish chars live in 0x80-0x9F
-    if (byte >= 0x80 && byte <= 0x9f && CP437_MAP[byte]) {
-      cp437Count++
-    }
-
-    // Windows-1252 Swedish chars live in 0xC0-0xFF
-    if (WIN1252_SWEDISH_BYTES.has(byte)) {
-      win1252Count++
-    }
   }
 
   if (utf8Count > cp437Count && utf8Count > win1252Count) return 'utf8'

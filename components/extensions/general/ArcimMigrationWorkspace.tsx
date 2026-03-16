@@ -23,6 +23,12 @@ import {
   ExternalLink,
   Info,
   RotateCcw,
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  Calendar,
+  XCircle,
+  BookOpen,
 } from 'lucide-react'
 import type { WorkspaceComponentProps } from '@/lib/extensions/workspace-registry'
 
@@ -732,6 +738,213 @@ function MigratingStep({ currentStep, progress }: { currentStep: string; progres
 
 // ── Result step ─────────────────────────────────────────────────
 
+/** Format a fiscal year label from ISO dates, e.g. "2024-01-01" → "2024" or "2024/2025" */
+function formatFiscalYearLabel(start: string, end: string): string {
+  const startYear = start.slice(0, 4)
+  const endYear = end.slice(0, 4)
+  return startYear === endYear ? startYear : `${startYear}/${endYear}`
+}
+
+/** Determine the overall status icon and color for a single FY import */
+function getFYStatus(r: ImportResult): { icon: 'success' | 'warning' | 'error'; label: string } {
+  if (r.errors.length > 0 && r.journalEntriesCreated === 0) {
+    return { icon: 'error', label: 'Misslyckades' }
+  }
+  if (r.errors.length > 0 || (r.details?.skippedVouchers && r.details.skippedVouchers.total > 0)) {
+    return { icon: 'warning', label: 'Delvis importerad' }
+  }
+  return { icon: 'success', label: 'Importerad' }
+}
+
+const StatusIcon = ({ status }: { status: 'success' | 'warning' | 'error' }) => {
+  if (status === 'error') return <XCircle className="h-4 w-4 text-destructive" />
+  if (status === 'warning') return <AlertTriangle className="h-4 w-4 text-amber-500" />
+  return <CheckCircle className="h-4 w-4 text-green-600" />
+}
+
+/** Expandable per-fiscal-year detail card */
+function FiscalYearResult({ result, index }: { result: ImportResult; index: number }) {
+  const [expanded, setExpanded] = useState(false)
+  const status = getFYStatus(result)
+  const d = result.details
+  const fyLabel = d?.fiscalYear
+    ? formatFiscalYearLabel(d.fiscalYear.start, d.fiscalYear.end)
+    : `Räkenskapsår ${index + 1}`
+
+  return (
+    <div className="rounded-lg border border-border">
+      {/* Header — always visible */}
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-accent/50"
+      >
+        <StatusIcon status={status.icon} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2">
+            <span className="font-medium">{fyLabel}</span>
+            <span className={`text-sm ${
+              status.icon === 'error' ? 'text-destructive' :
+              status.icon === 'warning' ? 'text-amber-600' :
+              'text-muted-foreground'
+            }`}>
+              {status.label}
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground tabular-nums">
+            {result.journalEntriesCreated.toLocaleString('sv-SE')} verifikationer importerade
+            {d?.skippedVouchers && d.skippedVouchers.total > 0 && (
+              <span className="text-amber-600">
+                {' · '}{d.skippedVouchers.total} hoppade över
+              </span>
+            )}
+          </p>
+        </div>
+        {expanded
+          ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+          : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        }
+      </button>
+
+      {/* Expanded details */}
+      {expanded && (
+        <div className="border-t border-border px-4 pb-4 pt-3 space-y-3">
+          {/* Errors — shown prominently */}
+          {result.errors.length > 0 && (
+            <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium text-destructive">
+                    {result.errors.length === 1 ? '1 fel vid import' : `${result.errors.length} fel vid import`}
+                  </p>
+                  {result.errors.map((e, i) => (
+                    <p key={i} className="text-sm text-muted-foreground">{e}</p>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Opening balance adjustment */}
+          {d?.openingBalance && (
+            <div className="rounded-md border border-border bg-muted/30 p-3">
+              <div className="flex items-start gap-2">
+                <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Ingående balanser justerade</p>
+                  <p className="text-sm text-muted-foreground">
+                    {d.openingBalance.explanation === 'unallocated_result' && (
+                      <>
+                        Differens på <span className="tabular-nums font-medium">{Math.abs(d.openingBalance.imbalance).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} SEK</span> bokförd
+                        på konto {d.openingBalance.bookedToAccount}. Detta beror troligen på att föregående
+                        års resultat inte allokerats till eget kapital i källsystemet — vanligt vid byte
+                        av bokföringsprogram.
+                      </>
+                    )}
+                    {d.openingBalance.explanation === 'excluded_accounts' && (
+                      <>
+                        Exkluderade systemkonton (t.ex. Fortnox 0099) hade ingående saldon. Differensen
+                        (<span className="tabular-nums font-medium">{Math.abs(d.openingBalance.imbalance).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} SEK</span>)
+                        bokförd på konto {d.openingBalance.bookedToAccount}.
+                      </>
+                    )}
+                    {d.openingBalance.explanation === 'rounding' && (
+                      <>
+                        Avrundningsdifferens (<span className="tabular-nums font-medium">{Math.abs(d.openingBalance.imbalance).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} SEK</span>)
+                        bokförd på konto {d.openingBalance.bookedToAccount}.
+                      </>
+                    )}
+                    {!d.openingBalance.explanation && (
+                      <>
+                        Differens på <span className="tabular-nums font-medium">{Math.abs(d.openingBalance.imbalance).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} SEK</span> bokförd
+                        på konto {d.openingBalance.bookedToAccount}.
+                      </>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Skipped vouchers breakdown */}
+          {d?.skippedVouchers && d.skippedVouchers.total > 0 && (
+            <div className="rounded-md border border-amber-200 bg-amber-50/50 p-3 dark:border-amber-900/30 dark:bg-amber-950/20">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                <div>
+                  <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                    {d.skippedVouchers.total} verifikationer hoppades över
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Ofullständiga verifikationer i källsystemet som inte kan importeras.
+                    Saldon har justerats automatiskt via omföringsverifikation.
+                  </p>
+                  <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-sm text-muted-foreground tabular-nums">
+                    {d.skippedVouchers.unbalanced > 0 && (
+                      <div className="flex justify-between">
+                        <span>Obalanserade</span>
+                        <span className="font-medium">{d.skippedVouchers.unbalanced}</span>
+                      </div>
+                    )}
+                    {d.skippedVouchers.unmapped > 0 && (
+                      <div className="flex justify-between">
+                        <span>Ej mappade konton</span>
+                        <span className="font-medium">{d.skippedVouchers.unmapped}</span>
+                      </div>
+                    )}
+                    {d.skippedVouchers.singleLine > 0 && (
+                      <div className="flex justify-between">
+                        <span>Enradsverifikationer</span>
+                        <span className="font-medium">{d.skippedVouchers.singleLine}</span>
+                      </div>
+                    )}
+                    {d.skippedVouchers.empty > 0 && (
+                      <div className="flex justify-between">
+                        <span>Tomma</span>
+                        <span className="font-medium">{d.skippedVouchers.empty}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Migration adjustment info */}
+          {d?.migrationAdjustment?.created && (
+            <div className="rounded-md border border-border bg-muted/30 p-3">
+              <div className="flex items-start gap-2">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Omföringsverifikation skapad</p>
+                  <p className="text-sm text-muted-foreground">
+                    {d.migrationAdjustment.accountsAdjusted} konton justerade för att saldon ska matcha
+                    källsystemet. Verifikationen kompenserar för hoppade verifikationer så att dina
+                    balansräkning och resultaträkning stämmer.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Retry info (only shown if retries happened) */}
+          {d && d.retriedBatches > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {d.retriedBatches} {d.retriedBatches === 1 ? 'batch' : 'batcher'} behövde omförsök
+              {d.failedBatches > 0 && (
+                <span className="text-destructive">
+                  {' · '}{d.failedBatches} misslyckades trots omförsök
+                </span>
+              )}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ResultStep({
   results,
   sieResults,
@@ -753,8 +966,8 @@ function ResultStep({
             <div className="flex gap-3 rounded-lg border border-destructive/20 bg-destructive/10 p-4">
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
               <div>
-                <p className="font-medium text-destructive">Migreringen misslyckades</p>
-                <p className="text-sm text-muted-foreground">{error}</p>
+                <p className="text-base font-medium text-destructive">Migreringen misslyckades</p>
+                <p className="mt-1 text-sm text-muted-foreground">{error}</p>
               </div>
             </div>
           </CardContent>
@@ -773,77 +986,119 @@ function ResultStep({
   const hasResults = results || sieResults.length > 0
   if (!hasResults) return null
 
-  // Compute combined SIE totals from all FY imports
+  // Compute combined SIE stats
   const totalJournalEntries = sieResults.reduce((sum, r) => sum + r.journalEntriesCreated, 0)
-  const allSieErrors = sieResults.flatMap(r => r.errors)
-  const allSieWarnings = sieResults.flatMap(r => r.warnings)
+  const totalErrors = sieResults.reduce((sum, r) => sum + r.errors.length, 0)
+  const totalSkipped = sieResults.reduce((sum, r) => (r.details?.skippedVouchers?.total || 0) + sum, 0)
   const allSieSucceeded = sieResults.length > 0 && sieResults.every(r => r.success)
+  const anySieFailed = sieResults.some(r => r.errors.length > 0 && r.journalEntriesCreated === 0)
+
+  // Overall status
+  const overallIcon = anySieFailed ? 'error' as const :
+    (!allSieSucceeded || totalErrors > 0) ? 'warning' as const : 'success' as const
 
   return (
     <div className="space-y-4">
+      {/* ── Header card with overall summary ── */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-600" />
-            Migrering klar
+          <CardTitle className="flex items-center gap-2.5">
+            <StatusIcon status={overallIcon} />
+            {anySieFailed ? 'Migrering delvis genomförd' :
+             !allSieSucceeded ? 'Migrering klar med anmärkningar' :
+             'Migrering klar'}
           </CardTitle>
-          <CardDescription>
-            Din bokföringsdata har importerats till gnubok.
+          <CardDescription className="text-sm">
+            {totalJournalEntries > 0 && (
+              <>
+                <span className="tabular-nums font-medium text-foreground">
+                  {totalJournalEntries.toLocaleString('sv-SE')}
+                </span>
+                {' verifikationer importerade'}
+                {sieResults.length > 1 && ` över ${sieResults.length} räkenskapsår`}
+                {totalSkipped > 0 && (
+                  <span className="text-amber-600">
+                    {' · '}{totalSkipped} hoppade över
+                  </span>
+                )}
+              </>
+            )}
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {/* SIE import results — combined summary */}
-            {sieResults.length > 0 && (
-              <ResultRow
-                label="Bokföringsdata (SIE)"
-                value={allSieSucceeded ? 'Importerad' : 'Delvis importerad'}
-                detail={totalJournalEntries > 0
-                  ? `${totalJournalEntries} verifikationer skapade (${sieResults.length} räkenskapsår)`
-                  : `${sieResults.length} räkenskapsår importerade`
-                }
-                errors={allSieErrors}
-                warnings={allSieWarnings}
+      </Card>
+
+      {/* ── Per-fiscal-year SIE breakdown ── */}
+      {sieResults.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <Database className="h-4 w-4" />
+            Bokföringsdata (SIE)
+          </h3>
+          <div className="space-y-2">
+            {sieResults.map((r, i) => (
+              <FiscalYearResult key={i} result={r} index={i} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── API import results (company info, customers, etc.) ── */}
+      {results && (
+        <div className="space-y-2">
+          <h3 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <FileText className="h-4 w-4" />
+            Övriga data
+          </h3>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {results.companyInfo && (
+              <EntityResultRow
+                icon={<Building2 className="h-4 w-4" />}
+                label="Företagsinformation"
+                status={results.companyInfo.imported ? 'success' : 'skipped'}
+                statusText={results.companyInfo.imported ? 'Importerad' : 'Hoppades över'}
               />
             )}
-
-            {/* API import results */}
-            {results?.companyInfo && (
-              <ResultRow label="Företagsinformation" value={results.companyInfo.imported ? 'Importerad' : 'Hoppad'} />
-            )}
-            {results?.customers && (
-              <ResultRow
+            {results.customers && (
+              <EntityResultRow
+                icon={<Users className="h-4 w-4" />}
                 label="Kunder"
-                value={`${results.customers.imported} importerade`}
+                status="success"
+                statusText={`${results.customers.imported} importerade`}
                 detail={results.customers.skipped > 0 ? `${results.customers.skipped} fanns redan` : undefined}
               />
             )}
-            {results?.suppliers && (
-              <ResultRow
+            {results.suppliers && (
+              <EntityResultRow
+                icon={<Truck className="h-4 w-4" />}
                 label="Leverantörer"
-                value={`${results.suppliers.imported} importerade`}
+                status="success"
+                statusText={`${results.suppliers.imported} importerade`}
                 detail={results.suppliers.skipped > 0 ? `${results.suppliers.skipped} fanns redan` : undefined}
               />
             )}
-            {results?.salesInvoices && (
-              <ResultRow
+            {results.salesInvoices && (
+              <EntityResultRow
+                icon={<FileText className="h-4 w-4" />}
                 label="Kundfakturor"
-                value={`${results.salesInvoices.imported} importerade`}
-                detail={results.salesInvoices.skipped > 0 ? `${results.salesInvoices.skipped} hoppade` : undefined}
+                status="success"
+                statusText={`${results.salesInvoices.imported} importerade`}
+                detail={results.salesInvoices.skipped > 0 ? `${results.salesInvoices.skipped} hoppades över` : undefined}
               />
             )}
-            {results?.supplierInvoices && (
-              <ResultRow
+            {results.supplierInvoices && (
+              <EntityResultRow
+                icon={<FileText className="h-4 w-4" />}
                 label="Leverantörsfakturor"
-                value={`${results.supplierInvoices.imported} importerade`}
-                detail={results.supplierInvoices.skipped > 0 ? `${results.supplierInvoices.skipped} hoppade` : undefined}
+                status="success"
+                statusText={`${results.supplierInvoices.imported} importerade`}
+                detail={results.supplierInvoices.skipped > 0 ? `${results.supplierInvoices.skipped} hoppades över` : undefined}
               />
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      )}
 
-      {/* Next steps guidance */}
+      {/* ── Next steps ── */}
       <Card className="bg-muted/50">
         <CardHeader>
           <CardTitle className="text-base">Nästa steg</CardTitle>
@@ -855,7 +1110,7 @@ function ResultStep({
             </div>
             <div>
               <p className="font-medium">Granska importerade verifikationer</p>
-              <p className="text-sm text-muted-foreground">Kontrollera att bokföringen ser korrekt ut</p>
+              <p className="text-sm text-muted-foreground">Kontrollera att bokföringen ser korrekt ut i huvudboken</p>
             </div>
           </div>
           <div className="flex items-start gap-3">
@@ -863,8 +1118,8 @@ function ResultStep({
               2
             </div>
             <div>
-              <p className="font-medium">Kontrollera kunder och leverantörer</p>
-              <p className="text-sm text-muted-foreground">Verifiera att kontaktuppgifter och bankinfo stämmer</p>
+              <p className="font-medium">Stäm av balansräkningen</p>
+              <p className="text-sm text-muted-foreground">Jämför ingående balanser och saldon mot ditt tidigare system</p>
             </div>
           </div>
           <div className="flex items-start gap-3">
@@ -872,8 +1127,8 @@ function ResultStep({
               3
             </div>
             <div>
-              <p className="font-medium">Verifiera balanserna i rapporterna</p>
-              <p className="text-sm text-muted-foreground">Jämför med ditt tidigare system</p>
+              <p className="font-medium">Kontrollera kunder och leverantörer</p>
+              <p className="text-sm text-muted-foreground">Verifiera kontaktuppgifter, organisationsnummer och bankinfo</p>
             </div>
           </div>
         </CardContent>
@@ -903,38 +1158,29 @@ function ResultStep({
   )
 }
 
-function ResultRow({
+/** Simple row for non-SIE entity results (customers, invoices, etc.) */
+function EntityResultRow({
+  icon,
   label,
-  value,
+  status,
+  statusText,
   detail,
-  errors,
-  warnings,
 }: {
+  icon: React.ReactNode
   label: string
-  value: string
+  status: 'success' | 'skipped'
+  statusText: string
   detail?: string
-  errors?: string[]
-  warnings?: string[]
 }) {
   return (
-    <div className="rounded-lg border border-border p-3">
-      <p className="text-sm font-medium">{label}</p>
-      <p className="text-sm text-muted-foreground">{value}</p>
-      {detail && <p className="text-xs text-muted-foreground">{detail}</p>}
-      {warnings && warnings.length > 0 && (
-        <p className="mt-1 text-xs text-warning-foreground">{warnings.join('. ')}</p>
-      )}
-      {errors && errors.length > 0 && (
-        <details className="mt-1">
-          <summary className="cursor-pointer text-xs text-destructive">
-            {errors.length} fel
-          </summary>
-          <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
-            {errors.slice(0, 5).map((e, i) => <li key={i}>{e}</li>)}
-            {errors.length > 5 && <li>...och {errors.length - 5} till</li>}
-          </ul>
-        </details>
-      )}
+    <div className="flex items-center gap-3 rounded-lg border border-border p-3">
+      <div className="text-muted-foreground">{icon}</div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-sm text-muted-foreground">{statusText}</p>
+        {detail && <p className="text-sm text-muted-foreground/70">{detail}</p>}
+      </div>
+      <StatusIcon status={status === 'success' ? 'success' : 'warning'} />
     </div>
   )
 }

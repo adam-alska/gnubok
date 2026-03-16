@@ -17,6 +17,7 @@ import {
   Landmark,
   CheckCircle2,
   FileWarning,
+  Clock,
 } from 'lucide-react'
 import { getExtensionDefinition } from '@/lib/extensions/sectors'
 import { resolveIcon } from '@/lib/extensions/icon-resolver'
@@ -41,6 +42,7 @@ interface DashboardContentProps {
     deadlines: Deadline[]
     receiptQueue: ReceiptQueueSummary | null
     missingUnderlagCount: number
+    staleUncategorizedCount: number
   }
   onboardingProgress?: OnboardingProgress
   enabledExtensions?: { sector_slug: string; extension_slug: string }[]
@@ -182,6 +184,26 @@ export default function DashboardContent({ firstName, settings, summary, onboard
     )
   }
 
+  if (summary.staleUncategorizedCount > 0) {
+    alertItems.push(
+      <Link key="stale-transactions" href="/transactions" className="group">
+        <Card className="h-full border-destructive/30 hover:bg-destructive/[0.03] transition-colors">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Clock className="h-4 w-4 text-destructive flex-shrink-0" />
+              <div>
+                <p className="font-medium text-sm">Gamla transaktioner</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {summary.staleUncategorizedCount} transaktioner äldre än 14 dagar saknar bokföring
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
+    )
+  }
+
   if (summary.expiringBankConnections && summary.expiringBankConnections.length > 0) {
     const conn = summary.expiringBankConnections[0]
     alertItems.push(
@@ -249,6 +271,7 @@ export default function DashboardContent({ firstName, settings, summary, onboard
             hasCustomers={onboardingProgress.hasCustomers}
             hasInvoices={onboardingProgress.hasInvoices}
             hasBankConnected={onboardingProgress.hasBankConnected}
+            hasSIEImport={onboardingProgress.hasSIEImport}
           />
         </section>
       )}

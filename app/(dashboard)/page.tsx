@@ -51,6 +51,8 @@ export default async function DashboardPage() {
     { data: entriesWithDocs },
     { data: recentReceiptActivity },
     { data: enabledToggles },
+    { count: sieImportCount },
+    { count: staleUncategorizedCount },
   ] = await Promise.all([
     supabase.from('profiles').select('full_name').eq('id', user.id).single(),
     supabase.from('company_settings').select('*').eq('user_id', user.id).single(),
@@ -74,6 +76,8 @@ export default async function DashboardPage() {
     supabase.from('document_attachments').select('journal_entry_id').eq('user_id', user.id).eq('is_current_version', true).not('journal_entry_id', 'is', null),
     supabase.from('receipts').select('created_at').eq('user_id', user.id).eq('status', 'confirmed').order('created_at', { ascending: false }).limit(30),
     supabase.from('extension_toggles').select('sector_slug, extension_slug').eq('user_id', user.id).eq('enabled', true),
+    supabase.from('sie_imports').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'completed'),
+    supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('user_id', user.id).is('journal_entry_id', null).not('is_business', 'eq', false).lt('date', new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
   ])
 
   const firstName = profile?.full_name?.split(' ')[0] || null
@@ -82,6 +86,7 @@ export default async function DashboardPage() {
     hasCustomers: (customerCount || 0) > 0,
     hasInvoices: (invoiceCount || 0) > 0,
     hasBankConnected: (transactionCount || 0) > 0,
+    hasSIEImport: (sieImportCount || 0) > 0,
   }
 
   // Calculate totals from journal entry lines using account classes
@@ -215,6 +220,7 @@ export default async function DashboardPage() {
         deadlines: (deadlines || []) as Deadline[],
         receiptQueue,
         missingUnderlagCount,
+        staleUncategorizedCount: staleUncategorizedCount || 0,
       }}
       onboardingProgress={onboardingProgress}
       enabledExtensions={enabledToggles || []}

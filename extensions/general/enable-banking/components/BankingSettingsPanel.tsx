@@ -151,10 +151,35 @@ export default function BankingSettingsPanel() {
   }
 
   const activeConnections = bankConnections.filter((c) => c.status === 'active')
+  const actionRequiredConnections = bankConnections.filter((c) => ['expired', 'error'].includes(c.status))
 
   return (
     <div className="space-y-6">
       <DestructiveConfirmDialog {...dialogProps} />
+
+      {/* Action required — expired/error connections */}
+      {actionRequiredConnections.length > 0 && (
+        <Card className="border-warning/30">
+          <CardHeader>
+            <CardTitle>Åtgärd krävs</CardTitle>
+            <CardDescription>
+              Dessa anslutningar behöver uppmärksamhet.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {actionRequiredConnections.map((connection) => (
+              <BankConnectionStatus
+                key={connection.id}
+                connection={connection}
+                onSync={handleSyncTransactions}
+                onDisconnect={handleDisconnectBank}
+                onReconnect={handleConnectBank}
+                isSyncing={syncingConnectionId === connection.id}
+              />
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Connected banks */}
       {activeConnections.length > 0 && (

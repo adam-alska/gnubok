@@ -33,6 +33,22 @@ export async function lockPeriod(
     throw new Error('Period is already locked')
   }
 
+  // Check for uncategorized business transactions in this period
+  const { count: unbookedCount } = await supabase
+    .from('transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .is('journal_entry_id', null)
+    .eq('is_business', true)
+    .gte('date', period.period_start)
+    .lte('date', period.period_end)
+
+  if (unbookedCount && unbookedCount > 0) {
+    throw new Error(
+      `Kan inte låsa period: ${unbookedCount} affärstransaktion(er) saknar bokföring. Bokför alla transaktioner innan perioden låses.`
+    )
+  }
+
   const { data: updated, error: updateError } = await supabase
     .from('fiscal_periods')
     .update({ locked_at: new Date().toISOString() })

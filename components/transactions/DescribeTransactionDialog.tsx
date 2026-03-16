@@ -23,7 +23,7 @@ import {
   Check,
   CheckCircle2,
   AlertTriangle,
-  Sparkles,
+  Wand,
 } from 'lucide-react'
 import JournalEntryPreview from './JournalEntryPreview'
 import { formatAccountWithName } from '@/lib/bookkeeping/client-account-names'
@@ -436,7 +436,7 @@ export default function DescribeTransactionDialog({
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 mb-1">
-                          <Sparkles className="h-3.5 w-3.5 text-violet-500" />
+                          <Wand className="h-3.5 w-3.5 text-violet-500" />
                           <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
                             AI-förslag
                           </Badge>

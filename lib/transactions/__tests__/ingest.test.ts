@@ -112,6 +112,12 @@ function makeMappingResult(overrides: Record<string, unknown> = {}) {
 
 // ---------------------------------------------------------------------------
 // Tests
+//
+// Queue order after batch dedup refactor:
+// 1. Booked transaction map query
+// 2. Supplier invoices fetch
+// 3. Batch external_id dedup query (returns matching external_ids)
+// 4. Per-transaction: insert, updates, etc.
 // ---------------------------------------------------------------------------
 
 describe('ingestTransactions', () => {
@@ -134,8 +140,8 @@ describe('ingestTransactions', () => {
     enqueue({ data: [], error: null })
     // Supplier invoices fetch (no unpaid invoices)
     enqueue({ data: [], error: null })
-    // Dedup check returns null (no existing row)
-    enqueue({ data: null, error: null })
+    // Batch external_id dedup query (no matches)
+    enqueue({ data: [], error: null })
     // Insert returns the new transaction
     enqueue({ data: inserted, error: null })
     // evaluateMappingRules will be called but we want low confidence
@@ -160,8 +166,8 @@ describe('ingestTransactions', () => {
     enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
-    // Dedup check returns an existing record
-    enqueue({ data: { id: 'existing-tx-1' }, error: null })
+    // Batch external_id dedup query — returns matching external_id
+    enqueue({ data: [{ external_id: raw.external_id }], error: null })
 
     const result = await ingestTransactions(supabase as never, USER_ID, [raw])
 
@@ -181,8 +187,8 @@ describe('ingestTransactions', () => {
     enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
-    // Dedup check: no duplicate
-    enqueue({ data: null, error: null })
+    // Batch external_id dedup query (no matches)
+    enqueue({ data: [], error: null })
     // Insert fails
     enqueue({ data: null, error: { message: 'DB constraint violation' } })
 
@@ -209,8 +215,8 @@ describe('ingestTransactions', () => {
     enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
-    // Dedup: no duplicate
-    enqueue({ data: null, error: null })
+    // Batch external_id dedup query (no matches)
+    enqueue({ data: [], error: null })
     // Insert returns the new transaction
     enqueue({ data: inserted, error: null })
     // Invoice match update (supabase.from('transactions').update(...))
@@ -252,8 +258,8 @@ describe('ingestTransactions', () => {
     enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
-    // Dedup: no duplicate
-    enqueue({ data: null, error: null })
+    // Batch external_id dedup query (no matches)
+    enqueue({ data: [], error: null })
     // Insert
     enqueue({ data: inserted, error: null })
 
@@ -283,8 +289,8 @@ describe('ingestTransactions', () => {
     enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
-    // Dedup: no duplicate
-    enqueue({ data: null, error: null })
+    // Batch external_id dedup query (no matches)
+    enqueue({ data: [], error: null })
     // Insert
     enqueue({ data: inserted, error: null })
     // Update after journal entry creation
@@ -322,8 +328,8 @@ describe('ingestTransactions', () => {
     enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
-    // Dedup: no duplicate
-    enqueue({ data: null, error: null })
+    // Batch external_id dedup query (no matches)
+    enqueue({ data: [], error: null })
     // Insert
     enqueue({ data: inserted, error: null })
 
@@ -353,8 +359,8 @@ describe('ingestTransactions', () => {
     enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
-    // Dedup: no duplicate
-    enqueue({ data: null, error: null })
+    // Batch external_id dedup query (no matches)
+    enqueue({ data: [], error: null })
     // Insert
     enqueue({ data: inserted, error: null })
 
@@ -383,11 +389,11 @@ describe('ingestTransactions', () => {
     enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
-    // Transaction 1: dedup (no match), insert OK
-    enqueue({ data: null, error: null })
+    // Batch external_id dedup query (no matches)
+    enqueue({ data: [], error: null })
+    // Transaction 1: insert OK
     enqueue({ data: inserted1, error: null })
-    // Transaction 2: dedup (no match), insert OK
-    enqueue({ data: null, error: null })
+    // Transaction 2: insert OK
     enqueue({ data: inserted2, error: null })
 
     mockEvaluateMappingRules.mockResolvedValue(makeMappingResult({ confidence: 0.5 }))
@@ -422,19 +428,16 @@ describe('ingestTransactions', () => {
     enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
-    // Transaction rawNew: dedup (no match), insert OK
-    enqueue({ data: null, error: null })
+    // Batch external_id dedup query — ext-dup already exists
+    enqueue({ data: [{ external_id: 'ext-dup' }], error: null })
+    // Transaction rawNew: insert OK
     enqueue({ data: insertedNew, error: null })
     // Invoice match update for income transaction
     enqueue({ data: null, error: null })
     // Auto-categorization update
     enqueue({ data: null, error: null })
-
-    // Transaction rawDup: dedup returns existing record
-    enqueue({ data: { id: 'existing-dup' }, error: null })
-
-    // Transaction rawErr: dedup (no match), insert fails
-    enqueue({ data: null, error: null })
+    // rawDup: skipped (in Set) — no queue entry needed
+    // Transaction rawErr: insert fails
     enqueue({ data: null, error: { message: 'Insert failed' } })
 
     // Income transaction gets an invoice match
@@ -496,7 +499,8 @@ describe('ingestTransactions', () => {
     enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
-    enqueue({ data: null, error: null })
+    // Batch external_id dedup query (no matches)
+    enqueue({ data: [], error: null })
     enqueue({ data: inserted, error: null })
 
     mockGetBestInvoiceMatch.mockRejectedValue(new Error('Network error'))
@@ -522,7 +526,8 @@ describe('ingestTransactions', () => {
     enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
-    enqueue({ data: null, error: null })
+    // Batch external_id dedup query (no matches)
+    enqueue({ data: [], error: null })
     enqueue({ data: inserted, error: null })
 
     mockEvaluateMappingRules.mockRejectedValue(new Error('Mapping error'))
@@ -574,8 +579,8 @@ describe('ingestTransactions', () => {
     enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
-    // Dedup: no duplicate
-    enqueue({ data: null, error: null })
+    // Batch external_id dedup query (no matches)
+    enqueue({ data: [], error: null })
     // Insert
     enqueue({ data: inserted, error: null })
     // Reconciliation update
@@ -618,8 +623,8 @@ describe('ingestTransactions', () => {
     enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
-    // Dedup: no duplicate
-    enqueue({ data: null, error: null })
+    // Batch external_id dedup query (no matches)
+    enqueue({ data: [], error: null })
     // Insert
     enqueue({ data: inserted, error: null })
 
@@ -647,8 +652,8 @@ describe('ingestTransactions', () => {
     enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
-    // Dedup: no duplicate
-    enqueue({ data: null, error: null })
+    // Batch external_id dedup query (no matches)
+    enqueue({ data: [], error: null })
     // Insert
     enqueue({ data: inserted, error: null })
 
@@ -679,8 +684,8 @@ describe('ingestTransactions', () => {
     })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
-    // external_id dedup: no match (different source)
-    enqueue({ data: null, error: null })
+    // Batch external_id dedup query (no match by external_id)
+    enqueue({ data: [], error: null })
 
     const result = await ingestTransactions(supabase as never, USER_ID, [raw])
 
@@ -704,8 +709,8 @@ describe('ingestTransactions', () => {
     })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
-    // external_id dedup: no match
-    enqueue({ data: null, error: null })
+    // Batch external_id dedup query (no match)
+    enqueue({ data: [], error: null })
     // Insert
     enqueue({ data: inserted, error: null })
 
@@ -738,13 +743,12 @@ describe('ingestTransactions', () => {
     })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
+    // Batch external_id dedup query (no matches for any)
+    enqueue({ data: [], error: null })
 
-    // raw1: external_id dedup (no match) -> content dedup matches (bookedCount=2 -> 1)
-    enqueue({ data: null, error: null })
-    // raw2: external_id dedup (no match) -> content dedup matches (bookedCount=1 -> 0)
-    enqueue({ data: null, error: null })
-    // raw3: external_id dedup (no match) -> content dedup exhausted -> insert
-    enqueue({ data: null, error: null })
+    // raw1: not in external_id set → content dedup matches (bookedCount=2 -> 1)
+    // raw2: not in external_id set → content dedup matches (bookedCount=1 -> 0)
+    // raw3: not in external_id set → content dedup exhausted → insert
     enqueue({ data: inserted, error: null })
 
     mockEvaluateMappingRules.mockResolvedValue(makeMappingResult({ confidence: 0.5 }))
@@ -764,8 +768,8 @@ describe('ingestTransactions', () => {
     enqueue({ error: { message: 'Query failed' } })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
-    // external_id dedup: no match
-    enqueue({ data: null, error: null })
+    // Batch external_id dedup query (no matches)
+    enqueue({ data: [], error: null })
     // Insert
     enqueue({ data: inserted, error: null })
 

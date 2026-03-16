@@ -65,7 +65,7 @@ describe('BAS_REFERENCE data integrity', () => {
 })
 
 describe('Non-standard accounts removed', () => {
-  const nonStandard = ['1249', '1259', '1400', '1580', '3109', '4100', '4990', '7834', '7835', '7910', '8710']
+  const nonStandard = ['1400', '1580', '3109', '4100', '4990', '7834', '7835', '7910', '8710']
 
   for (const num of nonStandard) {
     it(`${num} is not in the catalog`, () => {

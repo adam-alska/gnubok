@@ -94,9 +94,30 @@ export async function checkDuplicateImport(
     .select('*')
     .eq('user_id', userId)
     .eq('file_hash', fileHash)
+    .eq('status', 'completed')
     .single()
 
   return data as SIEImport | null
+}
+
+/**
+ * Clean up stale pending/failed import records for a given file hash.
+ * Prevents UNIQUE constraint conflicts when re-importing after a failure.
+ */
+async function cleanupStaleImportRecords(
+  supabase: SupabaseClient,
+  userId: string,
+  fileHash: string
+): Promise<void> {
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+
+  await supabase
+    .from('sie_imports')
+    .delete()
+    .eq('user_id', userId)
+    .eq('file_hash', fileHash)
+    .in('status', ['pending', 'failed'])
+    .lt('created_at', oneHourAgo)
 }
 
 /**
@@ -342,6 +363,8 @@ async function importVouchers(
     originalLineCount?: number
   }[]
   voucherNumberMapping: Array<{ sourceId: string; targetNumber: number }>
+  retriedBatches: number
+  failedBatches: number
 }> {
   const results = {
     created: 0,
@@ -366,6 +389,8 @@ async function importVouchers(
       originalLineCount?: number
     }[],
     voucherNumberMapping: [] as Array<{ sourceId: string; targetNumber: number }>,
+    retriedBatches: 0,
+    failedBatches: 0,
   }
 
   // Pre-filter and prepare all valid vouchers
@@ -507,17 +532,9 @@ async function importVouchers(
     })
   }
 
-  // Compute per-account net movements from vouchers that will be imported.
-  // Used for UB/RES reconciliation to generate migration adjustment entries.
-  for (const v of preparedVouchers) {
-    for (const l of v.lines) {
-      const net = l.debit_amount - l.credit_amount
-      results.movementsByAccount.set(
-        l.account_number,
-        (results.movementsByAccount.get(l.account_number) || 0) + net
-      )
-    }
-  }
+  // NOTE: Per-account net movements are tracked inside the batch loop below,
+  // so that only SUCCESSFULLY inserted vouchers are counted. This ensures
+  // the migration adjustment entry correctly compensates for failed batches.
 
   if (preparedVouchers.length === 0) {
     return results
@@ -552,11 +569,17 @@ async function importVouchers(
 
   const currentVoucherNumber = (startNumber as number) || 1
 
-  // Batch insert journal entries (in chunks of 100)
+  // Batch insert journal entries (in chunks of 100) with retry logic.
+  // Retries handle transient errors (Supabase rate limits, Cloudflare 500s).
   const BATCH_SIZE = 100
+  const MAX_RETRIES = 3
+  const INTER_BATCH_DELAY_MS = 50  // Prevent rate limiting under sustained load
+  let retriedBatches = 0
+  let failedBatches = 0
 
   for (let batchStart = 0; batchStart < preparedVouchers.length; batchStart += BATCH_SIZE) {
     const batch = preparedVouchers.slice(batchStart, batchStart + BATCH_SIZE)
+    const batchNumber = Math.floor(batchStart / BATCH_SIZE) + 1
 
     // Prepare journal entry headers
     const entryInserts = batch.map((v, i) => ({
@@ -571,14 +594,37 @@ async function importVouchers(
       committed_at: new Date().toISOString(),
     }))
 
-    // Insert headers
-    const { data: entries, error: entryError } = await supabase
-      .from('journal_entries')
-      .insert(entryInserts)
-      .select('id')
+    // Insert headers with retry
+    let entries: { id: string }[] | null = null
+    let lastEntryError: string | null = null
 
-    if (entryError || !entries) {
-      results.errors.push(`Batch ${Math.floor(batchStart / BATCH_SIZE) + 1}: ${entryError?.message || 'Failed to insert entries'}`)
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (attempt > 0) {
+        retriedBatches++
+        const backoffMs = Math.pow(2, attempt - 1) * 1000 // 1s, 2s, 4s
+        console.log(`[sie-import] Retrying batch ${batchNumber} (attempt ${attempt + 1}/${MAX_RETRIES + 1}) after ${backoffMs}ms`)
+        await new Promise(resolve => setTimeout(resolve, backoffMs))
+      }
+
+      const { data, error: entryError } = await supabase
+        .from('journal_entries')
+        .insert(entryInserts)
+        .select('id')
+
+      if (!entryError && data) {
+        entries = data
+        lastEntryError = null
+        break
+      }
+
+      lastEntryError = entryError?.message || 'Failed to insert entries'
+    }
+
+    if (!entries) {
+      failedBatches++
+      results.errors.push(
+        `Batch ${batchNumber} misslyckades efter ${MAX_RETRIES + 1} försök: ${lastEntryError}`
+      )
       continue
     }
 
@@ -613,7 +659,6 @@ async function importVouchers(
         })
       })
 
-      // Fix 7: Capture voucher number mapping (source → target)
       results.voucherNumberMapping.push({
         sourceId: voucher.sourceId,
         targetNumber: assignedNumber,
@@ -623,15 +668,68 @@ async function importVouchers(
       results.created++
     }
 
-    // Insert all lines for this batch
+    // Insert all lines with retry
     if (allLines.length > 0) {
-      const { error: linesError } = await supabase
-        .from('journal_entry_lines')
-        .insert(allLines)
+      let linesInserted = false
+      let lastLinesError: string | null = null
 
-      if (linesError) {
-        results.errors.push(`Batch ${Math.floor(batchStart / BATCH_SIZE) + 1} lines: ${linesError.message}`)
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        if (attempt > 0) {
+          retriedBatches++
+          const backoffMs = Math.pow(2, attempt - 1) * 1000
+          console.log(`[sie-import] Retrying batch ${batchNumber} lines (attempt ${attempt + 1}/${MAX_RETRIES + 1}) after ${backoffMs}ms`)
+          await new Promise(resolve => setTimeout(resolve, backoffMs))
+        }
+
+        const { error: linesError } = await supabase
+          .from('journal_entry_lines')
+          .insert(allLines)
+
+        if (!linesError) {
+          linesInserted = true
+          break
+        }
+
+        lastLinesError = linesError.message
       }
+
+      if (linesInserted) {
+        // Track movements ONLY for successfully inserted vouchers.
+        // This ensures the migration adjustment correctly compensates for
+        // any batches that failed completely.
+        for (let i = 0; i < batch.length; i++) {
+          const voucher = batch[i]
+          for (const line of voucher.lines) {
+            const net = line.debit_amount - line.credit_amount
+            results.movementsByAccount.set(
+              line.account_number,
+              (results.movementsByAccount.get(line.account_number) || 0) + net
+            )
+          }
+        }
+      } else {
+        failedBatches++
+        results.errors.push(
+          `Batch ${batchNumber} rader misslyckades efter ${MAX_RETRIES + 1} försök: ${lastLinesError}`
+        )
+      }
+    } else {
+      // No lines to insert — still count movements for vouchers with entries
+      for (let i = 0; i < batch.length; i++) {
+        const voucher = batch[i]
+        for (const line of voucher.lines) {
+          const net = line.debit_amount - line.credit_amount
+          results.movementsByAccount.set(
+            line.account_number,
+            (results.movementsByAccount.get(line.account_number) || 0) + net
+          )
+        }
+      }
+    }
+
+    // Small delay between batches to prevent Supabase/Cloudflare rate limiting
+    if (batchStart + BATCH_SIZE < preparedVouchers.length) {
+      await new Promise(resolve => setTimeout(resolve, INTER_BATCH_DELAY_MS))
     }
   }
 
@@ -647,6 +745,10 @@ async function importVouchers(
       p_highest_used: highestUsed,
     })
   }
+
+  // Propagate batch retry stats
+  results.retriedBatches = retriedBatches
+  results.failedBatches = failedBatches
 
   return results
 }
@@ -882,18 +984,20 @@ async function ensureAccountExists(
 }
 
 /**
- * Record the import in the database and archive the SIE file to Supabase Storage.
+ * Phase 1: Create a pending import record early, before any journal entries.
+ * This ensures the import is tracked even if later steps fail.
  */
-async function recordImport(
+async function createPendingImportRecord(
   supabase: SupabaseClient,
   userId: string,
   parsed: ParsedSIEFile,
   fileContent: string,
-  filename: string,
-  result: ImportResult,
-  documentation?: MigrationDocumentation
+  filename: string
 ): Promise<string> {
   const fileHash = await calculateFileHash(fileContent)
+
+  // Clean up any stale pending/failed records for this hash to avoid UNIQUE conflicts
+  await cleanupStaleImportRecords(supabase, userId, fileHash)
 
   const { data, error } = await supabase
     .from('sie_imports')
@@ -911,38 +1015,63 @@ async function recordImport(
         ? formatDate(parsed.stats.fiscalYearEnd)
         : null,
       accounts_count: parsed.stats.totalAccounts,
-      transactions_count: result.journalEntriesCreated,
-      status: result.success ? 'completed' : 'failed',
-      error_message: result.errors.length > 0 ? result.errors.join('; ') : null,
-      fiscal_period_id: result.fiscalPeriodId,
-      opening_balance_entry_id: result.openingBalanceEntryId,
-      imported_at: new Date().toISOString(),
-      migration_documentation: documentation ?? null,
+      transactions_count: 0,
+      status: 'pending',
+      imported_at: null,
     })
     .select('id')
     .single()
 
   if (error || !data) {
-    throw new Error(`Failed to record import: ${error?.message}`)
-  }
-
-  // Archive the SIE file to Supabase Storage (BFL 7 kap 1-2§ retention)
-  const storagePath = `${userId}/${data.id}.se`
-  const fileBlob = new Blob([fileContent], { type: 'text/plain; charset=cp437' })
-  const { error: uploadError } = await supabase.storage
-    .from('sie-files')
-    .upload(storagePath, fileBlob, { upsert: false })
-
-  if (uploadError) {
-    console.error(`[sie-import] Failed to archive SIE file: ${uploadError.message}`)
-  } else {
-    await supabase
-      .from('sie_imports')
-      .update({ file_storage_path: storagePath })
-      .eq('id', data.id)
+    throw new Error(`Failed to create pending import record: ${error?.message}`)
   }
 
   return data.id
+}
+
+/**
+ * Phase 2: Finalize the import record with results and archive the SIE file.
+ */
+async function finalizeImportRecord(
+  supabase: SupabaseClient,
+  importId: string,
+  userId: string,
+  result: ImportResult,
+  fileContent: string,
+  documentation?: MigrationDocumentation
+): Promise<void> {
+  const status = result.success ? 'completed' : 'failed'
+
+  await supabase
+    .from('sie_imports')
+    .update({
+      status,
+      imported_at: result.success ? new Date().toISOString() : null,
+      transactions_count: result.journalEntriesCreated,
+      error_message: result.errors.length > 0 ? result.errors.join('; ') : null,
+      fiscal_period_id: result.fiscalPeriodId,
+      opening_balance_entry_id: result.openingBalanceEntryId,
+      migration_documentation: documentation ?? null,
+    })
+    .eq('id', importId)
+
+  // Archive the SIE file to Supabase Storage (BFL 7 kap 1-2§ retention)
+  if (result.success) {
+    const storagePath = `${userId}/${importId}.se`
+    const fileBlob = new Blob([fileContent], { type: 'text/plain; charset=cp437' })
+    const { error: uploadError } = await supabase.storage
+      .from('sie-files')
+      .upload(storagePath, fileBlob, { upsert: false })
+
+    if (uploadError) {
+      console.error(`[sie-import] Failed to archive SIE file: ${uploadError.message}`)
+    } else {
+      await supabase
+        .from('sie_imports')
+        .update({ file_storage_path: storagePath })
+        .eq('id', importId)
+    }
+  }
 }
 
 /**
@@ -1043,14 +1172,23 @@ export async function executeSIEImport(
       return result
     }
 
-    // Check for duplicate import
+    // Check for duplicate import (only completed imports count as duplicates)
     const duplicate = await checkDuplicateImport(supabase, userId, options.fileContent)
     if (duplicate) {
       result.errors.push(
-        `This file has already been imported on ${new Date(duplicate.imported_at!).toLocaleDateString('sv-SE')}`
+        `This file has already been imported on ${duplicate.imported_at ? new Date(duplicate.imported_at).toLocaleDateString('sv-SE') : 'okänt datum'}`
       )
       return result
     }
+
+    // Create pending import record early — ensures tracking even if later steps fail
+    result.importId = await createPendingImportRecord(
+      supabase,
+      userId,
+      parsed,
+      options.fileContent,
+      options.filename
+    )
 
     // Build account mapping lookup
     const accountMap = mappingsToMap(mappings)
@@ -1108,8 +1246,10 @@ export async function executeSIEImport(
 
     // Track documentation data across import phases
     let ibRoundingAdjustment = 0
+    let ibExplanation: 'unallocated_result' | 'excluded_accounts' | 'rounding' | null = null
     let migrationAdjustmentInfo = { created: false, deltaAccounts: 0, entryId: null as string | null }
     let voucherNumberMapping: Array<{ sourceId: string; targetNumber: number }> = []
+    let voucherRetryStats = { retriedBatches: 0, failedBatches: 0 }
     let voucherStats = {
       total: parsed.vouchers.length,
       imported: 0,
@@ -1131,48 +1271,62 @@ export async function executeSIEImport(
     // explicit documentation. We never reject based on IB imbalance — the
     // original goal was to stop SILENT equity alteration, not prevent it.
     if (options.importOpeningBalances && parsed.openingBalances.length > 0 && result.fiscalPeriodId) {
-      const ibValidation = validateIBBalance(parsed, accountMap)
+      // Check if opening balances already exist for this period
+      const { data: period } = await supabase
+        .from('fiscal_periods')
+        .select('opening_balances_set, opening_balance_entry_id')
+        .eq('id', result.fiscalPeriodId)
+        .single()
 
-      if (ibValidation.lines.length > 0) {
-        const absAdj = Math.abs(ibValidation.roundingAdjustment)
+      if (period?.opening_balances_set || period?.opening_balance_entry_id) {
+        result.warnings.push('Ingående balanser finns redan för denna period — hoppar över IB-import')
+      } else {
+        const ibValidation = validateIBBalance(parsed, accountMap)
 
-        if (absAdj > 0.01) {
-          ibRoundingAdjustment = ibValidation.roundingAdjustment
+        if (ibValidation.lines.length > 0) {
+          const absAdj = Math.abs(ibValidation.roundingAdjustment)
 
-          // Produce a descriptive warning explaining the source of the imbalance
-          if (Math.abs(ibValidation.excludedAccountsTotal) > 0.01 && ibValidation.fileImbalance <= 1.00) {
-            // File-level IB is balanced — imbalance is entirely from excluded system accounts
-            result.warnings.push(
-              `Exkluderade systemkonton har IB-saldon på totalt ${ibValidation.excludedAccountsTotal} SEK. ` +
-              `Differensen (${ibValidation.roundingAdjustment} SEK) bokförs på konto 2099.`
-            )
-          } else if (ibValidation.fileImbalance > 1.00) {
-            // File-level IB doesn't balance — likely unallocated årets resultat from previous year
-            result.warnings.push(
-              `Ingående balanser obalanserade med ${ibValidation.roundingAdjustment} SEK ` +
-              `(troligen ej allokerat årets resultat från föregående räkenskapsår). ` +
-              `Differensen bokförs på konto 2099 (Årets resultat).`
-            )
-          } else {
-            // Small rounding
-            result.warnings.push(
-              `Avrundningsdifferens vid SIE-import: ${ibValidation.roundingAdjustment} SEK bokförd på konto 2099`
-            )
+          if (absAdj > 0.01) {
+            ibRoundingAdjustment = ibValidation.roundingAdjustment
+
+            // Produce a descriptive warning explaining the source of the imbalance
+            if (Math.abs(ibValidation.excludedAccountsTotal) > 0.01 && ibValidation.fileImbalance <= 1.00) {
+              // File-level IB is balanced — imbalance is entirely from excluded system accounts
+              ibExplanation = 'excluded_accounts'
+              result.warnings.push(
+                `Exkluderade systemkonton har IB-saldon på totalt ${ibValidation.excludedAccountsTotal} SEK. ` +
+                `Differensen (${ibValidation.roundingAdjustment} SEK) bokförs på konto 2099.`
+              )
+            } else if (ibValidation.fileImbalance > 1.00) {
+              // File-level IB doesn't balance — likely unallocated årets resultat from previous year
+              ibExplanation = 'unallocated_result'
+              result.warnings.push(
+                `Ingående balanser obalanserade med ${ibValidation.roundingAdjustment} SEK ` +
+                `(troligen ej allokerat årets resultat från föregående räkenskapsår). ` +
+                `Differensen bokförs på konto 2099 (Årets resultat).`
+              )
+            } else {
+              // Small rounding
+              ibExplanation = 'rounding'
+              result.warnings.push(
+                `Avrundningsdifferens vid SIE-import: ${ibValidation.roundingAdjustment} SEK bokförd på konto 2099`
+              )
+            }
           }
-        }
 
-        result.openingBalanceEntryId = await createOpeningBalanceEntry(
-          supabase,
-          userId,
-          result.fiscalPeriodId,
-          parsed,
-          accountMap,
-          ibRoundingAdjustment
-        )
+          result.openingBalanceEntryId = await createOpeningBalanceEntry(
+            supabase,
+            userId,
+            result.fiscalPeriodId,
+            parsed,
+            accountMap,
+            ibRoundingAdjustment
+          )
 
-        if (result.openingBalanceEntryId) {
-          result.journalEntriesCreated++
-          result.journalEntryIds.push(result.openingBalanceEntryId)
+          if (result.openingBalanceEntryId) {
+            result.journalEntriesCreated++
+            result.journalEntryIds.push(result.openingBalanceEntryId)
+          }
         }
       }
     }
@@ -1216,6 +1370,10 @@ export async function executeSIEImport(
       result.journalEntryIds.push(...voucherResults.ids)
       result.errors.push(...voucherResults.errors)
       voucherNumberMapping = voucherResults.voucherNumberMapping
+      voucherRetryStats = {
+        retriedBatches: voucherResults.retriedBatches,
+        failedBatches: voucherResults.failedBatches,
+      }
 
       // Update stats for documentation
       voucherStats = {
@@ -1287,10 +1445,15 @@ export async function executeSIEImport(
       }
     }
 
-    // Save account mappings for future use
-    await saveMappings(supabase, userId, mappings)
+    // Save account mappings for future use (non-fatal — import data is already committed)
+    try {
+      await saveMappings(supabase, userId, mappings)
+    } catch (mappingError) {
+      console.error('[sie-import] Failed to save mappings (non-fatal):', mappingError)
+      result.warnings.push('Kunde inte spara kontomappningar — påverkar inte importerade data')
+    }
 
-    // Fix 6: Generate systemdokumentation (MigrationDocumentation)
+    // Generate systemdokumentation (MigrationDocumentation)
     const mappingStats = getMappingStats(mappings)
     const documentation: MigrationDocumentation = {
       sourceSystem: parsed.header.program,
@@ -1323,17 +1486,43 @@ export async function executeSIEImport(
       voucherNumberMapping,
     }
 
-    // Set success before recording so recordImport() sees correct status
+    // Populate structured details for the UI
+    const totalSkippedForDetails = voucherStats.skippedUnbalanced + voucherStats.skippedUnmapped +
+      voucherStats.skippedSingleLine + voucherStats.skippedEmpty
+    result.details = {
+      fiscalYear: fiscalYearStart && fiscalYearEnd
+        ? { start: formatDate(fiscalYearStart), end: formatDate(fiscalYearEnd) }
+        : undefined,
+      skippedVouchers: totalSkippedForDetails > 0 ? {
+        unbalanced: voucherStats.skippedUnbalanced,
+        unmapped: voucherStats.skippedUnmapped,
+        singleLine: voucherStats.skippedSingleLine,
+        empty: voucherStats.skippedEmpty,
+        total: totalSkippedForDetails,
+      } : undefined,
+      openingBalance: ibRoundingAdjustment !== 0 ? {
+        imbalance: ibRoundingAdjustment,
+        explanation: ibExplanation,
+        bookedToAccount: '2099',
+      } : undefined,
+      migrationAdjustment: migrationAdjustmentInfo.created ? {
+        created: true,
+        accountsAdjusted: migrationAdjustmentInfo.deltaAccounts,
+      } : undefined,
+      retriedBatches: voucherRetryStats.retriedBatches,
+      failedBatches: voucherRetryStats.failedBatches,
+    }
+
+    // Set success before finalizing
     result.success = result.errors.length === 0
 
-    // Record the import with documentation
-    result.importId = await recordImport(
+    // Finalize the import record with results and documentation
+    await finalizeImportRecord(
       supabase,
+      result.importId,
       userId,
-      parsed,
-      options.fileContent,
-      options.filename,
       result,
+      options.fileContent,
       documentation
     )
 
@@ -1348,6 +1537,21 @@ export async function executeSIEImport(
     result.errors.push(
       `Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`
     )
+
+    // Mark the pending import as failed if we created one
+    if (result.importId) {
+      try {
+        await finalizeImportRecord(
+          supabase,
+          result.importId,
+          userId,
+          result,
+          options.fileContent
+        )
+      } catch (finalizeError) {
+        console.error('[sie-import] Failed to finalize import record on error:', finalizeError)
+      }
+    }
   }
 
   return result

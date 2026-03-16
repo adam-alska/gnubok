@@ -27,6 +27,7 @@ import {
   mapSalesInvoice,
   mapSupplierInvoice,
   mapCompanyInfo,
+  inferTypeFromParty,
 } from './entity-mapper'
 
 export interface MigrationOptions {
@@ -246,12 +247,13 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
           }
 
           if (!customerId) {
+            const customerType = inferTypeFromParty(inv.customer)
             const minimalCustomer = {
               user_id: userId,
               name: inv.customer.name,
-              customer_type: 'swedish_business',
+              customer_type: customerType,
               default_payment_terms: 30,
-              country: 'SE',
+              country: inv.customer.postalAddress?.countryCode || (customerType === 'swedish_business' ? 'SE' : null),
               vat_number_validated: false,
             }
             const { data: created, error: custErr } = await supabase
@@ -356,13 +358,14 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
           }
 
           if (!supplierId) {
+            const supplierType = inferTypeFromParty(inv.supplier)
             const minimalSupplier = {
               user_id: userId,
               name: inv.supplier.name,
-              supplier_type: 'swedish_business',
+              supplier_type: supplierType,
               default_payment_terms: 30,
               default_currency: 'SEK',
-              country: 'SE',
+              country: inv.supplier.postalAddress?.countryCode || (supplierType === 'swedish_business' ? 'SE' : null),
             }
             const { data: created, error: supErr } = await supabase
               .from('suppliers')
