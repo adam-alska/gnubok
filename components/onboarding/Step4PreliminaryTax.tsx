@@ -61,7 +61,9 @@ export default function Step4PreliminaryTax({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={handleSubmit(onSubmit, (errs) => {
+            console.error('[onboarding] step 4 validation failed:', Object.keys(errs).join(', '), errs)
+          })} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="preliminary_tax_monthly">
                 Preliminärskatt per månad (kr)

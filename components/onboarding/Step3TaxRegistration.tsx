@@ -271,7 +271,9 @@ export default function Step3TaxRegistration({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={handleSubmit(onSubmit, (errs) => {
+            console.error('[onboarding] step 3 validation failed:', Object.keys(errs).join(', '), errs)
+          })} className="space-y-6">
             {/* F-skatt */}
             <div className="flex items-start space-x-3">
               <Controller

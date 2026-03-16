@@ -68,7 +68,9 @@ export default function Step6ConnectBank({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit(onManualSubmit)} className="space-y-4">
+          <form onSubmit={handleSubmit(onManualSubmit, (errs) => {
+            console.error('[onboarding] step 5 validation failed:', Object.keys(errs).join(', '), errs)
+          })} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="bank_name">Bank</Label>
               <Input

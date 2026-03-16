@@ -39,9 +39,11 @@ export default function Step1EntityType({ initialData, onNext, isSaving }: Step1
   const [selected, setSelected] = useState<EntityType | undefined>(initialData.entity_type)
 
   const handleNext = () => {
-    if (selected) {
-      onNext({ entity_type: selected })
+    if (!selected) {
+      console.error('[onboarding] step 1: fortsätt clicked without entity type selected')
+      return
     }
+    onNext({ entity_type: selected })
   }
 
   return (
