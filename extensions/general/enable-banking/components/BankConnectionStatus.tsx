@@ -98,7 +98,7 @@ export function BankConnectionStatus({
 
   const isConnectionExpired = connection.status === 'expired'
   const isConnectionError = connection.status === 'error'
-  const errorMessage = 'error_message' in connection ? String((connection as Record<string, unknown>).error_message || '') : ''
+  const errorMessage = connection.error_message ?? ''
 
   return (
     <div className="border rounded-lg p-4 space-y-4">

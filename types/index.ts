@@ -167,6 +167,7 @@ export interface BankConnection {
   // Consent
   consent_expires: string | null
   last_synced_at: string | null
+  error_message: string | null
 
   created_at: string
   updated_at: string
