@@ -13,13 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { InfoTooltip } from '@/components/ui/info-tooltip'
 import { Loader2, ArrowRight, ArrowLeft, Check, CalendarDays, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useToast } from '@/components/ui/use-toast'
 import { monthsBetween } from '@/lib/bookkeeping/validate-period-duration'
 import type { MomsPeriod, EntityType } from '@/types'
 
 const schema = z.object({
   f_skatt: z.boolean(),
   is_first_fiscal_year: z.boolean(),
-  // First year fields (conditional)
+  // First year fields (conditional — validated via superRefine below)
   first_year_start: z.string().optional(),
   first_year_end: z.string().optional(),
   // Ongoing year field (conditional)
@@ -29,6 +30,23 @@ const schema = z.object({
   vat_number: z.string().optional(),
   moms_period: z.enum(['monthly', 'quarterly', 'yearly']).optional(),
   accounting_method: z.enum(['accrual', 'cash']),
+}).superRefine((data, ctx) => {
+  if (data.is_first_fiscal_year) {
+    if (!data.first_year_start) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Välj startdatum för första räkenskapsåret.',
+        path: ['first_year_start'],
+      })
+    }
+    if (!data.first_year_end) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Välj slutdatum för första räkenskapsåret.',
+        path: ['first_year_end'],
+      })
+    }
+  }
 })
 
 type FormData = z.infer<typeof schema>
@@ -145,6 +163,7 @@ export default function Step3TaxRegistration({
   isSaving,
 }: Step3Props) {
   const isEF = entityType === 'enskild_firma'
+  const { toast } = useToast()
 
   const {
     register,
@@ -271,7 +290,15 @@ export default function Step3TaxRegistration({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={handleSubmit(onSubmit, (errs) => {
+            const fields = Object.keys(errs).join(', ')
+            console.error('[onboarding] step 3 validation failed:', fields, errs)
+            fetch('/api/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'step 3 validation failed', extra: { fields } }) }).catch(() => {})
+            // Show first validation error to user
+            const firstError = Object.values(errs)[0]
+            const message = firstError?.message || 'Kontrollera att alla fält är korrekt ifyllda.'
+            toast({ title: 'Saknade uppgifter', description: String(message), variant: 'destructive' })
+          })} className="space-y-6">
             {/* F-skatt */}
             <div className="flex items-start space-x-3">
               <Controller
@@ -438,6 +465,9 @@ export default function Step3TaxRegistration({
                     <p className="text-xs text-muted-foreground">
                       Månaden verksamheten startade. Räkenskapsåret börjar alltid den 1:a.
                     </p>
+                    {errors.first_year_start && (
+                      <p className="text-xs text-destructive">{errors.first_year_start.message}</p>
+                    )}
                   </div>
 
                   {/* AB: end month selector */}
@@ -487,6 +517,9 @@ export default function Step3TaxRegistration({
                           </Select>
                         )}
                       />
+                      {errors.first_year_end && (
+                        <p className="text-xs text-destructive">{errors.first_year_end.message}</p>
+                      )}
                     </div>
                   )}
 
