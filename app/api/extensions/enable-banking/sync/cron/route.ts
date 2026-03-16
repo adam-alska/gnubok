@@ -124,7 +124,7 @@ export async function GET(request: Request) {
       const expiringSoon = isConsentExpiringSoon(connection.consent_expires)
 
       // Send consent expiry notifications at 7-day and 3-day thresholds
-      if (expiringSoon && daysLeft !== null && (daysLeft <= 7 || daysLeft <= 3)) {
+      if (expiringSoon && daysLeft !== null && (daysLeft <= 3 || daysLeft === 7)) {
         await sendConsentExpiryNotification(
           supabase, connection, daysLeft, false, baseUrl
         )

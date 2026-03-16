@@ -51,7 +51,7 @@ function getOrgNumber(party: PartyDto): string | null {
   return party.legalEntity?.companyId || null
 }
 
-const EU_COUNTRIES = ['AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'EL', 'ES', 'FI', 'FR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SI', 'SK']
+const EU_COUNTRIES = ['AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'EL', 'ES', 'FI', 'FR', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SI', 'SK']
 
 /**
  * Check if a string looks like a Swedish org number (XXXXXX-XXXX or 10 digits).
@@ -305,7 +305,7 @@ export function mapSalesInvoice(
     your_reference: null,
     our_reference: null,
     notes: dto.note || null,
-    document_type: isCreditNote ? 'invoice' : 'invoice',
+    document_type: isCreditNote ? 'credit_note' : 'invoice',
     paid_at: dto.paymentStatus.paid ? dto.paymentStatus.lastPaymentDate || dto.issueDate : null,
     paid_amount: dto.paymentStatus.paid ? total : round2(total - dto.paymentStatus.balance.value),
   }
