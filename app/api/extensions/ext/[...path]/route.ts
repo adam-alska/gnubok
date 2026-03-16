@@ -9,6 +9,9 @@ import type { ApiRouteDefinition } from '@/lib/extensions/types'
 
 ensureInitialized()
 
+// Heavy extension routes (SIE import, migration) need up to 5 minutes
+export const maxDuration = 300
+
 /**
  * Match a request path against a route pattern.
  * Supports :param wildcards (e.g., /:id/confirm).

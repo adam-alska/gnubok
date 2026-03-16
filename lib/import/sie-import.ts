@@ -580,6 +580,7 @@ async function importVouchers(
   for (let batchStart = 0; batchStart < preparedVouchers.length; batchStart += BATCH_SIZE) {
     const batch = preparedVouchers.slice(batchStart, batchStart + BATCH_SIZE)
     const batchNumber = Math.floor(batchStart / BATCH_SIZE) + 1
+    let batchWasRetried = false
 
     // Prepare journal entry headers
     const entryInserts = batch.map((v, i) => ({
@@ -600,7 +601,7 @@ async function importVouchers(
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       if (attempt > 0) {
-        retriedBatches++
+        batchWasRetried = true
         const backoffMs = Math.pow(2, attempt - 1) * 1000 // 1s, 2s, 4s
         console.log(`[sie-import] Retrying batch ${batchNumber} (attempt ${attempt + 1}/${MAX_RETRIES + 1}) after ${backoffMs}ms`)
         await new Promise(resolve => setTimeout(resolve, backoffMs))
@@ -675,7 +676,7 @@ async function importVouchers(
 
       for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         if (attempt > 0) {
-          retriedBatches++
+          batchWasRetried = true
           const backoffMs = Math.pow(2, attempt - 1) * 1000
           console.log(`[sie-import] Retrying batch ${batchNumber} lines (attempt ${attempt + 1}/${MAX_RETRIES + 1}) after ${backoffMs}ms`)
           await new Promise(resolve => setTimeout(resolve, backoffMs))
@@ -725,6 +726,11 @@ async function importVouchers(
           )
         }
       }
+    }
+
+    // Count distinct batches that needed retries (not individual attempts)
+    if (batchWasRetried) {
+      retriedBatches++
     }
 
     // Small delay between batches to prevent Supabase/Cloudflare rate limiting
