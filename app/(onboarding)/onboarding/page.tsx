@@ -131,7 +131,7 @@ function OnboardingPageContent() {
   }, [supabase, router, toast])
 
   const saveSettings = async (updates: Partial<CompanySettings>, nextStep?: number) => {
-    const targetStep = nextStep || currentStep
+    const targetStep = nextStep ?? currentStep
     setIsSaving(true)
 
     try {
