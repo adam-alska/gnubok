@@ -44,8 +44,9 @@ describe('lockPeriod', () => {
     const lockedPeriod = { ...period, locked_at: '2024-12-31T23:59:59Z' }
 
     results = [
-      { data: period, error: null },       // fetch
-      { data: lockedPeriod, error: null },  // update
+      { data: period, error: null },              // fetch
+      { count: 0, data: null, error: null },       // uncategorized tx count check
+      { data: lockedPeriod, error: null },         // update
     ]
 
     const handler = vi.fn()

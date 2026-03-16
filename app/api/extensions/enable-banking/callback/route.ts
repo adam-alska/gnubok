@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
 
   const code = searchParams.get('code')
-  const state = searchParams.get('state') // This is the user_id we passed during authorization
+  const state = searchParams.get('state') // Cryptographic oauth_state token
   const error = searchParams.get('error')
   const errorDescription = searchParams.get('error_description')
 
@@ -35,8 +35,25 @@ export async function GET(request: Request) {
   const supabase = await createServiceClient()
 
   try {
+    // Look up pending connection by oauth_state (CSRF-safe)
+    const { data: pendingConnection, error: findError } = await supabase
+      .from('bank_connections')
+      .select('id, user_id')
+      .eq('oauth_state', state)
+      .eq('status', 'pending')
+      .single()
+
+    if (findError || !pendingConnection) {
+      console.error('No pending connection for oauth_state:', findError)
+      return NextResponse.redirect(
+        `${baseUrl}/settings?bank_error=${encodeURIComponent('invalid_state')}`
+      )
+    }
+
+    const userId = pendingConnection.user_id
+
     const sessionData = await createSession(code)
-    const { session_id, accounts, access, aspsp } = sessionData
+    const { session_id, accounts, access } = sessionData
     const consentExpiresAt = access.valid_until
 
     const accountsWithBalances: StoredAccount[] = await Promise.all(
@@ -63,61 +80,28 @@ export async function GET(request: Request) {
       })
     )
 
-    const { data: pendingConnection, error: findError } = await supabase
+    const { error: updateError } = await supabase
       .from('bank_connections')
-      .select('id')
-      .eq('user_id', state)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
+      .update({
+        session_id,
+        status: 'active',
+        accounts_data: accountsWithBalances,
+        consent_expires: consentExpiresAt,
+        last_synced_at: new Date().toISOString(),
+        oauth_state: null, // Clear to prevent replay
+      })
+      .eq('id', pendingConnection.id)
 
-    let connectionId: string
-
-    if (findError || !pendingConnection) {
-      console.error('Could not find pending connection:', findError)
-      const { data: inserted, error: insertError } = await supabase
-        .from('bank_connections')
-        .insert({
-          user_id: state,
-          provider: `${aspsp.name.toLowerCase().replace(/\s+/g, '-')}-${aspsp.country.toLowerCase()}`,
-          bank_name: aspsp.name,
-          session_id,
-          status: 'active',
-          accounts_data: accountsWithBalances,
-          consent_expires: consentExpiresAt,
-          last_synced_at: new Date().toISOString(),
-        })
-        .select('id')
-        .single()
-
-      if (insertError || !inserted) {
-        console.error('Insert error:', insertError)
-        throw new Error('Failed to create connection')
-      }
-      connectionId = inserted.id
-    } else {
-      const { error: updateError } = await supabase
-        .from('bank_connections')
-        .update({
-          session_id,
-          status: 'active',
-          accounts_data: accountsWithBalances,
-          consent_expires: consentExpiresAt,
-          last_synced_at: new Date().toISOString(),
-        })
-        .eq('id', pendingConnection.id)
-
-      if (updateError) {
-        throw new Error('Failed to update connection')
-      }
-      connectionId = pendingConnection.id
+    if (updateError) {
+      throw new Error('Failed to update connection')
     }
+
+    const connectionId = pendingConnection.id
 
     const { data: userSettings } = await supabase
       .from('company_settings')
       .select('onboarding_complete')
-      .eq('user_id', state)
+      .eq('user_id', userId)
       .single()
 
     const redirectTarget = userSettings?.onboarding_complete
@@ -131,8 +115,8 @@ export async function GET(request: Request) {
     try {
       await supabase
         .from('bank_connections')
-        .update({ status: 'error' })
-        .eq('user_id', state)
+        .update({ status: 'error', oauth_state: null })
+        .eq('oauth_state', state)
         .eq('status', 'pending')
     } catch {
       // Ignore cleanup errors

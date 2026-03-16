@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     if (duplicate) {
       return NextResponse.json({
         error: 'duplicate',
-        message: `This file has already been imported on ${new Date(duplicate.imported_at!).toLocaleDateString('sv-SE')}`,
+        message: `This file has already been imported on ${duplicate.imported_at ? new Date(duplicate.imported_at).toLocaleDateString('sv-SE') : 'okänt datum'}`,
         importId: duplicate.id,
       }, { status: 409 })
     }

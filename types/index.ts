@@ -1017,6 +1017,7 @@ export interface OnboardingProgress {
   hasCustomers: boolean
   hasInvoices: boolean
   hasBankConnected: boolean
+  hasSIEImport: boolean
 }
 
 // Onboarding step data

@@ -89,10 +89,29 @@ export function generateJWT(expiresInSeconds: number = 3600): string {
   return `${headerBase64}.${payloadBase64}.${signatureBase64}`
 }
 
+// JWT token cache
+let cachedToken: string | null = null
+let cachedTokenExpiry: number = 0
+
 /**
- * Get the Authorization header value for Enable Banking API
+ * Get the Authorization header value for Enable Banking API.
+ * Caches JWT tokens and reuses them until 60s before expiry.
  */
 export function getAuthorizationHeader(): string {
-  const token = generateJWT()
+  const now = Math.floor(Date.now() / 1000)
+  if (cachedToken && now < cachedTokenExpiry - 60) {
+    return `Bearer ${cachedToken}`
+  }
+
+  const expiresInSeconds = 3600
+  const token = generateJWT(expiresInSeconds)
+  cachedToken = token
+  cachedTokenExpiry = now + expiresInSeconds
   return `Bearer ${token}`
+}
+
+/** @internal Reset token cache — for testing only */
+export function _resetTokenCache(): void {
+  cachedToken = null
+  cachedTokenExpiry = 0
 }

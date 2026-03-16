@@ -124,16 +124,22 @@ export async function ingestTransactions(
     // Non-critical — amount_sek fields will stay null
   }
 
-  for (const raw of rawTransactions) {
-    // 1. Check for duplicates via external_id
-    const { data: existing } = await supabase
+  // Pre-fetch existing external_ids in batches for dedup (avoids N+1 queries)
+  const existingExternalIds = new Set<string>()
+  const externalIds = rawTransactions.map(t => t.external_id)
+  for (let i = 0; i < externalIds.length; i += 500) {
+    const chunk = externalIds.slice(i, i + 500)
+    const { data } = await supabase
       .from('transactions')
-      .select('id')
+      .select('external_id')
       .eq('user_id', userId)
-      .eq('external_id', raw.external_id)
-      .single()
+      .in('external_id', chunk)
+    data?.forEach(r => existingExternalIds.add(r.external_id))
+  }
 
-    if (existing) {
+  for (const raw of rawTransactions) {
+    // 1. Check for duplicates via external_id (batch pre-fetched)
+    if (existingExternalIds.has(raw.external_id)) {
       result.duplicates++
       continue
     }

@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
-import { Upload, Sparkles, Plus, CheckSquare, FileText } from 'lucide-react'
+import { Upload, Wand, Plus, CheckSquare, FileText } from 'lucide-react'
 import type { ViewMode } from './transaction-types'
 
 interface TransactionStatusBarProps {
@@ -66,7 +66,7 @@ export default function TransactionStatusBar({
                 onClick={onOpenSwipeView}
                 disabled={isLoadingSuggestions}
               >
-                <Sparkles className="mr-2 h-4 w-4" />
+                <Wand className="mr-2 h-4 w-4" />
                 {isLoadingSuggestions ? 'Laddar...' : 'Gå igenom alla'}
               </Button>
               <Button

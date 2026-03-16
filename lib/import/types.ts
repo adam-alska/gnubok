@@ -191,6 +191,7 @@ export interface SIEImport {
   opening_balance_entry_id: string | null
   imported_at: string | null
   migration_documentation: MigrationDocumentation | null
+  file_storage_path: string | null
   created_at: string
   updated_at: string
 }
@@ -234,6 +235,47 @@ export interface ImportOptions {
 }
 
 /**
+ * Structured import details for UI display.
+ * Provides machine-readable data so the UI can render proper explanations
+ * instead of parsing warning strings.
+ */
+export interface ImportResultDetails {
+  /** Fiscal year this import covers */
+  fiscalYear?: { start: string; end: string }
+
+  /** Breakdown of skipped vouchers by reason */
+  skippedVouchers?: {
+    unbalanced: number
+    unmapped: number
+    singleLine: number
+    empty: number
+    total: number
+  }
+
+  /** Opening balance imbalance info */
+  openingBalance?: {
+    /** SEK amount of the imbalance (0 if balanced) */
+    imbalance: number
+    /** Why the imbalance exists */
+    explanation: 'unallocated_result' | 'excluded_accounts' | 'rounding' | null
+    /** Account the difference was booked to */
+    bookedToAccount: string | null
+  }
+
+  /** Migration adjustment entry info */
+  migrationAdjustment?: {
+    created: boolean
+    accountsAdjusted: number
+  }
+
+  /** Number of batches that needed retries (0 = clean run) */
+  retriedBatches: number
+
+  /** Number of batches that still failed after all retries */
+  failedBatches: number
+}
+
+/**
  * Result of executing an import
  */
 export interface ImportResult {
@@ -249,6 +291,9 @@ export interface ImportResult {
   // Issues
   errors: string[]
   warnings: string[]
+
+  // Structured details for UI (populated alongside warnings for backwards compat)
+  details?: ImportResultDetails
 }
 
 /**

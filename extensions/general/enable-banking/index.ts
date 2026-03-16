@@ -94,11 +94,14 @@ export const enableBankingExtension: Extension = {
 
           const redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/extensions/enable-banking/callback`
 
+          // Generate cryptographic state token for CSRF protection
+          const oauthState = crypto.randomUUID()
+
           const { url, authorization_id } = await startAuthorization(
             aspsp_name,
             aspsp_country,
             redirectUrl,
-            user.id,
+            oauthState,
             psuType
           )
 
@@ -109,6 +112,7 @@ export const enableBankingExtension: Extension = {
               provider: `${aspsp_name.toLowerCase().replace(/\s+/g, '-')}-${aspsp_country.toLowerCase()}`,
               bank_name: aspsp_name,
               authorization_id,
+              oauth_state: oauthState,
               status: 'pending',
             })
             .select()
@@ -144,7 +148,8 @@ export const enableBankingExtension: Extension = {
           return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { connection_id, days_back = 30 } = await request.json()
+        const { connection_id, days_back: rawDaysBack = 30 } = await request.json()
+        const days_back = Math.min(Math.max(1, rawDaysBack), 365)
 
         const { data: connection, error: connectionError } = await supabase
           .from('bank_connections')
@@ -168,6 +173,7 @@ export const enableBankingExtension: Extension = {
           const fromDate = new Date(Date.now() - days_back * 24 * 60 * 60 * 1000)
             .toISOString()
             .split('T')[0]
+          const syncStartedAt = new Date().toISOString()
 
           // Use ctx.services.ingestTransactions when available
           const ingestFn = ctx?.services.ingestTransactions
@@ -202,7 +208,7 @@ export const enableBankingExtension: Extension = {
               .select('*')
               .eq('user_id', user.id)
               .eq('bank_connection_id', connection.id)
-              .gte('created_at', fromDate)
+              .gte('created_at', syncStartedAt)
               .order('created_at', { ascending: false })
               .limit(totalImported)
 

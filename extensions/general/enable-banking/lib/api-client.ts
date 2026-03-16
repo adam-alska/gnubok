@@ -142,6 +142,12 @@ export interface BankTransaction {
   merchant_category_code?: string
 }
 
+// Constants
+const FETCH_TIMEOUT_MS = 15_000
+const MAX_RETRIES = 2
+const RETRY_DELAY_MS = 1000
+const MAX_PAGINATION_PAGES = 100
+
 // API Helper
 
 async function authenticatedFetch(
@@ -149,17 +155,53 @@ async function authenticatedFetch(
   options: RequestInit = {}
 ): Promise<Response> {
   const url = `${ENABLE_BANKING_API_URL}${endpoint}`
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
 
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Authorization': getAuthorizationHeader(),
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  })
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        'Authorization': getAuthorizationHeader(),
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    })
 
-  return response
+    return response
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+/**
+ * Retry wrapper for idempotent read operations.
+ * Retries on 429, 502, 503, 504, and AbortError (timeout).
+ */
+async function authenticatedFetchWithRetry(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await authenticatedFetch(endpoint, options)
+      if (attempt < MAX_RETRIES && [429, 502, 503, 504].includes(response.status)) {
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * (attempt + 1)))
+        continue
+      }
+      return response
+    } catch (error: unknown) {
+      const isAbort = error instanceof Error && error.name === 'AbortError'
+      if (attempt < MAX_RETRIES && isAbort) {
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * (attempt + 1)))
+        continue
+      }
+      throw error
+    }
+  }
+  // Unreachable, but satisfies TypeScript
+  throw new Error('Max retries exceeded')
 }
 
 // API Functions
@@ -175,7 +217,7 @@ export async function getASPSPs(country: string = 'SE'): Promise<ASPSP[]> {
     sandbox: String(isSandbox),
     psu_type: psuType,
   })
-  const response = await authenticatedFetch(`/aspsps?${params.toString()}`)
+  const response = await authenticatedFetchWithRetry(`/aspsps?${params.toString()}`)
 
   if (!response.ok) {
     const error = await response.text()
@@ -286,7 +328,7 @@ export async function createSession(code: string): Promise<SessionResponse> {
  * @param sessionId - The session ID
  */
 export async function getSession(sessionId: string): Promise<SessionResponse> {
-  const response = await authenticatedFetch(`/sessions/${sessionId}`)
+  const response = await authenticatedFetchWithRetry(`/sessions/${sessionId}`)
 
   if (!response.ok) {
     throw new Error('Failed to get session')
@@ -316,7 +358,7 @@ export async function deleteSession(sessionId: string): Promise<void> {
  * @param accountUid - The account UID (from session.accounts[].uid)
  */
 export async function getAccountBalances(accountUid: string): Promise<Balance[]> {
-  const response = await authenticatedFetch(`/accounts/${accountUid}/balances`)
+  const response = await authenticatedFetchWithRetry(`/accounts/${accountUid}/balances`)
 
   if (!response.ok) {
     throw new Error('Failed to get account balances')
@@ -372,7 +414,7 @@ export async function getAccountTransactions(
   const queryString = params.toString()
   const endpoint = `/accounts/${accountUid}/transactions${queryString ? `?${queryString}` : ''}`
 
-  const response = await authenticatedFetch(endpoint)
+  const response = await authenticatedFetchWithRetry(endpoint)
 
   if (!response.ok) {
     throw new Error('Failed to get transactions')
@@ -391,6 +433,7 @@ export async function getAllTransactions(
 ): Promise<Transaction[]> {
   const allTransactions: Transaction[] = []
   let continuationKey: string | undefined
+  let page = 0
 
   do {
     const response = await getAccountTransactions(
@@ -402,9 +445,61 @@ export async function getAllTransactions(
 
     allTransactions.push(...response.transactions)
     continuationKey = response.continuation_key
+    page++
+
+    if (page >= MAX_PAGINATION_PAGES) {
+      console.warn(`[enable-banking] Pagination cap reached (${MAX_PAGINATION_PAGES} pages) for account ${accountUid}`)
+      break
+    }
   } while (continuationKey)
 
   return allTransactions
+}
+
+/**
+ * Get all transactions with raw JSON responses for archival.
+ * Returns both parsed transactions and the raw response strings.
+ */
+export async function getAllTransactionsWithRaw(
+  accountUid: string,
+  dateFrom?: string,
+  dateTo?: string
+): Promise<{ transactions: Transaction[]; rawPages: string[] }> {
+  const allTransactions: Transaction[] = []
+  const rawPages: string[] = []
+  let continuationKey: string | undefined
+  let page = 0
+
+  do {
+    const params = new URLSearchParams()
+    if (dateFrom) params.set('date_from', dateFrom)
+    if (dateTo) params.set('date_to', dateTo)
+    if (continuationKey) params.set('continuation_key', continuationKey)
+
+    const queryString = params.toString()
+    const endpoint = `/accounts/${accountUid}/transactions${queryString ? `?${queryString}` : ''}`
+
+    const response = await authenticatedFetchWithRetry(endpoint)
+
+    if (!response.ok) {
+      throw new Error('Failed to get transactions')
+    }
+
+    const rawText = await response.text()
+    rawPages.push(rawText)
+
+    const data: TransactionsResponse = JSON.parse(rawText)
+    allTransactions.push(...data.transactions)
+    continuationKey = data.continuation_key
+    page++
+
+    if (page >= MAX_PAGINATION_PAGES) {
+      console.warn(`[enable-banking] Pagination cap reached (${MAX_PAGINATION_PAGES} pages) for account ${accountUid}`)
+      break
+    }
+  } while (continuationKey)
+
+  return { transactions: allTransactions, rawPages }
 }
 
 /**

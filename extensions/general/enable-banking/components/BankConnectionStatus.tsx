@@ -19,6 +19,7 @@ interface BankConnectionStatusProps {
   connection: BankConnection
   onSync: (connectionId: string) => void
   onDisconnect: (connectionId: string) => void
+  onReconnect?: (bank: { name: string; country: string }) => void
   isSyncing?: boolean
 }
 
@@ -26,39 +27,53 @@ export function BankConnectionStatus({
   connection,
   onSync,
   onDisconnect,
+  onReconnect,
   isSyncing = false,
 }: BankConnectionStatusProps) {
   const daysUntilExpiry = getDaysUntilExpiry(connection.consent_expires)
   const isExpiring = isConsentExpiringSoon(connection.consent_expires)
 
-  const statusConfig = {
+  type StatusEntry = {
+    icon: typeof CheckCircle
+    color: string
+    label: string
+    variant: 'success' | 'warning' | 'destructive' | 'secondary'
+  }
+
+  const statusConfig: Record<string, StatusEntry> = {
     active: {
       icon: CheckCircle,
       color: 'text-success',
       label: 'Aktiv',
-      variant: 'success' as const,
+      variant: 'success',
     },
     pending: {
       icon: Loader2,
       color: 'text-warning',
       label: 'Väntar',
-      variant: 'warning' as const,
+      variant: 'warning',
+    },
+    expired: {
+      icon: AlertTriangle,
+      color: 'text-warning',
+      label: 'Utgånget samtycke',
+      variant: 'warning',
     },
     error: {
       icon: XCircle,
       color: 'text-destructive',
       label: 'Fel',
-      variant: 'destructive' as const,
+      variant: 'destructive',
     },
     revoked: {
       icon: XCircle,
       color: 'text-gray-600',
       label: 'Bortkopplad',
-      variant: 'secondary' as const,
+      variant: 'secondary',
     },
   }
 
-  const status = statusConfig[connection.status as keyof typeof statusConfig] || statusConfig.error
+  const status = statusConfig[connection.status] || statusConfig.error
   const StatusIcon = status.icon
 
   // Parse accounts from connection
@@ -80,6 +95,10 @@ export function BankConnectionStatus({
     const daysAgo = Math.floor(hoursAgo / 24)
     return `${daysAgo}d sedan`
   }
+
+  const isConnectionExpired = connection.status === 'expired'
+  const isConnectionError = connection.status === 'error'
+  const errorMessage = 'error_message' in connection ? String((connection as Record<string, unknown>).error_message || '') : ''
 
   return (
     <div className="border rounded-lg p-4 space-y-4">
@@ -104,6 +123,35 @@ export function BankConnectionStatus({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {isConnectionExpired && onReconnect && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onReconnect({
+                name: connection.bank_name,
+                country: (connection.provider as string)?.split('-').pop()?.toUpperCase() || 'SE',
+              })}
+            >
+              Förnya anslutning
+            </Button>
+          )}
+          {isConnectionError && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onSync(connection.id)}
+              disabled={isSyncing}
+            >
+              {isSyncing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                  Försök igen
+                </>
+              )}
+            </Button>
+          )}
           {connection.status === 'active' && (
             <Button
               variant="outline"
@@ -128,8 +176,28 @@ export function BankConnectionStatus({
         </div>
       </div>
 
-      {/* Consent expiry warning */}
-      {isExpiring && daysUntilExpiry !== null && (
+      {/* Error message */}
+      {isConnectionError && errorMessage && (
+        <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-lg">
+          <XCircle className="h-4 w-4 text-destructive flex-shrink-0" />
+          <span className="text-sm text-destructive">
+            {errorMessage}
+          </span>
+        </div>
+      )}
+
+      {/* Expired consent notice */}
+      {isConnectionExpired && (
+        <div className="flex items-center gap-2 p-3 bg-warning/10 rounded-lg">
+          <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />
+          <span className="text-sm">
+            PSD2-samtycket har löpt ut. Förnya anslutningen för att återuppta synkroniseringen.
+          </span>
+        </div>
+      )}
+
+      {/* Consent expiry warning (for active connections) */}
+      {!isConnectionExpired && isExpiring && daysUntilExpiry !== null && (
         <div className="flex items-center gap-2 p-3 bg-warning/10 rounded-lg">
           <AlertTriangle className="h-4 w-4 text-warning" />
           <span className="text-sm">

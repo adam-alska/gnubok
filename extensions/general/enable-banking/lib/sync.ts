@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { getTransactions, getAccountBalance } from './api-client'
+import { getAllTransactionsWithRaw, convertTransaction, getAccountBalance } from './api-client'
+import { uploadDocument } from '@/lib/core/documents/document-service'
 import { ingestTransactions as defaultIngest } from '@/lib/transactions/ingest'
 import type { RawTransaction, IngestResult } from '@/types'
 import type { StoredAccount } from '../types'
@@ -21,7 +22,8 @@ export interface SyncResult {
  * Sync transactions for a single bank account via Enable Banking PSD2.
  *
  * Fetches transactions from the Enable Banking API, converts to RawTransaction
- * format, and delegates to the shared ingestion pipeline.
+ * format, and delegates to the shared ingestion pipeline. Raw API responses
+ * are archived as räkenskapsinformation per BFL 7 kap.
  *
  * @param ingest - Optional ingest function override (defaults to core ingestTransactions).
  *                 When called from an extension handler with ctx.services.ingestTransactions,
@@ -36,12 +38,13 @@ export async function syncAccountTransactions(
   toDate: string,
   ingest: IngestFn = defaultIngest
 ): Promise<SyncResult> {
-  const bankTransactions = await getTransactions(
+  const { transactions, rawPages } = await getAllTransactionsWithRaw(
     account.uid,
     fromDate,
     toDate,
-    account.currency
   )
+
+  const bankTransactions = transactions.map(tx => convertTransaction(tx, account.currency))
 
   // Convert Enable Banking format to generic RawTransaction
   const rawTransactions: RawTransaction[] = bankTransactions.map((tx) => ({
@@ -58,6 +61,21 @@ export async function syncAccountTransactions(
   }))
 
   const ingestResult = await ingest(supabase, userId, rawTransactions)
+
+  // Archive raw PSD2 API responses as räkenskapsinformation (BFL 7 kap)
+  for (let i = 0; i < rawPages.length; i++) {
+    try {
+      const fileName = `psd2-response_${connectionId}_${account.uid}_${new Date().toISOString().replace(/[:.]/g, '-')}_p${i + 1}.json`
+      const buffer = new TextEncoder().encode(rawPages[i]).buffer as ArrayBuffer
+      await uploadDocument(supabase, userId,
+        { name: fileName, buffer, type: 'application/json' },
+        { upload_source: 'api' }
+      )
+    } catch (archiveError) {
+      console.error(`[enable-banking] Failed to archive raw response page ${i + 1}:`, archiveError)
+      // Archival failure must not fail the sync
+    }
+  }
 
   // Update account balance
   try {

@@ -1,6 +1,6 @@
 import {
   Camera,
-  Sparkles,
+  Wand,
   MessageSquare,
   Bell,
   Inbox,
@@ -33,7 +33,7 @@ import {
 
 const ICON_MAP: Record<string, LucideIcon> = {
   Camera,
-  Sparkles,
+  Wand,
   MessageSquare,
   Bell,
   Inbox,
