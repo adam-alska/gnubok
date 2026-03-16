@@ -8,6 +8,9 @@ import { BAS_REFERENCE } from '@/lib/bookkeeping/bas-data'
 import { getBASReference } from '@/lib/bookkeeping/bas-reference'
 import type { AccountMapping, SIEAccountMappingRecord } from '@/lib/import/types'
 
+// SIE imports with many vouchers need extended execution time
+export const maxDuration = 300
+
 /**
  * POST /api/import/sie/execute
  * Execute the SIE import

@@ -370,15 +370,12 @@ function PreviewStep({
       <Card>
         <CardHeader>
           <CardTitle>Anslutet till {providerName}</CardTitle>
-          <CardDescription>
-            Vi har hämtat information om ditt företag. Kontrollera att det stämmer.
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {isLoading && (
             <div className="flex items-center gap-3 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
-              <p>Hämtar företagsinformation och bokföringsdata...</p>
+              <p>Hämtar bokföringsdata...</p>
             </div>
           )}
 
@@ -387,28 +384,6 @@ function PreviewStep({
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
               <p className="text-sm text-muted-foreground">{error}</p>
             </div>
-          )}
-
-          {preview?.companyInfo && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <InfoItem label="Företagsnamn" value={preview.companyInfo.company_name} />
-              <InfoItem label="Organisationsnummer" value={preview.companyInfo.org_number} />
-              <InfoItem label="Momsregistrering" value={preview.companyInfo.vat_number} />
-              <InfoItem label="Räkenskapsår startar" value={MONTH_NAMES[preview.companyInfo.fiscal_year_start_month - 1] ?? `Månad ${preview.companyInfo.fiscal_year_start_month}`} />
-              <InfoItem label="Adress" value={preview.companyInfo.address_line1} />
-              <InfoItem
-                label="Postort"
-                value={[preview.companyInfo.postal_code, preview.companyInfo.city].filter(Boolean).join(' ') || null}
-              />
-              <InfoItem label="Telefon" value={preview.companyInfo.phone} />
-              <InfoItem label="E-post" value={preview.companyInfo.email} />
-            </div>
-          )}
-
-          {preview && !preview.companyInfo && !isLoading && (
-            <p className="text-sm text-muted-foreground">
-              Ingen företagsinformation kunde hämtas. Du kan fylla i uppgifterna manuellt under Inställningar.
-            </p>
           )}
 
           {/* SIE stats summary */}

@@ -31,17 +31,22 @@ function getApiKey(): string {
 
 async function request<T>(
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  timeoutMs: number = 120_000
 ): Promise<T> {
   const url = `${getBaseUrl()}${path}`
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+
   const response = await fetch(url, {
     ...options,
+    signal: controller.signal,
     headers: {
       'Authorization': `Bearer ${getApiKey()}`,
       'Content-Type': 'application/json',
       ...options.headers,
     },
-  })
+  }).finally(() => clearTimeout(timer))
 
   if (!response.ok) {
     const body = await response.text().catch(() => '')
