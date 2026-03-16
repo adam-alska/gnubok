@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
+import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/use-toast'
 import { Loader2 } from 'lucide-react'
@@ -46,6 +47,15 @@ export default function OnboardingPage() {
 
 const LOG = '[onboarding]'
 
+/** Log to console AND report to Sentry with onboarding context. */
+function logError(message: string, extra?: Record<string, unknown>) {
+  console.error(LOG, message, extra ?? '')
+  Sentry.captureMessage(`onboarding: ${message}`, {
+    level: 'error',
+    extra: { ...extra, component: 'onboarding' },
+  })
+}
+
 function OnboardingPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -63,7 +73,7 @@ function OnboardingPageContent() {
   useEffect(() => {
     if (settings.onboarding_complete && !isLoading) {
       const timeout = setTimeout(() => {
-        console.error(LOG, 'still on onboarding page after onboarding_complete=true — redirect may have failed')
+        logError('still on onboarding page after onboarding_complete=true — redirect may have failed')
       }, 3000)
       return () => clearTimeout(timeout)
     }
@@ -75,11 +85,11 @@ function OnboardingPageContent() {
       const { data: { user }, error: authError } = await supabase.auth.getUser()
 
       if (authError) {
-        console.error(LOG, 'auth.getUser() failed on mount:', authError.message)
+        logError('auth.getUser() failed on mount', { message: authError.message })
       }
 
       if (!user) {
-        console.warn(LOG, 'no authenticated user on mount, redirecting to login')
+        logError('no authenticated user on mount, redirecting to login')
         router.push('/login')
         return
       }
@@ -91,14 +101,14 @@ function OnboardingPageContent() {
         .single()
 
       if (error && error.code !== 'PGRST116') {
-        console.error(LOG, 'failed to load settings:', error.message, { code: error.code })
+        logError('failed to load settings', { message: error.message, code: error.code })
       }
 
       if (data) {
         const step = data.onboarding_step || 1
         const clampedStep = step > totalSteps ? totalSteps : step
         if (step > totalSteps) {
-          console.warn(LOG, 'onboarding_step', step, 'exceeds totalSteps', totalSteps, '— clamped')
+          logError('onboarding_step exceeds totalSteps — clamped', { step, totalSteps })
         }
         // Important milestone: where we resume
         console.log(LOG, 'resuming at step', clampedStep, { entity_type: data.entity_type })
@@ -120,11 +130,11 @@ function OnboardingPageContent() {
       const { data: { user }, error: authError } = await supabase.auth.getUser()
 
       if (authError) {
-        console.error(LOG, 'auth.getUser() failed during save:', authError.message, { step: targetStep })
+        logError('auth.getUser() failed during save', { message: authError.message, step: targetStep })
       }
 
       if (!user) {
-        console.error(LOG, 'save aborted: no authenticated user', { step: targetStep })
+        logError('save aborted: no authenticated user', { step: targetStep })
         router.push('/login')
         return false
       }
@@ -147,7 +157,7 @@ function OnboardingPageContent() {
         .upsert({ ...settingsToSave, user_id: user.id }, { onConflict: 'user_id' })
 
       if (error) {
-        console.error(LOG, 'save failed:', error.message, { step: targetStep, code: error.code, details: error.details })
+        logError('save failed', { message: error.message, step: targetStep, code: error.code, details: error.details })
         toast({
           title: 'Fel',
           description: error.message || 'Kunde inte spara. Försök igen.',
@@ -159,7 +169,9 @@ function OnboardingPageContent() {
       setSettings(updatedSettings)
       return true
     } catch (err) {
-      console.error(LOG, 'saveSettings threw unexpectedly:', err, { step: targetStep })
+      const message = err instanceof Error ? err.message : String(err)
+      logError('saveSettings threw unexpectedly', { message, step: targetStep })
+      Sentry.captureException(err)
       toast({
         title: 'Fel',
         description: 'Ett oväntat fel uppstod. Försök igen.',
@@ -181,7 +193,7 @@ function OnboardingPageContent() {
       // Complete onboarding after bank connection
       saveSettings({ onboarding_complete: true }, totalSteps).then((success) => {
         if (!success) {
-          console.error(LOG, 'failed to complete onboarding after bank_connected callback')
+          logError('failed to complete onboarding after bank_connected callback')
         } else {
           toast({
             title: 'Välkommen!',
@@ -204,7 +216,7 @@ function OnboardingPageContent() {
     const success = await saveSettings(stepData, nextStep)
 
     if (!success) {
-      console.error(LOG, 'handleNext aborted: saveSettings failed for step', currentStep)
+      logError('handleNext aborted: saveSettings failed', { step: currentStep })
       return
     }
 
@@ -213,7 +225,7 @@ function OnboardingPageContent() {
       try {
         const { data: { user }, error: authError } = await supabase.auth.getUser()
         if (authError) {
-          console.error(LOG, 'auth.getUser() failed before seeding chart of accounts:', authError.message)
+          logError('auth.getUser() failed before seeding chart of accounts', { message: authError.message })
         }
         if (user) {
           const { error: rpcError } = await supabase.rpc('seed_chart_of_accounts', {
@@ -221,17 +233,19 @@ function OnboardingPageContent() {
             p_entity_type: stepData.entity_type,
           })
           if (rpcError) {
-            console.error(LOG, 'chart of accounts seeding failed:', rpcError.message, {
+            logError('chart of accounts seeding failed', {
               entity_type: stepData.entity_type,
+              message: rpcError.message,
               code: rpcError.code,
               details: rpcError.details,
             })
           }
         } else {
-          console.error(LOG, 'chart of accounts seeding skipped: no user')
+          logError('chart of accounts seeding skipped: no user')
         }
       } catch (err) {
-        console.error(LOG, 'chart of accounts seeding threw:', err)
+        logError('chart of accounts seeding threw', { error: String(err) })
+        Sentry.captureException(err)
       }
     }
 
@@ -240,10 +254,10 @@ function OnboardingPageContent() {
       try {
         const { data: { user }, error: authError } = await supabase.auth.getUser()
         if (authError) {
-          console.error(LOG, 'auth.getUser() failed before fiscal period creation:', authError.message)
+          logError('auth.getUser() failed before fiscal period creation', { message: authError.message })
         }
         if (!user) {
-          console.error(LOG, 'fiscal period creation skipped: no user')
+          logError('fiscal period creation skipped: no user')
         } else {
           const isFirstYear = stepData.is_first_fiscal_year as boolean | undefined
           const firstYearStart = stepData.first_year_start as string | undefined
@@ -295,8 +309,8 @@ function OnboardingPageContent() {
           // Validate period duration
           const validationError = validatePeriodDuration(startStr, endStr)
           if (validationError) {
-            console.error(LOG, 'fiscal period validation failed:', validationError, {
-              startStr, endStr, isFirstYear, entity_type: settings.entity_type,
+            logError('fiscal period validation failed', {
+              validationError, startStr, endStr, isFirstYear, entity_type: settings.entity_type,
             })
             toast({
               title: 'Ogiltigt räkenskapsår',
@@ -316,8 +330,8 @@ function OnboardingPageContent() {
             .eq('user_id', user.id)
 
           if (fetchPeriodsError) {
-            console.error(LOG, 'failed to fetch existing fiscal periods:', fetchPeriodsError.message, {
-              code: fetchPeriodsError.code,
+            logError('failed to fetch existing fiscal periods', {
+              message: fetchPeriodsError.message, code: fetchPeriodsError.code,
             })
           }
 
@@ -329,7 +343,7 @@ function OnboardingPageContent() {
                 .eq('fiscal_period_id', ep.id)
 
               if (countError) {
-                console.error(LOG, 'failed to count journal entries for period', ep.id, ':', countError.message)
+                logError('failed to count journal entries for period', { periodId: ep.id, message: countError.message })
                 continue
               }
 
@@ -340,7 +354,7 @@ function OnboardingPageContent() {
                   .eq('id', ep.id)
 
                 if (deleteError) {
-                  console.error(LOG, 'failed to delete empty fiscal period', ep.id, ':', deleteError.message)
+                  logError('failed to delete empty fiscal period', { periodId: ep.id, message: deleteError.message })
                 }
               }
             }
@@ -356,13 +370,14 @@ function OnboardingPageContent() {
           })
 
           if (upsertError) {
-            console.error(LOG, 'fiscal period upsert failed:', upsertError.message, {
-              startStr, endStr, code: upsertError.code, details: upsertError.details,
+            logError('fiscal period upsert failed', {
+              message: upsertError.message, startStr, endStr, code: upsertError.code, details: upsertError.details,
             })
           }
         }
       } catch (err) {
-        console.error(LOG, 'fiscal period creation threw:', err)
+        logError('fiscal period creation threw', { error: String(err) })
+        Sentry.captureException(err)
         toast({
           title: 'Kunde inte skapa räkenskapsår',
           description: 'Ett fel uppstod när räkenskapsåret skulle skapas. Försök igen.',
@@ -374,7 +389,7 @@ function OnboardingPageContent() {
     if (nextStep > totalSteps) {
       const finalSuccess = await saveSettings({ onboarding_complete: true }, totalSteps)
       if (!finalSuccess) {
-        console.error(LOG, 'failed to set onboarding_complete after all steps')
+        logError('failed to set onboarding_complete after all steps')
         return
       }
       // Important milestone
@@ -400,7 +415,7 @@ function OnboardingPageContent() {
     const success = await saveSettings({}, nextStep)
 
     if (!success) {
-      console.error(LOG, 'skip failed: saveSettings returned false for step', currentStep)
+      logError('skip failed: saveSettings returned false', { step: currentStep })
       return
     }
     setCurrentStep(nextStep)
@@ -486,13 +501,13 @@ function OnboardingPageContent() {
             if (data) {
               const bankSaved = await saveSettings(data, totalSteps)
               if (!bankSaved) {
-                console.error(LOG, 'failed to save bank details at step 5')
+                logError('failed to save bank details at step 5')
                 return
               }
             }
             const finalSuccess = await saveSettings({ onboarding_complete: true }, totalSteps)
             if (!finalSuccess) {
-              console.error(LOG, 'failed to set onboarding_complete at step 5')
+              logError('failed to set onboarding_complete at step 5')
               return
             }
             console.log(LOG, 'onboarding completed')
@@ -506,7 +521,7 @@ function OnboardingPageContent() {
           onSkip={async () => {
             const finalSuccess = await saveSettings({ onboarding_complete: true }, totalSteps)
             if (!finalSuccess) {
-              console.error(LOG, 'failed to set onboarding_complete when skipping step 5')
+              logError('failed to set onboarding_complete when skipping step 5')
               return
             }
             console.log(LOG, 'onboarding completed')
