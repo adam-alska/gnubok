@@ -82,7 +82,7 @@ export default function BankFileColumnMappingStep({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Avgränsare</Label>
-              <Select value={delimiter} onValueChange={setDelimiter}>
+              <Select value={delimiter} onValueChange={(v) => { if (v) setDelimiter(v) }}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -95,7 +95,7 @@ export default function BankFileColumnMappingStep({
             </div>
             <div className="space-y-2">
               <Label>Decimalavgränsare</Label>
-              <Select value={decimalSep} onValueChange={(v) => setDecimalSep(v as ',' | '.')}>
+              <Select value={decimalSep} onValueChange={(v) => { if (v) setDecimalSep(v as ',' | '.') }}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

@@ -84,15 +84,19 @@ export default function AccountCombobox({ value, accounts, onChange }: AccountCo
     }
   }, [highlightedIndex, isOpen])
 
-  // Close dropdown when clicking outside
+  // Close dropdown when clicking/tapping outside
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
+    function handleClickOutside(e: MouseEvent | TouchEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('touchstart', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('touchstart', handleClickOutside)
+    }
   }, [])
 
   const selectAccount = useCallback(

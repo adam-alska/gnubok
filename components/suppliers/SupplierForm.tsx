@@ -91,7 +91,7 @@ export default function SupplierForm({
           name="supplier_type"
           control={control}
           render={({ field }) => (
-            <Select value={field.value} onValueChange={field.onChange}>
+            <Select value={field.value} onValueChange={(v) => { if (v) field.onChange(v) }}>
               <SelectTrigger>
                 <SelectValue placeholder="Välj typ" />
               </SelectTrigger>
@@ -244,7 +244,7 @@ export default function SupplierForm({
               name="default_currency"
               control={control}
               render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
+                <Select value={field.value} onValueChange={(v) => { if (v) field.onChange(v) }}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
