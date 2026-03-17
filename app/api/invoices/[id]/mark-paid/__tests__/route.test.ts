@@ -26,6 +26,15 @@ vi.mock('@/lib/bookkeeping/invoice-entries', () => ({
     mockCreateInvoiceCashEntry(...args),
 }))
 
+const mockCreateJournalEntry = vi.fn()
+const mockFindFiscalPeriod = vi.fn()
+vi.mock('@/lib/bookkeeping/engine', () => ({
+  createJournalEntry: (...args: unknown[]) =>
+    mockCreateJournalEntry(...args),
+  findFiscalPeriod: (...args: unknown[]) =>
+    mockFindFiscalPeriod(...args),
+}))
+
 import { POST } from '../route'
 
 describe('POST /api/invoices/[id]/mark-paid', () => {
@@ -188,5 +197,85 @@ describe('POST /api/invoices/[id]/mark-paid', () => {
     expect(status).toBe(200)
     expect(body.success).toBe(true)
     expect(body.journal_entry_id).toBeNull()
+  })
+
+  it('uses custom lines when provided instead of auto-generating', async () => {
+    const invoice = makeInvoice({ id: 'inv-1', status: 'sent', total: 12500 })
+
+    // Fetch invoice
+    enqueue({ data: invoice, error: null })
+    // Update invoice status
+    enqueue({ data: null, error: null })
+    // Fetch company settings
+    enqueue({ data: { accounting_method: 'accrual', entity_type: 'enskild_firma' }, error: null })
+
+    mockFindFiscalPeriod.mockResolvedValue('fp-1')
+    mockCreateJournalEntry.mockResolvedValue({ id: 'je-custom' })
+
+    const customLines = [
+      { account_number: '1920', debit_amount: 12500, credit_amount: 0, line_description: 'Betalning' },
+      { account_number: '1510', debit_amount: 0, credit_amount: 12500, line_description: 'Betalning' },
+    ]
+
+    const request = createMockRequest('/api/invoices/inv-1/mark-paid', {
+      method: 'POST',
+      body: {
+        payment_date: '2025-03-17',
+        lines: customLines,
+      },
+    })
+    const response = await POST(request, createMockRouteParams({ id: 'inv-1' }))
+    const { status, body } = await parseJsonResponse<{
+      success: boolean
+      journal_entry_id: string | null
+    }>(response)
+
+    expect(status).toBe(200)
+    expect(body.success).toBe(true)
+    expect(body.journal_entry_id).toBe('je-custom')
+    // Should NOT call auto-generation functions
+    expect(mockCreateInvoicePaymentJournalEntry).not.toHaveBeenCalled()
+    expect(mockCreateInvoiceCashEntry).not.toHaveBeenCalled()
+    // Should call createJournalEntry directly with custom lines
+    expect(mockCreateJournalEntry).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      expect.objectContaining({
+        entry_date: '2025-03-17',
+        source_type: 'invoice_paid',
+        lines: customLines,
+      })
+    )
+  })
+
+  it('falls back to auto-generation when lines are not provided', async () => {
+    const customer = makeCustomer()
+    const invoice = makeInvoice({
+      id: 'inv-1',
+      status: 'sent',
+      total: 12500,
+      customer,
+    })
+
+    enqueue({ data: invoice, error: null })
+    enqueue({ data: null, error: null })
+    enqueue({ data: { accounting_method: 'accrual', entity_type: 'enskild_firma' }, error: null })
+
+    mockCreateInvoicePaymentJournalEntry.mockResolvedValue({ id: 'je-auto' })
+
+    const request = createMockRequest('/api/invoices/inv-1/mark-paid', {
+      method: 'POST',
+      body: { payment_date: '2025-03-17' },
+    })
+    const response = await POST(request, createMockRouteParams({ id: 'inv-1' }))
+    const { status, body } = await parseJsonResponse<{
+      success: boolean
+      journal_entry_id: string | null
+    }>(response)
+
+    expect(status).toBe(200)
+    expect(body.journal_entry_id).toBe('je-auto')
+    expect(mockCreateInvoicePaymentJournalEntry).toHaveBeenCalled()
+    expect(mockCreateJournalEntry).not.toHaveBeenCalled()
   })
 })

@@ -174,6 +174,12 @@ export const MarkInvoicePaidSchema = z.object({
   payment_date: isoDate.optional(),
   exchange_rate_difference: z.number().optional(),
   notes: z.string().optional(),
+  lines: z.array(z.object({
+    account_number: accountNumber,
+    debit_amount: nonNegativeAmount.default(0),
+    credit_amount: nonNegativeAmount.default(0),
+    line_description: z.string().optional(),
+  })).min(2).optional(),
 })
 
 // ============================================================

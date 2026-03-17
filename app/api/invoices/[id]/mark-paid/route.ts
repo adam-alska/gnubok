@@ -4,9 +4,10 @@ import {
   createInvoicePaymentJournalEntry,
   createInvoiceCashEntry,
 } from '@/lib/bookkeeping/invoice-entries'
+import { createJournalEntry, findFiscalPeriod } from '@/lib/bookkeeping/engine'
 import { MarkInvoicePaidSchema } from '@/lib/api/schemas'
 import { ensureInitialized } from '@/lib/init'
-import type { EntityType, Invoice } from '@/types'
+import type { CreateJournalEntryInput, EntityType, Invoice } from '@/types'
 
 ensureInitialized()
 
@@ -56,6 +57,7 @@ export async function POST(
   // Parse optional body (backward compatible — body may be empty)
   let exchangeRateDifference: number | undefined
   let bodyPaymentDate: string | undefined
+  let customLines: { account_number: string; debit_amount: number; credit_amount: number; line_description?: string }[] | undefined
   try {
     const text = await request.text()
     if (text) {
@@ -63,6 +65,7 @@ export async function POST(
       if (parsed.success) {
         exchangeRateDifference = parsed.data.exchange_rate_difference
         bodyPaymentDate = parsed.data.payment_date
+        customLines = parsed.data.lines
       }
     }
   } catch {
@@ -103,7 +106,23 @@ export async function POST(
 
   if (isRealInvoice) {
     try {
-      if (accountingMethod === 'accrual') {
+      if (customLines) {
+        // User-provided lines from PaymentBookingDialog
+        const fiscalPeriodId = await findFiscalPeriod(supabase, user.id, paymentDate)
+        if (fiscalPeriodId) {
+          const sourceType = accountingMethod === 'accrual' ? 'invoice_paid' : 'invoice_cash_payment'
+          const input: CreateJournalEntryInput = {
+            fiscal_period_id: fiscalPeriodId,
+            entry_date: paymentDate,
+            description: `Betalning faktura ${invoice.invoice_number}`,
+            source_type: sourceType,
+            source_id: invoice.id,
+            lines: customLines,
+          }
+          const journalEntry = await createJournalEntry(supabase, user.id, input)
+          journalEntryId = journalEntry?.id ?? null
+        }
+      } else if (accountingMethod === 'accrual') {
         // Faktureringsmetoden: clear receivable (Debit 1930, Credit 1510)
         const journalEntry = await createInvoicePaymentJournalEntry(
           supabase,
