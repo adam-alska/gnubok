@@ -71,6 +71,45 @@ async function handleRequest(
     return NextResponse.json({ error: 'Extension not found' }, { status: 404 })
   }
 
+  // Match route BEFORE auth so we can check skipAuth (e.g. OAuth callbacks)
+  let matchedRoute: ApiRouteDefinition | null = null
+  let extractedParams: Record<string, string> = {}
+
+  for (const route of extension.apiRoutes) {
+    if (route.method !== method) continue
+
+    const routeParams = matchPath(route.path, routePath)
+    if (routeParams !== null) {
+      matchedRoute = route
+      extractedParams = routeParams
+      break
+    }
+  }
+
+  if (!matchedRoute) {
+    return NextResponse.json({ error: 'Route not found' }, { status: 404 })
+  }
+
+  // For skipAuth routes (e.g. OAuth callbacks from external providers),
+  // skip user auth, toggle check, and AI consent — dispatch immediately
+  if (matchedRoute.skipAuth) {
+    let handlerRequest = request
+    if (Object.keys(extractedParams).length > 0) {
+      const url = new URL(request.url)
+      for (const [key, value] of Object.entries(extractedParams)) {
+        url.searchParams.set(`_${key}`, value)
+      }
+      handlerRequest = new Request(url.toString(), {
+        method: request.method,
+        headers: request.headers,
+        body: request.body,
+        // @ts-expect-error -- duplex needed for streaming body
+        duplex: 'half',
+      })
+    }
+    return matchedRoute.handler(handlerRequest)
+  }
+
   // Auth check
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -95,25 +134,6 @@ async function handleRequest(
         { status: 403 }
       )
     }
-  }
-
-  // Find matching route (supports :param patterns)
-  let matchedRoute: ApiRouteDefinition | null = null
-  let extractedParams: Record<string, string> = {}
-
-  for (const route of extension.apiRoutes) {
-    if (route.method !== method) continue
-
-    const params = matchPath(route.path, routePath)
-    if (params !== null) {
-      matchedRoute = route
-      extractedParams = params
-      break
-    }
-  }
-
-  if (!matchedRoute) {
-    return NextResponse.json({ error: 'Route not found' }, { status: 404 })
   }
 
   // If path params were extracted, create a new Request with them as search params

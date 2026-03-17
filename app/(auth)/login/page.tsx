@@ -12,12 +12,9 @@ import { Loader2, Mail, ArrowLeft, KeyRound } from 'lucide-react'
 import Image from 'next/image'
 import { getErrorMessage } from '@/lib/errors/get-error-message'
 
-type AuthMode = 'password' | 'magic-link'
-
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [authMode, setAuthMode] = useState<AuthMode>('password')
   const [isLoading, setIsLoading] = useState(false)
   const [isEmailSent, setIsEmailSent] = useState(false)
   const [showResetPassword, setShowResetPassword] = useState(false)
@@ -62,47 +59,6 @@ export default function LoginPage() {
     } catch (error) {
       toast({
         title: 'Inloggning misslyckades',
-        description: getErrorMessage(error, { context: 'auth' }),
-        variant: 'destructive',
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleMagicLink = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setIsLoading(true)
-
-    const formData = new FormData(e.currentTarget)
-    const emailValue = (formData.get('email') as string) || email
-
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: emailValue,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
-
-      if (error) {
-        toast({
-          title: 'Kunde inte skicka länk',
-          description: getErrorMessage(error, { context: 'auth' }),
-          variant: 'destructive',
-        })
-        return
-      }
-
-      setEmail(emailValue)
-      setIsEmailSent(true)
-      toast({
-        title: 'E-post skickad!',
-        description: 'Kolla din inkorg för att logga in.',
-      })
-    } catch (error) {
-      toast({
-        title: 'Kunde inte skicka länk',
         description: getErrorMessage(error, { context: 'auth' }),
         variant: 'destructive',
       })
@@ -269,87 +225,57 @@ export default function LoginPage() {
         </div>
 
         <div className="rounded-xl border bg-card p-6" style={{ boxShadow: 'var(--shadow-md)' }}>
-          {authMode === 'password' ? (
-            <form onSubmit={handlePasswordLogin} className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="email">E-postadress</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="namn@exempel.se"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={isLoading}
-                  className="h-11"
-                />
+          <form onSubmit={handlePasswordLogin} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="email">E-postadress</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                placeholder="namn@exempel.se"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={isLoading}
+                className="h-11"
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Lösenord</Label>
+                <button
+                  type="button"
+                  onClick={() => setShowResetPassword(true)}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
+                >
+                  Glömt lösenord?
+                </button>
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Lösenord</Label>
-                  <button
-                    type="button"
-                    onClick={() => setShowResetPassword(true)}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
-                  >
-                    Glömt lösenord?
-                  </button>
-                </div>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  placeholder="Ditt lösenord"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  disabled={isLoading}
-                  className="h-11"
-                />
-              </div>
-              <Button type="submit" className="w-full h-11" disabled={isLoading}>
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loggar in...
-                  </>
-                ) : (
-                  'Logga in'
-                )}
-              </Button>
-            </form>
-          ) : (
-            <form onSubmit={handleMagicLink} className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="email">E-postadress</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="namn@exempel.se"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={isLoading}
-                  className="h-11"
-                />
-              </div>
-              <Button type="submit" className="w-full h-11" disabled={isLoading}>
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Skickar...
-                  </>
-                ) : (
-                  'Skicka inloggningslänk'
-                )}
-              </Button>
-            </form>
-          )}
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                placeholder="Ditt lösenord"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={isLoading}
+                className="h-11"
+              />
+            </div>
+            <Button type="submit" className="w-full h-11" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loggar in...
+                </>
+              ) : (
+                'Logga in'
+              )}
+            </Button>
+          </form>
 
           <div className="relative my-5">
             <div className="absolute inset-0 flex items-center">
@@ -363,31 +289,13 @@ export default function LoginPage() {
           <Button
             variant="outline"
             className="w-full"
-            onClick={() => setAuthMode(authMode === 'password' ? 'magic-link' : 'password')}
+            asChild
           >
-            {authMode === 'password' ? (
-              <>
-                <Mail className="mr-2 h-4 w-4" />
-                Logga in med e-postlänk
-              </>
-            ) : (
-              <>
-                <KeyRound className="mr-2 h-4 w-4" />
-                Logga in med lösenord
-              </>
-            )}
+            <Link href="/register">
+              Skapa konto
+            </Link>
           </Button>
         </div>
-
-        <p className="mt-6 text-center text-sm text-muted-foreground">
-          Har du inget konto?{' '}
-          <Link
-            href="/register"
-            className="font-medium text-foreground underline underline-offset-2 hover:text-primary transition-colors"
-          >
-            Skapa konto
-          </Link>
-        </p>
 
         <p className="mt-4 text-center text-xs text-muted-foreground leading-relaxed">
           Genom att logga in godkänner du våra{' '}

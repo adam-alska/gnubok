@@ -38,15 +38,26 @@ async function request<T>(
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
 
-  const response = await fetch(url, {
-    ...options,
-    signal: controller.signal,
-    headers: {
-      'Authorization': `Bearer ${getApiKey()}`,
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  }).finally(() => clearTimeout(timer))
+  let response: Response
+  try {
+    response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        'Authorization': `Bearer ${getApiKey()}`,
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    })
+  } catch (err) {
+    clearTimeout(timer)
+    if (err instanceof DOMException || (err instanceof Error && err.name === 'AbortError')) {
+      throw new Error(`Arcim API timeout after ${Math.round(timeoutMs / 1000)}s: ${path}`)
+    }
+    throw err
+  } finally {
+    clearTimeout(timer)
+  }
 
   if (!response.ok) {
     const body = await response.text().catch(() => '')
@@ -92,10 +103,12 @@ export async function deleteConsent(consentId: string): Promise<void> {
 
 export async function getAuthUrl(
   provider: ArcimProvider,
-  state?: string
+  state?: string,
+  redirectUri?: string
 ): Promise<{ url: string }> {
   const params = new URLSearchParams()
   if (state) params.set('state', state)
+  if (redirectUri) params.set('redirectUri', redirectUri)
   const qs = params.toString()
   return request<{ url: string }>(`/api/v1/auth/${provider}/url${qs ? `?${qs}` : ''}`)
 }
@@ -104,7 +117,8 @@ export async function exchangeAuthToken(
   consentId: string,
   provider: ArcimProvider,
   otcCode: string,
-  oauthCode: string
+  oauthCode: string,
+  redirectUri?: string
 ): Promise<{ success: boolean; consentId: string }> {
   return request(`/api/v1/auth/${provider}/callback`, {
     method: 'POST',
@@ -112,6 +126,7 @@ export async function exchangeAuthToken(
       code: oauthCode,
       consentId,
       otcCode,
+      ...(redirectUri ? { redirectUri } : {}),
     }),
   })
 }
