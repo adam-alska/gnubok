@@ -176,7 +176,7 @@ export function DeadlineForm({
               <Label>Typ *</Label>
               <Select
                 value={formData.deadline_type}
-                onValueChange={(v) => updateField('deadline_type', v as DeadlineType)}
+                onValueChange={(v) => { if (v) updateField('deadline_type', v as DeadlineType) }}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -194,7 +194,7 @@ export function DeadlineForm({
               <Label>Prioritet</Label>
               <Select
                 value={formData.priority}
-                onValueChange={(v) => updateField('priority', v as DeadlinePriority)}
+                onValueChange={(v) => { if (v) updateField('priority', v as DeadlinePriority) }}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -216,7 +216,7 @@ export function DeadlineForm({
               <Label>Kund (valfritt)</Label>
               <Select
                 value={formData.customer_id || 'none'}
-                onValueChange={(v) => updateField('customer_id', v === 'none' ? '' : v)}
+                onValueChange={(v) => { if (v) updateField('customer_id', v === 'none' ? '' : v) }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Välj kund..." />

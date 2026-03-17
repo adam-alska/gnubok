@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -179,7 +178,7 @@ export default function Step6ConnectBank({
             </Button>
           </form>
 
-          <div className="flex justify-between pt-4">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-3 pt-4">
             <Button
               type="button"
               variant="ghost"
@@ -192,6 +191,7 @@ export default function Step6ConnectBank({
               type="button"
               variant="outline"
               onClick={onSkip}
+              className="w-full sm:w-auto"
             >
               <SkipForward className="mr-2 h-4 w-4" />
               Hoppa över
