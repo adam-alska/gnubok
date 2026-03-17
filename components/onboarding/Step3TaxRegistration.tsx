@@ -21,10 +21,19 @@ const schema = z.object({
   f_skatt: z.boolean(),
   is_first_fiscal_year: z.boolean(),
   // First year fields (conditional — validated via superRefine below)
-  first_year_start: z.string().optional(),
-  first_year_end: z.string().optional(),
+  first_year_start: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.string().optional()
+  ),
+  first_year_end: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.string().optional()
+  ),
   // Ongoing year field (conditional)
-  fiscal_year_end_month: z.number().min(1).max(12).optional(),
+  fiscal_year_end_month: z.preprocess(
+    (v) => (v === '' || v === undefined ? undefined : v),
+    z.number().min(1).max(12).optional()
+  ),
   // Existing fields
   vat_registered: z.boolean(),
   vat_number: z.string().optional(),
@@ -32,7 +41,10 @@ const schema = z.object({
     (v) => (v === '' ? undefined : v),
     z.enum(['monthly', 'quarterly', 'yearly']).optional()
   ),
-  accounting_method: z.enum(['accrual', 'cash']),
+  accounting_method: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.enum(['accrual', 'cash'])
+  ),
 }).superRefine((data, ctx) => {
   if (data.is_first_fiscal_year) {
     if (!data.first_year_start) {
