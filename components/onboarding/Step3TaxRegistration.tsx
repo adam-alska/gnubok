@@ -438,7 +438,7 @@ export default function Step3TaxRegistration({
                         }
 
                         return (
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <Select
                               value={startMonth ? startMonth.toString() : ''}
                               onValueChange={(v) => { if (v) handleMonthChange(parseInt(v)) }}
@@ -651,7 +651,7 @@ export default function Step3TaxRegistration({
               </div>
 
               {vatRegistered && (
-                <div className="space-y-4 pl-7">
+                <div className="space-y-4 pl-0 sm:pl-7">
                   <div className="space-y-2">
                     <Label htmlFor="vat_number">Momsregistreringsnummer</Label>
                     <Input
