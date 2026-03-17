@@ -77,6 +77,8 @@ export interface RouteDefinition {
 export interface ApiRouteDefinition {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
   path: string
+  /** Skip auth check for this route (e.g. OAuth callbacks from external providers) */
+  skipAuth?: boolean
   handler: (request: Request, ctx?: ExtensionContext) => Promise<Response>
 }
 
