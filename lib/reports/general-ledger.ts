@@ -51,13 +51,13 @@ export async function generateGeneralLedger(
     return { accounts: [], period: { start: '', end: '' } }
   }
 
-  // Fetch posted entries for this period
+  // Fetch posted and reversed entries for this period (reversed entries must appear alongside their storno)
   const { data: entries } = await supabase
     .from('journal_entries')
     .select('id, entry_date, voucher_number, voucher_series, description, source_type')
     .eq('user_id', userId)
     .eq('fiscal_period_id', periodId)
-    .eq('status', 'posted')
+    .in('status', ['posted', 'reversed'])
 
   if (!entries || entries.length === 0) {
     return { accounts: [], period: { start: period.period_start, end: period.period_end } }
@@ -90,12 +90,12 @@ export async function generateGeneralLedger(
     accountNameMap.set(acc.account_number, acc.account_name)
   }
 
-  // Compute opening balances: sum all posted lines from entries before this period
+  // Compute opening balances: sum all posted/reversed lines from entries before this period
   const { data: priorEntries } = await supabase
     .from('journal_entries')
     .select('id')
     .eq('user_id', userId)
-    .eq('status', 'posted')
+    .in('status', ['posted', 'reversed'])
     .lt('entry_date', period.period_start)
 
   const openingBalances = new Map<string, number>()

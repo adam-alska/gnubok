@@ -31,6 +31,7 @@ import {
   MessageSquare,
   Trash2,
 } from 'lucide-react'
+import PaymentBookingDialog from '@/components/invoices/PaymentBookingDialog'
 import type { Invoice, InvoiceItem, Customer, InvoiceStatus, InvoiceReminder, InvoiceDocumentType } from '@/types'
 
 const statusConfig: Record<InvoiceStatus, { label: string; variant: 'default' | 'secondary' | 'success' | 'warning' | 'destructive'; icon: React.ElementType }> = {
@@ -65,6 +66,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [creditNote, setCreditNote] = useState<Invoice | null>(null)
   const [originalInvoice, setOriginalInvoice] = useState<Invoice | null>(null)
   const [convertedFromInvoice, setConvertedFromInvoice] = useState<Invoice | null>(null)
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [isConverting, setIsConverting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
@@ -172,15 +174,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         if (!response.ok) {
           const data = await response.json()
           throw new Error(data.error || 'Kunde inte markera som skickad')
-        }
-      } else if (status === 'paid') {
-        // Use mark-paid API for proper bookkeeping
-        const response = await fetch(`/api/invoices/${invoice.id}/mark-paid`, {
-          method: 'POST',
-        })
-        if (!response.ok) {
-          const data = await response.json()
-          throw new Error(data.error || 'Kunde inte markera som betald')
         }
       } else if (status === 'cancelled') {
         // Only drafts and proformas can be cancelled directly — sent/overdue/paid
@@ -418,7 +411,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             </Button>
           )}
           {(invoice.status === 'sent' || invoice.status === 'overdue') && isRealInvoice && (
-            <Button onClick={() => updateStatus('paid')} disabled={isUpdating}>
+            <Button onClick={() => setShowPaymentDialog(true)} disabled={isUpdating}>
               <CheckCircle className="mr-2 h-4 w-4" />
               Markera som betald
             </Button>
@@ -904,7 +897,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                   <>
                     <Button
                       className="w-full"
-                      onClick={() => updateStatus('paid')}
+                      onClick={() => setShowPaymentDialog(true)}
                       disabled={isUpdating}
                     >
                       <CheckCircle className="mr-2 h-4 w-4" />
@@ -931,6 +924,19 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           )}
         </div>
       </div>
+
+      <PaymentBookingDialog
+        open={showPaymentDialog}
+        onOpenChange={setShowPaymentDialog}
+        invoice={invoice}
+        onSuccess={() => {
+          fetchInvoice()
+          toast({
+            title: 'Betald',
+            description: `Faktura ${invoice.invoice_number} har markerats som betald och bokförts`,
+          })
+        }}
+      />
     </div>
   )
 }

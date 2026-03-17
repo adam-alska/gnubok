@@ -4,9 +4,10 @@ import {
   createInvoicePaymentJournalEntry,
   createInvoiceCashEntry,
 } from '@/lib/bookkeeping/invoice-entries'
+import { createJournalEntry, findFiscalPeriod } from '@/lib/bookkeeping/engine'
 import { MarkInvoicePaidSchema } from '@/lib/api/schemas'
 import { ensureInitialized } from '@/lib/init'
-import type { EntityType, Invoice } from '@/types'
+import type { CreateJournalEntryInput, EntityType, Invoice } from '@/types'
 
 ensureInitialized()
 
@@ -56,17 +57,23 @@ export async function POST(
   // Parse optional body (backward compatible — body may be empty)
   let exchangeRateDifference: number | undefined
   let bodyPaymentDate: string | undefined
+  let customLines: { account_number: string; debit_amount: number; credit_amount: number; line_description?: string }[] | undefined
+  let rawBody: unknown
   try {
     const text = await request.text()
-    if (text) {
-      const parsed = MarkInvoicePaidSchema.safeParse(JSON.parse(text))
-      if (parsed.success) {
-        exchangeRateDifference = parsed.data.exchange_rate_difference
-        bodyPaymentDate = parsed.data.payment_date
-      }
-    }
+    if (text) rawBody = JSON.parse(text)
   } catch {
     // No body or invalid JSON — use defaults
+  }
+
+  if (rawBody) {
+    const parsed = MarkInvoicePaidSchema.safeParse(rawBody)
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Ogiltig förfrågan', details: parsed.error.flatten() }, { status: 400 })
+    }
+    exchangeRateDifference = parsed.data.exchange_rate_difference
+    bodyPaymentDate = parsed.data.payment_date
+    customLines = parsed.data.lines
   }
 
   const now = new Date().toISOString()
@@ -103,7 +110,33 @@ export async function POST(
 
   if (isRealInvoice) {
     try {
-      if (accountingMethod === 'accrual') {
+      if (customLines) {
+        // Server-side balance validation — never commit imbalanced entries
+        const totalDebit = customLines.reduce((s, l) => s + l.debit_amount, 0)
+        const totalCredit = customLines.reduce((s, l) => s + l.credit_amount, 0)
+        if (Math.round((totalDebit - totalCredit) * 100) !== 0 || totalDebit <= 0) {
+          return NextResponse.json(
+            { error: 'Verifikationsraderna är inte balanserade (debet ≠ kredit)' },
+            { status: 400 }
+          )
+        }
+
+        // User-provided lines from PaymentBookingDialog
+        const fiscalPeriodId = await findFiscalPeriod(supabase, user.id, paymentDate)
+        if (fiscalPeriodId) {
+          const sourceType = accountingMethod === 'accrual' ? 'invoice_paid' : 'invoice_cash_payment'
+          const input: CreateJournalEntryInput = {
+            fiscal_period_id: fiscalPeriodId,
+            entry_date: paymentDate,
+            description: `Betalning faktura ${invoice.invoice_number}`,
+            source_type: sourceType,
+            source_id: invoice.id,
+            lines: customLines,
+          }
+          const journalEntry = await createJournalEntry(supabase, user.id, input)
+          journalEntryId = journalEntry?.id ?? null
+        }
+      } else if (accountingMethod === 'accrual') {
         // Faktureringsmetoden: clear receivable (Debit 1930, Credit 1510)
         const journalEntry = await createInvoicePaymentJournalEntry(
           supabase,

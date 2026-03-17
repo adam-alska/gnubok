@@ -190,7 +190,7 @@ export async function generateNEDeclaration(
     .select('*, lines:journal_entry_lines(*)')
     .eq('user_id', userId)
     .eq('fiscal_period_id', fiscalPeriodId)
-    .eq('status', 'posted')
+    .in('status', ['posted', 'reversed'])
 
   if (entriesError) {
     throw new Error(`Failed to fetch journal entries: ${entriesError.message}`)

@@ -46,7 +46,7 @@ export async function generateSIEExport(
     .select('*, lines:journal_entry_lines(*)')
     .eq('user_id', userId)
     .eq('fiscal_period_id', options.fiscal_period_id)
-    .eq('status', 'posted')
+    .in('status', ['posted', 'reversed'])
     .order('voucher_number')
 
   // Fetch cost centers and projects for dimension records

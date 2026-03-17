@@ -66,7 +66,7 @@ async function generateTrialBalanceManual(
     .select('id')
     .eq('user_id', userId)
     .eq('fiscal_period_id', fiscalPeriodId)
-    .eq('status', 'posted')
+    .in('status', ['posted', 'reversed'])
 
   if (entriesError || !entries || entries.length === 0) {
     return { rows: [], totalDebit: 0, totalCredit: 0, isBalanced: true }
