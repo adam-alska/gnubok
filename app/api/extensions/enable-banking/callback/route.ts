@@ -22,7 +22,44 @@ export async function GET(request: Request) {
 
   if (error) {
     const errorMessage = errorDescription || error
-    console.error('Bank authorization error:', errorMessage)
+    console.error('[enable-banking] Bank authorization denied', {
+      error,
+      error_description: errorDescription,
+      has_state: !!state,
+    })
+
+    // Clean up the pending bank_connections row so it doesn't accumulate
+    if (state) {
+      try {
+        const supabase = await createServiceClient()
+
+        // Fetch connection details for logging before updating
+        const { data: pendingConn } = await supabase
+          .from('bank_connections')
+          .select('id, user_id, bank_name')
+          .eq('oauth_state', state)
+          .eq('status', 'pending')
+          .single()
+
+        if (pendingConn) {
+          console.error('[enable-banking] Authorization denied details', {
+            connection_id: pendingConn.id,
+            user_id: pendingConn.user_id,
+            bank_name: pendingConn.bank_name,
+            error_code: error,
+            error_description: errorDescription,
+          })
+
+          await supabase
+            .from('bank_connections')
+            .update({ status: 'error', error_message: errorMessage, oauth_state: null })
+            .eq('id', pendingConn.id)
+        }
+      } catch (cleanupError) {
+        console.error('[enable-banking] Failed to clean up pending bank connection:', cleanupError)
+      }
+    }
+
     return NextResponse.redirect(
       `${baseUrl}/settings?bank_error=${encodeURIComponent(errorMessage)}`
     )

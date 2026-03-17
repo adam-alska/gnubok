@@ -91,12 +91,32 @@ describe('GET /api/extensions/enable-banking/callback', () => {
     expect(location).toContain('connection_id=conn-1')
   })
 
-  it('redirects with error when bank returns error param', async () => {
+  it('redirects with error when bank returns error param (no state)', async () => {
     const response = await GET(makeRequest({ error: 'access_denied', error_description: 'User cancelled' }))
 
     expect(response.status).toBe(307)
     const location = response.headers.get('location') || ''
     expect(location).toContain('bank_error=User%20cancelled')
+    // No state → no DB cleanup attempted
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it('cleans up pending connection when bank returns error with state', async () => {
+    mockFrom.mockImplementation(() =>
+      mockChain({ data: null, error: null })
+    )
+
+    const response = await GET(makeRequest({
+      error: 'access_denied',
+      error_description: 'Denied data sharing consent',
+      state: 'pending-state',
+    }))
+
+    expect(response.status).toBe(307)
+    const location = response.headers.get('location') || ''
+    expect(location).toContain('bank_error=Denied%20data%20sharing%20consent')
+    // Should clean up the pending row
+    expect(mockFrom).toHaveBeenCalledWith('bank_connections')
   })
 
   it('redirects with error when code or state is missing', async () => {
