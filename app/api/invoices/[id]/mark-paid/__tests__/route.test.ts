@@ -114,10 +114,10 @@ describe('POST /api/invoices/[id]/mark-paid', () => {
 
     // Fetch invoice
     enqueue({ data: invoice, error: null })
+    // Fetch company settings (now before update due to journal-first ordering)
+    enqueue({ data: { accounting_method: 'accrual', entity_type: 'enskild_firma' }, error: null })
     // Update invoice status
     enqueue({ data: null, error: null })
-    // Fetch company settings
-    enqueue({ data: { accounting_method: 'accrual', entity_type: 'enskild_firma' }, error: null })
 
     mockCreateInvoicePaymentJournalEntry.mockResolvedValue({ id: 'je-1' })
 
@@ -154,8 +154,8 @@ describe('POST /api/invoices/[id]/mark-paid', () => {
     })
 
     enqueue({ data: invoice, error: null })
-    enqueue({ data: null, error: null })
     enqueue({ data: { accounting_method: 'cash', entity_type: 'enskild_firma' }, error: null })
+    enqueue({ data: null, error: null })
 
     mockCreateInvoiceCashEntry.mockResolvedValue({ id: 'je-2' })
 
@@ -178,25 +178,19 @@ describe('POST /api/invoices/[id]/mark-paid', () => {
     )
   })
 
-  it('returns success with null journal_entry_id when journal entry creation fails', async () => {
+  it('returns 500 when journal entry creation fails (invoice not marked paid)', async () => {
     const invoice = makeInvoice({ id: 'inv-1', status: 'sent', total: 12500 })
 
     enqueue({ data: invoice, error: null })
-    enqueue({ data: null, error: null })
     enqueue({ data: { accounting_method: 'accrual', entity_type: 'enskild_firma' }, error: null })
 
-    mockCreateInvoicePaymentJournalEntry.mockRejectedValue(new Error('Period locked'))
+    mockCreateInvoicePaymentJournalEntry.mockRejectedValueOnce(new Error('Period locked'))
 
     const request = createMockRequest('/api/invoices/inv-1/mark-paid', { method: 'POST' })
     const response = await POST(request, createMockRouteParams({ id: 'inv-1' }))
-    const { status, body } = await parseJsonResponse<{
-      success: boolean
-      journal_entry_id: string | null
-    }>(response)
+    const { status } = await parseJsonResponse(response)
 
-    expect(status).toBe(200)
-    expect(body.success).toBe(true)
-    expect(body.journal_entry_id).toBeNull()
+    expect(status).toBe(500)
   })
 
   it('uses custom lines when provided instead of auto-generating', async () => {
@@ -204,10 +198,10 @@ describe('POST /api/invoices/[id]/mark-paid', () => {
 
     // Fetch invoice
     enqueue({ data: invoice, error: null })
+    // Fetch company settings (before update — journal-first ordering)
+    enqueue({ data: { accounting_method: 'accrual', entity_type: 'enskild_firma' }, error: null })
     // Update invoice status
     enqueue({ data: null, error: null })
-    // Fetch company settings
-    enqueue({ data: { accounting_method: 'accrual', entity_type: 'enskild_firma' }, error: null })
 
     mockFindFiscalPeriod.mockResolvedValue('fp-1')
     mockCreateJournalEntry.mockResolvedValue({ id: 'je-custom' })
@@ -253,10 +247,6 @@ describe('POST /api/invoices/[id]/mark-paid', () => {
 
     // Fetch invoice
     enqueue({ data: invoice, error: null })
-    // Update invoice status
-    enqueue({ data: null, error: null })
-    // Fetch company settings
-    enqueue({ data: { accounting_method: 'accrual', entity_type: 'enskild_firma' }, error: null })
 
     const unbalancedLines = [
       { account_number: '1920', debit_amount: 12500, credit_amount: 0 },
@@ -309,8 +299,8 @@ describe('POST /api/invoices/[id]/mark-paid', () => {
     })
 
     enqueue({ data: invoice, error: null })
-    enqueue({ data: null, error: null })
     enqueue({ data: { accounting_method: 'accrual', entity_type: 'enskild_firma' }, error: null })
+    enqueue({ data: null, error: null })
 
     mockCreateInvoicePaymentJournalEntry.mockResolvedValue({ id: 'je-auto' })
 

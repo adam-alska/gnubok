@@ -94,6 +94,7 @@ export async function POST(
   let journalEntryId: string | null = null
 
   if (isRealInvoice) {
+    try {
     if (customLines) {
       // Server-side balance validation — never commit imbalanced entries
       const totalDebit = customLines.reduce((s, l) => s + l.debit_amount, 0)
@@ -144,6 +145,13 @@ export async function POST(
         entityType
       )
       journalEntryId = journalEntry?.id ?? null
+    }
+    } catch (err) {
+      console.error('Failed to create payment journal entry:', err)
+      return NextResponse.json(
+        { error: 'Kunde inte bokföra betalningen' },
+        { status: 500 }
+      )
     }
   }
 
