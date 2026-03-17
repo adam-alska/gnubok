@@ -28,7 +28,10 @@ const schema = z.object({
   // Existing fields
   vat_registered: z.boolean(),
   vat_number: z.string().optional(),
-  moms_period: z.enum(['monthly', 'quarterly', 'yearly']).optional(),
+  moms_period: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.enum(['monthly', 'quarterly', 'yearly']).optional()
+  ),
   accounting_method: z.enum(['accrual', 'cash']),
 }).superRefine((data, ctx) => {
   if (data.is_first_fiscal_year) {
@@ -46,6 +49,13 @@ const schema = z.object({
         path: ['first_year_end'],
       })
     }
+  }
+  if (data.vat_registered && !data.moms_period) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Välj momsredovisningsperiod.',
+      path: ['moms_period'],
+    })
   }
 })
 
@@ -272,8 +282,8 @@ export default function Step3TaxRegistration({
       ...(firstStart && { first_year_start: firstStart }),
       ...(firstEnd && { first_year_end: firstEnd }),
       vat_registered: data.vat_registered,
-      vat_number: data.vat_number,
-      moms_period: data.moms_period,
+      vat_number: data.vat_registered ? data.vat_number : undefined,
+      moms_period: data.vat_registered ? data.moms_period : undefined,
       accounting_method: data.accounting_method,
     }
 
