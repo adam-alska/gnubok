@@ -97,8 +97,16 @@ export const arcimMigrationExtension: Extension = {
             // Generate OTC for OAuth flow
             const otc = await generateOtc(consent.id)
 
-            // Get OAuth URL from Arcim (redirect URI is configured server-side in the gateway)
-            const { url } = await getAuthUrl(provider, otc.code)
+            // Build the OAuth callback URL using the current app URL (localhost in dev, production in prod)
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+            const callbackUrl = `${appUrl}/api/extensions/ext/arcim-migration/callback`
+
+            // Encode consentId + provider in state so the callback doesn't depend on session storage
+            const statePayload = JSON.stringify({ otc: otc.code, consentId: consent.id, provider })
+            const stateEncoded = Buffer.from(statePayload).toString('base64url')
+
+            // Pass callbackUrl as redirectUri so Fortnox redirects here (works for localhost and production)
+            const { url } = await getAuthUrl(provider, stateEncoded, callbackUrl)
 
             return NextResponse.json({
               consentId: consent.id,
@@ -181,37 +189,63 @@ export const arcimMigrationExtension: Extension = {
     },
 
     // ── OAuth callback ────────────────────────────────────────────
+    // This handler is called by the OAuth provider redirect. It does NOT
+    // require user auth — the request comes from the provider, not the user's
+    // browser session. Authentication is validated via the OTC code + consent.
+    // The 'skipAuth' flag is checked by the extension dispatch route.
     {
       method: 'GET',
       path: '/callback',
+      skipAuth: true,
       handler: async (request: Request, ctx?: ExtensionContext) => {
         const log = ctx?.log ?? console
         const url = new URL(request.url)
         const code = url.searchParams.get('code')
-        const state = url.searchParams.get('state') // OTC code
+        const stateRaw = url.searchParams.get('state')
 
-        if (!code || !state) {
+        if (!code || !stateRaw) {
           return NextResponse.json({ error: 'Missing code or state' }, { status: 400 })
         }
 
         try {
-          // The state is the OTC code, and the code is the OAuth auth code
-          // Exchange with the Arcim gateway
-          const consentId = ctx?.settings
-            ? await ctx.settings.get<string>('consent_id')
-            : null
-          const provider = ctx?.settings
-            ? await ctx.settings.get<ArcimProvider>('provider')
-            : null
+          // Decode state — supports both new format (base64url JSON with consentId/provider)
+          // and legacy format (plain OTC code string)
+          let consentId: string | null = null
+          let provider: ArcimProvider | null = null
+          let otcCode: string = stateRaw
+
+          try {
+            const decoded = JSON.parse(Buffer.from(stateRaw, 'base64url').toString())
+            if (decoded.consentId && decoded.provider && decoded.otc) {
+              consentId = decoded.consentId
+              provider = decoded.provider as ArcimProvider
+              otcCode = decoded.otc
+            }
+          } catch {
+            // Legacy: state is just the OTC code — fall back to ctx.settings
+          }
+
+          // Fall back to session-based settings if state didn't contain the data
+          if (!consentId || !provider) {
+            consentId = ctx?.settings
+              ? await ctx.settings.get<string>('consent_id')
+              : null
+            provider = ctx?.settings
+              ? await ctx.settings.get<ArcimProvider>('provider')
+              : null
+          }
 
           if (!consentId || !provider) {
             return NextResponse.json({ error: 'No active migration session' }, { status: 400 })
           }
 
-          await exchangeAuthToken(consentId, provider, state, code)
+          // The redirectUri used for the token exchange must match the one used in the auth URL
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+          const redirectUri = `${appUrl}/api/extensions/ext/arcim-migration/callback`
+
+          await exchangeAuthToken(consentId, provider, otcCode, code, redirectUri)
 
           // Redirect to import page with success
-          const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
           return NextResponse.redirect(`${appUrl}/import?migration=connected&consentId=${consentId}`)
         } catch (error) {
           log.error('OAuth callback error:', error)
@@ -251,11 +285,16 @@ export const arcimMigrationExtension: Extension = {
             )
           }
 
-          // Fetch company info for preview
-          const companyInfo = await fetchCompanyInfo(consentId)
-          const mapped = companyInfo ? mapCompanyInfo(companyInfo) : null
+          // Fetch company info for preview (non-blocking — continue if it fails)
+          let mapped = null
+          try {
+            const companyInfo = await fetchCompanyInfo(consentId)
+            mapped = companyInfo ? mapCompanyInfo(companyInfo) : null
+          } catch (err) {
+            log.info('Company info fetch failed:', err instanceof Error ? err.message : String(err))
+          }
 
-          // Try to fetch SIE stats
+          // Try to fetch SIE stats (non-blocking — continue if it fails)
           let sieAvailable = false
           let sieStats: { accountCount: number; transactionCount: number; fiscalYears: number[] } | null = null
 
