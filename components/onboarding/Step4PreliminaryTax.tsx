@@ -95,7 +95,7 @@ export default function Step4PreliminaryTax({
               </ul>
             </div>
 
-            <div className="flex justify-between pt-4">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-3 pt-4">
               <Button
                 type="button"
                 variant="ghost"
@@ -105,17 +105,18 @@ export default function Step4PreliminaryTax({
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Tillbaka
               </Button>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={onSkip}
                   disabled={isSaving}
+                  className="w-full sm:w-auto"
                 >
                   <SkipForward className="mr-2 h-4 w-4" />
                   Hoppa över
                 </Button>
-                <Button type="submit" disabled={isSaving}>
+                <Button type="submit" disabled={isSaving} className="w-full sm:w-auto">
                   {isSaving ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />

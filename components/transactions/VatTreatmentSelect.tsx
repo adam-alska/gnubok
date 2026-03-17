@@ -21,7 +21,7 @@ export default function VatTreatmentSelect({
   return (
     <Select
       value={value}
-      onValueChange={(v) => onValueChange(v as VatTreatment | 'none')}
+      onValueChange={(v) => { if (v) onValueChange(v as VatTreatment | 'none') }}
       disabled={disabled}
     >
       <SelectTrigger className="h-9">

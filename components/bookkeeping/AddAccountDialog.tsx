@@ -146,7 +146,7 @@ export function AddAccountDialog({ open, onOpenChange, onCreated }: AddAccountDi
             </div>
             <div className="space-y-2">
               <Label>Normal saldo</Label>
-              <Select value={normalBalance} onValueChange={(v) => setNormalBalance(v as 'debit' | 'credit')}>
+              <Select value={normalBalance} onValueChange={(v) => { if (v) setNormalBalance(v as 'debit' | 'credit') }}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

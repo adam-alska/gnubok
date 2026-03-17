@@ -786,20 +786,8 @@ export default function ImportPage() {
         </p>
       </div>
 
-      {mode === null && (
+      {mode === null && hasBankingExtension !== null && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {hasBankingExtension === null && (
-            <Card className="animate-pulse">
-              <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
-                <div className="h-12 w-12 rounded-full bg-muted" />
-                <div className="space-y-2 w-full flex flex-col items-center">
-                  <div className="h-5 bg-muted rounded w-24" />
-                  <div className="h-4 bg-muted rounded w-48" />
-                  <div className="h-4 bg-muted rounded w-40" />
-                </div>
-              </CardContent>
-            </Card>
-          )}
           {hasBankingExtension === true && (
             <Card
               role="button"
