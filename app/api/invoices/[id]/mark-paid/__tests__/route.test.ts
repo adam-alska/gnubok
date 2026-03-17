@@ -248,6 +248,57 @@ describe('POST /api/invoices/[id]/mark-paid', () => {
     )
   })
 
+  it('returns 400 when custom lines are unbalanced', async () => {
+    const invoice = makeInvoice({ id: 'inv-1', status: 'sent', total: 12500 })
+
+    // Fetch invoice
+    enqueue({ data: invoice, error: null })
+    // Update invoice status
+    enqueue({ data: null, error: null })
+    // Fetch company settings
+    enqueue({ data: { accounting_method: 'accrual', entity_type: 'enskild_firma' }, error: null })
+
+    const unbalancedLines = [
+      { account_number: '1920', debit_amount: 12500, credit_amount: 0 },
+      { account_number: '1510', debit_amount: 0, credit_amount: 10000 },
+    ]
+
+    const request = createMockRequest('/api/invoices/inv-1/mark-paid', {
+      method: 'POST',
+      body: {
+        payment_date: '2025-03-17',
+        lines: unbalancedLines,
+      },
+    })
+    const response = await POST(request, createMockRouteParams({ id: 'inv-1' }))
+    const { status, body } = await parseJsonResponse<{ error: string }>(response)
+
+    expect(status).toBe(400)
+    expect(body.error).toContain('balanserade')
+    expect(mockCreateJournalEntry).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 when body has invalid schema (e.g. bad account number)', async () => {
+    const invoice = makeInvoice({ id: 'inv-1', status: 'sent', total: 12500 })
+
+    // Fetch invoice
+    enqueue({ data: invoice, error: null })
+
+    const request = createMockRequest('/api/invoices/inv-1/mark-paid', {
+      method: 'POST',
+      body: {
+        payment_date: '2025-03-17',
+        lines: [
+          { account_number: 'XXXX', debit_amount: 12500, credit_amount: 0 },
+        ],
+      },
+    })
+    const response = await POST(request, createMockRouteParams({ id: 'inv-1' }))
+    const { status } = await parseJsonResponse(response)
+
+    expect(status).toBe(400)
+  })
+
   it('falls back to auto-generation when lines are not provided', async () => {
     const customer = makeCustomer()
     const invoice = makeInvoice({

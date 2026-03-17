@@ -58,18 +58,22 @@ export async function POST(
   let exchangeRateDifference: number | undefined
   let bodyPaymentDate: string | undefined
   let customLines: { account_number: string; debit_amount: number; credit_amount: number; line_description?: string }[] | undefined
+  let rawBody: unknown
   try {
     const text = await request.text()
-    if (text) {
-      const parsed = MarkInvoicePaidSchema.safeParse(JSON.parse(text))
-      if (parsed.success) {
-        exchangeRateDifference = parsed.data.exchange_rate_difference
-        bodyPaymentDate = parsed.data.payment_date
-        customLines = parsed.data.lines
-      }
-    }
+    if (text) rawBody = JSON.parse(text)
   } catch {
     // No body or invalid JSON — use defaults
+  }
+
+  if (rawBody) {
+    const parsed = MarkInvoicePaidSchema.safeParse(rawBody)
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Ogiltig förfrågan', details: parsed.error.flatten() }, { status: 400 })
+    }
+    exchangeRateDifference = parsed.data.exchange_rate_difference
+    bodyPaymentDate = parsed.data.payment_date
+    customLines = parsed.data.lines
   }
 
   const now = new Date().toISOString()
@@ -107,6 +111,16 @@ export async function POST(
   if (isRealInvoice) {
     try {
       if (customLines) {
+        // Server-side balance validation — never commit imbalanced entries
+        const totalDebit = customLines.reduce((s, l) => s + l.debit_amount, 0)
+        const totalCredit = customLines.reduce((s, l) => s + l.credit_amount, 0)
+        if (Math.round((totalDebit - totalCredit) * 100) !== 0 || totalDebit <= 0) {
+          return NextResponse.json(
+            { error: 'Verifikationsraderna är inte balanserade (debet ≠ kredit)' },
+            { status: 400 }
+          )
+        }
+
         // User-provided lines from PaymentBookingDialog
         const fiscalPeriodId = await findFiscalPeriod(supabase, user.id, paymentDate)
         if (fiscalPeriodId) {

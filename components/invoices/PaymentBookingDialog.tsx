@@ -61,45 +61,57 @@ export default function PaymentBookingDialog({
     let cancelled = false
 
     async function init() {
-      // Fetch accounts
-      const accountsRes = await fetch('/api/bookkeeping/accounts')
-      const accountsData = await accountsRes.json()
-      const fetchedAccounts: BASAccount[] = accountsData.data || []
+      try {
+        // Fetch accounts
+        const accountsRes = await fetch('/api/bookkeeping/accounts')
+        if (!accountsRes.ok) throw new Error('Kunde inte ladda kontoplanen')
+        const accountsData = await accountsRes.json()
+        const fetchedAccounts: BASAccount[] = accountsData.data || []
 
-      // Fetch company settings
-      const { data: settings } = await supabase
-        .from('company_settings')
-        .select('accounting_method, entity_type')
-        .single()
+        // Fetch company settings
+        const { data: settings, error: settingsError } = await supabase
+          .from('company_settings')
+          .select('accounting_method, entity_type')
+          .single()
 
-      if (cancelled) return
+        if (settingsError) throw new Error('Kunde inte ladda företagsinställningar')
+        if (cancelled) return
 
-      setAccounts(fetchedAccounts)
+        setAccounts(fetchedAccounts)
 
-      const accountingMethod = (settings?.accounting_method || 'accrual') as 'accrual' | 'cash'
-      const entityType = (settings?.entity_type as EntityType) || 'enskild_firma'
+        const accountingMethod = (settings?.accounting_method || 'accrual') as 'accrual' | 'cash'
+        const entityType = (settings?.entity_type as EntityType) || 'enskild_firma'
 
-      const proposed = proposePaymentLines({
-        invoice: {
-          invoice_number: invoice.invoice_number,
-          total: invoice.total,
-          total_sek: invoice.total_sek,
-          subtotal: invoice.subtotal,
-          subtotal_sek: invoice.subtotal_sek,
-          vat_amount: invoice.vat_amount,
-          vat_amount_sek: invoice.vat_amount_sek,
-          currency: invoice.currency,
-          exchange_rate: invoice.exchange_rate,
-          vat_treatment: invoice.vat_treatment,
-          items: invoice.items,
-        },
-        accountingMethod,
-        entityType,
-      })
+        const proposed = proposePaymentLines({
+          invoice: {
+            invoice_number: invoice.invoice_number,
+            total: invoice.total,
+            total_sek: invoice.total_sek,
+            subtotal: invoice.subtotal,
+            subtotal_sek: invoice.subtotal_sek,
+            vat_amount: invoice.vat_amount,
+            vat_amount_sek: invoice.vat_amount_sek,
+            currency: invoice.currency,
+            exchange_rate: invoice.exchange_rate,
+            vat_treatment: invoice.vat_treatment,
+            items: invoice.items,
+          },
+          accountingMethod,
+          entityType,
+        })
 
-      setLines(proposed)
-      setPaymentDate(new Date().toISOString().split('T')[0])
-      setIsInitialized(true)
+        setLines(proposed)
+        setPaymentDate(new Date().toISOString().split('T')[0])
+        setIsInitialized(true)
+      } catch (err) {
+        if (cancelled) return
+        toast({
+          title: 'Kunde inte ladda bokföringsdialog',
+          description: err instanceof Error ? err.message : 'Försök igen.',
+          variant: 'destructive',
+        })
+        onOpenChange(false)
+      }
     }
 
     init()
