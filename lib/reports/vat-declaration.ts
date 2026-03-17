@@ -143,7 +143,7 @@ export async function calculateVatDeclaration(
       `)
       .in('account_number', VAT_ACCOUNTS)
       .eq('journal_entries.user_id', userId)
-      .eq('journal_entries.status', 'posted')
+      .in('journal_entries.status', ['posted', 'reversed'])
       .gte('journal_entries.entry_date', start)
       .lte('journal_entries.entry_date', end)
       .range(from, to)
@@ -193,7 +193,7 @@ export async function calculateVatDeclaration(
     .from('journal_entries')
     .select('source_type')
     .eq('user_id', userId)
-    .eq('status', 'posted')
+    .in('status', ['posted', 'reversed'])
     .gte('entry_date', start)
     .lte('entry_date', end)
 
