@@ -21,30 +21,15 @@ const schema = z.object({
   f_skatt: z.boolean(),
   is_first_fiscal_year: z.boolean(),
   // First year fields (conditional — validated via superRefine below)
-  first_year_start: z.preprocess(
-    (v) => (v === '' ? undefined : v),
-    z.string().optional()
-  ),
-  first_year_end: z.preprocess(
-    (v) => (v === '' ? undefined : v),
-    z.string().optional()
-  ),
+  first_year_start: z.string().optional(),
+  first_year_end: z.string().optional(),
   // Ongoing year field (conditional)
-  fiscal_year_end_month: z.preprocess(
-    (v) => (v === '' || v === undefined ? undefined : v),
-    z.number().min(1).max(12).optional()
-  ),
+  fiscal_year_end_month: z.number().min(1).max(12).optional(),
   // Existing fields
   vat_registered: z.boolean(),
   vat_number: z.string().optional(),
-  moms_period: z.preprocess(
-    (v) => (v === '' ? undefined : v),
-    z.enum(['monthly', 'quarterly', 'yearly']).optional()
-  ),
-  accounting_method: z.preprocess(
-    (v) => (v === '' ? undefined : v),
-    z.enum(['accrual', 'cash'])
-  ),
+  moms_period: z.enum(['monthly', 'quarterly', 'yearly']).optional(),
+  accounting_method: z.enum(['accrual', 'cash']),
 }).superRefine((data, ctx) => {
   if (data.is_first_fiscal_year) {
     if (!data.first_year_start) {
@@ -456,7 +441,7 @@ export default function Step3TaxRegistration({
                           <div className="grid grid-cols-2 gap-2">
                             <Select
                               value={startMonth ? startMonth.toString() : ''}
-                              onValueChange={(v) => handleMonthChange(parseInt(v))}
+                              onValueChange={(v) => { if (v) handleMonthChange(parseInt(v)) }}
                             >
                               <SelectTrigger>
                                 <SelectValue placeholder="Månad" />
@@ -469,7 +454,7 @@ export default function Step3TaxRegistration({
                             </Select>
                             <Select
                               value={startYear ? startYear.toString() : ''}
-                              onValueChange={(v) => handleYearChange(parseInt(v))}
+                              onValueChange={(v) => { if (v) handleYearChange(parseInt(v)) }}
                             >
                               <SelectTrigger>
                                 <SelectValue placeholder="År" />
@@ -498,7 +483,7 @@ export default function Step3TaxRegistration({
                       <Label>Räkenskapsåret slutar (månad)</Label>
                       <Select
                         value={abEndMonth.toString()}
-                        onValueChange={(v) => setAbEndMonth(parseInt(v))}
+                        onValueChange={(v) => { if (v) setAbEndMonth(parseInt(v)) }}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Välj månad" />
@@ -524,7 +509,7 @@ export default function Step3TaxRegistration({
                         render={({ field }) => (
                           <Select
                             value={field.value || ''}
-                            onValueChange={field.onChange}
+                            onValueChange={(v) => { if (v) field.onChange(v) }}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Välj slutdatum" />
@@ -587,7 +572,7 @@ export default function Step3TaxRegistration({
                         render={({ field }) => (
                           <Select
                             value={field.value?.toString() || '12'}
-                            onValueChange={(value) => field.onChange(parseInt(value))}
+                            onValueChange={(v) => { if (v) field.onChange(parseInt(v)) }}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Välj månad" />
@@ -702,7 +687,7 @@ export default function Step3TaxRegistration({
                       render={({ field }) => (
                         <Select
                           value={field.value}
-                          onValueChange={field.onChange}
+                          onValueChange={(v) => { if (v) field.onChange(v) }}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Välj period" />
@@ -738,7 +723,7 @@ export default function Step3TaxRegistration({
                   render={({ field }) => (
                     <Select
                       value={field.value}
-                      onValueChange={field.onChange}
+                      onValueChange={(v) => { if (v) field.onChange(v) }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Välj metod" />
