@@ -1550,6 +1550,18 @@ export interface VatDeclarationRutor {
   ruta11: number  // Utgående moms 12%
   ruta12: number  // Utgående moms 6%
 
+  // Inköp vid omvänd skattskyldighet (reverse charge purchase bases)
+  ruta20: number  // Inköp av varor från annat EU-land (unused, goods via Tullverket)
+  ruta21: number  // Inköp av tjänster från annat EU-land
+  ruta22: number  // Inköp av tjänster från land utanför EU
+  ruta23: number  // Inköp av varor i Sverige (unused, construction reverse charge goods)
+  ruta24: number  // Övriga inköp av tjänster i Sverige (domestic reverse charge)
+
+  // Utgående moms omvänd skattskyldighet (self-assessed output VAT on reverse charge)
+  ruta30: number  // Utgående moms 25% omvänd skattskyldighet
+  ruta31: number  // Utgående moms 12% omvänd skattskyldighet
+  ruta32: number  // Utgående moms 6% omvänd skattskyldighet
+
   // EU och export
   ruta39: number  // Försäljning av tjänster till annat EU-land (reverse charge)
   ruta40: number  // Export utanför EU
@@ -1596,6 +1608,16 @@ export interface VatDeclaration {
     receipts: {
       ruta48: number  // Ingående moms from receipts
     }
+    reverseCharge: {
+      ruta20: number
+      ruta21: number
+      ruta22: number
+      ruta23: number
+      ruta24: number
+      ruta30: number
+      ruta31: number
+      ruta32: number
+    }
   }
 }
 
@@ -1614,6 +1636,14 @@ export const VAT_RUTA_LABELS: Record<keyof VatDeclarationRutor, string> = {
   ruta10: 'Utgående moms 25%',
   ruta11: 'Utgående moms 12%',
   ruta12: 'Utgående moms 6%',
+  ruta20: 'Inköp av varor från annat EU-land',
+  ruta21: 'Inköp av tjänster från annat EU-land',
+  ruta22: 'Inköp av tjänster från land utanför EU',
+  ruta23: 'Inköp av varor i Sverige',
+  ruta24: 'Övriga inköp av tjänster i Sverige',
+  ruta30: 'Utgående moms 25% (omvänd skattskyldighet)',
+  ruta31: 'Utgående moms 12% (omvänd skattskyldighet)',
+  ruta32: 'Utgående moms 6% (omvänd skattskyldighet)',
   ruta39: 'Försäljning av tjänster till EU-land',
   ruta40: 'Export utanför EU',
   ruta48: 'Ingående moms att dra av',

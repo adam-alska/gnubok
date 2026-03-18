@@ -315,7 +315,7 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
         </div>
       </nav>
 
-      {/* Mobile menu drawer */}
+      {/* Mobile menu — bottom sheet */}
       {isMobileMenuOpen && (
         <>
           {/* Backdrop */}
@@ -327,39 +327,41 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
             onClick={closeMobileMenu}
             aria-hidden="true"
           />
-          {/* Drawer */}
+          {/* Bottom sheet */}
           <div
             className={cn(
-              "md:hidden fixed right-0 top-0 bottom-0 w-72 bg-card border-l border-border/40 z-50 overflow-y-auto",
+              "md:hidden fixed inset-x-0 bottom-0 z-50 bg-card rounded-t-2xl border-t border-border/40 overflow-y-auto overscroll-contain",
               isClosing
-                ? "animate-out slide-out-to-right duration-200"
-                : "animate-in slide-in-from-right duration-300"
+                ? "animate-out slide-out-to-bottom duration-200"
+                : "animate-in slide-in-from-bottom duration-300"
             )}
+            style={{ maxHeight: '85dvh', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
             role="dialog"
             aria-label="Navigeringsmeny"
           >
-            <div className="p-4 border-b border-border/40 flex items-center justify-between">
-              <div>
-                <p className="font-medium truncate">{companyName}</p>
-                <p className="text-xs text-muted-foreground">Meny</p>
-              </div>
+            {/* Drag handle */}
+            <div className="flex justify-center pt-3 pb-1 sticky top-0 bg-card rounded-t-2xl">
+              <div className="w-8 h-1 rounded-full bg-muted-foreground/25" />
+            </div>
+
+            {/* Header */}
+            <div className="px-4 pb-2 flex items-center justify-between">
+              <p className="font-medium text-sm truncate">{companyName}</p>
               <Button
                 variant="ghost"
                 size="icon"
+                className="h-8 w-8 -mr-1"
                 onClick={closeMobileMenu}
                 aria-label="Stäng meny"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </Button>
             </div>
 
-            {/* Grouped navigation */}
-            <div className="p-2">
-              {/* Main section */}
-              <div className="mb-4">
-                <p className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Huvudmeny
-                </p>
+            {/* Navigation */}
+            <div className="px-2">
+              {/* Main items */}
+              <div className="space-y-0.5">
                 {mainItems.map((item) => {
                   const Icon = item.icon
                   const active = isActive(item.href)
@@ -369,51 +371,65 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                       href={item.href}
                       onClick={closeMobileMenu}
                       className={cn(
-                        'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
+                        'flex items-center gap-3 px-3 min-h-[44px] rounded-lg transition-colors',
                         active
                           ? 'bg-primary/10 text-primary font-medium'
-                          : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+                          : 'text-foreground active:bg-muted/60'
                       )}
                     >
-                      <Icon className="h-5 w-5" />
-                      {item.label}
+                      <Icon className={cn("h-[18px] w-[18px] flex-shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+                      <span className="text-sm">{item.label}</span>
                     </Link>
                   )
                 })}
               </div>
 
-              {/* Finance section */}
-              <div className="mb-4">
-                <p className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Finans
-                </p>
+              {/* Finans divider */}
+              <div className="flex items-center gap-3 my-1.5 px-3">
+                <span className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-[0.08em]">Finans</span>
+                <div className="flex-1 h-px bg-border/30" />
+              </div>
+
+              {/* Finance items */}
+              <div className="space-y-0.5">
                 {finansItems.map((item) => {
                   const Icon = item.icon
                   const active = isActive(item.href)
+                  const badge = item.href === '/transactions' && uncategorizedTransactionCount > 0
+                    ? uncategorizedTransactionCount
+                    : null
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
                       onClick={closeMobileMenu}
                       className={cn(
-                        'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
+                        'flex items-center gap-3 px-3 min-h-[44px] rounded-lg transition-colors',
                         active
                           ? 'bg-primary/10 text-primary font-medium'
-                          : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+                          : 'text-foreground active:bg-muted/60'
                       )}
                     >
-                      <Icon className="h-5 w-5" />
-                      {item.label}
+                      <Icon className={cn("h-[18px] w-[18px] flex-shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+                      <span className="text-sm flex-1">{item.label}</span>
+                      {badge !== null && (
+                        <span className="min-w-[20px] h-[20px] flex items-center justify-center rounded-full bg-primary/15 text-primary text-[10px] font-semibold px-1.5">
+                          {badge > 99 ? '99+' : badge}
+                        </span>
+                      )}
                     </Link>
                   )
                 })}
               </div>
 
-              {/* Other section */}
-              <div className="mb-4">
-                <p className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Övrigt
-                </p>
+              {/* Övrigt divider */}
+              <div className="flex items-center gap-3 my-1.5 px-3">
+                <span className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-[0.08em]">Övrigt</span>
+                <div className="flex-1 h-px bg-border/30" />
+              </div>
+
+              {/* Other items */}
+              <div className="space-y-0.5">
                 {övrigtItems.map((item) => {
                   const Icon = item.icon
                   const active = isActive(item.href)
@@ -423,33 +439,33 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                       href={item.href}
                       onClick={closeMobileMenu}
                       className={cn(
-                        'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
+                        'flex items-center gap-3 px-3 min-h-[44px] rounded-lg transition-colors',
                         active
                           ? 'bg-primary/10 text-primary font-medium'
-                          : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+                          : 'text-foreground active:bg-muted/60'
                       )}
                     >
-                      <Icon className="h-5 w-5" />
-                      {item.label}
+                      <Icon className={cn("h-[18px] w-[18px] flex-shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+                      <span className="text-sm">{item.label}</span>
                     </Link>
                   )
                 })}
               </div>
+            </div>
 
-              {/* Logout */}
-              <div className="pt-4 border-t border-border/40">
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    closeMobileMenu()
-                    handleLogout()
-                  }}
-                >
-                  <LogOut className="mr-3 h-5 w-5" />
-                  {isSandbox ? 'Avsluta sandbox' : 'Logga ut'}
-                </Button>
-              </div>
+            {/* Logout */}
+            <div className="px-2 py-2 mt-1 border-t border-border/30">
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-muted-foreground active:text-foreground text-sm h-11 px-3"
+                onClick={() => {
+                  closeMobileMenu()
+                  handleLogout()
+                }}
+              >
+                <LogOut className="mr-3 h-[18px] w-[18px]" />
+                {isSandbox ? 'Avsluta sandbox' : 'Logga ut'}
+              </Button>
             </div>
           </div>
         </>

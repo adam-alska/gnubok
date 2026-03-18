@@ -32,6 +32,10 @@ const ACCOUNT_RUTA: Record<string, { box: keyof VatDeclarationRutor; side: 'cred
   '2611': { box: 'ruta10', side: 'credit' },
   '2621': { box: 'ruta11', side: 'credit' },
   '2631': { box: 'ruta12', side: 'credit' },
+  // Reverse charge output VAT → ruta 30/31/32
+  '2614': { box: 'ruta30', side: 'credit' },
+  '2624': { box: 'ruta31', side: 'credit' },
+  '2634': { box: 'ruta32', side: 'credit' },
   // Input VAT → ruta 48
   '2641': { box: 'ruta48', side: 'debit' },
   '2645': { box: 'ruta48', side: 'debit' },
@@ -162,6 +166,8 @@ export async function calculateVatDeclaration(
   const rutor: VatDeclarationRutor = {
     ruta05: 0, ruta06: 0, ruta07: 0,
     ruta10: 0, ruta11: 0, ruta12: 0,
+    ruta20: 0, ruta21: 0, ruta22: 0, ruta23: 0, ruta24: 0,
+    ruta30: 0, ruta31: 0, ruta32: 0,
     ruta39: 0, ruta40: 0,
     ruta48: 0, ruta49: 0,
   }
@@ -175,7 +181,11 @@ export async function calculateVatDeclaration(
     rutor[mapping.box] = round(rutor[mapping.box] + balance)
   }
 
-  rutor.ruta49 = round(rutor.ruta10 + rutor.ruta11 + rutor.ruta12 - rutor.ruta48)
+  rutor.ruta49 = round(
+    rutor.ruta10 + rutor.ruta11 + rutor.ruta12 +
+    rutor.ruta30 + rutor.ruta31 + rutor.ruta32 -
+    rutor.ruta48
+  )
 
   // Compute per-rate base amounts from individual revenue accounts
   const revenueByRate = {
@@ -187,6 +197,14 @@ export async function calculateVatDeclaration(
     const t = totals.get(account)
     if (t) revenueByRate[rate] = round(t.credit - t.debit)
   }
+
+  // Calculate reverse charge purchase bases (ruta 20-24) from supplier invoices
+  const rcBases = await calculateReverseChargeBases(supabase, userId, start, end)
+  rutor.ruta20 = rcBases.ruta20
+  rutor.ruta21 = rcBases.ruta21
+  rutor.ruta22 = rcBases.ruta22
+  rutor.ruta23 = rcBases.ruta23
+  rutor.ruta24 = rcBases.ruta24
 
   // Count journal entries by source type for metadata
   const { data: entryCounts } = await supabase
@@ -228,8 +246,112 @@ export async function calculateVatDeclaration(
       },
       transactions: { ruta48: rutor.ruta48 },
       receipts: { ruta48: 0 },
+      reverseCharge: {
+        ruta20: rutor.ruta20,
+        ruta21: rutor.ruta21,
+        ruta22: rutor.ruta22,
+        ruta23: rutor.ruta23,
+        ruta24: rutor.ruta24,
+        ruta30: rutor.ruta30,
+        ruta31: rutor.ruta31,
+        ruta32: rutor.ruta32,
+      },
     },
   }
+}
+
+/**
+ * Calculate reverse charge purchase bases (ruta 20-24) from supplier invoices.
+ *
+ * Queries journal entries with supplier invoice source types, then looks up
+ * the linked supplier invoices + suppliers to determine supplier_type and
+ * sum item line_total (the net tax base in SEK).
+ *
+ * Classification (all reverse charge is currently services):
+ *   eu_business     → ruta21 (services from EU)
+ *   non_eu_business → ruta22 (services from outside EU)
+ *   swedish_business → ruta24 (domestic reverse charge, e.g. construction)
+ *   ruta20/23 (goods) → 0 for now (Tullverket path not implemented)
+ */
+async function calculateReverseChargeBases(
+  supabase: SupabaseClient,
+  userId: string,
+  start: string,
+  end: string,
+): Promise<{ ruta20: number; ruta21: number; ruta22: number; ruta23: number; ruta24: number }> {
+  const result = { ruta20: 0, ruta21: 0, ruta22: 0, ruta23: 0, ruta24: 0 }
+
+  // Step 1: Find journal entries from supplier invoices in this period
+  const supplierSourceTypes = [
+    'supplier_invoice_registered',
+    'supplier_invoice_cash_payment',
+  ]
+  const entries = await fetchAllRows<{
+    id: string
+    source_id: string
+  }>(({ from, to }) =>
+    supabase
+      .from('journal_entries')
+      .select('id, source_id')
+      .eq('user_id', userId)
+      .in('source_type', supplierSourceTypes)
+      .eq('status', 'posted')
+      .gte('entry_date', start)
+      .lte('entry_date', end)
+      .range(from, to)
+  )
+
+  if (entries.length === 0) return result
+
+  const sourceIds = [...new Set(entries.map(e => e.source_id).filter(Boolean))]
+  if (sourceIds.length === 0) return result
+
+  // Step 2: Fetch supplier invoices that are reverse charge, with supplier type
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const invoices = await fetchAllRows<Record<string, any>>(({ from, to }) =>
+    supabase
+      .from('supplier_invoices')
+      .select('id, supplier_id, reverse_charge, is_credit_note, subtotal_sek, subtotal, currency, exchange_rate, suppliers!inner(supplier_type)')
+      .in('id', sourceIds)
+      .eq('reverse_charge', true)
+      .eq('user_id', userId)
+      .range(from, to)
+  )
+
+  if (invoices.length === 0) return result
+
+  // Step 3: Sum tax bases by supplier type
+  for (const inv of invoices) {
+    // Use subtotal_sek if available, otherwise convert via exchange_rate
+    let baseSek: number
+    if (inv.subtotal_sek != null) {
+      baseSek = Number(inv.subtotal_sek)
+    } else if (inv.currency !== 'SEK' && inv.exchange_rate) {
+      baseSek = Math.round(Number(inv.subtotal) * Number(inv.exchange_rate) * 100) / 100
+    } else {
+      baseSek = Number(inv.subtotal)
+    }
+
+    // Credit notes reduce the base
+    if (inv.is_credit_note) baseSek = -baseSek
+
+    // !inner join: Supabase returns the related row as an object (1-to-1 FK)
+    const supplier = Array.isArray(inv.suppliers) ? inv.suppliers[0] : inv.suppliers
+    const supplierType = supplier?.supplier_type as string
+    switch (supplierType) {
+      case 'eu_business':
+        result.ruta21 = round(result.ruta21 + baseSek)
+        break
+      case 'non_eu_business':
+        result.ruta22 = round(result.ruta22 + baseSek)
+        break
+      case 'swedish_business':
+        result.ruta24 = round(result.ruta24 + baseSek)
+        break
+    }
+  }
+
+  return result
 }
 
 /**
@@ -244,7 +366,10 @@ export function getVatDeclarationSummary(declaration: VatDeclaration): {
   const totalOutputVat = round(
     declaration.rutor.ruta10 +
     declaration.rutor.ruta11 +
-    declaration.rutor.ruta12
+    declaration.rutor.ruta12 +
+    declaration.rutor.ruta30 +
+    declaration.rutor.ruta31 +
+    declaration.rutor.ruta32
   )
 
   const totalInputVat = declaration.rutor.ruta48

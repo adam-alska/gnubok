@@ -104,11 +104,12 @@ export default function Step1EntityType({ initialData, onNext, isSaving }: Step1
         })}
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
         <Button
           onClick={handleNext}
           disabled={!selected || isSaving}
           size="lg"
+          className="w-full sm:w-auto"
         >
           {isSaving ? (
             <>

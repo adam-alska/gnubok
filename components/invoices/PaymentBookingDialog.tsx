@@ -225,12 +225,71 @@ export default function PaymentBookingDialog({
                 type="date"
                 value={paymentDate}
                 onChange={(e) => setPaymentDate(e.target.value)}
-                className="w-48"
+                className="w-full sm:w-48"
               />
             </div>
 
             {/* Journal entry lines */}
-            <div className="space-y-2">
+            {/* Mobile card layout */}
+            <div className="sm:hidden space-y-3">
+              {lines.map((line, index) => (
+                <div key={index} className="rounded-lg border bg-card p-3 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1">
+                      <AccountCombobox
+                        value={line.account_number}
+                        accounts={accounts}
+                        onChange={(val) => updateLine(index, 'account_number', val)}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 min-h-[44px] min-w-[44px] shrink-0 -mr-1 -mt-1"
+                      onClick={() => removeLine(index)}
+                      disabled={lines.length <= 2}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Debet</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0,00"
+                        value={line.debit_amount}
+                        onChange={(e) => updateLine(index, 'debit_amount', e.target.value)}
+                        className="font-mono text-right"
+                        inputMode="decimal"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Kredit</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0,00"
+                        value={line.credit_amount}
+                        onChange={(e) => updateLine(index, 'credit_amount', e.target.value)}
+                        className="font-mono text-right"
+                        inputMode="decimal"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <Button type="button" variant="outline" size="sm" onClick={addLine} className="w-full">
+                <Plus className="mr-1 h-3.5 w-3.5" /> Lägg till rad
+              </Button>
+            </div>
+
+            {/* Desktop table layout */}
+            <div className="hidden sm:block space-y-2">
               {/* Header */}
               <div className="grid grid-cols-[1fr_120px_120px_32px] gap-2 text-xs font-medium text-muted-foreground px-1">
                 <span>Konto</span>
@@ -316,10 +375,10 @@ export default function PaymentBookingDialog({
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting} className="w-full sm:w-auto min-h-11">
             Avbryt
           </Button>
-          <Button onClick={handleSubmit} disabled={!isBalanced || isSubmitting || !isInitialized}>
+          <Button onClick={handleSubmit} disabled={!isBalanced || isSubmitting || !isInitialized} className="w-full sm:w-auto min-h-11">
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Bekräfta &amp; bokför
           </Button>

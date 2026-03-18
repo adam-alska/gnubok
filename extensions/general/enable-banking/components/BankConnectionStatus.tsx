@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'
 import { getDaysUntilExpiry, isConsentExpiringSoon } from '../lib/api-client'
+import Link from 'next/link'
 import {
   CreditCard,
   AlertTriangle,
@@ -12,6 +13,7 @@ import {
   Loader2,
   CheckCircle,
   XCircle,
+  Upload,
 } from 'lucide-react'
 import type { BankConnection } from '@/types'
 
@@ -178,22 +180,38 @@ export function BankConnectionStatus({
 
       {/* Error message */}
       {isConnectionError && errorMessage && (
-        <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-lg">
-          <XCircle className="h-4 w-4 text-destructive flex-shrink-0" />
-          <span className="text-sm text-destructive">
-            {errorMessage}
-          </span>
-        </div>
+        <>
+          <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-lg">
+            <XCircle className="h-4 w-4 text-destructive flex-shrink-0" />
+            <span className="text-sm text-destructive">
+              {errorMessage}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border border-border">
+            <Upload className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <span className="text-sm text-muted-foreground">
+              Du kan också <Link href="/import?mode=bank" className="underline hover:text-foreground">importera transaktioner via bankfil</Link>
+            </span>
+          </div>
+        </>
       )}
 
       {/* Expired consent notice */}
       {isConnectionExpired && (
-        <div className="flex items-center gap-2 p-3 bg-warning/10 rounded-lg">
-          <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />
-          <span className="text-sm">
-            PSD2-samtycket har löpt ut. Förnya anslutningen för att återuppta synkroniseringen.
-          </span>
-        </div>
+        <>
+          <div className="flex items-center gap-2 p-3 bg-warning/10 rounded-lg">
+            <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />
+            <span className="text-sm">
+              PSD2-samtycket har löpt ut. Förnya anslutningen för att återuppta synkroniseringen.
+            </span>
+          </div>
+          <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border border-border">
+            <Upload className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <span className="text-sm text-muted-foreground">
+              Medan du väntar kan du <Link href="/import?mode=bank" className="underline hover:text-foreground">importera transaktioner via bankfil</Link>
+            </span>
+          </div>
+        </>
       )}
 
       {/* Consent expiry warning (for active connections) */}

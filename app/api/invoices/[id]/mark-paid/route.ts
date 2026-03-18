@@ -95,57 +95,57 @@ export async function POST(
 
   if (isRealInvoice) {
     try {
-    if (customLines) {
-      // Server-side balance validation — never commit imbalanced entries
-      const totalDebit = customLines.reduce((s, l) => s + l.debit_amount, 0)
-      const totalCredit = customLines.reduce((s, l) => s + l.credit_amount, 0)
-      if (Math.round((totalDebit - totalCredit) * 100) !== 0 || totalDebit <= 0) {
-        return NextResponse.json(
-          { error: 'Verifikationsraderna är inte balanserade (debet ≠ kredit)' },
-          { status: 400 }
-        )
-      }
+      if (customLines) {
+        // Server-side balance validation — never commit imbalanced entries
+        const totalDebit = customLines.reduce((s, l) => s + l.debit_amount, 0)
+        const totalCredit = customLines.reduce((s, l) => s + l.credit_amount, 0)
+        if (Math.round((totalDebit - totalCredit) * 100) !== 0 || totalDebit <= 0) {
+          return NextResponse.json(
+            { error: 'Verifikationsraderna är inte balanserade (debet ≠ kredit)' },
+            { status: 400 }
+          )
+        }
 
-      // User-provided lines from PaymentBookingDialog
-      const fiscalPeriodId = await findFiscalPeriod(supabase, user.id, paymentDate)
-      if (!fiscalPeriodId) {
-        return NextResponse.json(
-          { error: 'Ingen öppen räkenskapsperiod för betalningsdatumet' },
-          { status: 400 }
+        // User-provided lines from PaymentBookingDialog
+        const fiscalPeriodId = await findFiscalPeriod(supabase, user.id, paymentDate)
+        if (!fiscalPeriodId) {
+          return NextResponse.json(
+            { error: 'Ingen öppen räkenskapsperiod för betalningsdatumet' },
+            { status: 400 }
+          )
+        }
+        const sourceType = accountingMethod === 'accrual' ? 'invoice_paid' : 'invoice_cash_payment'
+        const input: CreateJournalEntryInput = {
+          fiscal_period_id: fiscalPeriodId,
+          entry_date: paymentDate,
+          description: `Betalning faktura ${invoice.invoice_number}`,
+          source_type: sourceType,
+          source_id: invoice.id,
+          lines: customLines,
+        }
+        const journalEntry = await createJournalEntry(supabase, user.id, input)
+        journalEntryId = journalEntry?.id ?? null
+      } else if (accountingMethod === 'accrual') {
+        // Faktureringsmetoden: clear receivable (Debit 1930, Credit 1510)
+        const journalEntry = await createInvoicePaymentJournalEntry(
+          supabase,
+          user.id,
+          invoice as Invoice,
+          paymentDate,
+          exchangeRateDifference
         )
+        journalEntryId = journalEntry?.id ?? null
+      } else {
+        // Kontantmetoden: combined revenue entry (Debit 1930, Credit 30xx, Credit 26xx)
+        const journalEntry = await createInvoiceCashEntry(
+          supabase,
+          user.id,
+          invoice as Invoice,
+          paymentDate,
+          entityType
+        )
+        journalEntryId = journalEntry?.id ?? null
       }
-      const sourceType = accountingMethod === 'accrual' ? 'invoice_paid' : 'invoice_cash_payment'
-      const input: CreateJournalEntryInput = {
-        fiscal_period_id: fiscalPeriodId,
-        entry_date: paymentDate,
-        description: `Betalning faktura ${invoice.invoice_number}`,
-        source_type: sourceType,
-        source_id: invoice.id,
-        lines: customLines,
-      }
-      const journalEntry = await createJournalEntry(supabase, user.id, input)
-      journalEntryId = journalEntry?.id ?? null
-    } else if (accountingMethod === 'accrual') {
-      // Faktureringsmetoden: clear receivable (Debit 1930, Credit 1510)
-      const journalEntry = await createInvoicePaymentJournalEntry(
-        supabase,
-        user.id,
-        invoice as Invoice,
-        paymentDate,
-        exchangeRateDifference
-      )
-      journalEntryId = journalEntry?.id ?? null
-    } else {
-      // Kontantmetoden: combined revenue entry (Debit 1930, Credit 30xx, Credit 26xx)
-      const journalEntry = await createInvoiceCashEntry(
-        supabase,
-        user.id,
-        invoice as Invoice,
-        paymentDate,
-        entityType
-      )
-      journalEntryId = journalEntry?.id ?? null
-    }
     } catch (err) {
       console.error('Failed to create payment journal entry:', err)
       return NextResponse.json(
