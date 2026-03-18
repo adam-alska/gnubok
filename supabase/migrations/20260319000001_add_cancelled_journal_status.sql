@@ -25,12 +25,14 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  -- Posted can only transition to reversed (storno)
-  IF OLD.status = 'posted' AND NEW.status = 'reversed' THEN
-    IF NEW.description != OLD.description OR NEW.entry_date != OLD.entry_date
-       OR NEW.fiscal_period_id != OLD.fiscal_period_id
-       OR NEW.voucher_number != OLD.voucher_number THEN
-      RAISE EXCEPTION 'Cannot modify fields of a posted entry during reversal (id: %)', OLD.id;
+  -- Posted can transition to reversed (storno) or cancelled (orphaned concurrent reversal cleanup)
+  IF OLD.status = 'posted' AND NEW.status IN ('reversed', 'cancelled') THEN
+    IF NEW.status = 'reversed' THEN
+      IF NEW.description != OLD.description OR NEW.entry_date != OLD.entry_date
+         OR NEW.fiscal_period_id != OLD.fiscal_period_id
+         OR NEW.voucher_number != OLD.voucher_number THEN
+        RAISE EXCEPTION 'Cannot modify fields of a posted entry during reversal (id: %)', OLD.id;
+      END IF;
     END IF;
     RETURN NEW;
   END IF;
@@ -47,9 +49,16 @@ BEGIN
   SELECT status INTO v_status FROM public.journal_entries
   WHERE id = COALESCE(OLD.journal_entry_id, NEW.journal_entry_id);
 
-  IF v_status IN ('draft', 'cancelled') THEN
+  -- Draft entries: all operations allowed
+  IF v_status = 'draft' THEN
     IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
     RETURN NEW;
+  END IF;
+
+  -- Cancelled entries: only DELETE for cleanup
+  IF v_status = 'cancelled' THEN
+    IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    RAISE EXCEPTION 'Cannot % lines of a cancelled journal entry.', TG_OP;
   END IF;
 
   RAISE EXCEPTION 'Cannot % lines of a % journal entry.', TG_OP, v_status;

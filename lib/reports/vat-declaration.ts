@@ -285,6 +285,7 @@ async function calculateReverseChargeBases(
   const supplierSourceTypes = [
     'supplier_invoice_registered',
     'supplier_invoice_cash_payment',
+    'supplier_credit_note',
   ]
   const entries = await fetchAllRows<{
     id: string

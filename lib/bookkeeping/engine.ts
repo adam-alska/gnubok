@@ -405,16 +405,9 @@ export async function reverseEntry(
     .select('id')
 
   if (casError || !updatedOriginal || updatedOriginal.length === 0) {
-    // Another concurrent reversal already changed the status — best-effort cleanup.
-    // The reversal entry is already posted, so the immutability trigger will block
-    // deletion. Swallow the error — the atomic reversal RPC (deferred) will
-    // eliminate this path entirely.
-    try {
-      await supabase.from('journal_entry_lines').delete().eq('journal_entry_id', reversalEntry.id)
-      await supabase.from('journal_entries').delete().eq('id', reversalEntry.id)
-    } catch {
-      // Expected: immutability trigger blocks deletion of posted entries.
-    }
+    // Another concurrent reversal already changed the status — mark the orphaned
+    // reversal as cancelled so it's excluded from reports but remains traceable.
+    await supabase.from('journal_entries').update({ status: 'cancelled' }).eq('id', reversalEntry.id)
     throw new Error('Entry was already reversed by a concurrent operation')
   }
 

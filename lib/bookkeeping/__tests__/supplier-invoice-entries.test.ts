@@ -376,11 +376,11 @@ describe('createSupplierInvoiceRegistrationEntry', () => {
     const items = [makeItem()]
 
     await createSupplierInvoiceRegistrationEntry(
-      null as never, 'user-1', invoice, items, 'swedish_business', 'Leverantor AB'
+      null as never, 'user-1', invoice, items, 'swedish_business', 'Leverantör AB'
     )
 
     const input = mockedCreateEntry.mock.calls[0][2]
-    expect(input.description).toBe('Leverantorsfaktura LF-100, Leverantor AB (ankomst 5)')
+    expect(input.description).toBe('Leverantörsfaktura LF-100, Leverantör AB (ankomst 5)')
   })
 
   it('description falls back without supplier name', async () => {
@@ -395,7 +395,7 @@ describe('createSupplierInvoiceRegistrationEntry', () => {
     )
 
     const input = mockedCreateEntry.mock.calls[0][2]
-    expect(input.description).toBe('Leverantorsfaktura LF-100 (ankomst 5)')
+    expect(input.description).toBe('Leverantörsfaktura LF-100 (ankomst 5)')
   })
 
   it('handles non-EU reverse charge (services)', async () => {
@@ -590,11 +590,11 @@ describe('createSupplierInvoicePaymentEntry', () => {
     })
 
     await createSupplierInvoicePaymentEntry(
-      null as never, 'user-1', invoice, 10000, '2024-07-01', undefined, 'Leverantor AB'
+      null as never, 'user-1', invoice, 10000, '2024-07-01', undefined, 'Leverantör AB'
     )
 
     const input = mockedCreateEntry.mock.calls[0][2]
-    expect(input.description).toBe('Utbetalning leverantorsfaktura LF-200, Leverantor AB (ankomst 10)')
+    expect(input.description).toBe('Utbetalning leverantörsfaktura LF-200, Leverantör AB (ankomst 10)')
   })
 
   it('uses paymentDate not invoice_date as entry_date', async () => {
@@ -754,11 +754,11 @@ describe('createSupplierInvoiceCashEntry', () => {
     const items = [makeItem()]
 
     await createSupplierInvoiceCashEntry(
-      null as never, 'user-1', invoice, items, '2024-07-01', 'swedish_business', 'Leverantor AB'
+      null as never, 'user-1', invoice, items, '2024-07-01', 'swedish_business', 'Leverantör AB'
     )
 
     const input = mockedCreateEntry.mock.calls[0][2]
-    expect(input.description).toBe('Kontantbetalning leverantorsfaktura LF-300, Leverantor AB')
+    expect(input.description).toBe('Kontantbetalning leverantörsfaktura LF-300, Leverantör AB')
   })
 
   it('description falls back without supplier name', async () => {
@@ -770,7 +770,7 @@ describe('createSupplierInvoiceCashEntry', () => {
     )
 
     const input = mockedCreateEntry.mock.calls[0][2]
-    expect(input.description).toBe('Kontantbetalning leverantorsfaktura LF-300')
+    expect(input.description).toBe('Kontantbetalning leverantörsfaktura LF-300')
   })
 })
 
@@ -929,11 +929,11 @@ describe('createSupplierCreditNoteEntry', () => {
     const items = [makeItem({ line_total: -8000, account_number: '6200', vat_rate: 0.25 })]
 
     await createSupplierCreditNoteEntry(
-      null as never, 'user-1', creditNote, items, 'swedish_business', 'Leverantor AB'
+      null as never, 'user-1', creditNote, items, 'swedish_business', 'Leverantör AB'
     )
 
     const input = mockedCreateEntry.mock.calls[0][2]
-    expect(input.description).toBe('Kreditfaktura leverantor LF-400, Leverantor AB (ankomst 7)')
+    expect(input.description).toBe('Kreditfaktura leverantör LF-400, Leverantör AB (ankomst 7)')
   })
 
   it('sets source_type to supplier_credit_note', async () => {
