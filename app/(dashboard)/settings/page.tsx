@@ -161,6 +161,7 @@ export default function SettingsPage() {
         variant: 'destructive',
       })
       setBankConnectionError(errorMsg)
+      setActiveTab('banking')
       router.replace('/settings?tab=banking')
     }
   }, [searchParams])

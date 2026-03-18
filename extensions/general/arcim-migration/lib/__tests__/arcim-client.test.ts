@@ -179,12 +179,17 @@ describe('arcim-client', () => {
   describe('backoff', () => {
     it('increases delay on successive retries', async () => {
       const delays: number[] = []
-      // Track delays passed to retry setTimeout (filter out the abort timeout at 120000)
+      const realSetTimeout = globalThis.setTimeout
+      // Only intercept retry delays (1000–10000ms range), pass abort timers through
       vi.spyOn(globalThis, 'setTimeout').mockImplementation((fn, ms) => {
-        if (ms && ms >= 1000 && ms < 120_000) delays.push(ms as number)
-        // Execute immediately to avoid real delays in tests
-        if (typeof fn === 'function') fn()
-        return 0 as unknown as ReturnType<typeof setTimeout>
+        if (ms && ms >= 1000 && ms < 120_000) {
+          delays.push(ms as number)
+          // Execute retry delay callback immediately
+          if (typeof fn === 'function') fn()
+          return 0 as unknown as ReturnType<typeof setTimeout>
+        }
+        // Let abort controller timers run through real setTimeout
+        return realSetTimeout(fn, ms)
       })
 
       const fail = new Response('Service Unavailable', { status: 503 })
@@ -327,25 +332,26 @@ describe('arcim-client', () => {
       const orig = process.env.ARCIM_SYNC_GATEWAY_URL
       delete process.env.ARCIM_SYNC_GATEWAY_URL
 
-      await expect(getConsent('c1')).rejects.toThrow(
-        'ARCIM_SYNC_GATEWAY_URL is not configured'
-      )
-
-      process.env.ARCIM_SYNC_GATEWAY_URL = orig
+      try {
+        await expect(getConsent('c1')).rejects.toThrow(
+          'ARCIM_SYNC_GATEWAY_URL is not configured'
+        )
+      } finally {
+        process.env.ARCIM_SYNC_GATEWAY_URL = orig
+      }
     })
 
     it('throws when ARCIM_SYNC_API_KEY is missing', async () => {
       const orig = process.env.ARCIM_SYNC_API_KEY
       delete process.env.ARCIM_SYNC_API_KEY
 
-      // Need a valid URL for the first check to pass
-      fetchSpy.mockResolvedValueOnce(new Response('{}', { status: 200 }))
-
-      await expect(getConsent('c1')).rejects.toThrow(
-        'ARCIM_SYNC_API_KEY is not configured'
-      )
-
-      process.env.ARCIM_SYNC_API_KEY = orig
+      try {
+        await expect(getConsent('c1')).rejects.toThrow(
+          'ARCIM_SYNC_API_KEY is not configured'
+        )
+      } finally {
+        process.env.ARCIM_SYNC_API_KEY = orig
+      }
     })
   })
 })

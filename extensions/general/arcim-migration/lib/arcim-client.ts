@@ -56,7 +56,6 @@ async function request<T>(
         },
       })
     } catch (err) {
-      clearTimeout(timer)
       const isAbort = err instanceof DOMException || (err instanceof Error && err.name === 'AbortError')
       if (attempt < MAX_RETRIES && isAbort) {
         console.warn(`[arcim] ${path} timed out, retrying (attempt ${attempt + 1})`)
