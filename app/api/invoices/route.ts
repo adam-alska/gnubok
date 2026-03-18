@@ -387,7 +387,8 @@ async function createCreditNote(
         supabase,
         userId,
         completeCreditNote as Invoice,
-        entityType
+        entityType,
+        completeCreditNote.customer?.name
       )
       if (journalEntry) {
         await supabase

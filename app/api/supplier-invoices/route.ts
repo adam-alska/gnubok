@@ -172,7 +172,8 @@ export async function POST(request: Request) {
         user.id,
         invoice as SupplierInvoice,
         items as SupplierInvoiceItem[],
-        supplier.supplier_type
+        supplier.supplier_type,
+        supplier.name
       )
       if (journalEntry) {
         registrationJournalEntryId = journalEntry.id

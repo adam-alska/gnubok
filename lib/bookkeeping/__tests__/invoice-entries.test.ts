@@ -490,6 +490,89 @@ describe('createInvoiceJournalEntry — EUR foreign currency', () => {
   })
 })
 
+describe('BFL-compliant descriptions with counterparty names', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('createInvoiceJournalEntry includes customer name in description', async () => {
+    const invoice = makeInvoice({
+      items: [makeItem()],
+    })
+
+    await createInvoiceJournalEntry(null as never, 'user-1', invoice, 'enskild_firma', 'Foretag AB')
+
+    const input = mockedCreateEntry.mock.calls[0][2]
+    expect(input.description).toBe('Kundfaktura 1001, Foretag AB')
+  })
+
+  it('createInvoiceJournalEntry falls back without customer name', async () => {
+    const invoice = makeInvoice({
+      items: [makeItem()],
+    })
+
+    await createInvoiceJournalEntry(null as never, 'user-1', invoice, 'enskild_firma')
+
+    const input = mockedCreateEntry.mock.calls[0][2]
+    expect(input.description).toBe('Kundfaktura 1001')
+  })
+
+  it('createInvoicePaymentJournalEntry includes customer name', async () => {
+    const invoice = makeInvoice({ total: 1250 })
+
+    await createInvoicePaymentJournalEntry(null as never, 'user-1', invoice, '2024-07-15', undefined, 'Foretag AB')
+
+    const input = mockedCreateEntry.mock.calls[0][2]
+    expect(input.description).toBe('Inbetalning kundfaktura 1001, Foretag AB')
+  })
+
+  it('createInvoicePaymentJournalEntry falls back without customer name', async () => {
+    const invoice = makeInvoice({ total: 1250 })
+
+    await createInvoicePaymentJournalEntry(null as never, 'user-1', invoice, '2024-07-15')
+
+    const input = mockedCreateEntry.mock.calls[0][2]
+    expect(input.description).toBe('Inbetalning kundfaktura 1001')
+  })
+
+  it('createCreditNoteJournalEntry includes customer name', async () => {
+    const creditNote = makeInvoice({
+      invoice_number: 'KR-1001',
+      subtotal: -1000,
+      vat_amount: -250,
+      total: -1250,
+      items: [makeItem({ quantity: -1, line_total: -1000, vat_amount: -250 })],
+    })
+
+    await createCreditNoteJournalEntry(null as never, 'user-1', creditNote, 'enskild_firma', 'Foretag AB')
+
+    const input = mockedCreateEntry.mock.calls[0][2]
+    expect(input.description).toBe('Kreditfaktura KR-1001, Foretag AB')
+  })
+
+  it('createInvoiceCashEntry includes customer name', async () => {
+    const invoice = makeInvoice({
+      items: [makeItem()],
+    })
+
+    await createInvoiceCashEntry(null as never, 'user-1', invoice, '2024-07-01', 'enskild_firma', 'Foretag AB')
+
+    const input = mockedCreateEntry.mock.calls[0][2]
+    expect(input.description).toBe('Kontantbetalning kundfaktura 1001, Foretag AB')
+  })
+
+  it('createInvoiceCashEntry falls back without customer name', async () => {
+    const invoice = makeInvoice({
+      items: [makeItem()],
+    })
+
+    await createInvoiceCashEntry(null as never, 'user-1', invoice, '2024-07-01', 'enskild_firma')
+
+    const input = mockedCreateEntry.mock.calls[0][2]
+    expect(input.description).toBe('Kontantbetalning kundfaktura 1001')
+  })
+})
+
 describe('createInvoicePaymentJournalEntry — exchange rate difference', () => {
   beforeEach(() => {
     vi.clearAllMocks()

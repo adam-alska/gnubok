@@ -14,6 +14,19 @@ import type {
 const log = createLogger('supplier-invoice-entries')
 
 /**
+ * Build a BFL-compliant verifikation description with event type, counterparty, and suffix.
+ * Falls back to prefix + invoiceNumber + suffix if name is not provided (backward compat).
+ */
+function buildSupplierDescription(
+  prefix: string, invoiceNumber: string, supplierName?: string, suffix?: string
+): string {
+  const base = supplierName
+    ? `${prefix} ${invoiceNumber}, ${supplierName}`
+    : `${prefix} ${invoiceNumber}`
+  return suffix ? `${base} ${suffix}` : base
+}
+
+/**
  * Create journal entry when a supplier invoice is registered (accrual method)
  *
  * Swedish domestic (25% VAT):
@@ -35,7 +48,8 @@ export async function createSupplierInvoiceRegistrationEntry(
   userId: string,
   invoice: SupplierInvoice,
   items: SupplierInvoiceItem[],
-  supplierType: string
+  supplierType: string,
+  supplierName?: string
 ): Promise<JournalEntry | null> {
   const fiscalPeriodId = await findFiscalPeriod(supabase, userId, invoice.invoice_date)
   if (!fiscalPeriodId) {
@@ -44,7 +58,7 @@ export async function createSupplierInvoiceRegistrationEntry(
   }
 
   const lines: CreateJournalEntryLineInput[] = []
-  const desc = `Lev.faktura ${invoice.supplier_invoice_number} (ankomst ${invoice.arrival_number})`
+  const desc = buildSupplierDescription('Leverantörsfaktura', invoice.supplier_invoice_number, supplierName, `(ankomst ${invoice.arrival_number})`)
   const isForeign = invoice.currency !== 'SEK'
 
   // Aggregate expense amounts by account number and convert to SEK
@@ -134,7 +148,8 @@ export async function createSupplierInvoicePaymentEntry(
   invoice: SupplierInvoice,
   paymentAmount: number,
   paymentDate: string,
-  exchangeRateDifference?: number
+  exchangeRateDifference?: number,
+  supplierName?: string
 ): Promise<JournalEntry | null> {
   const fiscalPeriodId = await findFiscalPeriod(supabase, userId, paymentDate)
   if (!fiscalPeriodId) {
@@ -142,7 +157,7 @@ export async function createSupplierInvoicePaymentEntry(
     return null
   }
 
-  const desc = `Betalning lev.faktura ${invoice.supplier_invoice_number} (ankomst ${invoice.arrival_number})`
+  const desc = buildSupplierDescription('Utbetalning leverantörsfaktura', invoice.supplier_invoice_number, supplierName, `(ankomst ${invoice.arrival_number})`)
   const lines: CreateJournalEntryLineInput[] = []
 
   if (exchangeRateDifference && exchangeRateDifference !== 0) {
@@ -227,7 +242,8 @@ export async function createSupplierInvoiceCashEntry(
   invoice: SupplierInvoice,
   items: SupplierInvoiceItem[],
   paymentDate: string,
-  supplierType: string
+  supplierType: string,
+  supplierName?: string
 ): Promise<JournalEntry | null> {
   const fiscalPeriodId = await findFiscalPeriod(supabase, userId, paymentDate)
   if (!fiscalPeriodId) {
@@ -235,7 +251,7 @@ export async function createSupplierInvoiceCashEntry(
     return null
   }
 
-  const desc = `Betalning lev.faktura ${invoice.supplier_invoice_number} (kontantmetoden)`
+  const desc = buildSupplierDescription('Kontantbetalning leverantörsfaktura', invoice.supplier_invoice_number, supplierName)
   const lines: CreateJournalEntryLineInput[] = []
 
   // Aggregate expense amounts by account number and convert to SEK
@@ -317,7 +333,8 @@ export async function createSupplierCreditNoteEntry(
   userId: string,
   creditNote: SupplierInvoice,
   items: SupplierInvoiceItem[],
-  supplierType: string
+  supplierType: string,
+  supplierName?: string
 ): Promise<JournalEntry | null> {
   const fiscalPeriodId = await findFiscalPeriod(supabase, userId, creditNote.invoice_date)
   if (!fiscalPeriodId) {
@@ -325,7 +342,7 @@ export async function createSupplierCreditNoteEntry(
     return null
   }
 
-  const desc = `Kreditfaktura lev. ${creditNote.supplier_invoice_number} (ankomst ${creditNote.arrival_number})`
+  const desc = buildSupplierDescription('Kreditfaktura leverantör', creditNote.supplier_invoice_number, supplierName, `(ankomst ${creditNote.arrival_number})`)
   const lines: CreateJournalEntryLineInput[] = []
 
   // Credit: Expense accounts (reverse, in SEK)

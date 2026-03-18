@@ -110,7 +110,8 @@ export async function POST(
         user.id,
         invoice as Invoice,
         transaction.date,
-        entityType
+        entityType,
+        invoice.customer?.name
       )
       journalEntryId = journalEntry?.id ?? null
     } else {
@@ -119,7 +120,9 @@ export async function POST(
         supabase,
         user.id,
         invoice as Invoice,
-        transaction.date
+        transaction.date,
+        undefined,
+        invoice.customer?.name
       )
       journalEntryId = journalEntry?.id ?? null
     }

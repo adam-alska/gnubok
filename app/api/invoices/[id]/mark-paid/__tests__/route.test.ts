@@ -140,7 +140,8 @@ describe('POST /api/invoices/[id]/mark-paid', () => {
       'user-1',
       expect.objectContaining({ id: 'inv-1' }),
       expect.any(String),
-      undefined
+      undefined,
+      expect.anything()
     )
   })
 
@@ -174,7 +175,8 @@ describe('POST /api/invoices/[id]/mark-paid', () => {
       'user-1',
       expect.objectContaining({ id: 'inv-1' }),
       expect.any(String),
-      'enskild_firma'
+      'enskild_firma',
+      expect.anything()
     )
   })
 

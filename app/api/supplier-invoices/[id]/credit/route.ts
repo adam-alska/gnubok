@@ -111,7 +111,8 @@ export async function POST(
         user.id,
         creditNote as SupplierInvoice,
         creditItems as SupplierInvoiceItem[],
-        original.supplier?.supplier_type || 'swedish_business'
+        original.supplier?.supplier_type || 'swedish_business',
+        original.supplier?.name
       )
       if (journalEntry) {
         journalEntryId = journalEntry.id

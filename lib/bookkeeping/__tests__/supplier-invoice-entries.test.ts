@@ -368,6 +368,36 @@ describe('createSupplierInvoiceRegistrationEntry', () => {
     expect(input.description).toContain('42')
   })
 
+  it('description includes supplier name when provided', async () => {
+    const invoice = makeSupplierInvoice({
+      supplier_invoice_number: 'LF-100',
+      arrival_number: 5,
+    })
+    const items = [makeItem()]
+
+    await createSupplierInvoiceRegistrationEntry(
+      null as never, 'user-1', invoice, items, 'swedish_business', 'Leverantör AB'
+    )
+
+    const input = mockedCreateEntry.mock.calls[0][2]
+    expect(input.description).toBe('Leverantörsfaktura LF-100, Leverantör AB (ankomst 5)')
+  })
+
+  it('description falls back without supplier name', async () => {
+    const invoice = makeSupplierInvoice({
+      supplier_invoice_number: 'LF-100',
+      arrival_number: 5,
+    })
+    const items = [makeItem()]
+
+    await createSupplierInvoiceRegistrationEntry(
+      null as never, 'user-1', invoice, items, 'swedish_business'
+    )
+
+    const input = mockedCreateEntry.mock.calls[0][2]
+    expect(input.description).toBe('Leverantörsfaktura LF-100 (ankomst 5)')
+  })
+
   it('handles non-EU reverse charge (services)', async () => {
     const invoice = makeSupplierInvoice({
       subtotal: 5000,
@@ -553,6 +583,20 @@ describe('createSupplierInvoicePaymentEntry', () => {
     expect(input.source_id).toBe('si-pay-1')
   })
 
+  it('description includes supplier name when provided', async () => {
+    const invoice = makeSupplierInvoice({
+      supplier_invoice_number: 'LF-200',
+      arrival_number: 10,
+    })
+
+    await createSupplierInvoicePaymentEntry(
+      null as never, 'user-1', invoice, 10000, '2024-07-01', undefined, 'Leverantör AB'
+    )
+
+    const input = mockedCreateEntry.mock.calls[0][2]
+    expect(input.description).toBe('Utbetalning leverantörsfaktura LF-200, Leverantör AB (ankomst 10)')
+  })
+
   it('uses paymentDate not invoice_date as entry_date', async () => {
     const invoice = makeSupplierInvoice({ invoice_date: '2024-06-01' })
 
@@ -705,8 +749,20 @@ describe('createSupplierInvoiceCashEntry', () => {
     expect(input.source_id).toBe('si-cash-1')
   })
 
-  it('description contains "kontantmetoden"', async () => {
-    const invoice = makeSupplierInvoice()
+  it('description includes supplier name when provided', async () => {
+    const invoice = makeSupplierInvoice({ supplier_invoice_number: 'LF-300' })
+    const items = [makeItem()]
+
+    await createSupplierInvoiceCashEntry(
+      null as never, 'user-1', invoice, items, '2024-07-01', 'swedish_business', 'Leverantör AB'
+    )
+
+    const input = mockedCreateEntry.mock.calls[0][2]
+    expect(input.description).toBe('Kontantbetalning leverantörsfaktura LF-300, Leverantör AB')
+  })
+
+  it('description falls back without supplier name', async () => {
+    const invoice = makeSupplierInvoice({ supplier_invoice_number: 'LF-300' })
     const items = [makeItem()]
 
     await createSupplierInvoiceCashEntry(
@@ -714,7 +770,7 @@ describe('createSupplierInvoiceCashEntry', () => {
     )
 
     const input = mockedCreateEntry.mock.calls[0][2]
-    expect(input.description).toContain('kontantmetoden')
+    expect(input.description).toBe('Kontantbetalning leverantörsfaktura LF-300')
   })
 })
 
@@ -860,6 +916,24 @@ describe('createSupplierCreditNoteEntry', () => {
 
     const input = mockedCreateEntry.mock.calls[0][2]
     expect(input.lines[0].account_number).toBe('2440')
+  })
+
+  it('description includes supplier name when provided', async () => {
+    const creditNote = makeSupplierInvoice({
+      is_credit_note: true,
+      supplier_invoice_number: 'LF-400',
+      arrival_number: 7,
+      total: -10000,
+      vat_amount: -2000,
+    })
+    const items = [makeItem({ line_total: -8000, account_number: '6200', vat_rate: 0.25 })]
+
+    await createSupplierCreditNoteEntry(
+      null as never, 'user-1', creditNote, items, 'swedish_business', 'Leverantör AB'
+    )
+
+    const input = mockedCreateEntry.mock.calls[0][2]
+    expect(input.description).toBe('Kreditfaktura leverantör LF-400, Leverantör AB (ankomst 7)')
   })
 
   it('sets source_type to supplier_credit_note', async () => {

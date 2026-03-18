@@ -118,7 +118,9 @@ export async function POST(
         const input: CreateJournalEntryInput = {
           fiscal_period_id: fiscalPeriodId,
           entry_date: paymentDate,
-          description: `Betalning faktura ${invoice.invoice_number}`,
+          description: invoice.customer?.name
+            ? `Inbetalning kundfaktura ${invoice.invoice_number}, ${invoice.customer.name}`
+            : `Inbetalning kundfaktura ${invoice.invoice_number}`,
           source_type: sourceType,
           source_id: invoice.id,
           lines: customLines,
@@ -132,7 +134,8 @@ export async function POST(
           user.id,
           invoice as Invoice,
           paymentDate,
-          exchangeRateDifference
+          exchangeRateDifference,
+          invoice.customer?.name
         )
         journalEntryId = journalEntry?.id ?? null
       } else {
@@ -142,7 +145,8 @@ export async function POST(
           user.id,
           invoice as Invoice,
           paymentDate,
-          entityType
+          entityType,
+          invoice.customer?.name
         )
         journalEntryId = journalEntry?.id ?? null
       }

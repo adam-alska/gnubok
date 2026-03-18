@@ -17,6 +17,18 @@ import type {
 const log = createLogger('invoice-entries')
 
 /**
+ * Build a BFL-compliant verifikation description with event type and counterparty.
+ * Falls back to prefix + invoiceNumber if name is not provided (backward compat).
+ */
+function buildInvoiceDescription(
+  prefix: string, invoiceNumber: string, counterpartyName?: string
+): string {
+  return counterpartyName
+    ? `${prefix} ${invoiceNumber}, ${counterpartyName}`
+    : `${prefix} ${invoiceNumber}`
+}
+
+/**
  * Group invoice items by VAT rate and generate per-rate revenue + VAT lines.
  * Returns credit lines only (revenue + VAT). The caller adds the debit side.
  */
@@ -142,7 +154,8 @@ export async function createInvoiceJournalEntry(
   supabase: SupabaseClient,
   userId: string,
   invoice: Invoice,
-  entityType: EntityType = 'enskild_firma'
+  entityType: EntityType = 'enskild_firma',
+  customerName?: string
 ): Promise<JournalEntry | null> {
   const fiscalPeriodId = await findFiscalPeriod(supabase, userId, invoice.invoice_date)
   if (!fiscalPeriodId) {
@@ -213,7 +226,7 @@ export async function createInvoiceJournalEntry(
   const input: CreateJournalEntryInput = {
     fiscal_period_id: fiscalPeriodId,
     entry_date: invoice.invoice_date,
-    description: `Faktura ${invoice.invoice_number}`,
+    description: buildInvoiceDescription('Kundfaktura', invoice.invoice_number, customerName),
     source_type: 'invoice_created',
     source_id: invoice.id,
     lines,
@@ -233,7 +246,8 @@ export async function createInvoicePaymentJournalEntry(
   userId: string,
   invoice: Invoice,
   paymentDate: string,
-  exchangeRateDifference?: number
+  exchangeRateDifference?: number,
+  customerName?: string
 ): Promise<JournalEntry | null> {
   const fiscalPeriodId = await findFiscalPeriod(supabase, userId, paymentDate)
   if (!fiscalPeriodId) {
@@ -241,7 +255,7 @@ export async function createInvoicePaymentJournalEntry(
     return null
   }
 
-  const desc = `Betalning faktura ${invoice.invoice_number}`
+  const desc = buildInvoiceDescription('Inbetalning kundfaktura', invoice.invoice_number, customerName)
   const bookedSekAmount = resolveSekAmount(invoice.total, invoice.total_sek, invoice.currency, invoice.exchange_rate)
   const lines: CreateJournalEntryLineInput[] = []
 
@@ -326,7 +340,8 @@ export async function createCreditNoteJournalEntry(
   supabase: SupabaseClient,
   userId: string,
   creditNote: Invoice,
-  entityType: EntityType = 'enskild_firma'
+  entityType: EntityType = 'enskild_firma',
+  customerName?: string
 ): Promise<JournalEntry | null> {
   const fiscalPeriodId = await findFiscalPeriod(supabase, userId, creditNote.invoice_date)
   if (!fiscalPeriodId) {
@@ -391,7 +406,7 @@ export async function createCreditNoteJournalEntry(
   const input: CreateJournalEntryInput = {
     fiscal_period_id: fiscalPeriodId,
     entry_date: creditNote.invoice_date,
-    description: `Kreditfaktura ${creditNote.invoice_number}`,
+    description: buildInvoiceDescription('Kreditfaktura', creditNote.invoice_number, customerName),
     source_type: 'credit_note',
     source_id: creditNote.id,
     lines,
@@ -413,7 +428,8 @@ export async function createInvoiceCashEntry(
   userId: string,
   invoice: Invoice,
   paymentDate: string,
-  entityType: EntityType = 'enskild_firma'
+  entityType: EntityType = 'enskild_firma',
+  customerName?: string
 ): Promise<JournalEntry | null> {
   const fiscalPeriodId = await findFiscalPeriod(supabase, userId, paymentDate)
   if (!fiscalPeriodId) {
@@ -462,7 +478,7 @@ export async function createInvoiceCashEntry(
     account_number: '1930',
     debit_amount: isForeign ? Math.round(totalCredits * 100) / 100 : resolveSekAmount(invoice.total, invoice.total_sek, invoice.currency, invoice.exchange_rate),
     credit_amount: 0,
-    line_description: `Betalning faktura ${invoice.invoice_number}`,
+    line_description: buildInvoiceDescription('Kontantbetalning kundfaktura', invoice.invoice_number, customerName),
   })
 
   lines.push(...creditLines)
@@ -470,7 +486,7 @@ export async function createInvoiceCashEntry(
   const input: CreateJournalEntryInput = {
     fiscal_period_id: fiscalPeriodId,
     entry_date: paymentDate,
-    description: `Betalning faktura ${invoice.invoice_number} (kontantmetoden)`,
+    description: buildInvoiceDescription('Kontantbetalning kundfaktura', invoice.invoice_number, customerName),
     source_type: 'invoice_cash_payment',
     source_id: invoice.id,
     lines,
