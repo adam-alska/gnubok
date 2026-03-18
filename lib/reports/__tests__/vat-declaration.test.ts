@@ -482,7 +482,7 @@ describe('calculateVatDeclaration — reverse charge', () => {
       // rc journal entries — found a posted supplier invoice entry
       {
         data: [
-          { id: 'je-1', source_id: 'si-1', status: 'posted' },
+          { id: 'je-1', source_id: 'si-1' },
         ],
         error: null,
       },
@@ -527,7 +527,7 @@ describe('calculateVatDeclaration — reverse charge', () => {
       },
       {
         data: [
-          { id: 'je-1', source_id: 'si-1', status: 'posted' },
+          { id: 'je-1', source_id: 'si-1' },
         ],
         error: null,
       },
@@ -568,7 +568,7 @@ describe('calculateVatDeclaration — reverse charge', () => {
       },
       {
         data: [
-          { id: 'je-1', source_id: 'si-1', status: 'posted' },
+          { id: 'je-1', source_id: 'si-1' },
         ],
         error: null,
       },
@@ -635,8 +635,8 @@ describe('calculateVatDeclaration — reverse charge', () => {
       },
       {
         data: [
-          { id: 'je-1', source_id: 'si-1', status: 'posted' },
-          { id: 'je-2', source_id: 'si-2', status: 'posted' },
+          { id: 'je-1', source_id: 'si-1' },
+          { id: 'je-2', source_id: 'si-2' },
         ],
         error: null,
       },
@@ -678,7 +678,8 @@ describe('calculateVatDeclaration — reverse charge', () => {
     expect(result.rutor.ruta30).toBe(1000)
   })
 
-  it('skips reversed journal entries for reverse charge bases', async () => {
+  it('only includes posted journal entries for reverse charge bases (reversed filtered at DB level)', async () => {
+    // The query uses .eq('status', 'posted'), so reversed entries never appear
     results = [
       {
         data: [
@@ -689,15 +690,13 @@ describe('calculateVatDeclaration — reverse charge', () => {
       },
       {
         data: [
-          // One posted, one reversed
-          { id: 'je-1', source_id: 'si-1', status: 'posted' },
-          { id: 'je-2', source_id: 'si-2', status: 'reversed' },
+          // Only posted entries returned by DB query
+          { id: 'je-1', source_id: 'si-1' },
         ],
         error: null,
       },
       {
         data: [
-          // Only si-1 is queried (si-2 is filtered out before supplier lookup)
           {
             id: 'si-1',
             supplier_id: 'sup-1',

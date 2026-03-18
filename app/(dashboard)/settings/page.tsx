@@ -63,6 +63,15 @@ export default function SettingsPage() {
   const initialTab = searchParams.get('tab') || 'company'
   const [activeTab, setActiveTab] = useState(initialTab)
 
+  const settingsTabs = [
+    { value: 'company', label: 'Företag', show: true },
+    { value: 'banking', label: 'Bank (PSD2)', show: !settings?.is_sandbox },
+    { value: 'calendar', label: 'Kalender', show: hasCalendarExtension },
+    { value: 'security', label: 'Säkerhet', show: true },
+    { value: 'appearance', label: 'Utseende', show: true },
+    { value: 'account', label: 'Konto', show: true },
+  ].filter(t => t.show)
+
   useEffect(() => {
     setMounted(true)
   }, [])
@@ -302,44 +311,18 @@ export default function SettingsPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="company">Företag</SelectItem>
-              {!settings?.is_sandbox && (
-                <SelectItem value="banking">Bank (PSD2)</SelectItem>
-              )}
-              {hasCalendarExtension && (
-                <SelectItem value="calendar">Kalender</SelectItem>
-              )}
-              <SelectItem value="security">Säkerhet</SelectItem>
-              <SelectItem value="appearance">Utseende</SelectItem>
-              <SelectItem value="account">Konto</SelectItem>
+              {settingsTabs.map(t => (
+                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
 
         {/* Desktop: tab pills */}
         <TabsList className="hidden sm:inline-flex flex-wrap h-auto gap-1">
-          <TabsTrigger value="company">
-            Företag
-          </TabsTrigger>
-          {!settings?.is_sandbox && (
-            <TabsTrigger value="banking">
-              Bank (PSD2)
-            </TabsTrigger>
-          )}
-          {hasCalendarExtension && (
-            <TabsTrigger value="calendar">
-              Kalender
-            </TabsTrigger>
-          )}
-          <TabsTrigger value="security">
-            Säkerhet
-          </TabsTrigger>
-          <TabsTrigger value="appearance">
-            Utseende
-          </TabsTrigger>
-          <TabsTrigger value="account">
-            Konto
-          </TabsTrigger>
+          {settingsTabs.map(t => (
+            <TabsTrigger key={t.value} value={t.value}>{t.label}</TabsTrigger>
+          ))}
         </TabsList>
 
         {/* Company settings */}

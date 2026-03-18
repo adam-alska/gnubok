@@ -289,14 +289,13 @@ async function calculateReverseChargeBases(
   const entries = await fetchAllRows<{
     id: string
     source_id: string
-    status: string
   }>(({ from, to }) =>
     supabase
       .from('journal_entries')
-      .select('id, source_id, status')
+      .select('id, source_id')
       .eq('user_id', userId)
       .in('source_type', supplierSourceTypes)
-      .in('status', ['posted', 'reversed'])
+      .eq('status', 'posted')
       .gte('entry_date', start)
       .lte('entry_date', end)
       .range(from, to)
@@ -304,11 +303,7 @@ async function calculateReverseChargeBases(
 
   if (entries.length === 0) return result
 
-  // Only include posted entries (reversed means it was cancelled — skip)
-  const postedEntries = entries.filter(e => e.status === 'posted')
-  if (postedEntries.length === 0) return result
-
-  const sourceIds = [...new Set(postedEntries.map(e => e.source_id).filter(Boolean))]
+  const sourceIds = [...new Set(entries.map(e => e.source_id).filter(Boolean))]
   if (sourceIds.length === 0) return result
 
   // Step 2: Fetch supplier invoices that are reverse charge, with supplier type
