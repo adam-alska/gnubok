@@ -14,14 +14,14 @@ import type { CompanySettings, EntityType, MomsPeriod } from '@/types'
 import Step1EntityType from '@/components/onboarding/Step1EntityType'
 import Step2CompanyDetails from '@/components/onboarding/Step2CompanyDetails'
 import Step3TaxRegistration from '@/components/onboarding/Step3TaxRegistration'
-import Step4PreliminaryTax from '@/components/onboarding/Step4PreliminaryTax'
+import Step4VatAccounting from '@/components/onboarding/Step4VatAccounting'
 import Step5ConnectBank from '@/components/onboarding/Step6ConnectBank'
 
 const STEP_INFO = [
   { title: 'Välkommen', subtitle: 'Välj din företagsform för att komma igång.', label: 'Företagsform' },
   { title: 'Ditt företag', subtitle: 'Uppgifterna visas på fakturor och dokument.', label: 'Uppgifter' },
-  { title: 'Skatt & bokföring', subtitle: 'F-skatt, räkenskapsår och momsregistrering.', label: 'Skatt' },
-  { title: 'Preliminärskatt', subtitle: 'Frivilligt — hjälper dig hålla koll på skatten.', label: 'F-skatt' },
+  { title: 'F-skatt & räkenskapsår', subtitle: 'Ange din skatteregistrering och räkenskapsår.', label: 'Skatt' },
+  { title: 'Moms & bokföring', subtitle: 'Momsregistrering och bokföringsmetod.', label: 'Moms' },
   { title: 'Bankuppgifter', subtitle: 'Dessa visas på dina fakturor.', label: 'Bank' },
 ]
 
@@ -471,13 +471,8 @@ function OnboardingPageContent() {
           initialData={{
             f_skatt: settings.f_skatt ?? undefined,
             fiscal_year_start_month: settings.fiscal_year_start_month ?? undefined,
-            vat_registered: settings.vat_registered ?? undefined,
-            vat_number: settings.vat_number ?? undefined,
-            moms_period: settings.moms_period as MomsPeriod | undefined,
-            accounting_method: (settings.accounting_method as 'accrual' | 'cash') ?? undefined,
           }}
           entityType={settings.entity_type as EntityType}
-          orgNumber={settings.org_number ?? undefined}
           onNext={(data) => handleNext(data)}
           onBack={handleBack}
           isSaving={isSaving}
@@ -485,13 +480,17 @@ function OnboardingPageContent() {
       )}
 
       {currentStep === 4 && (
-        <Step4PreliminaryTax
+        <Step4VatAccounting
           initialData={{
-            preliminary_tax_monthly: settings.preliminary_tax_monthly ?? undefined,
+            vat_registered: settings.vat_registered ?? undefined,
+            vat_number: settings.vat_number ?? undefined,
+            moms_period: (settings.moms_period as MomsPeriod | null) ?? undefined,
+            accounting_method: (settings.accounting_method as 'accrual' | 'cash') ?? undefined,
           }}
+          entityType={settings.entity_type as EntityType}
+          orgNumber={settings.org_number ?? undefined}
           onNext={(data) => handleNext(data)}
           onBack={handleBack}
-          onSkip={handleSkip}
           isSaving={isSaving}
         />
       )}
