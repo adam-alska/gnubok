@@ -29,42 +29,63 @@ function getApiKey(): string {
   return key
 }
 
+const MAX_RETRIES = 2
+const RETRY_DELAY_MS = 1_000
+const RETRYABLE_STATUSES = [429, 502, 503, 504]
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
   timeoutMs: number = 120_000
 ): Promise<T> {
   const url = `${getBaseUrl()}${path}`
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
 
-  let response: Response
-  try {
-    response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-      headers: {
-        'Authorization': `Bearer ${getApiKey()}`,
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    })
-  } catch (err) {
-    clearTimeout(timer)
-    if (err instanceof DOMException || (err instanceof Error && err.name === 'AbortError')) {
-      throw new Error(`Arcim API timeout after ${Math.round(timeoutMs / 1000)}s: ${path}`)
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+    let response: Response
+    try {
+      response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          'Authorization': `Bearer ${getApiKey()}`,
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      })
+    } catch (err) {
+      clearTimeout(timer)
+      const isAbort = err instanceof DOMException || (err instanceof Error && err.name === 'AbortError')
+      if (attempt < MAX_RETRIES && isAbort) {
+        console.warn(`[arcim] ${path} timed out, retrying (attempt ${attempt + 1})`)
+        await new Promise(r => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)))
+        continue
+      }
+      if (isAbort) {
+        throw new Error(`Arcim API timeout after ${Math.round(timeoutMs / 1000)}s: ${path}`)
+      }
+      throw err
+    } finally {
+      clearTimeout(timer)
     }
-    throw err
-  } finally {
-    clearTimeout(timer)
+
+    if (attempt < MAX_RETRIES && RETRYABLE_STATUSES.includes(response.status)) {
+      console.warn(`[arcim] ${path} returned ${response.status}, retrying (attempt ${attempt + 1})`)
+      await new Promise(r => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)))
+      continue
+    }
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '')
+      throw new Error(`Arcim API ${response.status}: ${body || response.statusText}`)
+    }
+
+    return response.json()
   }
 
-  if (!response.ok) {
-    const body = await response.text().catch(() => '')
-    throw new Error(`Arcim API ${response.status}: ${body || response.statusText}`)
-  }
-
-  return response.json()
+  throw new Error(`Arcim API failed after ${MAX_RETRIES + 1} attempts: ${path}`)
 }
 
 // ── Consent lifecycle ───────────────────────────────────────────────

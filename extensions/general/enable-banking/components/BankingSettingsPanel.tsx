@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
 import { DestructiveConfirmDialog, useDestructiveConfirm } from '@/components/ui/destructive-confirm-dialog'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Upload } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { BankSelector, type Bank } from './BankSelector'
 import { BankConnectionStatus } from './BankConnectionStatus'
@@ -25,6 +27,7 @@ export default function BankingSettingsPanel() {
   const [isConnecting, setIsConnecting] = useState(false)
   const [connectingBankName, setConnectingBankName] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [showCsvFallback, setShowCsvFallback] = useState(false)
 
   useEffect(() => {
     fetchConnections()
@@ -71,6 +74,7 @@ export default function BankingSettingsPanel() {
       })
       setIsConnecting(false)
       setConnectingBankName(null)
+      setShowCsvFallback(true)
     }
   }
 
@@ -95,6 +99,7 @@ export default function BankingSettingsPanel() {
         description: `${data.imported} nya transaktioner importerade`,
       })
 
+      setShowCsvFallback(false)
       fetchConnections()
     } catch (error) {
       toast({
@@ -102,6 +107,7 @@ export default function BankingSettingsPanel() {
         description: error instanceof Error ? error.message : 'Synkronisering misslyckades',
         variant: 'destructive',
       })
+      setShowCsvFallback(true)
     }
 
     setSyncingConnectionId(null)
@@ -156,6 +162,19 @@ export default function BankingSettingsPanel() {
   return (
     <div className="space-y-6">
       <DestructiveConfirmDialog {...dialogProps} />
+
+      {/* Persistent CSV fallback after connection/sync failure */}
+      {showCsvFallback && (
+        <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/50 p-4">
+          <Upload className="h-5 w-5 shrink-0 text-muted-foreground" />
+          <p className="flex-1 text-sm text-muted-foreground">
+            Har du problem med bankanslutningen? Du kan importera transaktioner manuellt via bankfil.
+          </p>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/import?mode=bank">Importera bankfil</Link>
+          </Button>
+        </div>
+      )}
 
       {/* Action required — expired/error connections */}
       {actionRequiredConnections.length > 0 && (

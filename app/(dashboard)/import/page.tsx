@@ -761,10 +761,16 @@ export default function ImportPage() {
     })
   }, [])
 
-  // Auto-detect OAuth callback from migration extension
+  // Auto-detect OAuth callback or deep-link mode from query params
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('migration')) {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('migration')) {
       setMode('migration')
+    } else {
+      const modeParam = params.get('mode')
+      if (modeParam && ['psd2', 'bank', 'sie', 'migration'].includes(modeParam)) {
+        setMode(modeParam as ImportMode)
+      }
     }
   }, [])
   // If extension isn't compiled in, we know synchronously it's unavailable
