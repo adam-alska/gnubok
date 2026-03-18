@@ -92,6 +92,35 @@ export const enableBankingExtension: Extension = {
 
           const psuType = companySettings?.entity_type === 'aktiebolag' ? 'business' : 'personal'
 
+          log.info('[enable-banking] Starting bank connection', {
+            user_id: user.id,
+            bank: aspsp_name,
+            country: aspsp_country,
+            entity_type: companySettings?.entity_type,
+            psu_type: psuType,
+          })
+
+          // Clean up any stale pending connections for this user+bank
+          // to avoid conflicts with the new authorization
+          const { data: staleConnections } = await supabase
+            .from('bank_connections')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('bank_name', aspsp_name)
+            .eq('status', 'pending')
+
+          if (staleConnections && staleConnections.length > 0) {
+            log.info('[enable-banking] Cleaning up stale pending connections', {
+              count: staleConnections.length,
+            })
+            await supabase
+              .from('bank_connections')
+              .update({ status: 'error', error_message: 'Superseded by new connection attempt', oauth_state: null })
+              .eq('user_id', user.id)
+              .eq('bank_name', aspsp_name)
+              .eq('status', 'pending')
+          }
+
           const redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/extensions/enable-banking/callback`
 
           // Generate cryptographic state token for CSRF protection
