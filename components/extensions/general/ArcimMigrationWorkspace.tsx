@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { cn } from '@/lib/utils'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import Link from 'next/link'
+import { FallbackPrompt } from '@/components/ui/fallback-prompt'
 import {
   ArrowLeft,
   ArrowRight,
@@ -259,18 +260,25 @@ function ConnectStep({
           )}
 
           {error && (
-            <div className="flex gap-3 rounded-lg border border-destructive/20 bg-destructive/10 p-4">
-              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
-              <div>
-                <p className="font-medium text-destructive">Anslutning misslyckades</p>
-                <p className="text-sm text-muted-foreground">{error}</p>
-                {provider === 'fortnox' && (
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Obs: Fortnox kräver ett aktivt integrationstillägg (tillkostnadsbelagd tilläggstjänst) för att kunna använda integrationer. Kontrollera att detta är aktiverat i ditt Fortnox-konto.
-                  </p>
-                )}
+            <>
+              <div className="flex gap-3 rounded-lg border border-destructive/20 bg-destructive/10 p-4">
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+                <div>
+                  <p className="font-medium text-destructive">Anslutning misslyckades</p>
+                  <p className="text-sm text-muted-foreground">{error}</p>
+                  {provider === 'fortnox' && (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Obs: Fortnox kräver ett aktivt integrationstillägg (tillkostnadsbelagd tilläggstjänst) för att kunna använda integrationer. Kontrollera att detta är aktiverat i ditt Fortnox-konto.
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
+              <FallbackPrompt
+                message="Du kan också importera din bokföringsdata manuellt via en SIE-fil."
+                linkHref="/import?mode=sie"
+                linkLabel="Ladda upp SIE-fil"
+              />
+            </>
           )}
 
           {/* OAuth flow */}
@@ -381,10 +389,17 @@ function PreviewStep({
           )}
 
           {error && (
-            <div className="flex gap-3 rounded-lg border border-destructive/20 bg-destructive/10 p-4">
-              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
-              <p className="text-sm text-muted-foreground">{error}</p>
-            </div>
+            <>
+              <div className="flex gap-3 rounded-lg border border-destructive/20 bg-destructive/10 p-4">
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+                <p className="text-sm text-muted-foreground">{error}</p>
+              </div>
+              <FallbackPrompt
+                message="Du kan också importera din bokföringsdata manuellt via en SIE-fil."
+                linkHref="/import?mode=sie"
+                linkLabel="Ladda upp SIE-fil"
+              />
+            </>
           )}
 
           {/* SIE stats summary */}
@@ -411,7 +426,7 @@ function PreviewStep({
               <div>
                 <p className="text-sm font-medium text-warning-foreground">SIE-hämtning inte tillgänglig</p>
                 <p className="text-xs text-muted-foreground">
-                  SIE-hämtning är inte tillgänglig för denna leverantör ännu. Du kan importera SIE-filen manuellt via SIE-importen.
+                  SIE-hämtning är inte tillgänglig för denna leverantör ännu. Du kan importera SIE-filen manuellt via <Link href="/import?mode=sie" className="underline hover:text-foreground">SIE-importen</Link>.
                 </p>
               </div>
             </div>
@@ -486,6 +501,11 @@ function MappingStep({
             </div>
           </CardContent>
         </Card>
+        <FallbackPrompt
+          message="Om problemet kvarstår kan du importera din SIE-fil manuellt istället."
+          linkHref="/import?mode=sie"
+          linkLabel="Ladda upp SIE-fil"
+        />
         <Button variant="outline" className="min-h-11" onClick={onBack}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Tillbaka
@@ -948,6 +968,11 @@ function ResultStep({
             </div>
           </CardContent>
         </Card>
+        <FallbackPrompt
+          message="Du kan istället importera din bokföringsdata manuellt via en SIE-fil."
+          linkHref="/import?mode=sie"
+          linkLabel="Ladda upp SIE-fil"
+        />
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
           <Button variant="outline" className="min-h-11" onClick={onDone}>Klar</Button>
           <Button className="min-h-11" onClick={onRetry}>

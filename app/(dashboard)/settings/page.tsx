@@ -54,6 +54,7 @@ export default function SettingsPage() {
     bankingCompiledIn ? null : false
   )
   const [hasCalendarExtension, setHasCalendarExtension] = useState(false)
+  const [bankConnectionError, setBankConnectionError] = useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
@@ -153,12 +154,15 @@ export default function SettingsPage() {
     }
 
     if (bankError) {
+      const errorMsg = decodeURIComponent(bankError)
       toast({
         title: 'Anslutning misslyckades',
-        description: decodeURIComponent(bankError),
+        description: errorMsg,
         variant: 'destructive',
       })
-      router.replace('/settings')
+      setBankConnectionError(errorMsg)
+      setActiveTab('banking')
+      router.replace('/settings?tab=banking')
     }
   }, [searchParams])
 
@@ -548,6 +552,24 @@ export default function SettingsPage() {
         {/* Banking settings — loaded dynamically from extension, hidden for sandbox */}
         {!settings?.is_sandbox && (
           <TabsContent value="banking" className="space-y-6">
+            {bankConnectionError && (
+              <div className="flex items-start gap-3 rounded-lg border border-destructive/20 bg-destructive/10 p-4">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-destructive">{bankConnectionError}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Du kan också <Link href="/import?mode=bank" className="underline hover:text-foreground">importera transaktioner via bankfil</Link> istället.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setBankConnectionError(null)}
+                  className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-foreground"
+                  aria-label="Stäng"
+                >
+                  <span className="text-lg leading-none">&times;</span>
+                </button>
+              </div>
+            )}
             {hasBankingExtension === null ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
