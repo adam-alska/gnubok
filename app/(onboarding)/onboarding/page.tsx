@@ -14,14 +14,12 @@ import type { CompanySettings, EntityType, MomsPeriod } from '@/types'
 import Step1EntityType from '@/components/onboarding/Step1EntityType'
 import Step2CompanyDetails from '@/components/onboarding/Step2CompanyDetails'
 import Step3TaxRegistration from '@/components/onboarding/Step3TaxRegistration'
-import Step4PreliminaryTax from '@/components/onboarding/Step4PreliminaryTax'
 import Step5ConnectBank from '@/components/onboarding/Step6ConnectBank'
 
 const STEP_INFO = [
   { title: 'Välkommen', subtitle: 'Välj din företagsform för att komma igång.', label: 'Företagsform' },
   { title: 'Ditt företag', subtitle: 'Uppgifterna visas på fakturor och dokument.', label: 'Uppgifter' },
   { title: 'Skatt & bokföring', subtitle: 'F-skatt, räkenskapsår och momsregistrering.', label: 'Skatt' },
-  { title: 'Preliminärskatt', subtitle: 'Frivilligt — hjälper dig hålla koll på skatten.', label: 'F-skatt' },
   { title: 'Bankuppgifter', subtitle: 'Dessa visas på dina fakturor.', label: 'Bank' },
 ]
 
@@ -75,7 +73,7 @@ function OnboardingPageContent() {
   const [currentStep, setCurrentStep] = useState(1)
   const [settings, setSettings] = useState<Partial<CompanySettings>>({})
 
-  const totalSteps = 5
+  const totalSteps = 4
 
   // Detect stuck state: onboarding marked complete but still on this page
   useEffect(() => {
@@ -485,18 +483,6 @@ function OnboardingPageContent() {
       )}
 
       {currentStep === 4 && (
-        <Step4PreliminaryTax
-          initialData={{
-            preliminary_tax_monthly: settings.preliminary_tax_monthly ?? undefined,
-          }}
-          onNext={(data) => handleNext(data)}
-          onBack={handleBack}
-          onSkip={handleSkip}
-          isSaving={isSaving}
-        />
-      )}
-
-      {currentStep === 5 && (
         <Step5ConnectBank
           initialData={{
             bank_name: settings.bank_name ?? undefined,
