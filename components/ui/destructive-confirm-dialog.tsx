@@ -78,6 +78,7 @@ export function DestructiveConfirmDialog({
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={isLoading}
+            className="min-h-11 w-full sm:w-auto"
           >
             {cancelLabel}
           </Button>
@@ -85,11 +86,10 @@ export function DestructiveConfirmDialog({
             variant={variant === 'destructive' ? 'destructive' : 'default'}
             onClick={handleConfirm}
             disabled={isLoading}
-            className={
-              variant === 'warning'
-                ? 'bg-warning hover:bg-warning/90 text-warning-foreground'
-                : undefined
-            }
+            className={cn(
+              'min-h-11 w-full sm:w-auto',
+              variant === 'warning' && 'bg-warning hover:bg-warning/90 text-warning-foreground'
+            )}
           >
             {isLoading ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

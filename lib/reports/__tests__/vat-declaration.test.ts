@@ -92,20 +92,18 @@ describe('formatPeriodLabel', () => {
 })
 
 describe('getVatDeclarationSummary', () => {
+  const emptyRc = { ruta20: 0, ruta21: 0, ruta22: 0, ruta23: 0, ruta24: 0, ruta30: 0, ruta31: 0, ruta32: 0 }
+
   it('calculates totals and detects payment', () => {
     const declaration: VatDeclaration = {
       period: { type: 'monthly', year: 2024, period: 1, start: '2024-01-01', end: '2024-01-31' },
       rutor: {
-        ruta05: 10000,   // domestic taxable sales
-        ruta06: 0,
-        ruta07: 0,
-        ruta10: 2500,    // output VAT 25%
-        ruta11: 0,
-        ruta12: 0,
-        ruta39: 0,
-        ruta40: 0,
-        ruta48: 1000,
-        ruta49: 1500,    // 2500 - 1000
+        ruta05: 10000, ruta06: 0, ruta07: 0,
+        ruta10: 2500, ruta11: 0, ruta12: 0,
+        ruta20: 0, ruta21: 0, ruta22: 0, ruta23: 0, ruta24: 0,
+        ruta30: 0, ruta31: 0, ruta32: 0,
+        ruta39: 0, ruta40: 0,
+        ruta48: 1000, ruta49: 1500,
       },
       invoiceCount: 5,
       transactionCount: 10,
@@ -113,6 +111,7 @@ describe('getVatDeclarationSummary', () => {
         invoices: { ruta05: 10000, ruta06: 0, ruta07: 0, ruta10: 2500, ruta11: 0, ruta12: 0, ruta39: 0, ruta40: 0, base25: 10000, base12: 0, base6: 0 },
         transactions: { ruta48: 1000 },
         receipts: { ruta48: 0 },
+        reverseCharge: emptyRc,
       },
     }
 
@@ -127,16 +126,12 @@ describe('getVatDeclarationSummary', () => {
     const declaration: VatDeclaration = {
       period: { type: 'monthly', year: 2024, period: 1, start: '2024-01-01', end: '2024-01-31' },
       rutor: {
-        ruta05: 2000,    // domestic taxable sales
-        ruta06: 0,
-        ruta07: 0,
-        ruta10: 500,     // output VAT 25%
-        ruta11: 0,
-        ruta12: 0,
-        ruta39: 0,
-        ruta40: 0,
-        ruta48: 3000,
-        ruta49: -2500,   // 500 - 3000
+        ruta05: 2000, ruta06: 0, ruta07: 0,
+        ruta10: 500, ruta11: 0, ruta12: 0,
+        ruta20: 0, ruta21: 0, ruta22: 0, ruta23: 0, ruta24: 0,
+        ruta30: 0, ruta31: 0, ruta32: 0,
+        ruta39: 0, ruta40: 0,
+        ruta48: 3000, ruta49: -2500,
       },
       invoiceCount: 1,
       transactionCount: 20,
@@ -144,12 +139,39 @@ describe('getVatDeclarationSummary', () => {
         invoices: { ruta05: 2000, ruta06: 0, ruta07: 0, ruta10: 500, ruta11: 0, ruta12: 0, ruta39: 0, ruta40: 0, base25: 2000, base12: 0, base6: 0 },
         transactions: { ruta48: 3000 },
         receipts: { ruta48: 0 },
+        reverseCharge: emptyRc,
       },
     }
 
     const summary = getVatDeclarationSummary(declaration)
     expect(summary.isRefund).toBe(true)
     expect(summary.vatToPay).toBe(-2500)
+  })
+
+  it('includes ruta30-32 in totalOutputVat', () => {
+    const declaration: VatDeclaration = {
+      period: { type: 'monthly', year: 2024, period: 1, start: '2024-01-01', end: '2024-01-31' },
+      rutor: {
+        ruta05: 10000, ruta06: 0, ruta07: 0,
+        ruta10: 2500, ruta11: 0, ruta12: 0,
+        ruta20: 0, ruta21: 5000, ruta22: 0, ruta23: 0, ruta24: 0,
+        ruta30: 1250, ruta31: 0, ruta32: 0,
+        ruta39: 0, ruta40: 0,
+        ruta48: 2250, ruta49: 1500,
+      },
+      invoiceCount: 2,
+      transactionCount: 0,
+      breakdown: {
+        invoices: { ruta05: 10000, ruta06: 0, ruta07: 0, ruta10: 2500, ruta11: 0, ruta12: 0, ruta39: 0, ruta40: 0, base25: 10000, base12: 0, base6: 0 },
+        transactions: { ruta48: 0 },
+        receipts: { ruta48: 0 },
+        reverseCharge: { ruta20: 0, ruta21: 5000, ruta22: 0, ruta23: 0, ruta24: 0, ruta30: 1250, ruta31: 0, ruta32: 0 },
+      },
+    }
+
+    const summary = getVatDeclarationSummary(declaration)
+    // totalOutputVat = ruta10 + ruta30 = 2500 + 1250 = 3750
+    expect(summary.totalOutputVat).toBe(3750)
   })
 })
 
@@ -158,14 +180,17 @@ describe('getVatDeclarationSummary', () => {
 //
 // Mock queue order per call:
 //   [0] fetchAllRows: journal_entry_lines (VAT-relevant accounts)
-//   [1] entry counts: journal_entries source_type
+//   [1] fetchAllRows: journal_entries for reverse charge bases
+//   [2] (if rc entries found) fetchAllRows: supplier_invoices
+//   [N] entry counts: journal_entries source_type
 // ============================================================
 
 describe('calculateVatDeclaration', () => {
   it('returns all zeros when no ledger lines exist', async () => {
     results = [
-      { data: [], error: null },
-      { data: [], error: null },
+      { data: [], error: null },  // journal_entry_lines
+      { data: [], error: null },  // rc journal entries
+      { data: [], error: null },  // entry counts
     ]
 
     const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
@@ -174,6 +199,9 @@ describe('calculateVatDeclaration', () => {
     expect(result.rutor.ruta10).toBe(0)
     expect(result.rutor.ruta11).toBe(0)
     expect(result.rutor.ruta12).toBe(0)
+    expect(result.rutor.ruta30).toBe(0)
+    expect(result.rutor.ruta31).toBe(0)
+    expect(result.rutor.ruta32).toBe(0)
     expect(result.rutor.ruta48).toBe(0)
     expect(result.rutor.ruta49).toBe(0)
     expect(result.invoiceCount).toBe(0)
@@ -193,6 +221,7 @@ describe('calculateVatDeclaration', () => {
         ],
         error: null,
       },
+      { data: [], error: null },  // rc journal entries
       { data: [{ source_type: 'invoice_created' }, { source_type: 'invoice_created' }], error: null },
     ]
 
@@ -220,6 +249,7 @@ describe('calculateVatDeclaration', () => {
         ],
         error: null,
       },
+      { data: [], error: null },  // rc journal entries
       { data: [{ source_type: 'bank_transaction' }, { source_type: 'bank_transaction' }], error: null },
     ]
 
@@ -238,6 +268,7 @@ describe('calculateVatDeclaration', () => {
         ],
         error: null,
       },
+      { data: [], error: null },  // rc journal entries
       { data: [], error: null },
     ]
 
@@ -256,6 +287,7 @@ describe('calculateVatDeclaration', () => {
         ],
         error: null,
       },
+      { data: [], error: null },  // rc journal entries
       { data: [], error: null },
     ]
 
@@ -278,6 +310,7 @@ describe('calculateVatDeclaration', () => {
         ],
         error: null,
       },
+      { data: [], error: null },  // rc journal entries
       { data: [{ source_type: 'invoice_created' }, { source_type: 'credit_note' }], error: null },
     ]
 
@@ -299,6 +332,7 @@ describe('calculateVatDeclaration', () => {
         ],
         error: null,
       },
+      { data: [], error: null },  // rc journal entries
       { data: [], error: null },
     ]
 
@@ -319,6 +353,7 @@ describe('calculateVatDeclaration', () => {
         ],
         error: null,
       },
+      { data: [], error: null },  // rc journal entries
       { data: [], error: null },
     ]
 
@@ -330,6 +365,7 @@ describe('calculateVatDeclaration', () => {
   it('accepts accountingMethod parameter for backward compatibility', async () => {
     results = [
       { data: [], error: null },
+      { data: [], error: null },  // rc journal entries
       { data: [], error: null },
     ]
 
@@ -356,6 +392,7 @@ describe('calculateVatDeclaration', () => {
         ],
         error: null,
       },
+      { data: [], error: null },  // rc journal entries
       { data: [], error: null },
     ]
 
@@ -370,5 +407,317 @@ describe('calculateVatDeclaration', () => {
     expect(result.rutor.ruta48).toBe(1000)
     // Output: 2500 + 600 + 180 = 3280, Input: 1000 → Pay: 2280
     expect(result.rutor.ruta49).toBe(2280)
+  })
+})
+
+// ============================================================
+// Reverse charge (ruta 20-24, 30-32) tests
+// ============================================================
+
+describe('calculateVatDeclaration — reverse charge', () => {
+  it('maps 2614/2624/2634 credit balances to ruta30/31/32', async () => {
+    results = [
+      {
+        data: [
+          // Reverse charge output VAT accounts
+          { account_number: '2614', debit_amount: 0, credit_amount: 1250 },
+          { account_number: '2624', debit_amount: 0, credit_amount: 120 },
+          { account_number: '2634', debit_amount: 0, credit_amount: 60 },
+          // Corresponding input VAT (2645)
+          { account_number: '2645', debit_amount: 1430, credit_amount: 0 },
+        ],
+        error: null,
+      },
+      { data: [], error: null },  // rc journal entries (no supplier invoices for base query)
+      { data: [], error: null },  // entry counts
+    ]
+
+    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+
+    expect(result.rutor.ruta30).toBe(1250)
+    expect(result.rutor.ruta31).toBe(120)
+    expect(result.rutor.ruta32).toBe(60)
+    expect(result.rutor.ruta48).toBe(1430)
+    // ruta49 = (0+0+0 + 1250+120+60) - 1430 = 0
+    expect(result.rutor.ruta49).toBe(0)
+  })
+
+  it('includes ruta30-32 in ruta49 formula', async () => {
+    results = [
+      {
+        data: [
+          // Regular output VAT
+          { account_number: '2611', debit_amount: 0, credit_amount: 2500 },
+          { account_number: '3001', debit_amount: 0, credit_amount: 10000 },
+          // Reverse charge output VAT
+          { account_number: '2614', debit_amount: 0, credit_amount: 500 },
+          // Input VAT (regular + calculated)
+          { account_number: '2641', debit_amount: 300, credit_amount: 0 },
+          { account_number: '2645', debit_amount: 500, credit_amount: 0 },
+        ],
+        error: null,
+      },
+      { data: [], error: null },  // rc journal entries
+      { data: [], error: null },  // entry counts
+    ]
+
+    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+
+    expect(result.rutor.ruta10).toBe(2500)
+    expect(result.rutor.ruta30).toBe(500)
+    expect(result.rutor.ruta48).toBe(800)
+    // ruta49 = (2500 + 0 + 0 + 500 + 0 + 0) - 800 = 2200
+    expect(result.rutor.ruta49).toBe(2200)
+  })
+
+  it('populates ruta21 for EU services reverse charge base', async () => {
+    results = [
+      {
+        data: [
+          { account_number: '2614', debit_amount: 0, credit_amount: 1250 },
+          { account_number: '2645', debit_amount: 1250, credit_amount: 0 },
+        ],
+        error: null,
+      },
+      // rc journal entries — found a posted supplier invoice entry
+      {
+        data: [
+          { id: 'je-1', source_id: 'si-1', status: 'posted' },
+        ],
+        error: null,
+      },
+      // supplier_invoices lookup
+      {
+        data: [
+          {
+            id: 'si-1',
+            supplier_id: 'sup-1',
+            reverse_charge: true,
+            is_credit_note: false,
+            subtotal_sek: null,
+            subtotal: 5000,
+            currency: 'SEK',
+            exchange_rate: null,
+            suppliers: { supplier_type: 'eu_business' },
+          },
+        ],
+        error: null,
+      },
+      { data: [], error: null },  // entry counts
+    ]
+
+    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+
+    expect(result.rutor.ruta21).toBe(5000)
+    expect(result.rutor.ruta20).toBe(0)
+    expect(result.rutor.ruta22).toBe(0)
+    expect(result.rutor.ruta30).toBe(1250)
+    expect(result.breakdown.reverseCharge.ruta21).toBe(5000)
+    expect(result.breakdown.reverseCharge.ruta30).toBe(1250)
+  })
+
+  it('populates ruta22 for non-EU services reverse charge base', async () => {
+    results = [
+      {
+        data: [
+          { account_number: '2614', debit_amount: 0, credit_amount: 750 },
+          { account_number: '2645', debit_amount: 750, credit_amount: 0 },
+        ],
+        error: null,
+      },
+      {
+        data: [
+          { id: 'je-1', source_id: 'si-1', status: 'posted' },
+        ],
+        error: null,
+      },
+      {
+        data: [
+          {
+            id: 'si-1',
+            supplier_id: 'sup-1',
+            reverse_charge: true,
+            is_credit_note: false,
+            subtotal_sek: 3000,
+            subtotal: 300,
+            currency: 'USD',
+            exchange_rate: 10,
+            suppliers: { supplier_type: 'non_eu_business' },
+          },
+        ],
+        error: null,
+      },
+      { data: [], error: null },
+    ]
+
+    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+
+    // Uses subtotal_sek when available
+    expect(result.rutor.ruta22).toBe(3000)
+    expect(result.rutor.ruta21).toBe(0)
+  })
+
+  it('populates ruta24 for domestic reverse charge base', async () => {
+    results = [
+      {
+        data: [
+          { account_number: '2614', debit_amount: 0, credit_amount: 500 },
+          { account_number: '2645', debit_amount: 500, credit_amount: 0 },
+        ],
+        error: null,
+      },
+      {
+        data: [
+          { id: 'je-1', source_id: 'si-1', status: 'posted' },
+        ],
+        error: null,
+      },
+      {
+        data: [
+          {
+            id: 'si-1',
+            supplier_id: 'sup-1',
+            reverse_charge: true,
+            is_credit_note: false,
+            subtotal_sek: null,
+            subtotal: 2000,
+            currency: 'SEK',
+            exchange_rate: null,
+            suppliers: { supplier_type: 'swedish_business' },
+          },
+        ],
+        error: null,
+      },
+      { data: [], error: null },
+    ]
+
+    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+
+    expect(result.rutor.ruta24).toBe(2000)
+    expect(result.rutor.ruta21).toBe(0)
+    expect(result.rutor.ruta22).toBe(0)
+  })
+
+  it('returns zero ruta20-24 when no reverse charge entries exist', async () => {
+    results = [
+      {
+        data: [
+          { account_number: '2611', debit_amount: 0, credit_amount: 2500 },
+          { account_number: '3001', debit_amount: 0, credit_amount: 10000 },
+        ],
+        error: null,
+      },
+      { data: [], error: null },  // no rc journal entries
+      { data: [], error: null },
+    ]
+
+    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+
+    expect(result.rutor.ruta20).toBe(0)
+    expect(result.rutor.ruta21).toBe(0)
+    expect(result.rutor.ruta22).toBe(0)
+    expect(result.rutor.ruta23).toBe(0)
+    expect(result.rutor.ruta24).toBe(0)
+  })
+
+  it('credit notes reduce reverse charge bases', async () => {
+    results = [
+      {
+        data: [
+          // Original invoice RC VAT
+          { account_number: '2614', debit_amount: 0, credit_amount: 1250 },
+          { account_number: '2645', debit_amount: 1250, credit_amount: 0 },
+          // Credit note reversal
+          { account_number: '2614', debit_amount: 250, credit_amount: 0 },
+          { account_number: '2645', debit_amount: 0, credit_amount: 250 },
+        ],
+        error: null,
+      },
+      {
+        data: [
+          { id: 'je-1', source_id: 'si-1', status: 'posted' },
+          { id: 'je-2', source_id: 'si-2', status: 'posted' },
+        ],
+        error: null,
+      },
+      {
+        data: [
+          {
+            id: 'si-1',
+            supplier_id: 'sup-1',
+            reverse_charge: true,
+            is_credit_note: false,
+            subtotal_sek: null,
+            subtotal: 5000,
+            currency: 'SEK',
+            exchange_rate: null,
+            suppliers: { supplier_type: 'eu_business' },
+          },
+          {
+            id: 'si-2',
+            supplier_id: 'sup-1',
+            reverse_charge: true,
+            is_credit_note: true,
+            subtotal_sek: null,
+            subtotal: 1000,
+            currency: 'SEK',
+            exchange_rate: null,
+            suppliers: { supplier_type: 'eu_business' },
+          },
+        ],
+        error: null,
+      },
+      { data: [], error: null },
+    ]
+
+    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+
+    // 5000 - 1000 = 4000 net base for EU services
+    expect(result.rutor.ruta21).toBe(4000)
+    // Net RC output VAT: 1250 - 250 = 1000
+    expect(result.rutor.ruta30).toBe(1000)
+  })
+
+  it('skips reversed journal entries for reverse charge bases', async () => {
+    results = [
+      {
+        data: [
+          { account_number: '2614', debit_amount: 0, credit_amount: 1250 },
+          { account_number: '2645', debit_amount: 1250, credit_amount: 0 },
+        ],
+        error: null,
+      },
+      {
+        data: [
+          // One posted, one reversed
+          { id: 'je-1', source_id: 'si-1', status: 'posted' },
+          { id: 'je-2', source_id: 'si-2', status: 'reversed' },
+        ],
+        error: null,
+      },
+      {
+        data: [
+          // Only si-1 is queried (si-2 is filtered out before supplier lookup)
+          {
+            id: 'si-1',
+            supplier_id: 'sup-1',
+            reverse_charge: true,
+            is_credit_note: false,
+            subtotal_sek: null,
+            subtotal: 5000,
+            currency: 'SEK',
+            exchange_rate: null,
+            suppliers: { supplier_type: 'eu_business' },
+          },
+        ],
+        error: null,
+      },
+      { data: [], error: null },
+    ]
+
+    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+
+    // Only the posted entry's invoice (5000) should count
+    expect(result.rutor.ruta21).toBe(5000)
   })
 })

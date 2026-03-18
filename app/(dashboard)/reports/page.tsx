@@ -949,11 +949,34 @@ function VatDeclarationView() {
                       <tr className="border-t-2 font-semibold">
                         <td className="py-2">Summa utgående</td>
                         <td className="py-2 text-right">
-                          {formatAmount(data.rutor.ruta10 + data.rutor.ruta11 + data.rutor.ruta12)} kr
+                          {formatAmount(
+                            data.rutor.ruta10 + data.rutor.ruta11 + data.rutor.ruta12 +
+                            data.rutor.ruta30 + data.rutor.ruta31 + data.rutor.ruta32
+                          )} kr
                         </td>
                       </tr>
                     </tfoot>
                   </table></div>
+
+                  {/* Omvänd skattskyldighet (inköp) */}
+                  {(data.rutor.ruta20 > 0 || data.rutor.ruta21 > 0 || data.rutor.ruta22 > 0 || data.rutor.ruta23 > 0 || data.rutor.ruta24 > 0 ||
+                    data.rutor.ruta30 > 0 || data.rutor.ruta31 > 0 || data.rutor.ruta32 > 0) && (
+                    <>
+                      <h4 className="font-semibold mb-3 mt-6">Omvänd skattskyldighet (inköp)</h4>
+                      <div className="overflow-x-auto -mx-2 px-2"><table className="w-full text-sm min-w-[400px]">
+                        <tbody>
+                          <VatRutaRow ruta="20" label="Inköp av varor från annat EU-land" amount={0} baseAmount={data.rutor.ruta20} noVat />
+                          <VatRutaRow ruta="21" label="Inköp av tjänster från annat EU-land" amount={0} baseAmount={data.rutor.ruta21} noVat />
+                          <VatRutaRow ruta="22" label="Inköp av tjänster utanför EU" amount={0} baseAmount={data.rutor.ruta22} noVat />
+                          <VatRutaRow ruta="23" label="Inköp av varor i Sverige" amount={0} baseAmount={data.rutor.ruta23} noVat />
+                          <VatRutaRow ruta="24" label="Övriga inköp av tjänster i Sverige" amount={0} baseAmount={data.rutor.ruta24} noVat />
+                          <VatRutaRow ruta="30" label="Utgående moms 25% (omvänd)" amount={data.rutor.ruta30} baseAmount={0} />
+                          <VatRutaRow ruta="31" label="Utgående moms 12% (omvänd)" amount={data.rutor.ruta31} baseAmount={0} />
+                          <VatRutaRow ruta="32" label="Utgående moms 6% (omvänd)" amount={data.rutor.ruta32} baseAmount={0} />
+                        </tbody>
+                      </table></div>
+                    </>
+                  )}
                 </div>
 
                 {/* Ingående moms */}
@@ -1056,12 +1079,14 @@ function VatRutaRow({
           <span className="font-mono text-xs bg-muted px-1 rounded mr-2">{ruta}</span>
           {label}
         </td>
-        <td className="py-2 text-right">{noVat ? '-' : `${formatAmount(amount)} kr`}</td>
+        <td className="py-2 text-right">{noVat ? `${formatAmount(baseAmount)} kr` : `${formatAmount(amount)} kr`}</td>
       </tr>
-      <tr className="text-muted-foreground">
-        <td className="py-1 pl-6 text-xs">Underlag</td>
-        <td className="py-1 text-right text-xs">{formatAmount(baseAmount)} kr</td>
-      </tr>
+      {!noVat && baseAmount > 0 && (
+        <tr className="text-muted-foreground">
+          <td className="py-1 pl-6 text-xs">Underlag</td>
+          <td className="py-1 text-right text-xs">{formatAmount(baseAmount)} kr</td>
+        </tr>
+      )}
     </>
   )
 }

@@ -139,17 +139,18 @@ export default function Step2CompanyDetails({
               </div>
             </div>
 
-            <div className="flex justify-between pt-4">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-3 pt-4">
               <Button
                 type="button"
                 variant="ghost"
                 onClick={onBack}
                 disabled={isSaving}
+                className="w-full sm:w-auto"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Tillbaka
               </Button>
-              <Button type="submit" disabled={isSaving}>
+              <Button type="submit" disabled={isSaving} className="w-full sm:w-auto">
                 {isSaving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

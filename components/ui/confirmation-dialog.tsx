@@ -67,11 +67,12 @@ export function ConfirmationDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
+              className="min-h-11 w-full sm:w-auto"
             >
               Tillbaka
             </Button>
             {extraActions}
-            <Button onClick={onConfirm} disabled={isSubmitting}>
+            <Button onClick={onConfirm} disabled={isSubmitting} className="min-h-11 w-full sm:w-auto">
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
