@@ -229,18 +229,28 @@ export default function Step4VatAccounting({
                   name="accounting_method"
                   control={control}
                   render={({ field }) => (
-                    <Select
-                      value={field.value}
-                      onValueChange={(v) => { if (v) field.onChange(v) }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Välj metod" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="accrual">Faktureringsmetoden</SelectItem>
-                        <SelectItem value="cash">Kontantmetoden</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-3">
+                      <div className="flex items-start space-x-3">
+                        <Checkbox
+                          id="method_accrual"
+                          checked={field.value === 'accrual'}
+                          onCheckedChange={(checked) => { if (checked) field.onChange('accrual') }}
+                        />
+                        <Label htmlFor="method_accrual" className="cursor-pointer">
+                          Faktureringsmetoden
+                        </Label>
+                      </div>
+                      <div className="flex items-start space-x-3">
+                        <Checkbox
+                          id="method_cash"
+                          checked={field.value === 'cash'}
+                          onCheckedChange={(checked) => { if (checked) field.onChange('cash') }}
+                        />
+                        <Label htmlFor="method_cash" className="cursor-pointer">
+                          Kontantmetoden
+                        </Label>
+                      </div>
+                    </div>
                   )}
                 />
                 <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
@@ -254,7 +264,7 @@ export default function Step4VatAccounting({
                       : 'Intäkter och kostnader bokförs först när betalningen faktiskt sker. Enklare att hantera men ger en mindre exakt bild av verksamhetens ekonomi vid varje given tidpunkt.'}
                   </p>
                   {entityType === 'aktiebolag' && (
-                    <p className="text-xs text-warning-foreground bg-warning/10 rounded px-2 py-1">
+                    <p className="text-xs text-amber-800 dark:text-amber-200 bg-warning/10 rounded px-2 py-1">
                       Aktiebolag med omsättning över 3 MSEK per år måste använda faktureringsmetoden.
                     </p>
                   )}
