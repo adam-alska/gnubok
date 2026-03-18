@@ -23,7 +23,7 @@ export default function InboxZeroState({ hasTransactions, onCreateTransaction }:
           <p className="text-sm text-muted-foreground text-center max-w-sm mb-6">
             Importera kontoutdrag från din bank eller lägg till transaktioner manuellt för att komma igång.
           </p>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto px-4 sm:px-0">
             <Button asChild>
               <Link href="/import">
                 <Upload className="mr-2 h-4 w-4" />

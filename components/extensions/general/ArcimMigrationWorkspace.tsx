@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/components/ui/use-toast'
+import { cn } from '@/lib/utils'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import Link from 'next/link'
 import {
@@ -1513,10 +1514,16 @@ export default function ArcimMigrationWorkspace(_props: WorkspaceComponentProps)
           <CardContent className="pt-6">
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
+                <span className="sm:hidden text-primary font-medium">
+                  Steg {currentUserStepIndex + 1}/{userSteps.length}: {STEP_LABELS[step]}
+                </span>
                 {userSteps.map((s) => (
                   <span
                     key={s}
-                    className={userSteps.indexOf(s) <= currentUserStepIndex ? 'font-medium text-primary' : 'text-muted-foreground'}
+                    className={cn(
+                      'hidden sm:inline',
+                      userSteps.indexOf(s) <= currentUserStepIndex ? 'font-medium text-primary' : 'text-muted-foreground'
+                    )}
                   >
                     {STEP_LABELS[s]}
                   </span>

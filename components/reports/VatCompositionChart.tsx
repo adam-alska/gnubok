@@ -15,6 +15,9 @@ const COLORS = [
   'hsl(var(--chart-2))',
   'hsl(var(--chart-3))',
   'hsl(var(--chart-4))',
+  'hsl(var(--chart-1) / 0.6)',
+  'hsl(var(--chart-2) / 0.6)',
+  'hsl(var(--chart-3) / 0.6)',
 ]
 
 export function VatCompositionChart({ rutor }: VatCompositionChartProps) {
@@ -23,6 +26,9 @@ export function VatCompositionChart({ rutor }: VatCompositionChartProps) {
       { name: 'Utgående 25%', value: rutor.ruta10 },
       { name: 'Utgående 12%', value: rutor.ruta11 },
       { name: 'Utgående 6%', value: rutor.ruta12 },
+      { name: 'Omvänd 25%', value: rutor.ruta30 },
+      { name: 'Omvänd 12%', value: rutor.ruta31 },
+      { name: 'Omvänd 6%', value: rutor.ruta32 },
       { name: 'Ingående moms', value: rutor.ruta48 },
     ]
     return segments.filter((s) => s.value > 0)

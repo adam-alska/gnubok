@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
 import { Separator } from '@/components/ui/separator'
 import {
@@ -60,6 +61,16 @@ export default function SettingsPage() {
   const [mounted, setMounted] = useState(false)
 
   const initialTab = searchParams.get('tab') || 'company'
+  const [activeTab, setActiveTab] = useState(initialTab)
+
+  const settingsTabs = [
+    { value: 'company', label: 'Företag', show: true },
+    { value: 'banking', label: 'Bank (PSD2)', show: !settings?.is_sandbox },
+    { value: 'calendar', label: 'Kalender', show: hasCalendarExtension },
+    { value: 'security', label: 'Säkerhet', show: true },
+    { value: 'appearance', label: 'Utseende', show: true },
+    { value: 'account', label: 'Konto', show: true },
+  ].filter(t => t.show)
 
   useEffect(() => {
     setMounted(true)
@@ -159,9 +170,11 @@ export default function SettingsPage() {
 
     const formData = new FormData(e.currentTarget)
 
+    // Disabled inputs are excluded from FormData by the browser,
+    // so only include company_name/org_number when not locked
     const updates: Record<string, unknown> = {
-      company_name: formData.get('company_name') as string,
-      org_number: formData.get('org_number') as string,
+      ...(formData.has('company_name') && { company_name: formData.get('company_name') as string }),
+      ...(formData.has('org_number') && { org_number: formData.get('org_number') as string }),
       address_line1: formData.get('address_line1') as string,
       postal_code: formData.get('postal_code') as string,
       city: formData.get('city') as string,
@@ -290,30 +303,26 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <Tabs defaultValue={initialTab} className="space-y-6">
-        <TabsList className="flex-wrap h-auto gap-1">
-          <TabsTrigger value="company">
-            Företag
-          </TabsTrigger>
-          {!settings?.is_sandbox && (
-            <TabsTrigger value="banking">
-              Bank (PSD2)
-            </TabsTrigger>
-          )}
-          {hasCalendarExtension && (
-            <TabsTrigger value="calendar">
-              Kalender
-            </TabsTrigger>
-          )}
-          <TabsTrigger value="security">
-            Säkerhet
-          </TabsTrigger>
-          <TabsTrigger value="appearance">
-            Utseende
-          </TabsTrigger>
-          <TabsTrigger value="account">
-            Konto
-          </TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        {/* Mobile: dropdown selector */}
+        <div className="sm:hidden">
+          <Select value={activeTab} onValueChange={setActiveTab}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {settingsTabs.map(t => (
+                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Desktop: tab pills */}
+        <TabsList className="hidden sm:inline-flex flex-wrap h-auto gap-1">
+          {settingsTabs.map(t => (
+            <TabsTrigger key={t.value} value={t.value}>{t.label}</TabsTrigger>
+          ))}
         </TabsList>
 
         {/* Company settings */}
@@ -432,7 +441,7 @@ export default function SettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-3 gap-4 items-end">
                   <div className="space-y-2">
                     <Label htmlFor="invoice_prefix">Fakturaprefix</Label>
                     <Input
@@ -719,8 +728,8 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <Button variant="outline" asChild>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <Button variant="outline" className="w-full sm:w-auto min-h-11" asChild>
                   <Link href="/reports?type=sie">
                     <ExternalLink className="mr-2 h-4 w-4" />
                     Exportera bokföringsdata (SIE)
@@ -728,6 +737,7 @@ export default function SettingsPage() {
                 </Button>
                 <Button
                   variant="destructive"
+                  className="w-full sm:w-auto min-h-11"
                   onClick={() => setShowDeleteDialog(true)}
                 >
                   Radera mitt konto

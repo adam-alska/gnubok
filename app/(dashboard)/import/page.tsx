@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
 import { ArrowLeftRight, ArrowRightLeft, FileText, ArrowLeft, Landmark, Loader2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { BankSelector, type Bank } from '@/extensions/general/enable-banking/components/BankSelector'
 import { BankConnectionStatus } from '@/extensions/general/enable-banking/components/BankConnectionStatus'
@@ -223,12 +224,16 @@ function BankFileImportWizard() {
         <CardContent className="pt-6">
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
+              <span className="sm:hidden text-primary font-medium">
+                Steg {currentStepIndex + 1}/{steps.length}: {BANK_STEP_LABELS[bankStep]}
+              </span>
               {steps.map((s, i) => (
                 <span
                   key={s}
-                  className={
+                  className={cn(
+                    'hidden sm:inline',
                     i <= currentStepIndex ? 'text-primary font-medium' : 'text-muted-foreground'
-                  }
+                  )}
                 >
                   {BANK_STEP_LABELS[s]}
                 </span>
@@ -517,8 +522,14 @@ function SIEImportWizard() {
         <CardContent className="pt-6">
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
+              <span className="sm:hidden text-primary font-medium">
+                Steg {currentStepIndex + 1}/{sieSteps.length}: {SIE_STEP_LABELS[step]}
+              </span>
               {sieSteps.map((s, i) => (
-                <span key={s} className={i <= currentStepIndex ? 'text-primary font-medium' : 'text-muted-foreground'}>
+                <span key={s} className={cn(
+                  'hidden sm:inline',
+                  i <= currentStepIndex ? 'text-primary font-medium' : 'text-muted-foreground'
+                )}>
                   {SIE_STEP_LABELS[s]}
                 </span>
               ))}
