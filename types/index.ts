@@ -763,7 +763,7 @@ export type JournalEntrySourceType =
   | 'currency_revaluation'
 
 // Journal entry status
-export type JournalEntryStatus = 'draft' | 'posted' | 'reversed'
+export type JournalEntryStatus = 'draft' | 'posted' | 'reversed' | 'cancelled'
 
 // Mapping rule type
 export type MappingRuleType =

@@ -190,7 +190,9 @@ describe('POST /api/transactions/[id]/match-invoice', () => {
       expect.anything(),
       'user-1',
       expect.objectContaining({ id: VALID_UUID }),
-      '2024-06-15'
+      '2024-06-15',
+      undefined,
+      expect.anything()
     )
   })
 

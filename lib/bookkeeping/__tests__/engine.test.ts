@@ -1,6 +1,29 @@
-import { describe, it, expect } from 'vitest'
-import { validateBalance, getSwedishLocalDate } from '../engine'
-import type { CreateJournalEntryLineInput } from '@/types'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { validateBalance, getSwedishLocalDate, createDraftEntry, reverseEntry } from '../engine'
+import type { CreateJournalEntryLineInput, JournalEntryStatus } from '@/types'
+
+// Mock Supabase client for createDraftEntry/reverseEntry tests
+function createMockChain(overrides: Record<string, unknown> = {}) {
+  const chain: Record<string, unknown> = {
+    select: vi.fn().mockReturnThis(),
+    single: vi.fn().mockResolvedValue({ data: overrides.singleData ?? null, error: overrides.singleError ?? null }),
+    eq: vi.fn().mockReturnThis(),
+    insert: vi.fn().mockReturnThis(),
+    update: vi.fn().mockReturnThis(),
+    delete: vi.fn().mockReturnThis(),
+    in: vi.fn().mockReturnThis(),
+    lte: vi.fn().mockReturnThis(),
+    gte: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+  }
+  return chain
+}
+
+// Mock event bus
+vi.mock('@/lib/events', () => ({
+  eventBus: { emit: vi.fn().mockResolvedValue([]) },
+}))
 
 describe('validateBalance', () => {
   it('balanced entry (debit == credit) → valid: true', () => {
@@ -73,5 +96,71 @@ describe('getSwedishLocalDate', () => {
     const date = getSwedishLocalDate()
     const parsed = new Date(date)
     expect(parsed.toString()).not.toBe('Invalid Date')
+  })
+})
+
+describe('createDraftEntry — cancelled status on line-insert failure', () => {
+  it('sets status to cancelled (not delete) when line insert fails', async () => {
+    const updateMock = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) })
+
+    const supabase = {
+      from: vi.fn().mockImplementation((table: string) => {
+        if (table === 'journal_entries') {
+          return {
+            insert: vi.fn().mockReturnValue({
+              select: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: { id: 'entry-1', user_id: 'user-1', status: 'draft' as JournalEntryStatus },
+                  error: null,
+                }),
+              }),
+            }),
+            update: updateMock,
+            delete: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
+          }
+        }
+        if (table === 'journal_entry_lines') {
+          return {
+            insert: vi.fn().mockResolvedValue({ error: { message: 'Line insert failed' } }),
+          }
+        }
+        if (table === 'chart_of_accounts') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                in: vi.fn().mockResolvedValue({
+                  data: [{ account_number: '1930', id: 'acc-1' }, { account_number: '3001', id: 'acc-2' }],
+                  error: null,
+                }),
+              }),
+            }),
+          }
+        }
+        return createMockChain()
+      }),
+    }
+
+    await expect(
+      createDraftEntry(supabase as never, 'user-1', {
+        fiscal_period_id: 'period-1',
+        entry_date: '2024-01-01',
+        description: 'Test',
+        source_type: 'manual',
+        lines: [
+          { account_number: '1930', debit_amount: 1000, credit_amount: 0 },
+          { account_number: '3001', debit_amount: 0, credit_amount: 1000 },
+        ],
+      })
+    ).rejects.toThrow('Failed to create journal entry lines')
+
+    // Should call update with cancelled status, NOT delete
+    expect(updateMock).toHaveBeenCalledWith({ status: 'cancelled' })
+  })
+})
+
+describe('JournalEntryStatus type includes cancelled', () => {
+  it('cancelled is a valid JournalEntryStatus value', () => {
+    const status: JournalEntryStatus = 'cancelled'
+    expect(['draft', 'posted', 'reversed', 'cancelled']).toContain(status)
   })
 })

@@ -74,7 +74,8 @@ export async function POST(
         supabase,
         user.id,
         invoice as Invoice,
-        (settings?.entity_type as EntityType) || 'enskild_firma'
+        (settings?.entity_type as EntityType) || 'enskild_firma',
+        invoice.customer?.name
       )
       if (journalEntry) {
         journalEntryId = journalEntry.id

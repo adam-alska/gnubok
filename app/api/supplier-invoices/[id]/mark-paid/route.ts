@@ -72,7 +72,8 @@ export async function POST(
         invoice as SupplierInvoice,
         (invoice.items || []) as SupplierInvoiceItem[],
         paymentDate,
-        invoice.supplier?.supplier_type || 'swedish_business'
+        invoice.supplier?.supplier_type || 'swedish_business',
+        invoice.supplier?.name
       )
       if (journalEntry) journalEntryId = journalEntry.id
     } else {
@@ -82,7 +83,8 @@ export async function POST(
         invoice as SupplierInvoice,
         paymentAmount,
         paymentDate,
-        body.exchange_rate_difference
+        body.exchange_rate_difference,
+        invoice.supplier?.name
       )
       if (journalEntry) journalEntryId = journalEntry.id
     }
