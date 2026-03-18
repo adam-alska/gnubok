@@ -14,12 +14,14 @@ import type { CompanySettings, EntityType, MomsPeriod } from '@/types'
 import Step1EntityType from '@/components/onboarding/Step1EntityType'
 import Step2CompanyDetails from '@/components/onboarding/Step2CompanyDetails'
 import Step3TaxRegistration from '@/components/onboarding/Step3TaxRegistration'
+import Step4VatAccounting from '@/components/onboarding/Step4VatAccounting'
 import Step5ConnectBank from '@/components/onboarding/Step6ConnectBank'
 
 const STEP_INFO = [
   { title: 'Välkommen', subtitle: 'Välj din företagsform för att komma igång.', label: 'Företagsform' },
   { title: 'Ditt företag', subtitle: 'Uppgifterna visas på fakturor och dokument.', label: 'Uppgifter' },
-  { title: 'Skatt & bokföring', subtitle: 'F-skatt, räkenskapsår och momsregistrering.', label: 'Skatt' },
+  { title: 'F-skatt & räkenskapsår', subtitle: 'Ange din skatteregistrering och räkenskapsår.', label: 'Skatt' },
+  { title: 'Moms & bokföring', subtitle: 'Momsregistrering och bokföringsmetod.', label: 'Moms' },
   { title: 'Bankuppgifter', subtitle: 'Dessa visas på dina fakturor.', label: 'Bank' },
 ]
 
@@ -73,7 +75,7 @@ function OnboardingPageContent() {
   const [currentStep, setCurrentStep] = useState(1)
   const [settings, setSettings] = useState<Partial<CompanySettings>>({})
 
-  const totalSteps = 4
+  const totalSteps = 5
 
   // Detect stuck state: onboarding marked complete but still on this page
   useEffect(() => {
@@ -469,6 +471,17 @@ function OnboardingPageContent() {
           initialData={{
             f_skatt: settings.f_skatt ?? undefined,
             fiscal_year_start_month: settings.fiscal_year_start_month ?? undefined,
+          }}
+          entityType={settings.entity_type as EntityType}
+          onNext={(data) => handleNext(data)}
+          onBack={handleBack}
+          isSaving={isSaving}
+        />
+      )}
+
+      {currentStep === 4 && (
+        <Step4VatAccounting
+          initialData={{
             vat_registered: settings.vat_registered ?? undefined,
             vat_number: settings.vat_number ?? undefined,
             moms_period: (settings.moms_period as MomsPeriod | null) ?? undefined,
@@ -482,7 +495,7 @@ function OnboardingPageContent() {
         />
       )}
 
-      {currentStep === 4 && (
+      {currentStep === 5 && (
         <Step5ConnectBank
           initialData={{
             bank_name: settings.bank_name ?? undefined,
