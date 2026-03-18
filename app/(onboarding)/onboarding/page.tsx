@@ -471,7 +471,7 @@ function OnboardingPageContent() {
             fiscal_year_start_month: settings.fiscal_year_start_month ?? undefined,
             vat_registered: settings.vat_registered ?? undefined,
             vat_number: settings.vat_number ?? undefined,
-            moms_period: settings.moms_period as MomsPeriod | undefined,
+            moms_period: (settings.moms_period as MomsPeriod | null) ?? undefined,
             accounting_method: (settings.accounting_method as 'accrual' | 'cash') ?? undefined,
           }}
           entityType={settings.entity_type as EntityType}
