@@ -1,21 +1,20 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { InfoTooltip } from '@/components/ui/info-tooltip'
-import { Loader2, ArrowRight, ArrowLeft, Check, CalendarDays, Info } from 'lucide-react'
+import { Loader2, ArrowRight, ArrowLeft, Check, CalendarDays } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/components/ui/use-toast'
 import { monthsBetween } from '@/lib/bookkeeping/validate-period-duration'
-import type { MomsPeriod, EntityType } from '@/types'
+import type { EntityType } from '@/types'
 
 const schema = z.object({
   f_skatt: z.boolean(),
@@ -25,11 +24,6 @@ const schema = z.object({
   first_year_end: z.string().optional(),
   // Ongoing year field (conditional)
   fiscal_year_end_month: z.number().min(1).max(12).optional(),
-  // Existing fields
-  vat_registered: z.boolean(),
-  vat_number: z.string().optional(),
-  moms_period: z.enum(['monthly', 'quarterly', 'yearly']).optional(),
-  accounting_method: z.enum(['accrual', 'cash']),
 }).superRefine((data, ctx) => {
   if (data.is_first_fiscal_year) {
     if (!data.first_year_start) {
@@ -47,13 +41,6 @@ const schema = z.object({
       })
     }
   }
-  if (data.vat_registered && !data.moms_period) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Välj momsredovisningsperiod.',
-      path: ['moms_period'],
-    })
-  }
 })
 
 type FormData = z.infer<typeof schema>
@@ -65,16 +52,11 @@ interface Step3Output {
   is_first_fiscal_year: boolean
   first_year_start?: string
   first_year_end?: string
-  vat_registered: boolean
-  vat_number?: string
-  moms_period?: MomsPeriod
-  accounting_method: 'accrual' | 'cash'
 }
 
 interface Step3Props {
   initialData: Partial<Step3Output>
   entityType?: EntityType
-  orgNumber?: string
   onNext: (data: Step3Output) => void
   onBack: () => void
   isSaving: boolean
@@ -164,7 +146,6 @@ function getABFirstYearEndDates(
 export default function Step3TaxRegistration({
   initialData,
   entityType,
-  orgNumber,
   onNext,
   onBack,
   isSaving,
@@ -173,11 +154,9 @@ export default function Step3TaxRegistration({
   const { toast } = useToast()
 
   const {
-    register,
     handleSubmit,
     watch,
     control,
-    setValue,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -190,30 +169,13 @@ export default function Step3TaxRegistration({
       fiscal_year_end_month: initialData.fiscal_year_start_month
         ? (initialData.fiscal_year_start_month === 1 ? 12 : initialData.fiscal_year_start_month - 1)
         : 12,
-      vat_registered: initialData.vat_registered ?? false,
-      vat_number: initialData.vat_number || '',
-      moms_period: initialData.moms_period,
-      accounting_method: initialData.accounting_method ?? 'accrual',
     },
   })
 
-  const vatRegistered = watch('vat_registered')
   const isFirstYear = watch('is_first_fiscal_year')
   const firstYearStart = watch('first_year_start')
   const firstYearEnd = watch('first_year_end')
   const fiscalYearEndMonth = watch('fiscal_year_end_month')
-  const accountingMethod = watch('accounting_method')
-
-  // Auto-fill VAT number when vat_registered toggles on
-  const vatNumber = watch('vat_number')
-  useEffect(() => {
-    if (vatRegistered && !vatNumber && orgNumber) {
-      const cleaned = orgNumber.replace(/[-\s]/g, '')
-      if (cleaned.length >= 10) {
-        setValue('vat_number', `SE${cleaned}01`)
-      }
-    }
-  }, [vatRegistered, vatNumber, orgNumber, setValue])
 
   // State for first-year start date selectors (month/year)
   const [startMonth, setStartMonth] = useState<number>(
@@ -278,10 +240,6 @@ export default function Step3TaxRegistration({
       is_first_fiscal_year: data.is_first_fiscal_year,
       ...(firstStart && { first_year_start: firstStart }),
       ...(firstEnd && { first_year_end: firstEnd }),
-      vat_registered: data.vat_registered,
-      vat_number: data.vat_registered ? data.vat_number : undefined,
-      moms_period: data.vat_registered ? data.moms_period : undefined,
-      accounting_method: data.accounting_method,
     }
 
     onNext(output)
@@ -611,161 +569,17 @@ export default function Step3TaxRegistration({
               )}
             </div>
 
-            {/* VAT section */}
-            <div className="pt-4 border-t space-y-4">
-              <h3 className="font-medium flex items-center gap-2">
-                <InfoTooltip
-                  content={
-                    <div className="space-y-2">
-                      <p className="font-medium">Behöver jag momsregistrera mig?</p>
-                      <p>Ja, om din omsättning överstiger 120 000 kr per år. Med moms lägger du på 25% extra på dina fakturor, men får också dra av moms på dina inköp.</p>
-                      <p className="text-xs text-muted-foreground">Om din omsättning överstiger 120 000 kr per år behöver du momsregistrera dig.</p>
-                    </div>
-                  }
-                  side="right"
-                >
-                  <span>Momsregistrering</span>
-                </InfoTooltip>
-              </h3>
-
-              <div className="flex items-start space-x-3">
-                <Controller
-                  name="vat_registered"
-                  control={control}
-                  render={({ field }) => (
-                    <Checkbox
-                      id="vat_registered"
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  )}
-                />
-                <div className="space-y-1">
-                  <Label htmlFor="vat_registered" className="cursor-pointer">
-                    Jag är momsregistrerad
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Obligatoriskt om din omsättning överstiger 120 000 kr per år.
-                  </p>
-                </div>
-              </div>
-
-              {vatRegistered && (
-                <div className="space-y-4 pl-0 sm:pl-7">
-                  <div className="space-y-2">
-                    <Label htmlFor="vat_number">Momsregistreringsnummer</Label>
-                    <Input
-                      id="vat_number"
-                      placeholder="SE123456789001"
-                      {...register('vat_number')}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Format: SE + organisationsnummer + 01
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <InfoTooltip
-                      content={
-                        <div className="space-y-2">
-                          <p className="font-medium">Hur ofta rapporterar du moms?</p>
-                          <p>Välj den period som anges på Verksamt eller i ditt beslut från Skatteverket.</p>
-                          <ul className="text-xs text-muted-foreground space-y-1">
-                            <li>Under 1 miljon/år = Kan välja årsredovisning</li>
-                            <li>1-40 miljoner = Kvartal</li>
-                            <li>Över 40 miljoner = Månad</li>
-                          </ul>
-                        </div>
-                      }
-                      side="right"
-                    >
-                      <Label>Momsredovisningsperiod</Label>
-                    </InfoTooltip>
-                    <Controller
-                      name="moms_period"
-                      control={control}
-                      render={({ field }) => (
-                        <Select
-                          value={field.value}
-                          onValueChange={(v) => { if (v) field.onChange(v) }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Välj period" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="monthly">Månad</SelectItem>
-                            <SelectItem value="quarterly">Kvartal</SelectItem>
-                            <SelectItem value="yearly">År</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Välj den period som anges i ditt beslut från Skatteverket. Vanligtvis kvartal eller år.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Accounting method */}
-            <div className="pt-4 border-t space-y-4">
-              <div className="space-y-2">
-                <InfoTooltip
-                  content="Faktureringsmetoden bokför intäkter och kostnader när fakturan skickas/mottas. Kontantmetoden bokför vid betalning."
-                  side="right"
-                >
-                  <Label>Bokföringsmetod</Label>
-                </InfoTooltip>
-                <Controller
-                  name="accounting_method"
-                  control={control}
-                  render={({ field }) => (
-                    <Select
-                      value={field.value}
-                      onValueChange={(v) => { if (v) field.onChange(v) }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Välj metod" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="accrual">Faktureringsmetoden</SelectItem>
-                        <SelectItem value="cash">Kontantmetoden</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <Info className="h-4 w-4 text-muted-foreground" />
-                    {accountingMethod === 'accrual' ? 'Faktureringsmetoden' : 'Kontantmetoden'}
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {accountingMethod === 'accrual'
-                      ? 'Intäkter och kostnader bokförs när fakturan skickas eller tas emot, oavsett när betalningen sker. Detta ger en mer rättvisande bild av verksamhetens ekonomi.'
-                      : 'Intäkter och kostnader bokförs först när betalningen faktiskt sker. Enklare att hantera men ger en mindre exakt bild av verksamhetens ekonomi vid varje given tidpunkt.'}
-                  </p>
-                  {entityType === 'aktiebolag' && (
-                    <p className="text-xs text-warning-foreground bg-warning/10 rounded px-2 py-1">
-                      Aktiebolag med omsättning över 3 MSEK per år måste använda faktureringsmetoden.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-3 pt-4">
+            <div className="flex justify-between pt-4">
               <Button
                 type="button"
                 variant="ghost"
                 onClick={onBack}
                 disabled={isSaving}
-                className="w-full sm:w-auto"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Tillbaka
               </Button>
-              <Button type="submit" disabled={isSaving} className="w-full sm:w-auto">
+              <Button type="submit" disabled={isSaving}>
                 {isSaving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
