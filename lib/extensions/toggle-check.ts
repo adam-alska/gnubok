@@ -12,9 +12,8 @@ export const LEGACY_GENERAL_EXTENSIONS = [
   'receipt-ocr',
   'ai-categorization',
   'ai-chat',
+  'push-notifications',
   'enable-banking',
-  'arcim-migration',
-  'tic',
 ]
 
 export async function isExtensionEnabled(

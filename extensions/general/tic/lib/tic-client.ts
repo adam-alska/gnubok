@@ -44,7 +44,7 @@ export async function ticApiFetch<T>(endpoint: string): Promise<T | null> {
 
     return await response.json()
   } catch (error: unknown) {
-    if (error instanceof Error && error.name === 'AbortError') {
+    if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
       throw new TICAPIError('Request timeout', undefined, 'TIMEOUT')
     }
     if (error instanceof TICAPIError) {

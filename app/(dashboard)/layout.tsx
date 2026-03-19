@@ -5,6 +5,7 @@ import { RecaptIdentify } from '@/components/RecaptIdentify'
 import { SentryIdentify } from '@/components/SentryIdentify'
 import { SandboxBanner } from '@/components/dashboard/SandboxBanner'
 import { getExtensionNavItems } from '@/lib/extensions/sectors'
+import { LEGACY_GENERAL_EXTENSIONS } from '@/lib/extensions/toggle-check'
 import type { EntityType } from '@/types'
 
 export default async function DashboardLayout({
@@ -20,7 +21,7 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
-  const [{ data: settings }, { count: uncategorizedCount }] = await Promise.all([
+  const [{ data: settings }, { count: uncategorizedCount }, { data: enabledToggles }] = await Promise.all([
     supabase
       .from('company_settings')
       .select('company_name, onboarding_complete, entity_type, is_sandbox')
@@ -31,6 +32,11 @@ export default async function DashboardLayout({
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .is('is_business', null),
+    supabase
+      .from('extension_toggles')
+      .select('sector_slug, extension_slug')
+      .eq('user_id', user.id)
+      .eq('enabled', true),
   ])
 
   if (!settings?.onboarding_complete) {
@@ -56,7 +62,12 @@ export default async function DashboardLayout({
         entityType={entityType}
         uncategorizedTransactionCount={uncategorizedCount ?? 0}
         isSandbox={isSandbox}
-        extensionNavItems={getExtensionNavItems()}
+        extensionNavItems={getExtensionNavItems([
+          ...(enabledToggles || []),
+          ...LEGACY_GENERAL_EXTENSIONS
+            .filter(slug => !(enabledToggles || []).some(t => t.sector_slug === 'general' && t.extension_slug === slug))
+            .map(slug => ({ sector_slug: 'general', extension_slug: slug })),
+        ])}
       />
       <main id="main-content" className="safe-area-main-padding md:!pb-0 md:pl-[232px]" role="main">
         <div className="max-w-5xl mx-auto px-5 py-8 md:px-8 md:py-10">
