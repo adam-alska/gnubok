@@ -14,6 +14,9 @@ export const LEGACY_GENERAL_EXTENSIONS = [
   'ai-chat',
   'push-notifications',
   'enable-banking',
+  'email',
+  'arcim-migration',
+  'tic',
 ]
 
 export async function isExtensionEnabled(
