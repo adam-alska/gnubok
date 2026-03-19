@@ -24,6 +24,8 @@ import { resolveIcon } from '@/lib/extensions/icon-resolver'
 import type { QuickActionDefinition } from '@/lib/extensions/types'
 import type { CompanySettings, Deadline, ReceiptQueueSummary, OnboardingProgress } from '@/types'
 
+const SETUP_FRESH_START_KEY = 'erp_setup_fresh_start'
+
 interface DashboardContentProps {
   firstName?: string | null
   settings: CompanySettings | null
@@ -70,6 +72,31 @@ export default function DashboardContent({ firstName, settings, summary, onboard
     window.addEventListener('extension-toggle-changed', handler)
     return () => window.removeEventListener('extension-toggle-changed', handler)
   }, [])
+
+  // Setup gate — blocks dashboard until user imports data or chooses fresh start
+  const needsSetup = onboardingProgress && !onboardingProgress.hasBankConnected && !onboardingProgress.hasSIEImport
+  const [setupGateActive, setSetupGateActive] = useState(!!needsSetup)
+
+  useEffect(() => {
+    if (!needsSetup) {
+      setSetupGateActive(false)
+      return
+    }
+    const freshStart = localStorage.getItem(SETUP_FRESH_START_KEY) === 'true'
+    const oldDismissed = localStorage.getItem('erp_checklist_dismissed') === 'true'
+    if (freshStart || oldDismissed) setSetupGateActive(false)
+  }, [needsSetup])
+
+  if (setupGateActive) {
+    return (
+      <NewUserChecklist
+        onFreshStart={() => {
+          localStorage.setItem(SETUP_FRESH_START_KEY, 'true')
+          setSetupGateActive(false)
+        }}
+      />
+    )
+  }
 
   const formatLargeNumber = (amount: number) => {
     return new Intl.NumberFormat('sv-SE', {
@@ -263,18 +290,6 @@ export default function DashboardContent({ firstName, settings, summary, onboard
           {greeting}{firstName ? `, ${firstName}` : ''}
         </h1>
       </header>
-
-      {/* New user checklist */}
-      {onboardingProgress && (
-        <section className="mb-10">
-          <NewUserChecklist
-            hasCustomers={onboardingProgress.hasCustomers}
-            hasInvoices={onboardingProgress.hasInvoices}
-            hasBankConnected={onboardingProgress.hasBankConnected}
-            hasSIEImport={onboardingProgress.hasSIEImport}
-          />
-        </section>
-      )}
 
       {/* 4 Key Summary Cards */}
       <section className="mb-10">
