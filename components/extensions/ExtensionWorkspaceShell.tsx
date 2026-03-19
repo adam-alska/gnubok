@@ -1,9 +1,7 @@
 'use client'
 
 import type { ExtensionDefinition } from '@/lib/extensions/types'
-import { getSector } from '@/lib/extensions/sectors'
 import { resolveIcon } from '@/lib/extensions/icon-resolver'
-import Link from 'next/link'
 
 export default function ExtensionWorkspaceShell({
   definition,
@@ -12,28 +10,10 @@ export default function ExtensionWorkspaceShell({
   definition: ExtensionDefinition
   children: React.ReactNode
 }) {
-   
   const Icon = resolveIcon(definition.icon)
-  const sector = getSector(definition.sector)
 
   return (
     <div>
-      {/* Breadcrumb */}
-      <nav className="flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
-        <Link href="/extensions" className="hover:text-foreground transition-colors">
-          Tillägg
-        </Link>
-        <span>/</span>
-        <Link
-          href={`/extensions/${definition.sector}`}
-          className="hover:text-foreground transition-colors"
-        >
-          {sector?.name ?? definition.sector}
-        </Link>
-        <span>/</span>
-        <span className="text-foreground">{definition.name}</span>
-      </nav>
-
       {/* Header */}
       <div className="flex items-start gap-4 mb-8">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 flex-shrink-0">

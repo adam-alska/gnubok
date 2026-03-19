@@ -40,5 +40,23 @@ export const EXTENSION_DEFINITIONS: Record<string, ExtensionDefinition[]> = {
           "description": "Migrera bokföring från Fortnox, Visma, Bokio, Björn Lundén eller Briox",
           "longDescription": "Flytta all bokföringsdata från ditt gamla system till gnubok. Importerar kontoplan, verifikationer, kunder, leverantörer och öppna fakturor automatiskt via säker API-integration."
     },
+    {
+          "slug": "tic",
+          "name": "Bolagsuppgifter",
+          "sector": "general",
+          "category": "import",
+          "icon": "Building2",
+          "dataPattern": "manual",
+          "description": "Hämta företagsinformation automatiskt vid registrering",
+          "longDescription": "Fyll i företagsuppgifter automatiskt genom att ange organisationsnummer. Hämtar adress, momsregistrering, F-skattestatus och bankuppgifter från offentliga register via TIC.",
+          "hasOwnData": true,
+          "quickAction": {
+                "label": "Företagsprofil",
+                "description": "Visa offentliga uppgifter",
+                "icon": "Building2",
+                "href": "/e/general/tic",
+                "order": 10
+          }
+    },
   ],
 }

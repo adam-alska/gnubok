@@ -1,14 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-
-// Legacy general extensions default to enabled when no toggle row exists
-const LEGACY_GENERAL_EXTENSIONS = [
-  'receipt-ocr',
-  'ai-categorization',
-  'ai-chat',
-  'push-notifications',
-  'enable-banking',
-]
+import { LEGACY_GENERAL_EXTENSIONS } from '@/lib/extensions/toggle-check'
 
 export async function GET(
   _request: Request,

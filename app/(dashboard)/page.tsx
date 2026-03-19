@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import DashboardContent from '@/components/dashboard/DashboardContent'
+import { LEGACY_GENERAL_EXTENSIONS } from '@/lib/extensions/toggle-check'
 import type { Deadline, ReceiptQueueSummary, OnboardingProgress } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -223,7 +224,12 @@ export default async function DashboardPage() {
         staleUncategorizedCount: staleUncategorizedCount || 0,
       }}
       onboardingProgress={onboardingProgress}
-      enabledExtensions={enabledToggles || []}
+      enabledExtensions={[
+        ...(enabledToggles || []),
+        ...LEGACY_GENERAL_EXTENSIONS
+          .filter(slug => !(enabledToggles || []).some(t => t.sector_slug === 'general' && t.extension_slug === slug))
+          .map(slug => ({ sector_slug: 'general', extension_slug: slug })),
+      ]}
     />
   )
 }

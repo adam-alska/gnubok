@@ -8,12 +8,15 @@ import { createServiceClient } from '@/lib/supabase/server'
  * general extensions that were previously always-on default to
  * enabled when no toggle row exists.
  */
-const LEGACY_GENERAL_EXTENSIONS = [
+export const LEGACY_GENERAL_EXTENSIONS = [
   'receipt-ocr',
   'ai-categorization',
   'ai-chat',
+  'push-notifications',
   'enable-banking',
+  'email',
   'arcim-migration',
+  'tic',
 ]
 
 export async function isExtensionEnabled(
