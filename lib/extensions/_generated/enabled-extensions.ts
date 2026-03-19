@@ -4,4 +4,5 @@ export const ENABLED_EXTENSION_IDS: ReadonlySet<string> = new Set([
   'enable-banking',
   'email',
   'arcim-migration',
+  'tic',
 ])

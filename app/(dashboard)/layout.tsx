@@ -4,6 +4,7 @@ import DashboardNav from '@/components/dashboard/DashboardNav'
 import { RecaptIdentify } from '@/components/RecaptIdentify'
 import { SentryIdentify } from '@/components/SentryIdentify'
 import { SandboxBanner } from '@/components/dashboard/SandboxBanner'
+import { getExtensionNavItems } from '@/lib/extensions/sectors'
 import type { EntityType } from '@/types'
 
 export default async function DashboardLayout({
@@ -55,6 +56,7 @@ export default async function DashboardLayout({
         entityType={entityType}
         uncategorizedTransactionCount={uncategorizedCount ?? 0}
         isSandbox={isSandbox}
+        extensionNavItems={getExtensionNavItems()}
       />
       <main id="main-content" className="safe-area-main-padding md:!pb-0 md:pl-[232px]" role="main">
         <div className="max-w-5xl mx-auto px-5 py-8 md:px-8 md:py-10">

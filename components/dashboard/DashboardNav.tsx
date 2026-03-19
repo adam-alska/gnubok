@@ -25,13 +25,21 @@ import {
   FileInput,
   Wallet,
 } from 'lucide-react'
+import { resolveIcon } from '@/lib/extensions/icon-resolver'
 import type { EntityType } from '@/types'
+
+interface ExtensionNavItem {
+  href: string
+  label: string
+  icon: string
+}
 
 interface DashboardNavProps {
   companyName: string
   entityType: EntityType
   uncategorizedTransactionCount?: number
   isSandbox?: boolean
+  extensionNavItems?: ExtensionNavItem[]
 }
 
 interface NavItem {
@@ -67,7 +75,7 @@ const groupLabels: Record<string, string> = {
   övrigt: 'Övrigt',
 }
 
-export default function DashboardNav({ companyName, entityType, uncategorizedTransactionCount = 0, isSandbox = false }: DashboardNavProps) {
+export default function DashboardNav({ companyName, entityType, uncategorizedTransactionCount = 0, isSandbox = false, extensionNavItems = [] }: DashboardNavProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -75,7 +83,7 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
   const [isClosing, setIsClosing] = useState(false)
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Auto-expand Övrigt when the user is on one of its pages, or when manually toggled
-  const isOnOvrigtPage = ['/help', '/settings'].some(p => pathname.startsWith(p))
+  const isOnOvrigtPage = ['/help', '/settings', '/e/'].some(p => pathname.startsWith(p))
   const [manualOvrigtExpanded, setManualOvrigtExpanded] = useState(false)
   const isOvrigtExpanded = isOnOvrigtPage || manualOvrigtExpanded
   const openMobileMenu = () => {
@@ -222,6 +230,28 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                 </button>
                 {isOvrigtExpanded && (
                   <div className="space-y-px animate-fade-in">
+                    {extensionNavItems.map((item) => {
+                      const Icon = resolveIcon(item.icon)
+                      const active = isActive(item.href)
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={cn(
+                            'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
+                            active
+                              ? 'bg-primary/12 text-foreground font-medium'
+                              : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                          )}
+                        >
+                          <Icon className={cn(
+                            "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
+                            active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                          )} />
+                          {item.label}
+                        </Link>
+                      )
+                    })}
                     {övrigtItems.map((item) => {
                       const Icon = item.icon
                       const active = isActive(item.href)
@@ -430,6 +460,26 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
 
               {/* Other items */}
               <div className="space-y-0.5">
+                {extensionNavItems.map((item) => {
+                  const Icon = resolveIcon(item.icon)
+                  const active = isActive(item.href)
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={closeMobileMenu}
+                      className={cn(
+                        'flex items-center gap-3 px-3 min-h-[44px] rounded-lg transition-colors',
+                        active
+                          ? 'bg-primary/10 text-primary font-medium'
+                          : 'text-foreground active:bg-muted/60'
+                      )}
+                    >
+                      <Icon className={cn("h-[18px] w-[18px] flex-shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+                      <span className="text-sm">{item.label}</span>
+                    </Link>
+                  )
+                })}
                 {övrigtItems.map((item) => {
                   const Icon = item.icon
                   const active = isActive(item.href)
