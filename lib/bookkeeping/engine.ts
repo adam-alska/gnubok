@@ -379,6 +379,7 @@ export async function reverseEntry(
 
   if (linesError) {
     await supabase.from('journal_entries').update({ status: 'cancelled' }).eq('id', reversalEntry.id)
+    await supabase.from('journal_entry_lines').delete().eq('journal_entry_id', reversalEntry.id)
     throw new Error(`Failed to create reversal lines: ${linesError.message}`)
   }
 
@@ -390,6 +391,7 @@ export async function reverseEntry(
 
   if (postError) {
     await supabase.from('journal_entries').update({ status: 'cancelled' }).eq('id', reversalEntry.id)
+    await supabase.from('journal_entry_lines').delete().eq('journal_entry_id', reversalEntry.id)
     throw new Error(`Failed to post reversal entry: ${postError.message}`)
   }
 
@@ -408,6 +410,7 @@ export async function reverseEntry(
     // Another concurrent reversal already changed the status — mark the orphaned
     // reversal as cancelled so it's excluded from reports but remains traceable.
     await supabase.from('journal_entries').update({ status: 'cancelled' }).eq('id', reversalEntry.id)
+    await supabase.from('journal_entry_lines').delete().eq('journal_entry_id', reversalEntry.id)
     throw new Error('Entry was already reversed by a concurrent operation')
   }
 
