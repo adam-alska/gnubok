@@ -15,7 +15,7 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <html lang="sv">
+    <html lang="sv" translate="no">
       <body>
         <div className="flex min-h-screen items-center justify-center p-8">
           <div className="text-center space-y-4">

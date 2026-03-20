@@ -5,13 +5,24 @@
  */
 
 /**
+ * Parse a YYYY-MM-DD string into numeric parts without timezone issues.
+ * Using new Date(dateStr) is unsafe because it creates UTC midnight,
+ * but getDate()/getMonth()/getFullYear() return local-timezone values —
+ * shifting the date by -1 day in Western timezones.
+ */
+export function parseDateParts(dateStr: string): { year: number; month: number; day: number } {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  return { year, month, day }
+}
+
+/**
  * Calculate the number of months between two dates (inclusive of partial months).
  * Assumes start is 1st of month and end is last of month.
  */
 export function monthsBetween(start: string, end: string): number {
-  const s = new Date(start)
-  const e = new Date(end)
-  return (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()) + 1
+  const s = parseDateParts(start)
+  const e = parseDateParts(end)
+  return (e.year - s.year) * 12 + (e.month - s.month) + 1
 }
 
 /**
@@ -19,22 +30,23 @@ export function monthsBetween(start: string, end: string): number {
  * Returns null if valid, or an error message string if invalid.
  */
 export function validatePeriodDuration(start: string, end: string): string | null {
-  const startDate = new Date(start)
-  const endDate = new Date(end)
+  const startParts = parseDateParts(start)
+  const endParts = parseDateParts(end)
 
-  // end must be after start
-  if (endDate <= startDate) {
+  // end must be after start (YYYY-MM-DD strings are lexicographically orderable)
+  if (end <= start) {
     return 'Period end must be after period start'
   }
 
   // start must be 1st of month
-  if (startDate.getDate() !== 1) {
+  if (startParts.day !== 1) {
     return 'Period start must be the 1st of a month'
   }
 
   // end must be last day of month
-  const lastDayOfEndMonth = new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0).getDate()
-  if (endDate.getDate() !== lastDayOfEndMonth) {
+  // new Date(year, 1-indexed-month, 0) gives the last day of that month
+  const lastDayOfEndMonth = new Date(endParts.year, endParts.month, 0).getDate()
+  if (endParts.day !== lastDayOfEndMonth) {
     return 'Period end must be the last day of a month'
   }
 

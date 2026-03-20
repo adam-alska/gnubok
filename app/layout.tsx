@@ -46,8 +46,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="sv" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable}`}>
+    <html lang="sv" translate="no" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable}`}>
       <head>
+        <meta name="google" content="notranslate" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <script
           src="https://cdn.recapt.app/browser/glimt.js"
