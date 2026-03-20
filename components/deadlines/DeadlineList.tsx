@@ -111,23 +111,29 @@ export function DeadlineList({
 
       {/* Deadline groups */}
       {filteredDeadlines.length === 0 ? (
-        <div className="text-center py-12">
-          <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-medium">Inga deadlines</h3>
-          <p className="text-muted-foreground mt-1">
+        <div className="text-center py-16">
+          <Calendar className="h-10 w-10 text-muted-foreground/40 mx-auto mb-4" />
+          <h3 className="text-base font-medium">Inga deadlines</h3>
+          <p className="text-sm text-muted-foreground mt-1">
             {statusFilter !== 'all' || typeFilter !== 'all'
               ? 'Inga deadlines matchar dina filter'
               : 'Skapa din första deadline för att komma igång'}
           </p>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* Overdue */}
           {groupedDeadlines.overdue.length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium text-destructive mb-2">
-                Förfallna ({groupedDeadlines.overdue.length})
-              </h3>
+            <section>
+              <div className="flex items-center gap-3 mb-3">
+                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Förfallna
+                </h3>
+                <span className="text-xs tabular-nums text-muted-foreground/60">
+                  {groupedDeadlines.overdue.length}
+                </span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
               <div className="space-y-2">
                 {groupedDeadlines.overdue.map((deadline) => (
                   <DeadlineCard
@@ -139,15 +145,21 @@ export function DeadlineList({
                   />
                 ))}
               </div>
-            </div>
+            </section>
           )}
 
           {/* Today */}
           {groupedDeadlines.today.length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium text-warning mb-2">
-                Idag ({groupedDeadlines.today.length})
-              </h3>
+            <section>
+              <div className="flex items-center gap-3 mb-3">
+                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Idag
+                </h3>
+                <span className="text-xs tabular-nums text-muted-foreground/60">
+                  {groupedDeadlines.today.length}
+                </span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
               <div className="space-y-2">
                 {groupedDeadlines.today.map((deadline) => (
                   <DeadlineCard
@@ -159,15 +171,21 @@ export function DeadlineList({
                   />
                 ))}
               </div>
-            </div>
+            </section>
           )}
 
           {/* Upcoming */}
           {groupedDeadlines.upcoming.length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-2">
-                Kommande ({groupedDeadlines.upcoming.length})
-              </h3>
+            <section>
+              <div className="flex items-center gap-3 mb-3">
+                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Kommande
+                </h3>
+                <span className="text-xs tabular-nums text-muted-foreground/60">
+                  {groupedDeadlines.upcoming.length}
+                </span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
               <div className="space-y-2">
                 {groupedDeadlines.upcoming.map((deadline) => (
                   <DeadlineCard
@@ -179,15 +197,21 @@ export function DeadlineList({
                   />
                 ))}
               </div>
-            </div>
+            </section>
           )}
 
           {/* Completed */}
           {groupedDeadlines.completed.length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium text-success mb-2">
-                Klara ({groupedDeadlines.completed.length})
-              </h3>
+            <section>
+              <div className="flex items-center gap-3 mb-3">
+                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Klara
+                </h3>
+                <span className="text-xs tabular-nums text-muted-foreground/60">
+                  {groupedDeadlines.completed.length}
+                </span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
               <div className="space-y-2">
                 {groupedDeadlines.completed.map((deadline) => (
                   <DeadlineCard
@@ -199,7 +223,7 @@ export function DeadlineList({
                   />
                 ))}
               </div>
-            </div>
+            </section>
           )}
         </div>
       )}

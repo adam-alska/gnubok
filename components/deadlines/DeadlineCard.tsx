@@ -8,9 +8,10 @@ import {
   isDeadlineOverdue,
   DEADLINE_TYPE_LABELS,
   PRIORITY_LABELS,
-  PRIORITY_COLORS,
+  parseDate,
+  startOfDay,
 } from '@/lib/calendar/utils'
-import { CheckCircle, Circle, Clock, AlertTriangle, Trash2, Edit2 } from 'lucide-react'
+import { Check, Circle, Trash2, Pencil } from 'lucide-react'
 
 interface DeadlineCardProps {
   deadline: Deadline
@@ -19,6 +20,25 @@ interface DeadlineCardProps {
   onDelete?: (deadline: Deadline) => void
   compact?: boolean
 }
+
+function getRelativeDate(dateStr: string): string {
+  const today = startOfDay(new Date())
+  const target = parseDate(dateStr)
+  const diffMs = target.getTime() - today.getTime()
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) return 'Idag'
+  if (diffDays === 1) return 'Imorgon'
+  if (diffDays === -1) return 'Igår'
+  if (diffDays < -1) return `${Math.abs(diffDays)}d sedan`
+  if (diffDays <= 14) return `Om ${diffDays}d`
+  return ''
+}
+
+const SWEDISH_MONTHS_SHORT = [
+  'jan', 'feb', 'mar', 'apr', 'maj', 'jun',
+  'jul', 'aug', 'sep', 'okt', 'nov', 'dec',
+]
 
 export function DeadlineCard({
   deadline,
@@ -29,56 +49,58 @@ export function DeadlineCard({
 }: DeadlineCardProps) {
   const overdue = isDeadlineOverdue(deadline)
   const completed = deadline.is_completed
-  const priorityStyle = PRIORITY_COLORS[deadline.priority]
-
-  const formatDueDate = () => {
-    const date = new Date(deadline.due_date)
-    const formatted = date.toLocaleDateString('sv-SE', {
-      day: 'numeric',
-      month: 'short',
-    })
-    if (deadline.due_time) {
-      return `${formatted} kl. ${deadline.due_time.slice(0, 5)}`
-    }
-    return formatted
-  }
+  const relativeDate = getRelativeDate(deadline.due_date)
+  const dueDate = parseDate(deadline.due_date)
+  const dayNum = dueDate.getDate()
+  const monthStr = SWEDISH_MONTHS_SHORT[dueDate.getMonth()]
 
   if (compact) {
     return (
       <div
         className={cn(
-          'flex items-center gap-2 p-2 rounded-lg border transition-colors',
-          overdue && !completed
-            ? 'border-destructive/50 bg-destructive/5 dark:bg-destructive/10 dark:border-destructive/30'
-            : completed
-            ? 'border-success/50 bg-success/5 dark:bg-success/10 dark:border-success/30'
-            : `${priorityStyle.border} ${priorityStyle.bg}`
+          'group flex items-center gap-3 py-2 transition-colors',
+          completed && 'opacity-50'
         )}
       >
-        <button onClick={() => onToggle(deadline)} className="flex-shrink-0">
-          {completed ? (
-            <CheckCircle className="h-4 w-4 text-success" />
-          ) : (
-            <Circle className="h-4 w-4 text-muted-foreground" />
+        {/* Compact toggle */}
+        <button
+          onClick={() => onToggle(deadline)}
+          className={cn(
+            'flex-shrink-0 h-[18px] w-[18px] rounded-full border transition-colors',
+            completed
+              ? 'bg-success border-success text-success-foreground'
+              : overdue
+              ? 'border-destructive/40 hover:border-destructive'
+              : 'border-border hover:border-foreground/30'
           )}
+        >
+          {completed && <Check className="h-3 w-3 m-auto" />}
         </button>
-        <div className="flex-1 min-w-0">
-          <p
-            className={cn(
-              'text-sm font-medium truncate',
-              completed && 'line-through text-muted-foreground'
-            )}
-          >
-            {deadline.title}
-          </p>
-        </div>
-        {deadline.priority !== 'normal' && !completed && (
-          <div
-            className={cn(
-              'w-2 h-2 rounded-full flex-shrink-0',
-              deadline.priority === 'critical' ? 'bg-destructive' : 'bg-warning'
-            )}
-          />
+
+        {/* Compact date */}
+        <span className={cn(
+          'text-xs tabular-nums w-12 flex-shrink-0',
+          overdue && !completed ? 'text-destructive font-medium' : 'text-muted-foreground'
+        )}>
+          {dayNum} {monthStr}
+        </span>
+
+        {/* Title */}
+        <p className={cn(
+          'text-sm truncate flex-1 min-w-0',
+          completed ? 'line-through text-muted-foreground' : 'text-foreground'
+        )}>
+          {deadline.title}
+        </p>
+
+        {/* Relative date */}
+        {!completed && relativeDate && (
+          <span className={cn(
+            'text-xs flex-shrink-0',
+            overdue ? 'text-destructive' : 'text-muted-foreground'
+          )}>
+            {relativeDate}
+          </span>
         )}
       </div>
     )
@@ -87,89 +109,151 @@ export function DeadlineCard({
   return (
     <div
       className={cn(
-        'p-4 rounded-lg border transition-colors',
-        overdue && !completed
-          ? 'border-destructive/50 bg-destructive/5 dark:bg-destructive/10 dark:border-destructive/30'
-          : completed
-          ? 'border-success/50 bg-success/5 dark:bg-success/10 dark:border-success/30'
-          : `${priorityStyle.border} ${priorityStyle.bg}`
+        'group relative rounded-lg border bg-card transition-[box-shadow,opacity]',
+        'duration-[--duration-fast] ease-[--ease-out]',
+        completed
+          ? 'opacity-60'
+          : 'hover:shadow-[var(--shadow-sm)]'
       )}
     >
-      <div className="flex items-start gap-3">
-        <button onClick={() => onToggle(deadline)} className="mt-0.5 flex-shrink-0">
-          {completed ? (
-            <CheckCircle className="h-5 w-5 text-success" />
-          ) : overdue ? (
-            <AlertTriangle className="h-5 w-5 text-destructive" />
-          ) : (
-            <Clock className="h-5 w-5 text-muted-foreground" />
-          )}
-        </button>
+      <div className="flex items-stretch">
+        {/* Date block — calendar page motif */}
+        <div className={cn(
+          'flex-shrink-0 w-16 flex flex-col items-center justify-center py-4 border-r',
+          completed ? 'text-muted-foreground' : 'text-foreground'
+        )}>
+          <span className={cn(
+            'text-2xl font-display font-medium leading-none tabular-nums',
+            completed && 'line-through decoration-1'
+          )}>
+            {dayNum}
+          </span>
+          <span className="text-[11px] uppercase tracking-wider mt-1 text-muted-foreground">
+            {monthStr}
+          </span>
+        </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p
+        {/* Content */}
+        <div className="flex-1 min-w-0 py-3.5 px-4">
+          {/* Top: title + hover actions */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2.5 min-w-0 flex-1">
+              {/* Toggle */}
+              <button
+                onClick={() => onToggle(deadline)}
                 className={cn(
-                  'font-medium',
-                  completed && 'line-through text-muted-foreground'
+                  'flex-shrink-0 mt-0.5 h-[18px] w-[18px] rounded-full border transition-colors',
+                  completed
+                    ? 'bg-success border-success text-success-foreground'
+                    : 'border-border hover:border-foreground/40'
                 )}
               >
-                {deadline.title}
-              </p>
-              <p className="text-sm text-muted-foreground">{formatDueDate()}</p>
-              {deadline.customer && (
-                <p className="text-sm text-muted-foreground">{deadline.customer.name}</p>
-              )}
+                {completed && <Check className="h-3 w-3 m-auto" />}
+                {!completed && (
+                  <Circle className="h-3 w-3 m-auto text-transparent group-hover:text-muted-foreground/30 transition-colors" />
+                )}
+              </button>
+
+              <div className="min-w-0 flex-1">
+                <p className={cn(
+                  'font-medium leading-snug',
+                  completed && 'line-through text-muted-foreground'
+                )}>
+                  {deadline.title}
+                </p>
+
+                {/* Meta line */}
+                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                  {deadline.due_time && (
+                    <span className="text-sm text-muted-foreground tabular-nums">
+                      kl. {deadline.due_time.slice(0, 5)}
+                    </span>
+                  )}
+                  {deadline.due_time && (deadline.customer || relativeDate) && (
+                    <span className="text-muted-foreground/30 text-sm">·</span>
+                  )}
+                  {!completed && relativeDate && (
+                    <span className={cn(
+                      'text-sm',
+                      overdue ? 'text-destructive font-medium' : 'text-muted-foreground'
+                    )}>
+                      {relativeDate}
+                    </span>
+                  )}
+                  {relativeDate && deadline.customer && !completed && (
+                    <span className="text-muted-foreground/30 text-sm">·</span>
+                  )}
+                  {deadline.customer && (
+                    <span className="text-sm text-muted-foreground truncate">
+                      {deadline.customer.name}
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
 
-            <div className="flex flex-col items-end gap-1">
-              <Badge variant="outline" className="text-xs">
-                {DEADLINE_TYPE_LABELS[deadline.deadline_type]}
-              </Badge>
-              {!completed && deadline.priority !== 'normal' && (
+            {/* Right column: badges + actions */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Badges */}
+              <div className="flex items-center gap-1">
                 <Badge
-                  variant={deadline.priority === 'critical' ? 'destructive' : 'warning'}
-                  className="text-xs"
+                  variant="outline"
+                  className="text-[11px] px-1.5 py-0 h-5 font-normal"
                 >
-                  {PRIORITY_LABELS[deadline.priority]}
+                  {DEADLINE_TYPE_LABELS[deadline.deadline_type]}
                 </Badge>
-              )}
-              {overdue && !completed && (
-                <Badge variant="destructive" className="text-xs">
-                  Förfallen
-                </Badge>
+                {!completed && deadline.priority !== 'normal' && (
+                  <Badge
+                    variant={deadline.priority === 'critical' ? 'destructive' : 'warning'}
+                    className="text-[11px] px-1.5 py-0 h-5"
+                  >
+                    {PRIORITY_LABELS[deadline.priority]}
+                  </Badge>
+                )}
+                {overdue && !completed && (
+                  <Badge variant="destructive" className="text-[11px] px-1.5 py-0 h-5">
+                    Förfallen
+                  </Badge>
+                )}
+              </div>
+
+              {/* Actions */}
+              {(onEdit || onDelete) && !completed && (
+                <div className="flex items-center">
+                  <div className="w-px h-4 bg-border mr-2" />
+                  {onEdit && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                      onClick={() => onEdit(deadline)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                  {onDelete && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => onDelete(deadline)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
               )}
             </div>
           </div>
 
-          {deadline.notes && (
-            <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+          {/* Notes */}
+          {deadline.notes && !completed && (
+            <p className="text-sm text-muted-foreground mt-2 ml-[30px] line-clamp-2 leading-relaxed">
               {deadline.notes}
             </p>
           )}
         </div>
       </div>
-
-      {(onEdit || onDelete) && (
-        <div className="flex justify-end gap-1 mt-2 pt-2 border-t">
-          {onEdit && (
-            <Button variant="ghost" size="sm" onClick={() => onEdit(deadline)}>
-              <Edit2 className="h-4 w-4" />
-            </Button>
-          )}
-          {onDelete && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onDelete(deadline)}
-              className="text-destructive hover:text-destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      )}
     </div>
   )
 }
