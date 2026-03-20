@@ -438,6 +438,7 @@ export function makeCompanySettings(
     bank_name: null,
     clearing_number: null,
     account_number: null,
+    bankgiro: null,
     iban: null,
     bic: null,
     accounting_method: 'accrual',
