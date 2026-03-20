@@ -32,6 +32,14 @@ import {
   Trash2,
 } from 'lucide-react'
 import PaymentBookingDialog from '@/components/invoices/PaymentBookingDialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import type { Invoice, InvoiceItem, Customer, InvoiceStatus, InvoiceReminder, InvoiceDocumentType } from '@/types'
 
 const statusConfig: Record<InvoiceStatus, { label: string; variant: 'default' | 'secondary' | 'success' | 'warning' | 'destructive'; icon: React.ElementType }> = {
@@ -72,6 +80,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [isUpdating, setIsUpdating] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
   const [isSendingEmail, setIsSendingEmail] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     fetchInvoice()
@@ -324,6 +334,39 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     }
 
     setIsDownloading(false)
+  }
+
+  async function deleteInvoice() {
+    if (!invoice) return
+
+    setIsDeleting(true)
+
+    try {
+      const response = await fetch(`/api/invoices/${invoice.id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Kunde inte ta bort fakturan')
+      }
+
+      toast({
+        title: 'Faktura borttagen',
+        description: `Utkast ${invoice.invoice_number} har tagits bort`,
+      })
+
+      router.push('/invoices')
+    } catch (error) {
+      toast({
+        title: 'Kunde inte ta bort fakturan',
+        description: error instanceof Error ? error.message : 'Försök igen.',
+        variant: 'destructive',
+      })
+    }
+
+    setIsDeleting(false)
+    setShowDeleteDialog(false)
   }
 
   if (isLoading) {
@@ -885,8 +928,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     <Button
                       variant="outline"
                       className="w-full text-destructive hover:text-destructive"
-                      onClick={() => updateStatus('cancelled')}
-                      disabled={isUpdating}
+                      onClick={() => setShowDeleteDialog(true)}
+                      disabled={isDeleting}
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
                       Ta bort utkast
@@ -924,6 +967,27 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           )}
         </div>
       </div>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ta bort fakturautkast</DialogTitle>
+            <DialogDescription>
+              Är du säker på att du vill ta bort utkast {invoice.invoice_number}? Detta kan inte ångras.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>
+              Avbryt
+            </Button>
+            <Button variant="destructive" onClick={deleteInvoice} disabled={isDeleting}>
+              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Ta bort
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <PaymentBookingDialog
         open={showPaymentDialog}
