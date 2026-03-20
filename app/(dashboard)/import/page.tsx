@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
-import { ArrowLeftRight, ArrowRightLeft, FileText, ArrowLeft, Landmark, Loader2 } from 'lucide-react'
+import { ArrowLeftRight, ArrowRightLeft, FileText, ArrowLeft, Landmark, Loader2, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { BankSelector, type Bank } from '@/extensions/general/enable-banking/components/BankSelector'
@@ -752,17 +752,28 @@ type ImportMode = null | 'psd2' | 'bank' | 'sie' | 'migration'
 export default function ImportPage() {
   const [mode, setMode] = useState<ImportMode>(null)
   const [userId, setUserId] = useState('')
+  const [isSandbox, setIsSandbox] = useState(false)
 
-  // Fetch authenticated user ID for migration wizard
+  // Fetch authenticated user ID and sandbox status
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserId(user.id)
+      if (!user) return
+      setUserId(user.id)
+      supabase
+        .from('company_settings')
+        .select('is_sandbox')
+        .eq('user_id', user.id)
+        .single()
+        .then(({ data }) => {
+          if (data?.is_sandbox) setIsSandbox(true)
+        })
     })
   }, [])
 
-  // Auto-detect OAuth callback or deep-link mode from query params
+  // Auto-detect OAuth callback or deep-link mode from query params (disabled in sandbox)
   useEffect(() => {
+    if (isSandbox) return
     const params = new URLSearchParams(window.location.search)
     if (params.get('migration')) {
       setMode('migration')
@@ -772,7 +783,7 @@ export default function ImportPage() {
         setMode(modeParam as ImportMode)
       }
     }
-  }, [])
+  }, [isSandbox])
   // Extensions are active if compiled in — no runtime toggle check needed
   const hasBankingExtension = ENABLED_EXTENSION_IDS.has('enable-banking')
   const hasMigrationExtension = ENABLED_EXTENSION_IDS.has('arcim-migration')
@@ -788,103 +799,138 @@ export default function ImportPage() {
       </div>
 
       {mode === null && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {hasBankingExtension && (
-            <Card
-              role="button"
-              tabIndex={0}
-              className="cursor-pointer hover:border-primary/50 active:scale-[0.98] transition-all border-primary/20 relative"
-              onClick={() => setMode('psd2')}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMode('psd2') } }}
-            >
-              <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
-                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Landmark className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold">Koppla bank</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Anslut ditt bankkonto direkt och synka transaktioner automatiskt via PSD2.
-                  </p>
-                </div>
-                <p className="text-xs text-primary font-medium">
-                  Rekommenderat
-                </p>
-              </CardContent>
-            </Card>
+        <>
+          {isSandbox && (
+            <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/50 px-4 py-3">
+              <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+              <p className="text-sm text-muted-foreground">
+                Import är inte tillgängligt i sandlådemiljön. Skapa ett konto för att importera data.
+              </p>
+            </div>
           )}
 
-          <Card
-            role="button"
-            tabIndex={0}
-            className="cursor-pointer hover:border-primary/50 active:scale-[0.98] transition-all"
-            onClick={() => setMode('bank')}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMode('bank') } }}
-          >
-            <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
-              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                <ArrowLeftRight className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold">Banktransaktioner</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Importera kontoutdrag från din bank. Stöder CSV, OFX och de flesta svenska banker.
-                </p>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                CSV, OFX, SEB, Swedbank, Handelsbanken, Nordea m.fl.
-              </p>
-            </CardContent>
-          </Card>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {hasBankingExtension && (
+              <Card
+                role="button"
+                tabIndex={isSandbox ? -1 : 0}
+                aria-disabled={isSandbox}
+                className={cn(
+                  'transition-all border-primary/20 relative',
+                  isSandbox
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'cursor-pointer hover:border-primary/50 active:scale-[0.98]'
+                )}
+                onClick={() => { if (!isSandbox) setMode('psd2') }}
+                onKeyDown={(e) => { if (!isSandbox && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setMode('psd2') } }}
+              >
+                <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
+                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Landmark className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold">Koppla bank</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Anslut ditt bankkonto direkt och synka transaktioner automatiskt via PSD2.
+                    </p>
+                  </div>
+                  <p className="text-xs text-primary font-medium">
+                    Rekommenderat
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
-          <Card
-            role="button"
-            tabIndex={0}
-            className="cursor-pointer hover:border-primary/50 active:scale-[0.98] transition-all"
-            onClick={() => setMode('sie')}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMode('sie') } }}
-          >
-            <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
-              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                <FileText className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold">Bokföringsdata (SIE)</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Importera verifikationer och kontoplan från ett annat bokföringsprogram via SIE-filer.
-                </p>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                SIE4-format (.se, .si)
-              </p>
-            </CardContent>
-          </Card>
-
-          {hasMigrationExtension === true && (
             <Card
               role="button"
-              tabIndex={0}
-              className="cursor-pointer hover:border-primary/50 active:scale-[0.98] transition-all"
-              onClick={() => setMode('migration')}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMode('migration') } }}
+              tabIndex={isSandbox ? -1 : 0}
+              aria-disabled={isSandbox}
+              className={cn(
+                'transition-all',
+                isSandbox
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'cursor-pointer hover:border-primary/50 active:scale-[0.98]'
+              )}
+              onClick={() => { if (!isSandbox) setMode('bank') }}
+              onKeyDown={(e) => { if (!isSandbox && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setMode('bank') } }}
             >
               <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
                 <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                  <ArrowRightLeft className="h-6 w-6 text-muted-foreground" />
+                  <ArrowLeftRight className="h-6 w-6 text-muted-foreground" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold">Migrera från annat system</h3>
+                  <h3 className="text-lg font-semibold">Banktransaktioner</h3>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Flytta bokföring, kunder, leverantörer och fakturor från Fortnox, Visma, Bokio, Björn Lundén eller Briox.
+                    Importera kontoutdrag från din bank. Stöder CSV, OFX och de flesta svenska banker.
                   </p>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  SIE-data, kunder, leverantörer, fakturor
+                  CSV, OFX, SEB, Swedbank, Handelsbanken, Nordea m.fl.
                 </p>
               </CardContent>
             </Card>
-          )}
-        </div>
+
+            <Card
+              role="button"
+              tabIndex={isSandbox ? -1 : 0}
+              aria-disabled={isSandbox}
+              className={cn(
+                'transition-all',
+                isSandbox
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'cursor-pointer hover:border-primary/50 active:scale-[0.98]'
+              )}
+              onClick={() => { if (!isSandbox) setMode('sie') }}
+              onKeyDown={(e) => { if (!isSandbox && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setMode('sie') } }}
+            >
+              <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
+                <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                  <FileText className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">Bokföringsdata (SIE)</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Importera verifikationer och kontoplan från ett annat bokföringsprogram via SIE-filer.
+                  </p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  SIE4-format (.se, .si)
+                </p>
+              </CardContent>
+            </Card>
+
+            {hasMigrationExtension === true && (
+              <Card
+                role="button"
+                tabIndex={isSandbox ? -1 : 0}
+                aria-disabled={isSandbox}
+                className={cn(
+                  'transition-all',
+                  isSandbox
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'cursor-pointer hover:border-primary/50 active:scale-[0.98]'
+                )}
+                onClick={() => { if (!isSandbox) setMode('migration') }}
+                onKeyDown={(e) => { if (!isSandbox && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setMode('migration') } }}
+              >
+                <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
+                  <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                    <ArrowRightLeft className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold">Migrera från annat system</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Flytta bokföring, kunder, leverantörer och fakturor från Fortnox, Visma, Bokio, Björn Lundén eller Briox.
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    SIE-data, kunder, leverantörer, fakturor
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </>
       )}
 
       {mode !== null && (
