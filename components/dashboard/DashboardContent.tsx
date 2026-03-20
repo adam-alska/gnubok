@@ -19,7 +19,7 @@ import {
   FileWarning,
   Clock,
 } from 'lucide-react'
-import { getExtensionDefinition } from '@/lib/extensions/sectors'
+import { getAllExtensions } from '@/lib/extensions/sectors'
 import { resolveIcon } from '@/lib/extensions/icon-resolver'
 import type { QuickActionDefinition } from '@/lib/extensions/types'
 import type { CompanySettings, Deadline, ReceiptQueueSummary, OnboardingProgress } from '@/types'
@@ -47,31 +47,11 @@ interface DashboardContentProps {
     staleUncategorizedCount: number
   }
   onboardingProgress?: OnboardingProgress
-  enabledExtensions?: { sector_slug: string; extension_slug: string }[]
 }
 
-export default function DashboardContent({ firstName, settings, summary, onboardingProgress, enabledExtensions }: DashboardContentProps) {
+export default function DashboardContent({ firstName, settings, summary, onboardingProgress }: DashboardContentProps) {
   const [showAllAlerts, setShowAllAlerts] = useState(false)
   const [showMore, setShowMore] = useState(false)
-  const [liveExtensions, setLiveExtensions] = useState(enabledExtensions ?? [])
-
-  useEffect(() => {
-    setLiveExtensions(enabledExtensions ?? [])
-  }, [enabledExtensions])
-
-  useEffect(() => {
-    const handler = ((e: CustomEvent<{ sector_slug: string; extension_slug: string; enabled: boolean }>) => {
-      setLiveExtensions(prev => {
-        if (e.detail.enabled) {
-          if (prev.some(x => x.sector_slug === e.detail.sector_slug && x.extension_slug === e.detail.extension_slug)) return prev
-          return [...prev, { sector_slug: e.detail.sector_slug, extension_slug: e.detail.extension_slug }]
-        }
-        return prev.filter(x => !(x.sector_slug === e.detail.sector_slug && x.extension_slug === e.detail.extension_slug))
-      })
-    }) as EventListener
-    window.addEventListener('extension-toggle-changed', handler)
-    return () => window.removeEventListener('extension-toggle-changed', handler)
-  }, [])
 
   // Setup gate — blocks dashboard until user imports data or chooses fresh start
   const needsSetup = onboardingProgress && !onboardingProgress.hasBankConnected && !onboardingProgress.hasSIEImport
@@ -256,14 +236,10 @@ export default function DashboardContent({ firstName, settings, summary, onboard
   const visibleAlerts = showAllAlerts ? alertItems : alertItems.slice(0, MAX_VISIBLE_ALERTS)
   const hasMoreAlerts = alertItems.length > MAX_VISIBLE_ALERTS
 
-  // Build extension quick actions from enabled extensions
-  const extensionQuickActions: (QuickActionDefinition & { key: string })[] = liveExtensions
-    .map(toggle => {
-      const def = getExtensionDefinition(toggle.sector_slug, toggle.extension_slug)
-      if (!def?.quickAction) return null
-      return { ...def.quickAction, key: `${toggle.sector_slug}/${toggle.extension_slug}` }
-    })
-    .filter((a): a is QuickActionDefinition & { key: string } => a !== null)
+  // Build extension quick actions from all compiled extensions
+  const extensionQuickActions: (QuickActionDefinition & { key: string })[] = getAllExtensions()
+    .filter(def => def.quickAction)
+    .map(def => ({ ...def.quickAction!, key: `${def.sector}/${def.slug}` }))
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
 
   // Quick action items

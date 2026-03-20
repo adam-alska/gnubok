@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import DashboardContent from '@/components/dashboard/DashboardContent'
-import { LEGACY_GENERAL_EXTENSIONS } from '@/lib/extensions/toggle-check'
 import type { Deadline, ReceiptQueueSummary, OnboardingProgress } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -51,7 +50,6 @@ export default async function DashboardPage() {
     { count: postedEntriesCount },
     { data: entriesWithDocs },
     { data: recentReceiptActivity },
-    { data: enabledToggles },
     { count: sieImportCount },
     { count: staleUncategorizedCount },
   ] = await Promise.all([
@@ -76,7 +74,6 @@ export default async function DashboardPage() {
     supabase.from('journal_entries').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'posted').in('source_type', needsDocSourceTypes),
     supabase.from('document_attachments').select('journal_entry_id').eq('user_id', user.id).eq('is_current_version', true).not('journal_entry_id', 'is', null),
     supabase.from('receipts').select('created_at').eq('user_id', user.id).eq('status', 'confirmed').order('created_at', { ascending: false }).limit(30),
-    supabase.from('extension_toggles').select('sector_slug, extension_slug').eq('user_id', user.id).eq('enabled', true),
     supabase.from('sie_imports').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'completed'),
     supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('user_id', user.id).is('journal_entry_id', null).not('is_business', 'eq', false).lt('date', new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
   ])
@@ -224,12 +221,6 @@ export default async function DashboardPage() {
         staleUncategorizedCount: staleUncategorizedCount || 0,
       }}
       onboardingProgress={onboardingProgress}
-      enabledExtensions={[
-        ...(enabledToggles || []),
-        ...LEGACY_GENERAL_EXTENSIONS
-          .filter(slug => !(enabledToggles || []).some(t => t.sector_slug === 'general' && t.extension_slug === slug))
-          .map(slug => ({ sector_slug: 'general', extension_slug: slug })),
-      ]}
     />
   )
 }

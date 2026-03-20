@@ -39,7 +39,6 @@ import { SecuritySettings } from '@/components/settings/SecuritySettings'
 import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
 
 const BankingPanel = getSettingsPanel('enable-banking')
-const bankingCompiledIn = ENABLED_EXTENSION_IDS.has('enable-banking')
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -50,10 +49,8 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [settings, setSettings] = useState<CompanySettings | null>(null)
-  const [hasBankingExtension, setHasBankingExtension] = useState<boolean | null>(
-    bankingCompiledIn ? null : false
-  )
-  const [hasCalendarExtension, setHasCalendarExtension] = useState(false)
+  const hasBankingExtension = ENABLED_EXTENSION_IDS.has('enable-banking')
+  const hasCalendarExtension = ENABLED_EXTENSION_IDS.has('calendar')
   const [bankConnectionError, setBankConnectionError] = useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
@@ -86,33 +83,9 @@ export default function SettingsPage() {
       return
     }
 
-    // Fetch settings and extension toggles in parallel
-    const [settingsRes, bankingToggleRes, calendarToggleRes] = await Promise.all([
-      supabase.from('company_settings').select('*').eq('user_id', user.id).single(),
-      fetch('/api/extensions/toggles/general/enable-banking').catch(() => null),
-      fetch('/api/extensions/toggles/general/calendar').catch(() => null),
-    ])
+    const settingsRes = await supabase.from('company_settings').select('*').eq('user_id', user.id).single()
 
     setSettings(settingsRes.data)
-
-    if (bankingToggleRes?.ok) {
-      const { data } = await bankingToggleRes.json()
-      setHasBankingExtension(data?.enabled || false)
-    } else {
-      // Fallback: check for existing bank connections
-      const { data: connections } = await supabase
-        .from('bank_connections')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .limit(1)
-      setHasBankingExtension((connections && connections.length > 0) || false)
-    }
-
-    if (calendarToggleRes?.ok) {
-      const { data } = await calendarToggleRes.json()
-      setHasCalendarExtension(data?.enabled || false)
-    }
 
     setIsLoading(false)
   }
@@ -570,11 +543,7 @@ export default function SettingsPage() {
                 </button>
               </div>
             )}
-            {hasBankingExtension === null ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : hasBankingExtension && BankingPanel ? (
+            {hasBankingExtension && BankingPanel ? (
               <BankingPanel />
             ) : (
               <Card>

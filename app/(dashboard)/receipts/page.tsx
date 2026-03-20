@@ -1,7 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useExtensionToggle } from '@/lib/extensions/hooks'
+import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Receipt, Loader2 } from 'lucide-react'
@@ -12,18 +12,10 @@ const ReceiptsPageOCR = dynamic(
   { loading: () => <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div> }
 )
 
+const ocrEnabled = ENABLED_EXTENSION_IDS.has('receipt-ocr')
+
 export default function ReceiptsPage() {
-  const { enabled, isLoading } = useExtensionToggle('general', 'receipt-ocr')
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
-
-  if (enabled) {
+  if (ocrEnabled) {
     return <ReceiptsPageOCR />
   }
 
