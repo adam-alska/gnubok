@@ -169,7 +169,7 @@ export function DeadlineCard({
                       kl. {deadline.due_time.slice(0, 5)}
                     </span>
                   )}
-                  {deadline.due_time && (deadline.customer || relativeDate) && (
+                  {deadline.due_time && (deadline.customer || (!completed && relativeDate)) && (
                     <span className="text-muted-foreground/30 text-sm">·</span>
                   )}
                   {!completed && relativeDate && (
