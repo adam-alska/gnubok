@@ -574,13 +574,21 @@ export function parseSIEFile(content: string): ParsedSIEFile {
         case 'TRANS':
         case 'RTRANS':
         case 'BTRANS': {
-          // #TRANS/#RTRANS/#BTRANS accountNumber {objectList} amount [date] [description] [quantity] [signature]
-          // BTRANS = Added/corrected transaction lines (part of the voucher)
-          // RTRANS = Removed/reversed transaction lines (amounts already have correct sign)
-          // All three must be included for vouchers to balance correctly.
-          // Fortnox/Bokio/Visma only emit #TRANS — this is a no-op for those providers.
+          // #TRANS = final transaction lines (the current state of the voucher)
+          // #RTRANS = removed lines (correction audit trail — original lines that were undone)
+          // #BTRANS = added lines (correction audit trail — new lines that replaced removed ones)
+          //
+          // When a voucher has been corrected, Fortnox/Visma emit all three types.
+          // Only #TRANS represents the final voucher state; #RTRANS and #BTRANS are
+          // supplementary history. We skip RTRANS/BTRANS to avoid double-counting
+          // which would make balanced vouchers appear unbalanced.
           if (!currentVoucher) {
             addIssue(issues, 'error', lineNum, `${tag} outside of VER block`, tag)
+            break
+          }
+
+          // Skip RTRANS/BTRANS — they are correction audit trail, not final state
+          if (tag === 'RTRANS' || tag === 'BTRANS') {
             break
           }
 
