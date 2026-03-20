@@ -452,7 +452,7 @@ export const CreateDeadlineSchema = z.object({
   due_date: isoDate,
   due_time: timeString.nullish(),
   deadline_type: DeadlineTypeSchema,
-  priority: DeadlinePrioritySchema.optional(),
+  priority: DeadlinePrioritySchema.nullish(),
   customer_id: uuid.nullish(),
   notes: z.string().nullish(),
   tax_deadline_type: TaxDeadlineTypeSchema.nullish(),
