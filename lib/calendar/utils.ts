@@ -242,9 +242,9 @@ export const PRIORITY_LABELS: Record<string, string> = {
 
 // Priority colors for styling
 export const PRIORITY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  critical: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
-  important: { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
-  normal: { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' }
+  critical: { bg: 'bg-red-50 dark:bg-red-950/40', text: 'text-red-700 dark:text-red-400', border: 'border-red-200 dark:border-red-800/50' },
+  important: { bg: 'bg-orange-50 dark:bg-orange-950/40', text: 'text-orange-700 dark:text-orange-400', border: 'border-orange-200 dark:border-orange-800/50' },
+  normal: { bg: 'bg-gray-50 dark:bg-gray-800/40', text: 'text-gray-700 dark:text-gray-300', border: 'border-gray-200 dark:border-gray-700/50' }
 }
 
 // ============================================================
