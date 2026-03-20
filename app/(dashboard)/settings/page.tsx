@@ -33,6 +33,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import type { CompanySettings } from '@/types'
+import { validateBankgiroNumber, formatBankgiroNumber } from '@/lib/bankgiro/luhn'
 import { CalendarFeedSettings } from '@/components/settings/CalendarFeedSettings'
 import { getSettingsPanel } from '@/lib/extensions/settings-panel-registry'
 import { SecuritySettings } from '@/components/settings/SecuritySettings'
@@ -52,6 +53,7 @@ export default function SettingsPage() {
   const hasBankingExtension = ENABLED_EXTENSION_IDS.has('enable-banking')
   const hasCalendarExtension = ENABLED_EXTENSION_IDS.has('calendar')
   const [bankConnectionError, setBankConnectionError] = useState<string | null>(null)
+  const [bankgiroError, setBankgiroError] = useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
@@ -158,6 +160,7 @@ export default function SettingsPage() {
       bank_name: formData.get('bank_name') as string,
       clearing_number: formData.get('clearing_number') as string,
       account_number: formData.get('account_number') as string,
+      bankgiro: (formData.get('bankgiro') as string) || null,
       preliminary_tax_monthly: parseFloat(formData.get('preliminary_tax_monthly') as string) || null,
       invoice_prefix: formData.get('invoice_prefix') as string || null,
       next_invoice_number: parseInt(formData.get('next_invoice_number') as string) || 1,
@@ -379,7 +382,7 @@ export default function SettingsPage() {
                   Betalningsuppgifter som visas på dina fakturor
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="bank_name">Bank</Label>
@@ -405,6 +408,31 @@ export default function SettingsPage() {
                       defaultValue={settings?.account_number || ''}
                     />
                   </div>
+                </div>
+                <div className="max-w-xs space-y-2">
+                  <Label htmlFor="bankgiro">Bankgiro</Label>
+                  <Input
+                    id="bankgiro"
+                    name="bankgiro"
+                    placeholder="XXX-XXXX"
+                    defaultValue={settings?.bankgiro || ''}
+                    onBlur={(e) => {
+                      const val = e.target.value.trim()
+                      if (!val) {
+                        setBankgiroError(null)
+                        return
+                      }
+                      if (validateBankgiroNumber(val)) {
+                        e.target.value = formatBankgiroNumber(val)
+                        setBankgiroError(null)
+                      } else {
+                        setBankgiroError('Ogiltigt bankgironummer (7-8 siffror med kontrollsiffra)')
+                      }
+                    }}
+                  />
+                  {bankgiroError && (
+                    <p className="text-xs text-destructive">{bankgiroError}</p>
+                  )}
                 </div>
               </CardContent>
             </Card>

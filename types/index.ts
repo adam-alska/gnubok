@@ -118,6 +118,7 @@ export interface CompanySettings {
   bank_name: string | null
   clearing_number: string | null
   account_number: string | null
+  bankgiro: string | null
   iban: string | null
   bic: string | null
 

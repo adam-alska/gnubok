@@ -6,6 +6,7 @@ import {
   StyleSheet,
 } from '@react-pdf/renderer'
 import type { Invoice, InvoiceItem, Customer, CompanySettings, InvoiceDocumentType } from '@/types'
+import { generateOcrReference } from '@/lib/bankgiro/luhn'
 
 // Create styles
 const styles = StyleSheet.create({
@@ -484,6 +485,12 @@ export function InvoicePDF({ invoice, customer, items, company, originalInvoiceN
                 </Text>
               </View>
             )}
+            {company.bankgiro && (
+              <View style={styles.paymentRow}>
+                <Text style={styles.paymentLabel}>Bankgiro:</Text>
+                <Text style={styles.paymentValue}>{company.bankgiro}</Text>
+              </View>
+            )}
             {company.iban && (
               <View style={styles.paymentRow}>
                 <Text style={styles.paymentLabel}>IBAN:</Text>
@@ -502,7 +509,7 @@ export function InvoicePDF({ invoice, customer, items, company, originalInvoiceN
             </View>
             <View style={styles.paymentRow}>
               <Text style={styles.paymentLabel}>OCR/Referens:</Text>
-              <Text style={[styles.paymentValue, { fontWeight: 'bold' }]}>{invoice.invoice_number}</Text>
+              <Text style={[styles.paymentValue, { fontWeight: 'bold' }]}>{generateOcrReference(invoice.invoice_number)}</Text>
             </View>
           </View>
         )}

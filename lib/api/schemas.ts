@@ -372,6 +372,7 @@ export const UpdateSettingsSchema = z.object({
   bank_name: z.string().optional(),
   clearing_number: z.string().optional(),
   account_number: z.string().optional(),
+  bankgiro: z.string().nullable().optional(),
   iban: z.string().optional(),
   bic: z.string().optional(),
   accounting_method: AccountingMethodSchema.optional(),
