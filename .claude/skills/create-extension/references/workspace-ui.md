@@ -19,7 +19,7 @@ export default function MyExtensionWorkspace({ userId }: WorkspaceComponentProps
 
 **3. Regenerate:** `npm run setup:extensions`
 
-Render chain: `/e/general/my-extension` → auth+toggle check → `ExtensionWorkspaceShell` (breadcrumb+header) → your component.
+Render chain: `/e/general/my-extension` → auth check → definition exists check → `ExtensionWorkspaceShell` (breadcrumb+header) → your component.
 
 Set `"workspace": null` for extensions without a dedicated page (event-only, service-only, etc.).
 
@@ -45,15 +45,19 @@ Enabled extensions auto-appear in the "Tillägg" sidebar section as links to `/e
 sidebarItems: [{ label: 'My Tool', icon: 'Wrench', path: '/tools/my-tool', order: 10 }]
 ```
 
-## Toggle System
+## Extension Enablement
 
-Toggle state stored in `extension_toggles` table `(user_id, sector_slug, extension_slug, enabled)`. Checked server-side via `isExtensionEnabled()`. Toggle changes dispatch `extension-toggle-changed` custom event.
+All compiled extensions are active for all users. To check if an extension is compiled in:
+
+```typescript
+import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
+
+const isAvailable = ENABLED_EXTENSION_IDS.has('my-extension')
+```
 
 ## Hooks
 
 ```typescript
-const { extensions, isLoading, refresh } = useEnabledExtensions()  // lib/extensions/hooks
-const { enabled, isLoading, toggle } = useExtensionToggle('general', 'my-extension')
 const { data, save, remove, getByKey } = useExtensionData('general', 'my-extension')
 const { totals, monthly, totalNet } = useAccountTotals({ from, to, monthly: true })
 ```

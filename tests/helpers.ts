@@ -17,7 +17,6 @@ import type {
   CompanySettings,
   InvoiceInboxItem,
 } from '@/types'
-import type { ExtensionToggle } from '@/lib/extensions/types'
 
 // ============================================================
 // Chainable Supabase mock
@@ -483,21 +482,6 @@ export function makeInvoiceInboxItem(
     match_method: null,
     created_at: '2024-06-15T14:30:00Z',
     updated_at: '2024-06-15T14:30:00Z',
-    ...overrides,
-  }
-}
-
-export function makeExtensionToggle(
-  overrides: Partial<ExtensionToggle> = {}
-): ExtensionToggle {
-  return {
-    id: nextId(),
-    user_id: 'user-1',
-    sector_slug: 'general',
-    extension_slug: 'receipt-ocr',
-    enabled: true,
-    created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T00:00:00Z',
     ...overrides,
   }
 }

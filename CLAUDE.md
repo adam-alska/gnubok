@@ -145,7 +145,7 @@ export async function POST(request: Request) {
 
 **Framework**: Vitest 4, `globals: true`, `environment: 'node'`. Tests colocated in `__tests__/` directories. Scope: business logic in `lib/` and API routes in `app/api/`. No component or E2E tests.
 
-**Test helpers** (`tests/helpers.ts`): `createMockSupabase()`, `createQueuedMockSupabase()`, `createMockRequest()`, `parseJsonResponse()`, `createMockRouteParams()`, and fixture factories (`makeTransaction()`, `makeJournalEntry()`, `makeInvoice()`, `makeCustomer()`, `makeSupplier()`, `makeSupplierInvoice()`, `makeFiscalPeriod()`, `makeReceipt()`, `makeDocumentAttachment()`, `makeCompanySettings()`, `makeInvoiceInboxItem()`, `makeExtensionToggle()`, etc.).
+**Test helpers** (`tests/helpers.ts`): `createMockSupabase()`, `createQueuedMockSupabase()`, `createMockRequest()`, `parseJsonResponse()`, `createMockRouteParams()`, and fixture factories (`makeTransaction()`, `makeJournalEntry()`, `makeInvoice()`, `makeCustomer()`, `makeSupplier()`, `makeSupplierInvoice()`, `makeFiscalPeriod()`, `makeReceipt()`, `makeDocumentAttachment()`, `makeCompanySettings()`, `makeInvoiceInboxItem()`, etc.).
 
 **Patterns**: Always mock `@/lib/supabase/server`. Use `vi.clearAllMocks()` and `eventBus.clear()` in `beforeEach`. API route tests: mock `@/lib/init` and lib functions, test auth (401), validation (400), not found (404), errors (500), happy path.
 

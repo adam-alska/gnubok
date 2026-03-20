@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server'
 import { ensureInitialized } from '@/lib/init'
 import { extensionRegistry } from '@/lib/extensions/registry'
 import { createExtensionContext } from '@/lib/extensions/context-factory'
-import { isExtensionEnabled } from '@/lib/extensions/toggle-check'
 import { hasAiConsent, isAiExtension } from '@/lib/extensions/ai-consent'
 import type { ApiRouteDefinition } from '@/lib/extensions/types'
 
@@ -116,13 +115,6 @@ async function handleRequest(
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  // Toggle check — use extension's declared sector, fallback to 'general'
-  const sector = extension.sector || 'general'
-  const enabled = await isExtensionEnabled(user.id, sector, extensionId)
-  if (!enabled) {
-    return NextResponse.json({ error: 'Extension is disabled' }, { status: 403 })
   }
 
   // AI consent check

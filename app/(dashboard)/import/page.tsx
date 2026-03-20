@@ -773,25 +773,9 @@ export default function ImportPage() {
       }
     }
   }, [])
-  // If extension isn't compiled in, we know synchronously it's unavailable
-  const bankingCompiledIn = ENABLED_EXTENSION_IDS.has('enable-banking')
-  const [hasBankingExtension, setHasBankingExtension] = useState<boolean | null>(
-    bankingCompiledIn ? null : false
-  )
-
-  // Migration extension: show card when compiled in (no DB toggle needed,
-  // since the extensions marketplace is not exposed in the UI)
+  // Extensions are active if compiled in — no runtime toggle check needed
+  const hasBankingExtension = ENABLED_EXTENSION_IDS.has('enable-banking')
   const hasMigrationExtension = ENABLED_EXTENSION_IDS.has('arcim-migration')
-
-  useEffect(() => {
-    if (!bankingCompiledIn) return
-    fetch('/api/extensions/toggles/general/enable-banking')
-      .then(res => res.ok ? res.json() : null)
-      .then(json => {
-        setHasBankingExtension(json?.data?.enabled || false)
-      })
-      .catch(() => setHasBankingExtension(false))
-  }, [bankingCompiledIn])
 
   return (
     <div className="space-y-6">
@@ -803,9 +787,9 @@ export default function ImportPage() {
         </p>
       </div>
 
-      {mode === null && hasBankingExtension !== null && (
+      {mode === null && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {hasBankingExtension === true && (
+          {hasBankingExtension && (
             <Card
               role="button"
               tabIndex={0}

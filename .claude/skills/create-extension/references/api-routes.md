@@ -47,7 +47,7 @@ Use `:paramName` — dispatcher extracts as `_paramName` search params:
 ## Dispatcher Flow
 
 1. Extract `extensionId` and `routePath` from URL segments
-2. Auth check (401) → toggle check via `isExtensionEnabled()` (403) → match method+path (404)
+2. Auth check (401) → match method+path (404) → AI consent check (403 for AI extensions)
 3. Extract path params → create `ExtensionContext` → call handler
 
 ## Settings Route Pattern

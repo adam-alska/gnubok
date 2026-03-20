@@ -9,7 +9,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { validatePeriodDuration } from '@/lib/bookkeeping/validate-period-duration'
-import { useExtensionToggle } from '@/lib/extensions/hooks'
+import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
 import type { CompanyLookupResult } from '@/lib/company-lookup/types'
 import type { CompanySettings, EntityType, MomsPeriod } from '@/types'
 
@@ -76,7 +76,7 @@ function OnboardingPageContent() {
   const [isSaving, setIsSaving] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
   const [settings, setSettings] = useState<Partial<CompanySettings>>({})
-  const { enabled: ticEnabled } = useExtensionToggle('general', 'tic')
+  const ticEnabled = ENABLED_EXTENSION_IDS.has('tic')
   const [ticLookup, setTicLookup] = useState<CompanyLookupResult | null>(null)
 
   const totalSteps = 5

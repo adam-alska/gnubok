@@ -3,7 +3,8 @@ import { getExtensionDefinition, getSector } from '@/lib/extensions/sectors'
 import { resolveIcon } from '@/lib/extensions/icon-resolver'
 import type { SectorSlug } from '@/lib/extensions/types'
 import CategoryBadge from '@/components/extensions/CategoryBadge'
-import ExtensionToggleButton from '@/components/extensions/ExtensionToggleButton'
+import { WORKSPACES } from '@/lib/extensions/_generated/workspace-map'
+import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 
 export default async function ExtensionDetailPage({
@@ -17,8 +18,10 @@ export default async function ExtensionDetailPage({
   if (!definition) notFound()
 
   const sector = getSector(sectorSlug as SectorSlug)
-   
+
   const Icon = resolveIcon(definition.icon)
+
+  const hasWorkspace = `${sectorSlug}/${extensionSlug}` in WORKSPACES
 
   const dataPatternLabels: Record<string, string> = {
     core: 'Använder bokföringsdata',
@@ -44,7 +47,7 @@ export default async function ExtensionDetailPage({
         <span className="text-foreground">{definition.name}</span>
       </nav>
 
-      {/* Header with toggle */}
+      {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-8">
         <div className="flex items-start gap-4">
           <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 flex-shrink-0">
@@ -58,11 +61,13 @@ export default async function ExtensionDetailPage({
             </div>
           </div>
         </div>
-        <ExtensionToggleButton
-          sectorSlug={sectorSlug}
-          extensionSlug={extensionSlug}
-          subscriptionNotice={definition.subscriptionNotice}
-        />
+        {hasWorkspace && (
+          <Button asChild>
+            <Link href={`/e/${sectorSlug}/${extensionSlug}`}>
+              Öppna
+            </Link>
+          </Button>
+        )}
       </div>
 
       {/* Details */}

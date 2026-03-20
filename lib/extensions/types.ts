@@ -52,17 +52,6 @@ export interface Sector {
   extensions: ExtensionDefinition[]
 }
 
-/** Database row for extension toggle state */
-export interface ExtensionToggle {
-  id: string
-  user_id: string
-  sector_slug: string
-  extension_slug: string
-  enabled: boolean
-  created_at: string
-  updated_at: string
-}
-
 // ============================================================
 // Extension Interface & Supporting Types
 // ============================================================

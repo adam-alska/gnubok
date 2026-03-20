@@ -101,7 +101,6 @@ BEGIN
   DELETE FROM public.chat_sessions WHERE user_id = target_user_id;
   DELETE FROM public.extension_data WHERE user_id = target_user_id;
   DELETE FROM public.audit_log WHERE user_id = target_user_id;
-  DELETE FROM public.extension_toggles WHERE user_id = target_user_id;
   DELETE FROM public.company_settings WHERE user_id = target_user_id;
   DELETE FROM public.profiles WHERE id = target_user_id;
 

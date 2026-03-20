@@ -5,41 +5,12 @@ import { Button } from '@/components/ui/button'
 import { ChatPanel } from './ChatPanel'
 import { MessageCircle, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
+
+const chatEnabled = ENABLED_EXTENSION_IDS.has('ai-chat')
 
 export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false)
-  // Default to true for legacy compatibility (ai-chat defaults to enabled)
-  const [enabled, setEnabled] = useState(true)
-
-  // Fetch initial toggle state
-  useEffect(() => {
-    const check = async () => {
-      try {
-        const res = await fetch('/api/extensions/toggles/general/ai-chat')
-        if (res.ok) {
-          const { data } = await res.json()
-          // Legacy: enabled by default when no toggle row exists
-          setEnabled(data?.enabled ?? true)
-        }
-      } catch {
-        // Keep default (enabled) on fetch failure
-      }
-    }
-    check()
-  }, [])
-
-  // Listen for real-time toggle changes
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const { sectorSlug, extensionSlug, enabled: newValue } = (e as CustomEvent).detail
-      if (sectorSlug === 'general' && extensionSlug === 'ai-chat') {
-        setEnabled(newValue)
-        if (!newValue) setIsOpen(false)
-      }
-    }
-    window.addEventListener('extension-toggle-changed', handler)
-    return () => window.removeEventListener('extension-toggle-changed', handler)
-  }, [])
 
   // Allow other components to open the chat via custom event
   useEffect(() => {
@@ -48,7 +19,7 @@ export function ChatWidget() {
     return () => window.removeEventListener('open-ai-chat', handler)
   }, [])
 
-  if (!enabled) return null
+  if (!chatEnabled) return null
 
   return (
     <>

@@ -15,10 +15,6 @@ vi.mock('@/lib/init', () => ({
   ensureInitialized: vi.fn(),
 }))
 
-vi.mock('@/lib/extensions/toggle-check', () => ({
-  isExtensionEnabled: vi.fn(),
-}))
-
 vi.mock('@/lib/extensions/context-factory', () => ({
   createExtensionContext: vi.fn().mockReturnValue({
     userId: 'user-1',
@@ -28,11 +24,9 @@ vi.mock('@/lib/extensions/context-factory', () => ({
 
 import { createClient } from '@/lib/supabase/server'
 import { extensionRegistry } from '@/lib/extensions/registry'
-import { isExtensionEnabled } from '@/lib/extensions/toggle-check'
 import { GET, POST } from '../route'
 
 const mockCreateClient = vi.mocked(createClient)
-const mockIsEnabled = vi.mocked(isExtensionEnabled)
 
 function createPathParams(path: string[]) {
   return { params: Promise.resolve({ path }) }
@@ -89,29 +83,6 @@ describe('Extension Catch-All Route', () => {
     expect(status).toBe(401)
   })
 
-  it('returns 403 when extension is disabled', async () => {
-    extensionRegistry.register({
-      id: 'test-ext',
-      name: 'Test',
-      version: '1.0.0',
-      apiRoutes: [{ method: 'GET', path: '/data', handler: vi.fn() }],
-    })
-
-    const { supabase } = createQueuedMockSupabase()
-    supabase.auth.getUser.mockResolvedValue({
-      data: { user: { id: 'user-1' } },
-      error: null,
-    })
-    mockCreateClient.mockResolvedValue(supabase as never)
-    mockIsEnabled.mockResolvedValue(false)
-
-    const request = createMockRequest('/api/extensions/ext/test-ext/data')
-    const response = await GET(request, createPathParams(['test-ext', 'data']))
-    const { status } = await parseJsonResponse(response)
-
-    expect(status).toBe(403)
-  })
-
   it('returns 404 for unmatched method/path', async () => {
     extensionRegistry.register({
       id: 'test-ext',
@@ -126,7 +97,6 @@ describe('Extension Catch-All Route', () => {
       error: null,
     })
     mockCreateClient.mockResolvedValue(supabase as never)
-    mockIsEnabled.mockResolvedValue(true)
 
     // GET doesn't match POST /data
     const request = createMockRequest('/api/extensions/ext/test-ext/data')
@@ -154,7 +124,6 @@ describe('Extension Catch-All Route', () => {
       error: null,
     })
     mockCreateClient.mockResolvedValue(supabase as never)
-    mockIsEnabled.mockResolvedValue(true)
 
     const request = createMockRequest('/api/extensions/ext/enable-banking/banks')
     const response = await GET(request, createPathParams(['enable-banking', 'banks']))
@@ -185,7 +154,6 @@ describe('Extension Catch-All Route', () => {
       error: null,
     })
     mockCreateClient.mockResolvedValue(supabase as never)
-    mockIsEnabled.mockResolvedValue(true)
 
     const request = createMockRequest('/api/extensions/ext/test-ext/connect', {
       method: 'POST',
