@@ -13,7 +13,7 @@ import { InfoTooltip } from '@/components/ui/info-tooltip'
 import { Loader2, ArrowRight, ArrowLeft, Check, CalendarDays } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/components/ui/use-toast'
-import { monthsBetween } from '@/lib/bookkeeping/validate-period-duration'
+import { monthsBetween, parseDateParts } from '@/lib/bookkeeping/validate-period-duration'
 import type { EntityType } from '@/types'
 
 const schema = z.object({
@@ -68,11 +68,8 @@ const monthNames = [
 ]
 
 function formatSwedishDate(dateStr: string): string {
-  const d = new Date(dateStr)
-  const day = d.getDate()
-  const month = monthNames[d.getMonth()].toLowerCase()
-  const year = d.getFullYear()
-  return `${day} ${month} ${year}`
+  const { year, month, day } = parseDateParts(dateStr)
+  return `${day} ${monthNames[month - 1].toLowerCase()} ${year}`
 }
 
 /**
@@ -180,28 +177,28 @@ export default function Step3TaxRegistration({
   // State for first-year start date selectors (month/year)
   const [startMonth, setStartMonth] = useState<number>(
     initialData.first_year_start
-      ? new Date(initialData.first_year_start).getMonth() + 1
+      ? parseDateParts(initialData.first_year_start).month
       : 0
   )
   const [startYear, setStartYear] = useState<number>(
     initialData.first_year_start
-      ? new Date(initialData.first_year_start).getFullYear()
+      ? parseDateParts(initialData.first_year_start).year
       : 0
   )
 
   // State for AB first-year end month selector
   const [abEndMonth, setAbEndMonth] = useState<number>(
     initialData.first_year_end
-      ? new Date(initialData.first_year_end).getMonth() + 1
+      ? parseDateParts(initialData.first_year_end).month
       : 12
   )
 
   // Parse first year start for date computations
   const parsedStart = useMemo(() => {
     if (!firstYearStart) return null
-    const d = new Date(firstYearStart)
-    if (isNaN(d.getTime())) return null
-    return { year: d.getFullYear(), month: d.getMonth() + 1 }
+    const parts = parseDateParts(firstYearStart)
+    if (isNaN(parts.year) || isNaN(parts.month)) return null
+    return { year: parts.year, month: parts.month }
   }, [firstYearStart])
 
   // Compute end date options for first year
@@ -220,8 +217,7 @@ export default function Step3TaxRegistration({
 
     if (data.is_first_fiscal_year && data.first_year_start && data.first_year_end) {
       // Derive start month from end date
-      const endDate = new Date(data.first_year_end)
-      const endMonth = endDate.getMonth() + 1
+      const endMonth = parseDateParts(data.first_year_end).month
       fiscalYearStartMonth = endMonth === 12 ? 1 : endMonth + 1
       firstStart = data.first_year_start
       firstEnd = data.first_year_end
