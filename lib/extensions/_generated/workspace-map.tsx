@@ -6,4 +6,5 @@ import type { WorkspaceComponentProps } from '../workspace-registry'
 export const WORKSPACES: Record<string, ComponentType<WorkspaceComponentProps>> = {
   'general/enable-banking': dynamic(() => import('@/components/extensions/general/EnableBankingWorkspace')),
   'general/arcim-migration': dynamic(() => import('@/components/extensions/general/ArcimMigrationWorkspace')),
+  'general/tic': dynamic(() => import('@/components/extensions/general/TicWorkspace')),
 }

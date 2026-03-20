@@ -20,6 +20,9 @@ import { suggestMappings, getMappingStats, isSystemAccount } from '@/lib/import/
 import { loadMappings, generateImportPreview, executeSIEImport, saveMappings } from '@/lib/import/sie-import'
 import { BAS_REFERENCE } from '@/lib/bookkeeping/bas-reference'
 
+/** Fiscal years we support importing — older data is not needed */
+const ALLOWED_FISCAL_YEARS = new Set([2024, 2025, 2026])
+
 /**
  * Arcim Migration extension
  *
@@ -302,15 +305,25 @@ export const arcimMigrationExtension: Extension = {
             log.info(`Fetching SIE export for consent ${consentId}...`)
             const sieResult = await fetchSIEExport(consentId, 4)
             log.info(`SIE export response: ${sieResult.files.length} files returned`)
-            if (sieResult.files.length > 0) {
+
+            // Only keep fiscal years we need (2024–2026)
+            const filteredFiles = sieResult.files.filter(f => ALLOWED_FISCAL_YEARS.has(f.fiscalYear))
+            if (filteredFiles.length < sieResult.files.length) {
+              const skippedYears = sieResult.files
+                .filter(f => !ALLOWED_FISCAL_YEARS.has(f.fiscalYear))
+                .map(f => f.fiscalYear)
+              log.info(`Filtered out fiscal years: ${skippedYears.join(', ')} (only importing ${[...ALLOWED_FISCAL_YEARS].join(', ')})`)
+            }
+
+            if (filteredFiles.length > 0) {
               sieAvailable = true
-              const totalAccounts = Math.max(...sieResult.files.map(f => f.accountCount))
-              const totalTransactions = sieResult.files.reduce((sum, f) => sum + f.transactionCount, 0)
-              const fiscalYears = sieResult.files.map(f => f.fiscalYear).sort()
+              const totalAccounts = Math.max(...filteredFiles.map(f => f.accountCount))
+              const totalTransactions = filteredFiles.reduce((sum, f) => sum + f.transactionCount, 0)
+              const fiscalYears = filteredFiles.map(f => f.fiscalYear).sort()
               sieStats = { accountCount: totalAccounts, transactionCount: totalTransactions, fiscalYears }
               log.info(`SIE stats: ${totalAccounts} accounts, ${totalTransactions} transactions, years: ${fiscalYears.join(', ')}`)
             } else {
-              log.info('SIE export returned empty files array')
+              log.info('No SIE files within allowed fiscal years')
             }
           } catch (err) {
             log.info('SIE export failed:', err instanceof Error ? err.message : String(err))
@@ -358,21 +371,22 @@ export const arcimMigrationExtension: Extension = {
         }
 
         try {
-          // Fetch SIE from gateway
+          // Fetch SIE from gateway and filter to allowed fiscal years (2024–2026)
           const sieResult = await fetchSIEExport(consentId, 4)
-          if (sieResult.files.length === 0) {
-            return NextResponse.json({ error: 'No SIE data available' }, { status: 404 })
+          const filteredFiles = sieResult.files.filter(f => ALLOWED_FISCAL_YEARS.has(f.fiscalYear))
+          if (filteredFiles.length === 0) {
+            return NextResponse.json({ error: 'No SIE data available for fiscal years 2024–2026' }, { status: 404 })
           }
 
           // Parse most recent file for preview/validation
-          const sieFile = sieResult.files[sieResult.files.length - 1]
+          const sieFile = filteredFiles[filteredFiles.length - 1]
           const parsed = parseSIEFile(sieFile.rawContent)
           const validation = validateSIEFile(parsed)
 
           // Collect ALL unique accounts across ALL fiscal year files
           // so mappings cover every account that will be imported
           const allAccountsMap = new Map<string, { number: string; name: string }>()
-          for (const file of sieResult.files) {
+          for (const file of filteredFiles) {
             const fileParsed = parseSIEFile(file.rawContent)
             for (const acc of fileParsed.accounts) {
               if (!allAccountsMap.has(acc.number)) {
@@ -408,13 +422,13 @@ export const arcimMigrationExtension: Extension = {
           const mappings = suggestMappings(allAccounts, basAccounts, existingRecords)
           const mappingStats = getMappingStats(mappings)
 
-          log.info(`Account mapping: ${allAccounts.length} unique accounts across ${sieResult.files.length} files, ${mappingStats.unmapped} unmapped`)
+          log.info(`Account mapping: ${allAccounts.length} unique accounts across ${filteredFiles.length} files, ${mappingStats.unmapped} unmapped`)
 
           // Generate preview
           const preview = generateImportPreview(parsed, mappings)
 
-          // Collect all raw SIE content (all fiscal years)
-          const allRawContent = sieResult.files.map(f => f.rawContent)
+          // Collect all raw SIE content (filtered fiscal years only)
+          const allRawContent = filteredFiles.map(f => f.rawContent)
 
           return NextResponse.json({
             parsed,

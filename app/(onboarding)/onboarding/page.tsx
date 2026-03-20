@@ -9,6 +9,8 @@ import { useToast } from '@/components/ui/use-toast'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { validatePeriodDuration } from '@/lib/bookkeeping/validate-period-duration'
+import { useExtensionToggle } from '@/lib/extensions/hooks'
+import type { CompanyLookupResult } from '@/lib/company-lookup/types'
 import type { CompanySettings, EntityType, MomsPeriod } from '@/types'
 
 import Step1EntityType from '@/components/onboarding/Step1EntityType'
@@ -74,6 +76,8 @@ function OnboardingPageContent() {
   const [isSaving, setIsSaving] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
   const [settings, setSettings] = useState<Partial<CompanySettings>>({})
+  const { enabled: ticEnabled } = useExtensionToggle('general', 'tic')
+  const [ticLookup, setTicLookup] = useState<CompanyLookupResult | null>(null)
 
   const totalSteps = 5
 
@@ -218,6 +222,7 @@ function OnboardingPageContent() {
     if (currentStep === 1 && stepData.entity_type && stepData.entity_type !== settings.entity_type) {
       console.warn(LOG, 'entity type changed from', settings.entity_type, 'to', stepData.entity_type, '— clearing dependent fields')
       stepData = { ...stepData, org_number: '', company_name: '' }
+      setTicLookup(null)
     }
 
     const nextStep = currentStep + 1
@@ -460,6 +465,8 @@ function OnboardingPageContent() {
             city: settings.city ?? undefined,
           }}
           entityType={settings.entity_type as EntityType}
+          ticEnabled={ticEnabled}
+          onTicLookup={setTicLookup}
           onNext={(data) => handleNext(data)}
           onBack={handleBack}
           isSaving={isSaving}
@@ -469,7 +476,7 @@ function OnboardingPageContent() {
       {currentStep === 3 && (
         <Step3TaxRegistration
           initialData={{
-            f_skatt: settings.f_skatt ?? undefined,
+            f_skatt: settings.f_skatt ?? (ticLookup ? ticLookup.registration.fTax : undefined),
             fiscal_year_start_month: settings.fiscal_year_start_month ?? undefined,
           }}
           entityType={settings.entity_type as EntityType}
@@ -482,7 +489,7 @@ function OnboardingPageContent() {
       {currentStep === 4 && (
         <Step4VatAccounting
           initialData={{
-            vat_registered: settings.vat_registered ?? undefined,
+            vat_registered: settings.vat_registered ?? (ticLookup ? ticLookup.registration.vat : undefined),
             vat_number: settings.vat_number ?? undefined,
             moms_period: (settings.moms_period as MomsPeriod | null) ?? undefined,
             accounting_method: (settings.accounting_method as 'accrual' | 'cash') ?? undefined,
@@ -501,8 +508,8 @@ function OnboardingPageContent() {
             bank_name: settings.bank_name ?? undefined,
             clearing_number: settings.clearing_number ?? undefined,
             account_number: settings.account_number ?? undefined,
-            iban: settings.iban ?? undefined,
-            bic: settings.bic ?? undefined,
+            iban: settings.iban ?? (ticLookup?.bankAccounts.find((b) => b.type === 'iban')?.accountNumber) ?? undefined,
+            bic: settings.bic ?? (ticLookup?.bankAccounts.find((b) => b.type === 'iban')?.bic) ?? undefined,
           }}
           onComplete={async (data) => {
             if (data) {

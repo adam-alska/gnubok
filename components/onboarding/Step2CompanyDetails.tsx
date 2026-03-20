@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -7,8 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2, ArrowRight, ArrowLeft } from 'lucide-react'
+import { Loader2, ArrowRight, ArrowLeft, CheckCircle2, AlertTriangle } from 'lucide-react'
 import type { EntityType } from '@/types'
+import type { CompanyLookupResult } from '@/lib/company-lookup/types'
 
 const schema = z.object({
   company_name: z.string().min(1, 'Företagsnamn krävs'),
@@ -22,9 +24,13 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>
 
+const ORG_NUMBER_REGEX = /^\d{6,8}[-\s]?\d{4}$/
+
 interface Step2Props {
   initialData: Partial<FormData>
   entityType?: EntityType
+  ticEnabled?: boolean
+  onTicLookup?: (result: CompanyLookupResult | null) => void
   onNext: (data: FormData) => void
   onBack: () => void
   isSaving: boolean
@@ -33,6 +39,8 @@ interface Step2Props {
 export default function Step2CompanyDetails({
   initialData,
   entityType,
+  ticEnabled,
+  onTicLookup,
   onNext,
   onBack,
   isSaving,
@@ -40,6 +48,8 @@ export default function Step2CompanyDetails({
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -53,6 +63,81 @@ export default function Step2CompanyDetails({
     },
   })
 
+  const [isLooking, setIsLooking] = useState(false)
+  const [lookupError, setLookupError] = useState<string | null>(null)
+  const [lookupDone, setLookupDone] = useState<CompanyLookupResult | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+
+  const orgNumber = watch('org_number')
+
+  useEffect(() => {
+    if (!ticEnabled || !orgNumber || !ORG_NUMBER_REGEX.test(orgNumber)) {
+      return
+    }
+
+    setLookupError(null)
+    setLookupDone(null)
+
+    const timer = setTimeout(() => {
+      // Abort any in-flight request
+      abortRef.current?.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
+
+      setIsLooking(true)
+
+      fetch(`/api/extensions/ext/tic/lookup?org_number=${encodeURIComponent(orgNumber)}`, {
+        signal: controller.signal,
+      })
+        .then(async (res) => {
+          if (controller.signal.aborted) return
+
+          if (res.status === 403) {
+            // Extension disabled — silently ignore
+            return
+          }
+          if (res.status === 404) {
+            setLookupError('Inget företag hittades med det organisationsnumret.')
+            onTicLookup?.(null)
+            return
+          }
+          if (!res.ok) {
+            setLookupError('Kunde inte hämta företagsuppgifter. Du kan fylla i manuellt.')
+            onTicLookup?.(null)
+            return
+          }
+
+          const { data } = (await res.json()) as { data: CompanyLookupResult }
+
+          // Guard: only apply if org_number still matches (user may have changed it)
+          if (controller.signal.aborted) return
+
+          setLookupDone(data)
+          onTicLookup?.(data)
+
+          // Auto-fill from TIC — overwrite since user just entered a new org number
+          if (data.companyName) setValue('company_name', data.companyName)
+          if (data.address?.street) setValue('address_line1', data.address.street)
+          if (data.address?.postalCode) setValue('postal_code', data.address.postalCode)
+          if (data.address?.city) setValue('city', data.address.city)
+        })
+        .catch((err) => {
+          if ((err as Error).name === 'AbortError') return
+          setLookupError('Kunde inte hämta företagsuppgifter. Du kan fylla i manuellt.')
+          onTicLookup?.(null)
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setIsLooking(false)
+        })
+    }, 500)
+
+    return () => {
+      clearTimeout(timer)
+      abortRef.current?.abort()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticEnabled, orgNumber])
+
   const isAB = entityType === 'aktiebolag'
 
   return (
@@ -61,9 +146,11 @@ export default function Step2CompanyDetails({
         <CardHeader>
           <CardTitle>Grunduppgifter</CardTitle>
           <CardDescription>
-            {isAB
-              ? 'Ange bolagets registrerade namn och organisationsnummer.'
-              : 'Ange namn på din verksamhet.'}
+            {ticEnabled
+              ? 'Ange organisationsnummer så hämtas övriga uppgifter automatiskt.'
+              : isAB
+                ? 'Ange bolagets registrerade namn och organisationsnummer.'
+                : 'Ange namn på din verksamhet.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -72,20 +159,6 @@ export default function Step2CompanyDetails({
             console.error('[onboarding] step 2 validation failed:', fields, errs)
             fetch('/api/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'step 2 validation failed', extra: { fields } }) }).catch(() => {})
           })} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="company_name">
-                {isAB ? 'Företagsnamn' : 'Verksamhetsnamn (Eller ditt namn vid EF)'} *
-              </Label>
-              <Input
-                id="company_name"
-                placeholder={isAB ? 'AB Företaget' : 'Alices Konsultverksamhet'}
-                {...register('company_name')}
-              />
-              {errors.company_name && (
-                <p className="text-sm text-destructive">{errors.company_name.message}</p>
-              )}
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="org_number">
                 Organisationsnummer *
@@ -103,6 +176,41 @@ export default function Step2CompanyDetails({
                   ? 'Obligatoriskt för aktiebolag'
                   : 'Vid enskild firma är orgnummer samma som ditt personnummer'}
               </p>
+              {ticEnabled && isLooking && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Hämtar företagsuppgifter...
+                </div>
+              )}
+              {ticEnabled && lookupDone && !lookupDone.isCeased && (
+                <div className="flex items-center gap-2 text-sm text-primary">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  {lookupDone.companyName}
+                </div>
+              )}
+              {ticEnabled && lookupDone?.isCeased && (
+                <div className="flex items-center gap-2 text-sm text-destructive">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  {lookupDone.companyName} — företaget är avregistrerat
+                </div>
+              )}
+              {ticEnabled && lookupError && (
+                <p className="text-xs text-muted-foreground">{lookupError}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="company_name">
+                {isAB ? 'Företagsnamn' : 'Verksamhetsnamn (Eller ditt namn vid EF)'} *
+              </Label>
+              <Input
+                id="company_name"
+                placeholder={isAB ? 'AB Företaget' : 'Alices Konsultverksamhet'}
+                {...register('company_name')}
+              />
+              {errors.company_name && (
+                <p className="text-sm text-destructive">{errors.company_name.message}</p>
+              )}
             </div>
 
             <div className="pt-4 border-t">

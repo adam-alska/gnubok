@@ -1,5 +1,6 @@
 import type { Sector, SectorSlug, ExtensionDefinition } from './types'
 import { EXTENSION_DEFINITIONS } from './_generated/sector-definitions'
+import { WORKSPACES } from './_generated/workspace-map'
 
 // ============================================================
 // Sector & Extension Registry
@@ -45,4 +46,28 @@ export function getAllExtensions(): ExtensionDefinition[] {
 
 export function getExtensionsBySector(slug: SectorSlug): ExtensionDefinition[] {
   return getSector(slug)?.extensions ?? []
+}
+
+/** Extensions with a workspace and a quickAction href — for sidebar nav.
+ *  Filters against the user's enabled extensions when provided. */
+export function getExtensionNavItems(
+  enabledExtensions?: { sector_slug: string; extension_slug: string }[]
+): { href: string; label: string; icon: string }[] {
+  return getAllExtensions()
+    .filter(e => {
+      const key = `${e.sector}/${e.slug}`
+      if (!(key in WORKSPACES) || !e.quickAction?.href) return false
+      if (enabledExtensions) {
+        return enabledExtensions.some(
+          t => t.sector_slug === e.sector && t.extension_slug === e.slug
+        )
+      }
+      return true
+    })
+    .sort((a, b) => (a.quickAction!.order ?? 0) - (b.quickAction!.order ?? 0))
+    .map(e => ({
+      href: e.quickAction!.href!,
+      label: e.quickAction!.label,
+      icon: e.quickAction!.icon,
+    }))
 }
