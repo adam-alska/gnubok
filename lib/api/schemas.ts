@@ -450,16 +450,16 @@ export const EvaluateMappingRulesSchema = z.union([
 export const CreateDeadlineSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   due_date: isoDate,
-  due_time: timeString.optional(),
+  due_time: timeString.nullish(),
   deadline_type: DeadlineTypeSchema,
   priority: DeadlinePrioritySchema.optional(),
-  customer_id: uuid.optional(),
-  notes: z.string().optional(),
-  tax_deadline_type: TaxDeadlineTypeSchema.optional(),
-  tax_period: z.string().optional(),
+  customer_id: uuid.nullish(),
+  notes: z.string().nullish(),
+  tax_deadline_type: TaxDeadlineTypeSchema.nullish(),
+  tax_period: z.string().nullish(),
   source: DeadlineSourceSchema.optional(),
-  linked_report_type: z.string().optional(),
-  linked_report_period: z.record(z.string(), z.unknown()).optional(),
+  linked_report_type: z.string().nullish(),
+  linked_report_period: z.record(z.string(), z.unknown()).nullish(),
 })
 
 // ============================================================

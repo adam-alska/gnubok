@@ -49,9 +49,9 @@ export function DeadlineCard({
         className={cn(
           'flex items-center gap-2 p-2 rounded-lg border transition-colors',
           overdue && !completed
-            ? 'border-destructive/50 bg-destructive/5'
+            ? 'border-destructive/50 bg-destructive/5 dark:bg-destructive/10 dark:border-destructive/30'
             : completed
-            ? 'border-success/50 bg-success/5'
+            ? 'border-success/50 bg-success/5 dark:bg-success/10 dark:border-success/30'
             : `${priorityStyle.border} ${priorityStyle.bg}`
         )}
       >
@@ -89,9 +89,9 @@ export function DeadlineCard({
       className={cn(
         'p-4 rounded-lg border transition-colors',
         overdue && !completed
-          ? 'border-destructive/50 bg-destructive/5'
+          ? 'border-destructive/50 bg-destructive/5 dark:bg-destructive/10 dark:border-destructive/30'
           : completed
-          ? 'border-success/50 bg-success/5'
+          ? 'border-success/50 bg-success/5 dark:bg-success/10 dark:border-success/30'
           : `${priorityStyle.border} ${priorityStyle.bg}`
       )}
     >
