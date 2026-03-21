@@ -37,6 +37,7 @@ import { validateBankgiroNumber, formatBankgiroNumber } from '@/lib/bankgiro/luh
 import { CalendarFeedSettings } from '@/components/settings/CalendarFeedSettings'
 import { getSettingsPanel } from '@/lib/extensions/settings-panel-registry'
 import { SecuritySettings } from '@/components/settings/SecuritySettings'
+import { ApiKeysPanel } from '@/components/settings/ApiKeysPanel'
 import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
 
 const BankingPanel = getSettingsPanel('enable-banking')
@@ -52,6 +53,7 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<CompanySettings | null>(null)
   const hasBankingExtension = ENABLED_EXTENSION_IDS.has('enable-banking')
   const hasCalendarExtension = ENABLED_EXTENSION_IDS.has('calendar')
+  const hasMcpExtension = ENABLED_EXTENSION_IDS.has('mcp-server')
   const [bankConnectionError, setBankConnectionError] = useState<string | null>(null)
   const [bankgiroError, setBankgiroError] = useState<string | null>(null)
   const [clearingError, setClearingError] = useState<string | null>(null)
@@ -71,6 +73,7 @@ export default function SettingsPage() {
     { value: 'calendar', label: 'Kalender', show: hasCalendarExtension },
     { value: 'security', label: 'Säkerhet', show: true },
     { value: 'appearance', label: 'Utseende', show: true },
+    { value: 'api', label: 'API', show: hasMcpExtension },
     { value: 'account', label: 'Konto', show: true },
   ].filter(t => t.show)
 
@@ -777,6 +780,13 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* API keys */}
+        {hasMcpExtension && (
+          <TabsContent value="api">
+            <ApiKeysPanel />
+          </TabsContent>
+        )}
 
         {/* Account settings */}
         <TabsContent value="account" className="space-y-6">

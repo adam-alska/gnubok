@@ -24,6 +24,7 @@ import {
   Building2,
   FileInput,
   Wallet,
+  TrendingUp,
 } from 'lucide-react'
 import { resolveIcon } from '@/lib/extensions/icon-resolver'
 import type { EntityType } from '@/types'
@@ -54,6 +55,7 @@ interface NavItem {
 // All nav items for sidebar and mobile drawer
 const navItems: NavItem[] = [
   { href: '/', label: 'Översikt', icon: LayoutDashboard, group: 'main' },
+  { href: '/nyckeltal', label: 'Nyckeltal', icon: TrendingUp, group: 'main' },
   { href: '/deadlines', label: 'Deadlines', icon: Calendar, group: 'main' },
   { href: '/invoices', label: 'Fakturor', icon: Receipt, group: 'finans' },
   { href: '/customers', label: 'Kunder', icon: Users, group: 'finans' },
