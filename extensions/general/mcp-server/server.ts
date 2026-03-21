@@ -1228,10 +1228,23 @@ function jsonRpcError(
  * Auth is done via Bearer API key (extension route has skipAuth: true).
  */
 export async function handleMcpRequest(request: Request): Promise<Response> {
-  // ── Auth ──
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   const wwwAuth = `Bearer resource_metadata="${appUrl}/.well-known/oauth-protected-resource"`
 
+  // ── Pre-auth: handle fire-and-forget notifications before auth check ──
+  // MCP notifications have no id and don't expect error responses.
+  // Checking auth on them would return 401 which confuses clients.
+  const clonedRequest = request.clone()
+  try {
+    const peek = await clonedRequest.json()
+    if (peek.method === 'notifications/initialized') {
+      return new Response(null, { status: 202 })
+    }
+  } catch {
+    // Not valid JSON — fall through to auth + parse below
+  }
+
+  // ── Auth ──
   const token = extractBearerToken(request)
   if (!token) {
     return new Response('Unauthorized', {
@@ -1280,20 +1293,26 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
   const { method, id, params } = body
 
   switch (method) {
-    case 'initialize':
+    case 'initialize': {
+      const SUPPORTED_VERSIONS = new Set(['2025-03-26', '2024-11-05'])
+      const clientVersion = (params as Record<string, unknown>)?.protocolVersion as string | undefined
+      const negotiatedVersion =
+        clientVersion && SUPPORTED_VERSIONS.has(clientVersion) ? clientVersion : PROTOCOL_VERSION
       return NextResponse.json(
         jsonRpc(id ?? null, {
-          protocolVersion: PROTOCOL_VERSION,
+          protocolVersion: negotiatedVersion,
           capabilities: {
             tools: { listChanged: false },
           },
           serverInfo: SERVER_INFO,
+          instructions: 'gnubok — Swedish bookkeeping via conversation. List transactions, categorize, create invoices, view reports.',
         })
       )
+    }
 
     case 'notifications/initialized':
-      // Client acknowledgement — no response needed for notifications
-      return new Response(null, { status: 204 })
+      // Handled pre-auth above, but if it somehow reaches here, still return 202
+      return new Response(null, { status: 202 })
 
     case 'ping':
       return NextResponse.json(jsonRpc(id ?? null, {}))
