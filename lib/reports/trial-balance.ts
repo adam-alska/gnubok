@@ -28,7 +28,7 @@ export async function generateTrialBalance(
   }>(({ from, to }) =>
     supabase
       .from('journal_entry_lines')
-      .select('account_number, debit_amount, credit_amount, journal_entries!inner()')
+      .select('account_number, debit_amount, credit_amount, journal_entries!inner(user_id, fiscal_period_id, status)')
       .eq('journal_entries.user_id', userId)
       .eq('journal_entries.fiscal_period_id', fiscalPeriodId)
       .in('journal_entries.status', ['posted', 'reversed'])

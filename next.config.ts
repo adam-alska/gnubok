@@ -18,6 +18,15 @@ const cspDirectives = [
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  async redirects() {
+    return [
+      {
+        source: '/nyckeltal',
+        destination: '/kpi',
+        permanent: true,
+      },
+    ]
+  },
   async headers() {
     return [
       {
