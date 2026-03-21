@@ -66,6 +66,16 @@ export function DeadlineCard({
           aria-label={completed ? 'Markera som ej klar' : 'Markera som klar'}
           onClick={() => onToggle(deadline)}
           className={cn(
+            'flex-shrink-0 h-[18px] w-[18px] rounded-full border transition-colors',
+            completed
+              ? 'bg-success border-success text-success-foreground'
+              : overdue
+              ? 'border-destructive/40 hover:border-destructive'
+              : 'border-border hover:border-foreground/30'
+          )}
+        >
+          {completed && <Check className="h-3 w-3 m-auto" />}
+        </button>
 
         {/* Compact date */}
         <span className={cn(
