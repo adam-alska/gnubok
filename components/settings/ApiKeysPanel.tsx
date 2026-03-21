@@ -198,15 +198,46 @@ export function ApiKeysPanel() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Anslut MCP-klient</CardTitle>
+          <CardTitle className="text-base">Anslut till Claude Desktop</CardTitle>
+          <CardDescription>
+            Gör din bokföring genom konversation. Kräver{' '}
+            <a href="https://claude.ai/download" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+              Claude Desktop
+            </a>{' '}
+            och{' '}
+            <a href="https://nodejs.org" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+              Node.js
+            </a>.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div>
-            <p className="text-sm font-medium mb-1">Claude Desktop</p>
-            <p className="text-xs text-muted-foreground mb-2">
-              Lägg till i <code className="text-xs">claude_desktop_config.json</code> (Inställningar &rarr; Developer):
-            </p>
-            <pre className="rounded-md bg-muted p-4 text-xs font-mono overflow-x-auto select-all">
+        <CardContent>
+          <ol className="space-y-4 text-sm">
+            <li className="flex gap-3">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">1</span>
+              <div>
+                <p className="font-medium">Skapa en API-nyckel</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Klicka &quot;Skapa nyckel&quot; ovan och kopiera nyckeln.
+                </p>
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">2</span>
+              <div>
+                <p className="font-medium">Öppna Claude Desktop-inställningar</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Claude Desktop &rarr; Inställningar &rarr; Developer &rarr; Edit Config
+                </p>
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">3</span>
+              <div>
+                <p className="font-medium">Klistra in konfigurationen</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Ersätt <code className="text-xs">gnubok_sk_...</code> med din nyckel:
+                </p>
+                <pre className="mt-2 rounded-md bg-muted p-4 text-xs font-mono overflow-x-auto select-all">
 {`{
   "mcpServers": {
     "gnubok": {
@@ -218,20 +249,19 @@ export function ApiKeysPanel() {
     }
   }
 }`}
-            </pre>
-          </div>
-
-          <div>
-            <p className="text-sm font-medium mb-1">Claude Code / Cursor</p>
-            <p className="text-xs text-muted-foreground mb-2">
-              Kör i terminalen med en API-nyckel:
-            </p>
-            <pre className="rounded-md bg-muted p-4 text-xs font-mono overflow-x-auto">
-{`claude mcp add gnubok --transport http \\
-  --url ${mcpUrl} \\
-  --header "Authorization: Bearer gnubok_sk_..."`}
-            </pre>
-          </div>
+                </pre>
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">4</span>
+              <div>
+                <p className="font-medium">Starta om Claude Desktop</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Stäng och öppna Claude Desktop. Du kan nu fråga: &quot;Visa mina okategoriserade transaktioner.&quot;
+                </p>
+              </div>
+            </li>
+          </ol>
         </CardContent>
       </Card>
 
