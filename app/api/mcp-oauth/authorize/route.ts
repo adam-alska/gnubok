@@ -14,8 +14,8 @@ import { createAuthCode } from '@/lib/auth/oauth-codes'
 
 // Allowed redirect URI patterns — prevent open redirect attacks
 const ALLOWED_REDIRECT_PATTERNS = [
-  /^https:\/\/claude\.ai\//, // Claude.ai (any path — connectors use varying callback paths)
-  /^https:\/\/claude\.com\//, // Claude.com
+  /^https:\/\/claude\.ai\/api\//, // Claude.ai API callbacks (connector IDs vary in path)
+  /^https:\/\/claude\.com\/api\//, // Claude.com API callbacks
   /^http:\/\/localhost(:\d+)?\//, // Local development
   /^http:\/\/127\.0\.0\.1(:\d+)?\//, // Local development
 ]
