@@ -19,7 +19,7 @@
  */
 
 const API_KEY = process.env.GNUBOK_API_KEY
-const URL = process.env.GNUBOK_URL || 'https://app.gnubok.se/api/extensions/ext/mcp-server/mcp'
+const MCP_URL = process.env.GNUBOK_URL || 'https://app.gnubok.se/api/extensions/ext/mcp-server/mcp'
 
 if (!API_KEY) {
   process.stderr.write(
@@ -77,7 +77,7 @@ async function handleMessage(line) {
   const isNotification = parsed.id === undefined || parsed.id === null
 
   try {
-    const res = await fetch(URL, {
+    const res = await fetch(MCP_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -91,6 +91,23 @@ async function handleMessage(line) {
     }
 
     const text = await res.text()
+
+    // Guard against non-JSON error responses (CDN HTML pages, proxy errors)
+    if (!res.ok && !isNotification) {
+      let message = `HTTP ${res.status}`
+      try {
+        const json = JSON.parse(text)
+        if (json.error) message = typeof json.error === 'string' ? json.error : JSON.stringify(json.error)
+      } catch { /* body wasn't JSON — use generic message */ }
+      const errorResponse = JSON.stringify({
+        jsonrpc: '2.0',
+        id: parsed.id,
+        error: { code: -32000, message },
+      })
+      process.stdout.write(errorResponse + '\n')
+      return
+    }
+
     if (text) {
       process.stdout.write(text + '\n')
     }

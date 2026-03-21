@@ -206,7 +206,7 @@ export function ApiKeysPanel() {
             <p className="text-xs text-muted-foreground mb-2">
               Lägg till i <code className="text-xs">claude_desktop_config.json</code> (Inställningar &rarr; Developer):
             </p>
-            <pre className="rounded-md bg-muted p-4 text-xs font-mono overflow-x-auto">
+            <pre className="rounded-md bg-muted p-4 text-xs font-mono overflow-x-auto select-all">
 {`{
   "mcpServers": {
     "gnubok": {
