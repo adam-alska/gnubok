@@ -204,11 +204,20 @@ export function ApiKeysPanel() {
           <div>
             <p className="text-sm font-medium mb-1">Claude Desktop</p>
             <p className="text-xs text-muted-foreground mb-2">
-              Inställningar &rarr; Connectors &rarr; Add custom connector. Klistra in URL:en nedan.
-              Du loggas in automatiskt via OAuth.
+              Lägg till i <code className="text-xs">claude_desktop_config.json</code> (Inställningar &rarr; Developer):
             </p>
-            <pre className="rounded-md bg-muted p-3 text-xs font-mono overflow-x-auto select-all">
-{mcpUrl}
+            <pre className="rounded-md bg-muted p-4 text-xs font-mono overflow-x-auto">
+{`{
+  "mcpServers": {
+    "gnubok": {
+      "command": "npx",
+      "args": ["gnubok-mcp"],
+      "env": {
+        "GNUBOK_API_KEY": "gnubok_sk_..."
+      }
+    }
+  }
+}`}
             </pre>
           </div>
 
