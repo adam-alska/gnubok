@@ -20,10 +20,9 @@ import {
 import { generateTrialBalance } from '@/lib/reports/trial-balance'
 import { generateARLedger } from '@/lib/reports/ar-ledger'
 import { generateMonthlyBreakdown } from '@/lib/reports/monthly-breakdown'
-import { ensureInitialized } from '@/lib/init'
+// ensureInitialized() is called by the extension router (ext/[...path]/route.ts)
+// which dispatches to this handler — no duplicate call needed here.
 import type { Transaction, TransactionCategory, EntityType, VatTreatment, Invoice, Currency } from '@/types'
-
-ensureInitialized()
 
 // ── JSON-RPC types ───────────────────────────────────────────
 
