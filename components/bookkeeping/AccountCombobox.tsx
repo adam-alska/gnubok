@@ -104,7 +104,6 @@ export default function AccountCombobox({ value, accounts, onChange }: AccountCo
       onChange(accountNumber)
       setSearch(accountNumber)
       setIsOpen(false)
-      inputRef.current?.blur()
     },
     [onChange]
   )
