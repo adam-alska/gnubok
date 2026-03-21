@@ -1280,20 +1280,23 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
   const { method, id, params } = body
 
   switch (method) {
-    case 'initialize':
+    case 'initialize': {
+      const clientVersion = (params as Record<string, unknown>)?.protocolVersion as string | undefined
       return NextResponse.json(
         jsonRpc(id ?? null, {
-          protocolVersion: PROTOCOL_VERSION,
+          protocolVersion: clientVersion || PROTOCOL_VERSION,
           capabilities: {
             tools: { listChanged: false },
           },
           serverInfo: SERVER_INFO,
+          instructions: 'gnubok — Swedish bookkeeping via conversation. List transactions, categorize, create invoices, view reports.',
         })
       )
+    }
 
     case 'notifications/initialized':
-      // Client acknowledgement — no response needed for notifications
-      return new Response(null, { status: 204 })
+      // Streamable HTTP spec requires 202 Accepted for notifications
+      return new Response(null, { status: 202 })
 
     case 'ping':
       return NextResponse.json(jsonRpc(id ?? null, {}))
