@@ -1,14 +1,28 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { generateApiKey } from '@/lib/auth/api-keys'
 import { createAuthCode } from '@/lib/auth/oauth-codes'
 
 /**
  * OAuth 2.0 Authorization Endpoint.
  *
  * GET  → show consent page (or redirect to login)
- * POST → process consent, create API key, redirect with auth code
+ * POST → process consent, create auth code, redirect to callback
+ *
+ * The API key is NOT created here — it's created in the token endpoint
+ * after PKCE verification, preventing orphaned keys on abandoned flows.
  */
+
+// Known Claude callback URLs — reject all others to prevent open redirect
+const ALLOWED_REDIRECT_PATTERNS = [
+  /^https:\/\/claude\.ai\/api\/mcp\/auth_callback$/,
+  /^https:\/\/claude\.com\/api\/mcp\/auth_callback$/,
+  /^http:\/\/localhost(:\d+)?\//, // Local development
+  /^http:\/\/127\.0\.0\.1(:\d+)?\//, // Local development
+]
+
+function isAllowedRedirectUri(uri: string): boolean {
+  return ALLOWED_REDIRECT_PATTERNS.some((pattern) => pattern.test(uri))
+}
 
 function buildLoginRedirect(request: Request): Response {
   const url = new URL(request.url)
@@ -31,7 +45,6 @@ function errorRedirect(redirectUri: string, state: string | null, error: string,
  */
 export async function GET(request: Request) {
   const url = new URL(request.url)
-  const clientId = url.searchParams.get('client_id')
   const redirectUri = url.searchParams.get('redirect_uri')
   const state = url.searchParams.get('state')
   const codeChallenge = url.searchParams.get('code_challenge')
@@ -48,6 +61,21 @@ export async function GET(request: Request) {
   if (!redirectUri) {
     return NextResponse.json(
       { error: 'invalid_request', error_description: 'redirect_uri is required' },
+      { status: 400 }
+    )
+  }
+
+  // Validate redirect_uri against allowlist (prevents open redirect)
+  if (!isAllowedRedirectUri(redirectUri)) {
+    return NextResponse.json(
+      { error: 'invalid_request', error_description: 'redirect_uri is not allowed' },
+      { status: 400 }
+    )
+  }
+
+  if (codeChallengeMethod !== 'S256') {
+    return NextResponse.json(
+      { error: 'invalid_request', error_description: 'Only S256 code_challenge_method is supported' },
       { status: 400 }
     )
   }
@@ -75,6 +103,7 @@ export async function GET(request: Request) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="translate" content="no">
   <title>Anslut MCP-klient — gnubok</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -124,7 +153,7 @@ export async function GET(request: Request) {
 }
 
 /**
- * POST /api/mcp-oauth/authorize — process consent
+ * POST /api/mcp-oauth/authorize — process consent, issue auth code
  */
 export async function POST(request: Request) {
   const url = new URL(request.url)
@@ -135,6 +164,13 @@ export async function POST(request: Request) {
 
   if (!redirectUri) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
+  }
+
+  if (!isAllowedRedirectUri(redirectUri)) {
+    return NextResponse.json(
+      { error: 'invalid_request', error_description: 'redirect_uri is not allowed' },
+      { status: 400 }
+    )
   }
 
   // Check auth
@@ -153,29 +189,12 @@ export async function POST(request: Request) {
     return errorRedirect(redirectUri, state, 'access_denied', 'User denied the request')
   }
 
-  // Create an API key for this OAuth connection
-  const { key, hash, prefix } = generateApiKey()
-
-  const { error: insertError } = await supabase
-    .from('api_keys')
-    .insert({
-      user_id: user.id,
-      key_hash: hash,
-      key_prefix: prefix,
-      name: 'MCP-klient (OAuth)',
-    })
-
-  if (insertError) {
-    return errorRedirect(redirectUri, state, 'server_error', 'Failed to create API key')
-  }
-
-  // Create encrypted auth code containing the API key
+  // Create auth code with userId (NO API key — that's created at /token after PKCE)
   const code = createAuthCode({
-    apiKey: key,
+    userId: user.id,
     codeChallenge,
     codeChallengeMethod,
     redirectUri,
-    userId: user.id,
   })
 
   // Redirect to callback with the code

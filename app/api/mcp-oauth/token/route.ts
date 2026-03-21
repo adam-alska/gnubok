@@ -1,10 +1,17 @@
 import { NextResponse } from 'next/server'
-import { decryptAuthCode, verifyPkce } from '@/lib/auth/oauth-codes'
+import { decryptAuthCode, verifyPkce, hashAuthCode } from '@/lib/auth/oauth-codes'
+import { generateApiKey } from '@/lib/auth/api-keys'
+import { createServiceClientNoCookies } from '@/lib/auth/api-keys'
 
 /**
  * OAuth 2.0 Token Endpoint.
+ *
  * Exchanges an authorization code for an API key (access token).
- * Verifies PKCE before issuing the token.
+ * 1. Decrypts the stateless auth code
+ * 2. Checks for replay (single-use enforcement per OAuth 2.1 §4.1.2)
+ * 3. Verifies PKCE (S256 only)
+ * 4. Creates the API key (deferred from /authorize to prevent orphaned keys)
+ * 5. Returns the key as a bearer token
  */
 export async function POST(request: Request) {
   let params: URLSearchParams
@@ -39,7 +46,7 @@ export async function POST(request: Request) {
     )
   }
 
-  // Decrypt the auth code (stateless — no DB lookup needed)
+  // Decrypt the auth code
   const payload = decryptAuthCode(code)
   if (!payload) {
     return NextResponse.json(
@@ -56,23 +63,65 @@ export async function POST(request: Request) {
     )
   }
 
-  // Verify PKCE
-  if (codeVerifier) {
-    if (!verifyPkce(codeVerifier, payload.codeChallenge, payload.codeChallengeMethod)) {
-      return NextResponse.json(
-        { error: 'invalid_grant', error_description: 'PKCE verification failed' },
-        { status: 400 }
-      )
-    }
-  } else if (payload.codeChallenge) {
+  // Verify PKCE (S256 only)
+  if (!codeVerifier) {
     return NextResponse.json(
-      { error: 'invalid_request', error_description: 'code_verifier required for PKCE' },
+      { error: 'invalid_request', error_description: 'code_verifier is required' },
       { status: 400 }
     )
   }
 
+  if (!verifyPkce(codeVerifier, payload.codeChallenge)) {
+    return NextResponse.json(
+      { error: 'invalid_grant', error_description: 'PKCE verification failed' },
+      { status: 400 }
+    )
+  }
+
+  // Single-use enforcement: check and mark code as used (atomically via unique constraint)
+  const codeHash = hashAuthCode(code)
+  const supabase = createServiceClientNoCookies()
+
+  const { error: replayError } = await supabase
+    .from('oauth_used_codes')
+    .insert({ code_hash: codeHash })
+
+  if (replayError) {
+    // Unique constraint violation = code already used
+    return NextResponse.json(
+      { error: 'invalid_grant', error_description: 'Authorization code already used' },
+      { status: 400 }
+    )
+  }
+
+  // Clean up expired codes (non-blocking, best-effort)
+  supabase
+    .from('oauth_used_codes')
+    .delete()
+    .lt('created_at', new Date(Date.now() - 10 * 60 * 1000).toISOString())
+    .then(() => {})
+
+  // Create the API key now (after PKCE verification — prevents orphaned keys)
+  const { key, hash, prefix } = generateApiKey()
+
+  const { error: insertError } = await supabase
+    .from('api_keys')
+    .insert({
+      user_id: payload.userId,
+      key_hash: hash,
+      key_prefix: prefix,
+      name: 'MCP-klient (OAuth)',
+    })
+
+  if (insertError) {
+    return NextResponse.json(
+      { error: 'server_error', error_description: 'Failed to create API key' },
+      { status: 500 }
+    )
+  }
+
   return NextResponse.json({
-    access_token: payload.apiKey,
+    access_token: key,
     token_type: 'Bearer',
     scope: 'mcp',
   })

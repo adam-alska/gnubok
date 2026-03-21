@@ -20,7 +20,10 @@ import {
 import { generateTrialBalance } from '@/lib/reports/trial-balance'
 import { generateARLedger } from '@/lib/reports/ar-ledger'
 import { generateMonthlyBreakdown } from '@/lib/reports/monthly-breakdown'
+import { ensureInitialized } from '@/lib/init'
 import type { Transaction, TransactionCategory, EntityType, VatTreatment, Invoice, Currency } from '@/types'
+
+ensureInitialized()
 
 // ── JSON-RPC types ───────────────────────────────────────────
 

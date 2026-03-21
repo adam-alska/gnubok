@@ -3,25 +3,26 @@ import crypto from 'crypto'
 /**
  * Stateless OAuth auth codes.
  * The auth code is an AES-256-GCM encrypted JSON payload containing
- * the API key, PKCE code_challenge, and expiry. No DB storage needed.
+ * the user ID, PKCE code_challenge, and expiry.
+ *
+ * The API key is NOT embedded — it gets created at token exchange
+ * after PKCE verification, preventing orphaned keys.
  */
 
 const ALGORITHM = 'aes-256-gcm'
 const CODE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
 function getEncryptionKey(): Buffer {
-  // Derive a 32-byte key from the service role key
   const secret = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!secret) throw new Error('SUPABASE_SERVICE_ROLE_KEY is required')
   return crypto.createHash('sha256').update(secret).digest()
 }
 
-interface AuthCodePayload {
-  apiKey: string
+export interface AuthCodePayload {
+  userId: string
   codeChallenge: string
   codeChallengeMethod: string
   redirectUri: string
-  userId: string
   exp: number
 }
 
@@ -39,7 +40,6 @@ export function createAuthCode(payload: Omit<AuthCodePayload, 'exp'>): string {
   const encrypted = Buffer.concat([cipher.update(json, 'utf8'), cipher.final()])
   const tag = cipher.getAuthTag()
 
-  // Format: base64url(iv + tag + encrypted)
   const combined = Buffer.concat([iv, tag, encrypted])
   return combined.toString('base64url')
 }
@@ -59,7 +59,6 @@ export function decryptAuthCode(code: string): AuthCodePayload | null {
     const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()])
     const payload: AuthCodePayload = JSON.parse(decrypted.toString('utf8'))
 
-    // Check expiry
     if (Date.now() > payload.exp) return null
 
     return payload
@@ -70,19 +69,22 @@ export function decryptAuthCode(code: string): AuthCodePayload | null {
 
 /**
  * Verify PKCE: SHA256(code_verifier) must equal the stored code_challenge.
+ * Only S256 is supported (plain is insecure and not advertised).
  */
 export function verifyPkce(
   codeVerifier: string,
-  codeChallenge: string,
-  method: string
+  codeChallenge: string
 ): boolean {
-  if (method === 'plain') {
-    return codeVerifier === codeChallenge
-  }
-  // S256
   const hash = crypto
     .createHash('sha256')
     .update(codeVerifier)
     .digest('base64url')
   return hash === codeChallenge
+}
+
+/**
+ * Hash an auth code for replay tracking.
+ */
+export function hashAuthCode(code: string): string {
+  return crypto.createHash('sha256').update(code).digest('hex')
 }
