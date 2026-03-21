@@ -8,7 +8,7 @@ import { KPIOperationalGrid } from '@/components/kpi/KPIOperationalGrid'
 import { KPITrendChart } from '@/components/kpi/KPITrendChart'
 import type { FiscalPeriod, KPIReport } from '@/types'
 
-export default function NyckeltalPage() {
+export default function KpiPage() {
   const [periods, setPeriods] = useState<FiscalPeriod[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState('')
   const [report, setReport] = useState<KPIReport | null>(null)
