@@ -1234,21 +1234,23 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
 
   const token = extractBearerToken(request)
   if (!token) {
-    return new Response(
-      JSON.stringify(jsonRpcError(null, -32000, 'Authorization required')),
-      { status: 401, headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': wwwAuth } }
-    )
+    // Plain 401 — no JSON-RPC body. The MCP client uses WWW-Authenticate to trigger OAuth.
+    return new Response('Unauthorized', {
+      status: 401,
+      headers: { 'WWW-Authenticate': wwwAuth },
+    })
   }
 
   const authResult = await validateApiKey(token)
   if ('error' in authResult) {
-    const status = authResult.status
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-    if (status === 401) headers['WWW-Authenticate'] = wwwAuth
-    return new Response(
-      JSON.stringify(jsonRpcError(null, -32000, authResult.error)),
-      { status, headers }
-    )
+    if (authResult.status === 401) {
+      return new Response('Unauthorized', {
+        status: 401,
+        headers: { 'WWW-Authenticate': wwwAuth },
+      })
+    }
+    // 429 rate limit — return plain text, not JSON-RPC
+    return new Response(authResult.error, { status: authResult.status })
   }
 
   const { userId } = authResult
