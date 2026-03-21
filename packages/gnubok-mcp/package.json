@@ -1,0 +1,27 @@
+{
+  "name": "gnubok-mcp",
+  "version": "1.0.1",
+  "description": "Connect Claude Desktop to your gnubok bookkeeping account",
+  "bin": {
+    "gnubok-mcp": "./index.mjs"
+  },
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "gnubok",
+    "bookkeeping",
+    "claude",
+    "accounting"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/erp-mafia/gnubok"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "index.mjs"
+  ]
+}
