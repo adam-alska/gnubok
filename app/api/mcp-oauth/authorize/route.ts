@@ -12,10 +12,10 @@ import { createAuthCode } from '@/lib/auth/oauth-codes'
  * after PKCE verification, preventing orphaned keys on abandoned flows.
  */
 
-// Known Claude callback URLs — reject all others to prevent open redirect
+// Allowed redirect URI patterns — prevent open redirect attacks
 const ALLOWED_REDIRECT_PATTERNS = [
-  /^https:\/\/claude\.ai\/api\/mcp\/auth_callback$/,
-  /^https:\/\/claude\.com\/api\/mcp\/auth_callback$/,
+  /^https:\/\/claude\.ai\//, // Claude.ai (any path — connectors use varying callback paths)
+  /^https:\/\/claude\.com\//, // Claude.com
   /^http:\/\/localhost(:\d+)?\//, // Local development
   /^http:\/\/127\.0\.0\.1(:\d+)?\//, // Local development
 ]
