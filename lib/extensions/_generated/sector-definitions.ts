@@ -58,5 +58,15 @@ export const EXTENSION_DEFINITIONS: Record<string, ExtensionDefinition[]> = {
                 "order": 10
           }
     },
+    {
+          "slug": "mcp-server",
+          "name": "MCP-server (API)",
+          "sector": "general",
+          "category": "operations",
+          "icon": "Terminal",
+          "dataPattern": "manual",
+          "description": "Gör bokföring via Claude, Cursor eller annan MCP-klient",
+          "longDescription": "Exponerar gnuboks bokföringsmotor som MCP-verktyg (Model Context Protocol). Koppla din MCP-klient med en API-nyckel och gör bokföring genom konversation: visa okategoriserade transaktioner, bokför dem, skapa fakturor."
+    },
   ],
 }
