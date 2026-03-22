@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { createServiceClientNoCookies } from '@/lib/auth/api-keys'
 import { eventBus } from '@/lib/events'
 import type { DocumentAttachment, DocumentUploadSource } from '@/types'
 
@@ -21,16 +22,18 @@ export function _resetBucketVerified() {
  * Ensure the 'documents' storage bucket exists, creating it if missing.
  * Runs once per process lifetime (same pattern as ensureInitialized).
  *
- * Uses the caller's Supabase client (service-role) rather than creating
- * its own — avoids cookie dependency which breaks in API-key auth contexts.
+ * Uses a cookieless service-role client for bucket admin operations
+ * (getBucket/createBucket require service-role). This avoids the cookie
+ * dependency that hangs in API-key auth contexts (e.g. MCP server).
  */
-async function ensureDocumentsBucket(supabase: SupabaseClient): Promise<void> {
+async function ensureDocumentsBucket(): Promise<void> {
   if (bucketVerified) return
 
-  const { data: bucket } = await supabase.storage.getBucket('documents')
+  const serviceClient = createServiceClientNoCookies()
+  const { data: bucket } = await serviceClient.storage.getBucket('documents')
 
   if (!bucket) {
-    await supabase.storage.createBucket('documents', {
+    await serviceClient.storage.createBucket('documents', {
       public: false,
       fileSizeLimit: 52428800, // 50 MB
     })
@@ -61,7 +64,7 @@ export async function uploadDocument(
     journal_entry_line_id?: string
   } = {}
 ): Promise<DocumentAttachment> {
-  await ensureDocumentsBucket(supabase)
+  await ensureDocumentsBucket()
 
   // Compute SHA-256 hash
   const sha256Hash = await computeSHA256(file.buffer)
@@ -133,7 +136,7 @@ export async function createNewVersion(
   originalId: string,
   file: { name: string; buffer: ArrayBuffer; type?: string }
 ): Promise<DocumentAttachment> {
-  await ensureDocumentsBucket(supabase)
+  await ensureDocumentsBucket()
 
   // Compute SHA-256 hash
   const sha256Hash = await computeSHA256(file.buffer)
