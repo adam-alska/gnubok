@@ -1,5 +1,4 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { createServiceClient } from '@/lib/supabase/server'
 import { eventBus } from '@/lib/events'
 import type { DocumentAttachment, DocumentUploadSource } from '@/types'
 
@@ -21,11 +20,13 @@ export function _resetBucketVerified() {
 /**
  * Ensure the 'documents' storage bucket exists, creating it if missing.
  * Runs once per process lifetime (same pattern as ensureInitialized).
+ *
+ * Uses the caller's Supabase client (service-role) rather than creating
+ * its own — avoids cookie dependency which breaks in API-key auth contexts.
  */
-async function ensureDocumentsBucket(): Promise<void> {
+async function ensureDocumentsBucket(supabase: SupabaseClient): Promise<void> {
   if (bucketVerified) return
 
-  const supabase = await createServiceClient()
   const { data: bucket } = await supabase.storage.getBucket('documents')
 
   if (!bucket) {
@@ -60,7 +61,7 @@ export async function uploadDocument(
     journal_entry_line_id?: string
   } = {}
 ): Promise<DocumentAttachment> {
-  await ensureDocumentsBucket()
+  await ensureDocumentsBucket(supabase)
 
   // Compute SHA-256 hash
   const sha256Hash = await computeSHA256(file.buffer)
@@ -132,7 +133,7 @@ export async function createNewVersion(
   originalId: string,
   file: { name: string; buffer: ArrayBuffer; type?: string }
 ): Promise<DocumentAttachment> {
-  await ensureDocumentsBucket()
+  await ensureDocumentsBucket(supabase)
 
   // Compute SHA-256 hash
   const sha256Hash = await computeSHA256(file.buffer)
