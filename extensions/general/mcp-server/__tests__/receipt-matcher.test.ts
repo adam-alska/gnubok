@@ -99,7 +99,6 @@ async function parseResult(response: Response) {
 describe('MCP Receipt Matcher', () => {
   let supabase: ReturnType<typeof createQueuedMockSupabase>['supabase']
   let enqueueMany: ReturnType<typeof createQueuedMockSupabase>['enqueueMany']
-  let reset: ReturnType<typeof createQueuedMockSupabase>['reset']
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -107,7 +106,6 @@ describe('MCP Receipt Matcher', () => {
     const mock = createQueuedMockSupabase()
     supabase = mock.supabase
     enqueueMany = mock.enqueueMany
-    reset = mock.reset
     vi.mocked(createServiceClientNoCookies).mockReturnValue(supabase as never)
   })
 

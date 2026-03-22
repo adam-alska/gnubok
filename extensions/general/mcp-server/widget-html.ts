@@ -202,7 +202,7 @@ export const RECEIPT_MATCHER_HTML = `<!DOCTYPE html>
       const formatted = amt.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kr';
 
       html += '<tr class="' + cls + '" data-idx="' + i + '">';
-      html += '<td>' + (tx.date || '') + '</td>';
+      html += '<td>' + esc(tx.date || '') + '</td>';
       html += '<td>' + esc(tx.description || tx.merchant_name || '') + '</td>';
       html += '<td class="amount ' + amtClass + '">' + formatted + '</td>';
 
@@ -301,7 +301,7 @@ export const RECEIPT_MATCHER_HTML = `<!DOCTYPE html>
         resizeImage(reader.result, function(dataUri) {
           transactions[idx]._file = file.name;
           transactions[idx]._dataUri = dataUri;
-          transactions[idx]._mimeType = file.type;
+          transactions[idx]._mimeType = 'image/jpeg';
           render();
           bookTransaction(idx);
         });

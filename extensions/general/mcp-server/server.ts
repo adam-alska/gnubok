@@ -507,7 +507,7 @@ const tools: McpTool[] = [
         try {
           const doc = await uploadDocument(supabase, userId, {
             name: filename,
-            buffer: buffer.buffer as ArrayBuffer,
+            buffer: buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer,
             type: mimeType,
           }, {
             upload_source: 'api' as DocumentUploadSource,
