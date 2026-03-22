@@ -10,6 +10,7 @@ import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-ent
 import { eventBus } from '@/lib/events/bus'
 import { getVatRules, getAvailableVatRates } from '@/lib/invoices/vat-rules'
 import { fetchExchangeRate, convertToSEK } from '@/lib/currency/riksbanken'
+import { uploadDocument } from '@/lib/core/documents/document-service'
 import { generateIncomeStatement } from '@/lib/reports/income-statement'
 import {
   calculateGrossMargin,
@@ -20,9 +21,10 @@ import {
 import { generateTrialBalance } from '@/lib/reports/trial-balance'
 import { generateARLedger } from '@/lib/reports/ar-ledger'
 import { generateMonthlyBreakdown } from '@/lib/reports/monthly-breakdown'
+import { RECEIPT_MATCHER_HTML } from './widget-html'
 // ensureInitialized() is called by the extension router (ext/[...path]/route.ts)
 // which dispatches to this handler — no duplicate call needed here.
-import type { Transaction, TransactionCategory, EntityType, VatTreatment, Invoice, Currency } from '@/types'
+import type { Transaction, TransactionCategory, EntityType, VatTreatment, Invoice, Currency, DocumentUploadSource } from '@/types'
 
 // ── JSON-RPC types ───────────────────────────────────────────
 
@@ -54,6 +56,7 @@ interface McpTool {
   description: string
   inputSchema: Record<string, unknown>
   annotations: McpToolAnnotations
+  _meta?: { ui: { resourceUri: string } }
   execute: (
     args: Record<string, unknown>,
     userId: string,
@@ -75,6 +78,180 @@ const VALID_CATEGORIES = [
 const VALID_VAT_TREATMENTS = [
   'standard_25', 'reduced_12', 'reduced_6', 'reverse_charge', 'export', 'exempt',
 ] as const
+
+// ── Shared categorization logic ──────────────────────────────
+
+async function categorizeTransactionCore(
+  txId: string,
+  category: TransactionCategory,
+  vatTreatment: VatTreatment | undefined,
+  userId: string,
+  supabase: SupabaseClient
+): Promise<{
+  success: boolean
+  journal_entry_created: boolean
+  journal_entry_id: string | null
+  journal_entry_error: string | null
+  category: string
+  debit_account: string
+  credit_account: string
+  amount: number
+  currency: string
+  transaction: Transaction
+}> {
+  // Validate category
+  if (!VALID_CATEGORIES.includes(category as typeof VALID_CATEGORIES[number])) {
+    throw new Error(
+      `Invalid category "${category}". Valid categories: ${VALID_CATEGORIES.join(', ')}`
+    )
+  }
+
+  if (vatTreatment && !VALID_VAT_TREATMENTS.includes(vatTreatment as typeof VALID_VAT_TREATMENTS[number])) {
+    throw new Error(
+      `Invalid vat_treatment "${vatTreatment}". Valid: ${VALID_VAT_TREATMENTS.join(', ')}`
+    )
+  }
+
+  const isBusiness = category !== 'private'
+
+  // Fetch the transaction
+  const { data: transaction, error: fetchError } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('id', txId)
+    .eq('user_id', userId)
+    .single()
+
+  if (fetchError || !transaction) {
+    throw new Error('Transaction not found. Check the transaction_id is correct.')
+  }
+
+  if (transaction.journal_entry_id) {
+    return {
+      success: true,
+      journal_entry_created: false,
+      journal_entry_id: transaction.journal_entry_id,
+      journal_entry_error: 'Transaction already has a journal entry — use gnubok_list_uncategorized_transactions to find unbooked ones.',
+      category,
+      debit_account: '',
+      credit_account: '',
+      amount: Math.abs(transaction.amount),
+      currency: transaction.currency,
+      transaction: transaction as Transaction,
+    }
+  }
+
+  // Get entity type
+  const { data: settings } = await supabase
+    .from('company_settings')
+    .select('entity_type, fiscal_year_start_month')
+    .eq('user_id', userId)
+    .single()
+
+  const entityType: EntityType = (settings?.entity_type as EntityType) || 'enskild_firma'
+
+  // Build mapping
+  const mappingResult = buildMappingResultFromCategory(
+    category,
+    transaction as Transaction,
+    isBusiness,
+    entityType,
+    vatTreatment
+  )
+
+  if (!mappingResult.debit_account || !mappingResult.credit_account) {
+    throw new Error(
+      `No account mapping for category "${category}" with entity type "${entityType}". ` +
+      'Try a different category or check your chart of accounts.'
+    )
+  }
+
+  // Ensure fiscal period exists
+  const fiscalYearStartMonth = settings?.fiscal_year_start_month ?? 1
+  const txDate = new Date(transaction.date)
+  const txMonth = txDate.getMonth() + 1
+  const txYear = txDate.getFullYear()
+
+  let periodStartYear: number
+  if (fiscalYearStartMonth === 1) {
+    periodStartYear = txYear
+  } else if (txMonth >= fiscalYearStartMonth) {
+    periodStartYear = txYear
+  } else {
+    periodStartYear = txYear - 1
+  }
+
+  const startMonth = String(fiscalYearStartMonth).padStart(2, '0')
+  const periodStart = `${periodStartYear}-${startMonth}-01`
+
+  const endYear = fiscalYearStartMonth === 1 ? periodStartYear : periodStartYear + 1
+  const endMonth = fiscalYearStartMonth === 1 ? 12 : fiscalYearStartMonth - 1
+  const lastDay = new Date(endYear, endMonth, 0).getDate()
+  const periodEnd = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+
+  const periodName = fiscalYearStartMonth === 1
+    ? `Räkenskapsår ${periodStartYear}`
+    : `Räkenskapsår ${periodStartYear}/${endYear}`
+
+  await supabase
+    .from('fiscal_periods')
+    .upsert(
+      { user_id: userId, name: periodName, period_start: periodStart, period_end: periodEnd },
+      { onConflict: 'user_id,period_start,period_end' }
+    )
+
+  // Create journal entry
+  let journalEntryId: string | null = null
+  let journalEntryError: string | null = null
+
+  try {
+    const journalEntry = await createTransactionJournalEntry(
+      supabase,
+      userId,
+      transaction as Transaction,
+      mappingResult
+    )
+    if (journalEntry) {
+      journalEntryId = journalEntry.id
+    }
+  } catch (err) {
+    journalEntryError = err instanceof Error ? err.message : 'Unknown error'
+  }
+
+  // Update transaction
+  await supabase
+    .from('transactions')
+    .update({
+      is_business: isBusiness,
+      category,
+      journal_entry_id: journalEntryId,
+    })
+    .eq('id', txId)
+
+  // Emit event so extensions (mapping rules, etc.) can react
+  await eventBus.emit({
+    type: 'transaction.categorized',
+    payload: {
+      transaction: transaction as Transaction,
+      account: mappingResult.debit_account,
+      taxCode: mappingResult.vat_lines[0]?.account_number || '',
+      userId,
+    },
+  })
+
+  return {
+    success: true,
+    journal_entry_created: !!journalEntryId,
+    journal_entry_id: journalEntryId,
+    journal_entry_error: journalEntryError,
+    category,
+    debit_account: mappingResult.debit_account,
+    credit_account: mappingResult.credit_account,
+    amount: Math.abs(transaction.amount),
+    currency: transaction.currency,
+    transaction: transaction as Transaction,
+  }
+}
 
 // ── Tools ────────────────────────────────────────────────────
 
@@ -200,154 +377,153 @@ const tools: McpTool[] = [
       openWorldHint: false,
     },
     async execute(args, userId, supabase) {
-      const txId = args.transaction_id as string
-      const category = args.category as TransactionCategory
-      const vatTreatment = args.vat_treatment as VatTreatment | undefined
-
-      // Validate category
-      if (!VALID_CATEGORIES.includes(category as typeof VALID_CATEGORIES[number])) {
-        throw new Error(
-          `Invalid category "${category}". Valid categories: ${VALID_CATEGORIES.join(', ')}`
-        )
-      }
-
-      if (vatTreatment && !VALID_VAT_TREATMENTS.includes(vatTreatment as typeof VALID_VAT_TREATMENTS[number])) {
-        throw new Error(
-          `Invalid vat_treatment "${vatTreatment}". Valid: ${VALID_VAT_TREATMENTS.join(', ')}`
-        )
-      }
-
-      const isBusiness = category !== 'private'
-
-      // Fetch the transaction
-      const { data: transaction, error: fetchError } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('id', txId)
-        .eq('user_id', userId)
-        .single()
-
-      if (fetchError || !transaction) {
-        throw new Error('Transaction not found. Check the transaction_id is correct.')
-      }
-
-      if (transaction.journal_entry_id) {
-        return {
-          success: true,
-          journal_entry_created: false,
-          message: 'Transaction already has a journal entry — use gnubok_list_uncategorized_transactions to find unboooked ones.',
-          journal_entry_id: transaction.journal_entry_id,
-        }
-      }
-
-      // Get entity type
-      const { data: settings } = await supabase
-        .from('company_settings')
-        .select('entity_type, fiscal_year_start_month')
-        .eq('user_id', userId)
-        .single()
-
-      const entityType: EntityType = (settings?.entity_type as EntityType) || 'enskild_firma'
-
-      // Build mapping
-      const mappingResult = buildMappingResultFromCategory(
-        category,
-        transaction as Transaction,
-        isBusiness,
-        entityType,
-        vatTreatment
+      const result = await categorizeTransactionCore(
+        args.transaction_id as string,
+        args.category as TransactionCategory,
+        args.vat_treatment as VatTreatment | undefined,
+        userId,
+        supabase
       )
+      // Strip internal transaction field from public response
+      const { transaction: _tx, ...publicResult } = result
+      return publicResult
+    },
+  },
 
-      if (!mappingResult.debit_account || !mappingResult.credit_account) {
-        throw new Error(
-          `No account mapping for category "${category}" with entity type "${entityType}". ` +
-          'Try a different category or check your chart of accounts.'
-        )
-      }
+  // ── Receipt matcher tool ──────────────────────────────────────
 
-      // Ensure fiscal period exists
-      const fiscalYearStartMonth = settings?.fiscal_year_start_month ?? 1
-      const txDate = new Date(transaction.date)
-      const txMonth = txDate.getMonth() + 1
-      const txYear = txDate.getFullYear()
-
-      let periodStartYear: number
-      if (fiscalYearStartMonth === 1) {
-        periodStartYear = txYear
-      } else if (txMonth >= fiscalYearStartMonth) {
-        periodStartYear = txYear
-      } else {
-        periodStartYear = txYear - 1
-      }
-
-      const startMonth = String(fiscalYearStartMonth).padStart(2, '0')
-      const periodStart = `${periodStartYear}-${startMonth}-01`
-
-      const endYear = fiscalYearStartMonth === 1 ? periodStartYear : periodStartYear + 1
-      const endMonth = fiscalYearStartMonth === 1 ? 12 : fiscalYearStartMonth - 1
-      const lastDay = new Date(endYear, endMonth, 0).getDate()
-      const periodEnd = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-
-      const periodName = fiscalYearStartMonth === 1
-        ? `Räkenskapsår ${periodStartYear}`
-        : `Räkenskapsår ${periodStartYear}/${endYear}`
-
-      await supabase
-        .from('fiscal_periods')
-        .upsert(
-          { user_id: userId, name: periodName, period_start: periodStart, period_end: periodEnd },
-          { onConflict: 'user_id,period_start,period_end' }
-        )
-
-      // Create journal entry
-      let journalEntryId: string | null = null
-      let journalEntryError: string | null = null
-
-      try {
-        const journalEntry = await createTransactionJournalEntry(
-          supabase,
-          userId,
-          transaction as Transaction,
-          mappingResult
-        )
-        if (journalEntry) {
-          journalEntryId = journalEntry.id
-        }
-      } catch (err) {
-        journalEntryError = err instanceof Error ? err.message : 'Unknown error'
-      }
-
-      // Update transaction
-      await supabase
-        .from('transactions')
-        .update({
-          is_business: isBusiness,
-          category,
-          journal_entry_id: journalEntryId,
-        })
-        .eq('id', txId)
-
-      // Emit event so extensions (mapping rules, etc.) can react
-      await eventBus.emit({
-        type: 'transaction.categorized',
-        payload: {
-          transaction: transaction as Transaction,
-          account: mappingResult.debit_account,
-          taxCode: mappingResult.vat_lines[0]?.account_number || '',
-          userId,
+  {
+    name: 'gnubok_receipt_matcher',
+    description:
+      'Open the receipt matcher widget. Shows uncategorized transactions with drag-and-drop ' +
+      'receipt attachment. Renders an interactive UI inline in the conversation.\n\n' +
+      'Args:\n' +
+      '  - limit (number, optional): Max transactions to show, 1–50 (default: 20)\n\n' +
+      'Returns JSON:\n' +
+      '  { transactions: [...], categories: [...], vat_treatments: [...] }\n\n' +
+      'Examples:\n' +
+      '  - "Match my receipts" → call with no args\n' +
+      '  - "Open receipt matcher" → call with no args',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: {
+          type: 'number',
+          description: 'Max transactions to show, 1–50 (default 20)',
         },
-      })
+      },
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    _meta: { ui: { resourceUri: 'ui://receipt-matcher/app.html' } },
+    async execute(args, userId, supabase) {
+      const limit = Math.min(Math.max(1, Number(args.limit) || 20), 50)
+
+      const { data, error } = await supabase
+        .from('transactions')
+        .select(
+          'id, date, description, amount, currency, merchant_name, reference, is_business, category'
+        )
+        .eq('user_id', userId)
+        .is('journal_entry_id', null)
+        .order('date', { ascending: false })
+        .limit(limit)
+
+      if (error) throw new Error(`Database error: ${error.message}`)
 
       return {
-        success: true,
-        journal_entry_created: !!journalEntryId,
-        journal_entry_id: journalEntryId,
-        journal_entry_error: journalEntryError,
-        category,
-        debit_account: mappingResult.debit_account,
-        credit_account: mappingResult.credit_account,
-        amount: Math.abs(transaction.amount),
-        currency: transaction.currency,
+        transactions: data ?? [],
+        categories: [...VALID_CATEGORIES],
+        vat_treatments: [...VALID_VAT_TREATMENTS],
+      }
+    },
+  },
+
+  {
+    name: 'gnubok_categorize_with_receipt',
+    description:
+      'Categorize a transaction and attach a receipt document in one operation. ' +
+      'Called by the receipt matcher widget — not typically used directly.\n\n' +
+      'Args:\n' +
+      '  - transaction_id (string, required): UUID of the transaction\n' +
+      '  - category (string, required): One of: ' + VALID_CATEGORIES.join(', ') + '\n' +
+      '  - vat_treatment (string, optional): One of: ' + VALID_VAT_TREATMENTS.join(', ') + '\n' +
+      '  - file_data (string, required): Data URI of the receipt file\n' +
+      '  - filename (string, required): Original filename\n' +
+      '  - mime_type (string, required): MIME type (image/jpeg, image/png, application/pdf)\n\n' +
+      'Returns JSON:\n' +
+      '  { success: boolean, journal_entry_created: boolean, journal_entry_id?: string,\n' +
+      '    document_id?: string, category: string, debit_account: string, credit_account: string }',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        transaction_id: { type: 'string', description: 'UUID of the transaction' },
+        category: { type: 'string', description: 'Transaction category', enum: [...VALID_CATEGORIES] },
+        vat_treatment: { type: 'string', description: 'VAT treatment override', enum: [...VALID_VAT_TREATMENTS] },
+        file_data: { type: 'string', description: 'Data URI of the receipt (e.g. data:image/jpeg;base64,...)' },
+        filename: { type: 'string', description: 'Original filename' },
+        mime_type: { type: 'string', description: 'MIME type' },
+      },
+      required: ['transaction_id', 'category', 'file_data', 'filename', 'mime_type'],
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    async execute(args, userId, supabase) {
+      const fileData = args.file_data as string
+      const filename = args.filename as string
+      const mimeType = args.mime_type as string
+
+      // Validate data URI
+      const commaIdx = fileData.indexOf(',')
+      if (!fileData.startsWith('data:') || commaIdx === -1) {
+        throw new Error('Invalid file_data: expected a data URI (data:<mime>;base64,...)')
+      }
+
+      const base64 = fileData.slice(commaIdx + 1)
+      const buffer = Buffer.from(base64, 'base64')
+
+      // Categorize transaction
+      const result = await categorizeTransactionCore(
+        args.transaction_id as string,
+        args.category as TransactionCategory,
+        args.vat_treatment as VatTreatment | undefined,
+        userId,
+        supabase
+      )
+
+      // Upload document and link to journal entry
+      let documentId: string | null = null
+      let documentError: string | null = null
+
+      if (result.journal_entry_created && result.journal_entry_id) {
+        try {
+          const doc = await uploadDocument(supabase, userId, {
+            name: filename,
+            buffer: buffer.buffer as ArrayBuffer,
+            type: mimeType,
+          }, {
+            upload_source: 'api' as DocumentUploadSource,
+            journal_entry_id: result.journal_entry_id,
+          })
+          documentId = doc.id
+        } catch (err) {
+          documentError = err instanceof Error ? err.message : 'Document upload failed'
+        }
+      }
+
+      const { transaction: _tx, ...publicResult } = result
+      return {
+        ...publicResult,
+        document_id: documentId,
+        document_error: documentError,
       }
     },
   },
@@ -1303,6 +1479,7 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
           protocolVersion: negotiatedVersion,
           capabilities: {
             tools: { listChanged: false },
+            resources: { listChanged: false },
           },
           serverInfo: SERVER_INFO,
           instructions: 'gnubok — Swedish bookkeeping via conversation. List transactions, categorize, create invoices, view reports.',
@@ -1325,6 +1502,7 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
             description: t.description,
             inputSchema: t.inputSchema,
             annotations: t.annotations,
+            ...(t._meta ? { _meta: t._meta } : {}),
           })),
         })
       )
@@ -1346,11 +1524,13 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
 
       try {
         const result = await tool.execute(toolArgs, userId, supabase)
-        return NextResponse.json(
-          jsonRpc(id ?? null, {
-            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-          })
-        )
+        const response: Record<string, unknown> = {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        }
+        if (tool._meta?.ui) {
+          response.structuredContent = result
+        }
+        return NextResponse.json(jsonRpc(id ?? null, response))
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Tool execution failed'
         return NextResponse.json(
@@ -1360,6 +1540,40 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
           })
         )
       }
+    }
+
+    case 'resources/list':
+      return NextResponse.json(
+        jsonRpc(id ?? null, {
+          resources: [
+            {
+              uri: 'ui://receipt-matcher/app.html',
+              name: 'Receipt Matcher',
+              description: 'Interactive widget for matching receipts to uncategorized transactions',
+              mimeType: 'text/html;profile=mcp-app',
+            },
+          ],
+        })
+      )
+
+    case 'resources/read': {
+      const uri = (params as Record<string, unknown>)?.uri as string
+      if (uri === 'ui://receipt-matcher/app.html') {
+        return NextResponse.json(
+          jsonRpc(id ?? null, {
+            contents: [
+              {
+                uri,
+                mimeType: 'text/html;profile=mcp-app',
+                text: RECEIPT_MATCHER_HTML,
+              },
+            ],
+          })
+        )
+      }
+      return NextResponse.json(
+        jsonRpcError(id ?? null, -32602, `Resource not found: "${uri}"`)
+      )
     }
 
     default:
