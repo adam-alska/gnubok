@@ -11,17 +11,6 @@ interface KPIHeroCardsProps {
 export function KPIHeroCards({ report }: KPIHeroCardsProps) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      {/* Gross margin */}
-      <Card>
-        <CardContent className="p-5">
-          <p className="text-xs text-muted-foreground mb-1">Bruttomarginal</p>
-          <p className="font-display text-xl tabular-nums tracking-tight">
-            {report.grossMargin !== null ? `${report.grossMargin}%` : '—'}
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">av intäkter</p>
-        </CardContent>
-      </Card>
-
       {/* Net result */}
       <Card>
         <CardContent className="p-5">
@@ -62,6 +51,21 @@ export function KPIHeroCards({ report }: KPIHeroCardsProps) {
           ) : (
             <p className="text-xs text-muted-foreground mt-1">utestående</p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* VAT liability */}
+      <Card>
+        <CardContent className="p-5">
+          <p className="text-xs text-muted-foreground mb-1">Moms</p>
+          <p className={`font-display text-xl tabular-nums tracking-tight ${
+            report.vatLiability > 0 ? 'text-[hsl(var(--chart-2))]' : 'text-[hsl(var(--chart-1))]'
+          }`}>
+            {formatCurrency(Math.abs(report.vatLiability))}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {report.vatLiability > 0 ? 'att betala' : report.vatLiability < 0 ? 'att återfå' : 'jämnt'}
+          </p>
         </CardContent>
       </Card>
     </div>

@@ -1999,15 +1999,10 @@ export interface VatBreakdownItem {
 
 // KPI Report
 export interface KPIReport {
-  grossMargin: number | null       // percentage, null if no revenue
   netResult: number                // SEK
   cashPosition: number             // SEK (sum of 19xx account balances)
   outstandingReceivables: number   // SEK
   overdueReceivables: number       // SEK
-  revenueGrowth: number | null     // percentage, null if no prior period or current period incomplete
-  expenseRatio: number | null      // percentage, null if no revenue
-  avgPaymentDays: number | null    // days, null if < 5 paid invoices with paid_at
-  paidInvoiceCount: number         // how many invoices had paid_at data (for gating)
   vatLiability: number             // SEK, ruta 49 (positive = owe, negative = refund)
   totalRevenue: number             // SEK
   totalExpenses: number            // SEK
