@@ -59,6 +59,8 @@ export default function SettingsPage() {
   const [bankgiroError, setBankgiroError] = useState<string | null>(null)
   const [clearingError, setClearingError] = useState<string | null>(null)
   const [accountNumberError, setAccountNumberError] = useState<string | null>(null)
+  const [clearingError, setClearingError] = useState<string | null>(null)
+  const [accountNumberError, setAccountNumberError] = useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
