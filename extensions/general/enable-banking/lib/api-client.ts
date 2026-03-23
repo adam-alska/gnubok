@@ -187,6 +187,10 @@ async function authenticatedFetchWithRetry(
     try {
       const response = await authenticatedFetch(endpoint, options)
       if (attempt < MAX_RETRIES && [429, 502, 503, 504].includes(response.status)) {
+        console.warn(`[enable-banking] Retrying ${endpoint} (attempt ${attempt + 1}/${MAX_RETRIES})`, {
+          status: response.status,
+          statusText: response.statusText,
+        })
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * (attempt + 1)))
         continue
       }
@@ -194,9 +198,16 @@ async function authenticatedFetchWithRetry(
     } catch (error: unknown) {
       const isAbort = error instanceof Error && error.name === 'AbortError'
       if (attempt < MAX_RETRIES && isAbort) {
+        console.warn(`[enable-banking] Request timeout, retrying ${endpoint} (attempt ${attempt + 1}/${MAX_RETRIES})`)
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * (attempt + 1)))
         continue
       }
+      console.error(`[enable-banking] Request failed for ${endpoint}`, {
+        attempt,
+        error: error instanceof Error ? error.message : String(error),
+        name: error instanceof Error ? error.name : undefined,
+        isTimeout: isAbort,
+      })
       throw error
     }
   }
@@ -220,9 +231,17 @@ export async function getASPSPs(country: string = 'SE'): Promise<ASPSP[]> {
   const response = await authenticatedFetchWithRetry(`/aspsps?${params.toString()}`)
 
   if (!response.ok) {
-    const error = await response.text()
-    console.error('Failed to fetch ASPSPs:', error)
-    throw new Error('Failed to fetch banks')
+    const body = await response.text()
+    console.error('[enable-banking] getASPSPs failed', {
+      status: response.status,
+      statusText: response.statusText,
+      body,
+      country,
+      psuType,
+      sandbox: isSandbox,
+      apiUrl: ENABLE_BANKING_API_URL,
+    })
+    throw new Error(`Failed to fetch banks (${response.status})`)
   }
 
   const data = await response.json()
@@ -294,9 +313,19 @@ export async function startAuthorization(
   })
 
   if (!response.ok) {
-    const error = await response.text()
-    console.error('Failed to start authorization:', error)
-    throw new Error('Failed to start bank connection')
+    const body = await response.text()
+    console.error('[enable-banking] startAuthorization failed', {
+      status: response.status,
+      statusText: response.statusText,
+      body,
+      aspspName,
+      aspspCountry,
+      psuType,
+      redirectUrl,
+      apiUrl: ENABLE_BANKING_API_URL,
+      requestBody: JSON.stringify(requestBody),
+    })
+    throw new Error(`Failed to start bank connection (${response.status}): ${body}`)
   }
 
   return response.json()
@@ -314,9 +343,16 @@ export async function createSession(code: string): Promise<SessionResponse> {
   })
 
   if (!response.ok) {
-    const error = await response.text()
-    console.error('Failed to create session:', error)
-    throw new Error('Failed to create bank session')
+    const body = await response.text()
+    console.error('[enable-banking] createSession failed', {
+      status: response.status,
+      statusText: response.statusText,
+      body,
+      hasCode: !!code,
+      codeLength: code?.length,
+      apiUrl: ENABLE_BANKING_API_URL,
+    })
+    throw new Error(`Failed to create bank session (${response.status}): ${body}`)
   }
 
   return response.json()
@@ -331,7 +367,14 @@ export async function getSession(sessionId: string): Promise<SessionResponse> {
   const response = await authenticatedFetchWithRetry(`/sessions/${sessionId}`)
 
   if (!response.ok) {
-    throw new Error('Failed to get session')
+    const body = await response.text()
+    console.error('[enable-banking] getSession failed', {
+      status: response.status,
+      statusText: response.statusText,
+      body,
+      sessionId,
+    })
+    throw new Error(`Failed to get session (${response.status}): ${body}`)
   }
 
   return response.json()
@@ -348,7 +391,14 @@ export async function deleteSession(sessionId: string): Promise<void> {
   })
 
   if (!response.ok) {
-    throw new Error('Failed to revoke session')
+    const body = await response.text()
+    console.error('[enable-banking] deleteSession failed', {
+      status: response.status,
+      statusText: response.statusText,
+      body,
+      sessionId,
+    })
+    throw new Error(`Failed to revoke session (${response.status}): ${body}`)
   }
 }
 
@@ -361,7 +411,14 @@ export async function getAccountBalances(accountUid: string): Promise<Balance[]>
   const response = await authenticatedFetchWithRetry(`/accounts/${accountUid}/balances`)
 
   if (!response.ok) {
-    throw new Error('Failed to get account balances')
+    const body = await response.text()
+    console.error('[enable-banking] getAccountBalances failed', {
+      status: response.status,
+      statusText: response.statusText,
+      body,
+      accountUid,
+    })
+    throw new Error(`Failed to get account balances (${response.status}): ${body}`)
   }
 
   const data: BalanceResponse = await response.json()
@@ -417,7 +474,17 @@ export async function getAccountTransactions(
   const response = await authenticatedFetchWithRetry(endpoint)
 
   if (!response.ok) {
-    throw new Error('Failed to get transactions')
+    const body = await response.text()
+    console.error('[enable-banking] getAccountTransactions failed', {
+      status: response.status,
+      statusText: response.statusText,
+      body,
+      accountUid,
+      dateFrom,
+      dateTo,
+      hasContinuationKey: !!continuationKey,
+    })
+    throw new Error(`Failed to get transactions (${response.status}): ${body}`)
   }
 
   return response.json()
@@ -482,7 +549,18 @@ export async function getAllTransactionsWithRaw(
     const response = await authenticatedFetchWithRetry(endpoint)
 
     if (!response.ok) {
-      throw new Error('Failed to get transactions')
+      const body = await response.text()
+      console.error('[enable-banking] getAllTransactionsWithRaw failed', {
+        status: response.status,
+        statusText: response.statusText,
+        body,
+        accountUid,
+        dateFrom,
+        dateTo,
+        page,
+        hasContinuationKey: !!continuationKey,
+      })
+      throw new Error(`Failed to get transactions (${response.status}): ${body}`)
     }
 
     const rawText = await response.text()

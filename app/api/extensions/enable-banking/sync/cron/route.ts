@@ -64,7 +64,11 @@ export async function GET(request: Request) {
     .limit(50)
 
   if (connError) {
-    console.error('Failed to fetch bank connections:', connError)
+    console.error('[bank-sync-cron] Failed to fetch bank connections', {
+      message: connError.message,
+      code: connError.code,
+      details: connError.details,
+    })
     return NextResponse.json({ error: 'Failed to fetch connections' }, { status: 500 })
   }
 
@@ -174,7 +178,17 @@ export async function GET(request: Request) {
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
-      console.error(`Sync failed for connection ${connection.id}:`, error)
+      console.error('[bank-sync-cron] Sync failed for connection', {
+        connectionId: connection.id,
+        userId: connection.user_id,
+        bankName: connection.bank_name,
+        sessionId: connection.session_id,
+        consentExpires: connection.consent_expires,
+        lastSyncedAt: connection.last_synced_at,
+        message,
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : undefined,
+      })
 
       // Persist error status on sync failure
       await supabase

@@ -148,8 +148,14 @@ export const enableBankingExtension: Extension = {
             .single()
 
           if (error) {
-            log.error('Database error:', error)
-            throw new Error('Failed to store connection')
+            log.error('[enable-banking] Database error storing connection', {
+              errorMessage: error.message,
+              errorCode: error.code,
+              errorDetails: error.details,
+              user_id: user.id,
+              bank: aspsp_name,
+            })
+            throw new Error(`Failed to store connection: ${error.message}`)
           }
 
           return NextResponse.json({
@@ -157,7 +163,14 @@ export const enableBankingExtension: Extension = {
             authorization_url: url,
           })
         } catch (error) {
-          log.error('Bank connection error:', error)
+          log.error('[enable-banking] Connect handler error', {
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+            name: error instanceof Error ? error.name : undefined,
+            user_id: user.id,
+            aspsp_name,
+            aspsp_country,
+          })
           return NextResponse.json(
             { error: error instanceof Error ? error.message : 'Connection failed' },
             { status: 500 }
@@ -256,7 +269,15 @@ export const enableBankingExtension: Extension = {
             last_synced_at: syncedAt,
           })
         } catch (error) {
-          log.error('Sync error:', error)
+          log.error('[enable-banking] Sync handler error', {
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+            name: error instanceof Error ? error.name : undefined,
+            user_id: user.id,
+            connection_id,
+            connectionStatus: connection.status,
+            bankName: connection.bank_name,
+          })
           return NextResponse.json(
             { error: error instanceof Error ? error.message : 'Sync failed' },
             { status: 500 }
@@ -298,8 +319,12 @@ export const enableBankingExtension: Extension = {
           try {
             await deleteSession(connection.session_id)
           } catch (error) {
-            // Consent may already be expired — log and continue
-            log.error('Failed to revoke PSD2 session (may be expired):', error)
+            log.error('[enable-banking] Failed to revoke PSD2 session (may be expired)', {
+              message: error instanceof Error ? error.message : String(error),
+              sessionId: connection.session_id,
+              connectionId: connection_id,
+              connectionStatus: connection.status,
+            })
           }
         }
 

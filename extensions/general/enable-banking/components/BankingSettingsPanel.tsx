@@ -53,6 +53,11 @@ export default function BankingSettingsPanel() {
     setConnectingBankName(bank.name)
 
     try {
+      console.log('[enable-banking] Initiating bank connection', {
+        bankName: bank.name,
+        bankCountry: bank.country,
+      })
+
       const response = await fetch('/api/extensions/ext/enable-banking/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -62,11 +67,26 @@ export default function BankingSettingsPanel() {
       const data = await response.json()
 
       if (!response.ok) {
+        console.error('[enable-banking] Connect request failed', {
+          status: response.status,
+          statusText: response.statusText,
+          error: data.error,
+          bankName: bank.name,
+        })
         throw new Error(data.error)
       }
 
+      console.log('[enable-banking] Redirecting to bank authorization', {
+        connectionId: data.connection_id,
+        hasAuthUrl: !!data.authorization_url,
+      })
       window.location.href = data.authorization_url
     } catch (error) {
+      console.error('[enable-banking] Connect flow failed', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        bankName: bank.name,
+      })
       toast({
         title: 'Fel',
         description: error instanceof Error ? error.message : 'Kunde inte ansluta bank',
@@ -82,6 +102,8 @@ export default function BankingSettingsPanel() {
     setSyncingConnectionId(connectionId)
 
     try {
+      console.log('[enable-banking] Starting sync', { connectionId })
+
       const response = await fetch('/api/extensions/ext/enable-banking/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -91,8 +113,20 @@ export default function BankingSettingsPanel() {
       const data = await response.json()
 
       if (!response.ok) {
+        console.error('[enable-banking] Sync request failed', {
+          status: response.status,
+          statusText: response.statusText,
+          error: data.error,
+          connectionId,
+        })
         throw new Error(data.error)
       }
+
+      console.log('[enable-banking] Sync completed', {
+        connectionId,
+        imported: data.imported,
+        duplicates: data.duplicates,
+      })
 
       toast({
         title: 'Synkronisering klar',
@@ -102,6 +136,11 @@ export default function BankingSettingsPanel() {
       setShowCsvFallback(false)
       fetchConnections()
     } catch (error) {
+      console.error('[enable-banking] Sync flow failed', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        connectionId,
+      })
       toast({
         title: 'Fel',
         description: error instanceof Error ? error.message : 'Synkronisering misslyckades',
@@ -123,6 +162,8 @@ export default function BankingSettingsPanel() {
     if (!ok) return
 
     try {
+      console.log('[enable-banking] Disconnecting bank', { connectionId })
+
       const response = await fetch('/api/extensions/ext/enable-banking/disconnect', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -131,15 +172,27 @@ export default function BankingSettingsPanel() {
 
       if (!response.ok) {
         const data = await response.json()
+        console.error('[enable-banking] Disconnect request failed', {
+          status: response.status,
+          statusText: response.statusText,
+          error: data.error,
+          connectionId,
+        })
         throw new Error(data.error || 'Disconnect failed')
       }
 
+      console.log('[enable-banking] Bank disconnected', { connectionId })
       toast({
         title: 'Bank bortkopplad',
         description: 'Bankanslutningen och PSD2-samtycket har återkallats',
       })
       fetchConnections()
     } catch (error) {
+      console.error('[enable-banking] Disconnect flow failed', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        connectionId,
+      })
       toast({
         title: 'Fel',
         description: error instanceof Error ? error.message : 'Kunde inte koppla bort bank',
