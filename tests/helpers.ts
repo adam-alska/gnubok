@@ -11,6 +11,7 @@ import type {
   DocumentAttachment,
   TaxCode,
   Invoice,
+  InvoicePayment,
   Customer,
   Supplier,
   SupplierInvoice,
@@ -309,8 +310,29 @@ export function makeInvoice(overrides: Partial<Invoice> = {}): Invoice {
     converted_from_id: null,
     paid_at: null,
     paid_amount: null,
+    remaining_amount: 12500,
     created_at: '2024-06-15T14:30:00Z',
     updated_at: '2024-06-15T14:30:00Z',
+    ...overrides,
+  }
+}
+
+export function makeInvoicePayment(
+  overrides: Partial<InvoicePayment> = {}
+): InvoicePayment {
+  return {
+    id: nextId(),
+    user_id: 'user-1',
+    invoice_id: 'invoice-1',
+    payment_date: '2024-07-01',
+    amount: 12500,
+    currency: 'SEK',
+    exchange_rate: null,
+    exchange_rate_difference: 0,
+    journal_entry_id: null,
+    transaction_id: null,
+    notes: null,
+    created_at: '2024-07-01T00:00:00Z',
     ...overrides,
   }
 }

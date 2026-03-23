@@ -46,6 +46,7 @@ const statusConfig: Record<InvoiceStatus, { label: string; variant: 'default' | 
   draft: { label: 'Utkast', variant: 'secondary', icon: FileText },
   sent: { label: 'Skickad', variant: 'default', icon: Send },
   paid: { label: 'Betald', variant: 'success', icon: CheckCircle },
+  partially_paid: { label: 'Delbetalad', variant: 'warning', icon: Clock },
   overdue: { label: 'Förfallen', variant: 'destructive', icon: Clock },
   cancelled: { label: 'Makulerad', variant: 'secondary', icon: XCircle },
   credited: { label: 'Krediterad', variant: 'secondary', icon: XCircle },

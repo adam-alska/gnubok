@@ -6,7 +6,12 @@ import {
 } from '@/lib/bookkeeping/supplier-invoice-entries'
 import { validateBody } from '@/lib/api/validate'
 import { MatchSupplierInvoiceSchema } from '@/lib/api/schemas'
-import type { SupplierInvoice, SupplierInvoiceItem } from '@/types'
+import { logMatchEvent } from '@/lib/invoices/match-log'
+import { eventBus } from '@/lib/events/bus'
+import { ensureInitialized } from '@/lib/init'
+import type { SupplierInvoice, SupplierInvoiceItem, Transaction } from '@/types'
+
+ensureInitialized()
 
 /**
  * POST /api/transactions/[id]/match-supplier-invoice
@@ -116,13 +121,13 @@ export async function POST(
     console.error('Failed to create payment journal entry:', err)
   }
 
-  // Update supplier invoice
+  // Optimistic lock: only update if invoice is still in a matchable state
   const newRemaining = Math.max(0, Math.round((invoice.remaining_amount - paymentAmount) * 100) / 100)
   const newPaidAmount = Math.round((invoice.paid_amount + paymentAmount) * 100) / 100
   const isFullyPaid = newRemaining <= 0
   const newStatus = isFullyPaid ? 'paid' : 'partially_paid'
 
-  const { error: updateInvError } = await supabase
+  const { data: updatedRows, error: updateInvError } = await supabase
     .from('supplier_invoices')
     .update({
       status: newStatus,
@@ -133,20 +138,42 @@ export async function POST(
       transaction_id: transactionId,
     })
     .eq('id', supplier_invoice_id)
+    .in('status', ['registered', 'approved', 'partially_paid'])
+    .select('id')
 
   if (updateInvError) {
     return NextResponse.json({ error: 'Failed to update supplier invoice' }, { status: 500 })
   }
 
-  // Record payment
-  await supabase.from('supplier_invoice_payments').insert({
-    supplier_invoice_id,
-    payment_date: transaction.date,
-    amount: paymentAmount,
-    currency: invoice.currency,
-    journal_entry_id: journalEntryId,
-    transaction_id: transactionId,
-  })
+  if (!updatedRows || updatedRows.length === 0) {
+    return NextResponse.json(
+      { error: 'Supplier invoice has already been fully paid or is no longer matchable' },
+      { status: 409 }
+    )
+  }
+
+  // Record payment — catch unique constraint violation
+  const { error: paymentInsertError } = await supabase
+    .from('supplier_invoice_payments')
+    .insert({
+      user_id: user.id,
+      supplier_invoice_id,
+      payment_date: transaction.date,
+      amount: paymentAmount,
+      currency: invoice.currency,
+      journal_entry_id: journalEntryId,
+      transaction_id: transactionId,
+    })
+
+  if (paymentInsertError) {
+    if (paymentInsertError.code === '23505') {
+      return NextResponse.json(
+        { error: 'This transaction is already matched to this supplier invoice' },
+        { status: 409 }
+      )
+    }
+    console.error('Failed to record supplier invoice payment:', paymentInsertError)
+  }
 
   // Update transaction
   const { error: updateTxError } = await supabase
@@ -160,6 +187,27 @@ export async function POST(
 
   if (updateTxError) {
     return NextResponse.json({ error: 'Failed to link transaction' }, { status: 500 })
+  }
+
+  // Log the match event and emit event
+  logMatchEvent(supabase, user.id, transactionId, 'matched', {
+    supplierInvoiceId: supplier_invoice_id,
+    matchConfidence: 1.0,
+    matchMethod: 'manual_confirm',
+    newState: { status: newStatus, paid_amount: newPaidAmount, remaining_amount: newRemaining },
+  })
+
+  try {
+    eventBus.emit({
+      type: 'supplier_invoice.match_confirmed',
+      payload: {
+        supplierInvoice: invoice as SupplierInvoice,
+        transaction: transaction as Transaction,
+        userId: user.id,
+      },
+    })
+  } catch {
+    // Event emission is non-critical
   }
 
   return NextResponse.json({

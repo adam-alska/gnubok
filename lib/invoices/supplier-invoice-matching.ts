@@ -99,8 +99,9 @@ export function findSupplierInvoiceMatch(
       }
     }
 
-    // Pass 4: Fuzzy amount (±0.01) + supplier name in description → 0.70
-    const fuzzyAmountMatch = Math.abs(txAmount - remaining) <= 0.01
+    // Pass 4: Fuzzy amount (±5 SEK) + supplier name in description → 0.70
+    // Tolerance covers öresavrundning and minor fee differences
+    const fuzzyAmountMatch = Math.abs(txAmount - remaining) <= 5.00
     const supplierName = invoice.supplier?.name
     if (fuzzyAmountMatch && supplierName) {
       const txDesc = (transaction.description || '').toLowerCase()

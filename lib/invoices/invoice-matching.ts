@@ -40,7 +40,8 @@ function amountsMatchExact(transactionAmount: number, invoiceTotal: number): boo
 function amountsMatchFuzzy(transactionAmount: number, invoiceTotal: number): boolean {
   if (invoiceTotal === 0) return false
   const diff = Math.abs(transactionAmount - invoiceTotal)
-  const tolerance = invoiceTotal * FUZZY_TOLERANCE
+  // Cap fuzzy tolerance at 500 SEK to prevent false positives on large invoices
+  const tolerance = Math.min(invoiceTotal * FUZZY_TOLERANCE, 500)
   return diff <= tolerance
 }
 
@@ -134,7 +135,7 @@ export async function findMatchingInvoices(
       customer:customers(*)
     `)
     .eq('user_id', userId)
-    .in('status', ['sent', 'overdue'])
+    .in('status', ['sent', 'overdue', 'partially_paid'])
     .order('due_date', { ascending: true })
 
   if (error || !invoices) {
@@ -175,11 +176,14 @@ export async function findMatchingInvoices(
 
     if (!currencyMatch) continue
 
+    // Use remaining_amount for partially paid invoices, otherwise total
+    const invoiceAmount = invoice.remaining_amount ?? invoice.total
+
     // Use SEK amount for comparison if currencies differ
     const compareAmount =
       invoice.currency === transaction.currency
-        ? invoice.total
-        : invoice.total_sek || invoice.total
+        ? invoiceAmount
+        : invoice.total_sek || invoiceAmount
 
     const transactionAmount = transaction.amount
 

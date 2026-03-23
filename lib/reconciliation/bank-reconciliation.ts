@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Transaction, ReconciliationMethod } from '@/types'
 import { eventBus } from '@/lib/events/bus'
+import { logMatchEvent } from '@/lib/invoices/match-log'
 
 // ============================================================
 // Types
@@ -415,6 +416,13 @@ export async function unlinkReconciliation(
   if (updateError) {
     return { success: false, error: 'Failed to unlink transaction' }
   }
+
+  logMatchEvent(supabase, userId, transactionId, 'unmatched', {
+    previousState: {
+      journal_entry_id: tx.journal_entry_id,
+      reconciliation_method: tx.reconciliation_method,
+    },
+  })
 
   return { success: true }
 }

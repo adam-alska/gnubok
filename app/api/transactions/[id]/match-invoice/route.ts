@@ -4,18 +4,25 @@ import {
   createInvoicePaymentJournalEntry,
   createInvoiceCashEntry,
 } from '@/lib/bookkeeping/invoice-entries'
+import { reverseEntry } from '@/lib/bookkeeping/engine'
 import { validateBody } from '@/lib/api/validate'
 import { MatchInvoiceSchema } from '@/lib/api/schemas'
-import type { EntityType, Invoice } from '@/types'
+import { logMatchEvent } from '@/lib/invoices/match-log'
+import { eventBus } from '@/lib/events/bus'
+import { ensureInitialized } from '@/lib/init'
+import type { EntityType, Invoice, Transaction } from '@/types'
+
+ensureInitialized()
 
 /**
  * POST /api/transactions/[id]/match-invoice
  *
- * Confirms an invoice match for a transaction:
- * 1. Links transaction to invoice (sets invoice_id)
- * 2. Updates invoice status to 'paid'
- * 3. Sets paid_at and paid_amount on invoice
- * 4. Creates journal entry for payment receipt
+ * Confirms an invoice match for a transaction. Supports partial payments:
+ * 1. If transaction has an auto-categorization journal entry, storno it first
+ * 2. Links transaction to invoice (sets invoice_id)
+ * 3. Updates invoice status to 'paid' or 'partially_paid'
+ * 4. Records payment in invoice_payments table
+ * 5. Creates journal entry for payment receipt
  *    - Debit 1930 Företagskonto (Bank)
  *    - Credit 1510 Kundfordringar (Accounts Receivable)
  */
@@ -77,16 +84,50 @@ export async function POST(
     return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
   }
 
-  // Verify invoice is unpaid
-  if (invoice.status !== 'sent' && invoice.status !== 'overdue') {
+  // Verify invoice is in a matchable state (sent, overdue, or partially_paid)
+  if (invoice.status !== 'sent' && invoice.status !== 'overdue' && invoice.status !== 'partially_paid') {
     return NextResponse.json(
       { error: 'Invoice is not in an unpaid state' },
       { status: 400 }
     )
   }
 
+  // --- Commit 1: Storno conflicting auto-categorization journal entry ---
+  // Order: storno MUST complete before any other state changes.
+  // If storno fails, return 500 immediately — nothing else has been modified.
+  if (transaction.journal_entry_id) {
+    try {
+      await reverseEntry(supabase, user.id, transaction.journal_entry_id)
+
+      // Clear the journal_entry_id on the transaction
+      await supabase
+        .from('transactions')
+        .update({ journal_entry_id: null })
+        .eq('id', transactionId)
+
+      logMatchEvent(supabase, user.id, transactionId, 'storno_conflict_resolved', {
+        invoiceId: invoice_id,
+        previousState: { journal_entry_id: transaction.journal_entry_id },
+        newState: { journal_entry_id: null },
+      })
+    } catch (err) {
+      console.error('Failed to storno conflicting journal entry:', err)
+      return NextResponse.json(
+        { error: 'Failed to reverse conflicting journal entry' },
+        { status: 500 }
+      )
+    }
+  }
+
   const now = new Date().toISOString()
   const paidAmount = transaction.amount
+
+  // Calculate partial payment amounts
+  const newPaidAmount = Math.round(((invoice.paid_amount || 0) + paidAmount) * 100) / 100
+  const currentRemaining = invoice.remaining_amount ?? (invoice.total - (invoice.paid_amount || 0))
+  const newRemaining = Math.max(0, Math.round((currentRemaining - paidAmount) * 100) / 100)
+  const isFullyPaid = newRemaining <= 0
+  const newStatus = isFullyPaid ? 'paid' : 'partially_paid'
 
   // Fetch accounting method
   const { data: settings } = await supabase
@@ -103,8 +144,8 @@ export async function POST(
   let journalEntryError: string | null = null
 
   try {
-    if (accountingMethod === 'cash') {
-      // Kontantmetoden: combined revenue entry with per-line VAT rates
+    if (accountingMethod === 'cash' && isFullyPaid) {
+      // Kontantmetoden, full payment: combined revenue entry with per-line VAT rates
       const journalEntry = await createInvoiceCashEntry(
         supabase,
         user.id,
@@ -112,6 +153,24 @@ export async function POST(
         transaction.date,
         entityType,
         invoice.customer?.name
+      )
+      journalEntryId = journalEntry?.id ?? null
+    } else if (accountingMethod === 'cash' && !isFullyPaid) {
+      // Kontantmetoden, partial payment: use accrual-style clearing entry.
+      // Under kontantmetoden, invoice creation produces no journal entry,
+      // so 1510 has no prior balance. The debit 1930 / credit 1510 creates
+      // a credit on 1510 with no offsetting debit — this is intentional.
+      // 1510 is used as a temporary clearing account under cash method.
+      // The full revenue + VAT recognition (with 1510 reversal) happens at
+      // final payment when createInvoiceCashEntry is called.
+      const journalEntry = await createInvoicePaymentJournalEntry(
+        supabase,
+        user.id,
+        invoice as Invoice,
+        transaction.date,
+        undefined,
+        invoice.customer?.name,
+        paidAmount
       )
       journalEntryId = journalEntry?.id ?? null
     } else {
@@ -122,7 +181,8 @@ export async function POST(
         invoice as Invoice,
         transaction.date,
         undefined,
-        invoice.customer?.name
+        invoice.customer?.name,
+        paidAmount
       )
       journalEntryId = journalEntry?.id ?? null
     }
@@ -132,15 +192,21 @@ export async function POST(
     // Continue - we still want to update the invoice and transaction
   }
 
-  // Update invoice to paid status
-  const { error: updateInvError } = await supabase
+  // --- Commit 4: Optimistic lock on invoice status ---
+  // Only update if invoice is still in a matchable state.
+  // Prevents TOCTOU race where another request fully pays the invoice
+  // between our fetch and this update.
+  const { data: updatedRows, error: updateInvError } = await supabase
     .from('invoices')
     .update({
-      status: 'paid',
-      paid_at: now,
-      paid_amount: paidAmount,
+      status: newStatus,
+      paid_at: isFullyPaid ? now : null,
+      paid_amount: newPaidAmount,
+      remaining_amount: newRemaining,
     })
     .eq('id', invoice_id)
+    .in('status', ['sent', 'overdue', 'partially_paid'])
+    .select('id')
 
   if (updateInvError) {
     console.error('Failed to update invoice:', updateInvError)
@@ -148,6 +214,43 @@ export async function POST(
       { error: 'Failed to update invoice status' },
       { status: 500 }
     )
+  }
+
+  if (!updatedRows || updatedRows.length === 0) {
+    return NextResponse.json(
+      { error: 'Invoice has already been fully paid or is no longer matchable' },
+      { status: 409 }
+    )
+  }
+
+  // Record payment in invoice_payments table
+  const paymentNotes = (accountingMethod === 'cash' && !isFullyPaid)
+    ? 'Kontantmetoden: intäkt bokförs vid slutbetalning'
+    : null
+
+  const { error: paymentInsertError } = await supabase
+    .from('invoice_payments')
+    .insert({
+      user_id: user.id,
+      invoice_id,
+      payment_date: transaction.date,
+      amount: paidAmount,
+      currency: invoice.currency,
+      exchange_rate: invoice.exchange_rate,
+      journal_entry_id: journalEntryId,
+      transaction_id: transactionId,
+      notes: paymentNotes,
+    })
+
+  if (paymentInsertError) {
+    // Catch unique constraint violation (same transaction matched to same invoice twice)
+    if (paymentInsertError.code === '23505') {
+      return NextResponse.json(
+        { error: 'This transaction is already matched to this invoice' },
+        { status: 409 }
+      )
+    }
+    console.error('Failed to record invoice payment:', paymentInsertError)
   }
 
   // Update transaction to link to invoice and clear potential match
@@ -158,7 +261,7 @@ export async function POST(
       potential_invoice_id: null,
       journal_entry_id: journalEntryId,
       is_business: true,
-      category: 'income_services', // Default to services income
+      category: 'income_services',
     })
     .eq('id', transactionId)
 
@@ -170,11 +273,33 @@ export async function POST(
     )
   }
 
+  // Log the match event and emit event
+  logMatchEvent(supabase, user.id, transactionId, 'matched', {
+    invoiceId: invoice_id,
+    matchConfidence: 1.0,
+    matchMethod: 'manual_confirm',
+    newState: { status: newStatus, paid_amount: newPaidAmount, remaining_amount: newRemaining },
+  })
+
+  try {
+    eventBus.emit({
+      type: 'invoice.match_confirmed',
+      payload: {
+        invoice: invoice as Invoice,
+        transaction: transaction as Transaction,
+        userId: user.id,
+      },
+    })
+  } catch {
+    // Event emission is non-critical
+  }
+
   return NextResponse.json({
     success: true,
-    invoice_status: 'paid',
-    paid_at: now,
-    paid_amount: paidAmount,
+    invoice_status: newStatus,
+    paid_at: isFullyPaid ? now : null,
+    paid_amount: newPaidAmount,
+    remaining_amount: newRemaining,
     journal_entry_id: journalEntryId,
     journal_entry_error: journalEntryError,
   })

@@ -20,6 +20,7 @@ const statusConfig: Record<InvoiceStatus, { label: string; variant: 'default' | 
   draft: { label: 'Utkast', variant: 'secondary', icon: FileText, borderColor: 'border-muted-foreground/30' },
   sent: { label: 'Skickad', variant: 'default', icon: Send, borderColor: 'border-warning/50' },
   paid: { label: 'Betald', variant: 'success', icon: CheckCircle, borderColor: 'border-success/50' },
+  partially_paid: { label: 'Delbetalad', variant: 'warning', icon: Clock, borderColor: 'border-warning/50' },
   overdue: { label: 'Förfallen', variant: 'destructive', icon: Clock, borderColor: 'border-destructive/50' },
   cancelled: { label: 'Makulerad', variant: 'secondary', icon: XCircle, borderColor: 'border-muted-foreground/30' },
   credited: { label: 'Krediterad', variant: 'secondary', icon: XCircle, borderColor: 'border-muted-foreground/30' },
