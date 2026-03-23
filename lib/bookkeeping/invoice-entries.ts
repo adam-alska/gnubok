@@ -247,7 +247,8 @@ export async function createInvoicePaymentJournalEntry(
   invoice: Invoice,
   paymentDate: string,
   exchangeRateDifference?: number,
-  customerName?: string
+  customerName?: string,
+  paymentAmount?: number
 ): Promise<JournalEntry | null> {
   const fiscalPeriodId = await findFiscalPeriod(supabase, userId, paymentDate)
   if (!fiscalPeriodId) {
@@ -255,11 +256,22 @@ export async function createInvoicePaymentJournalEntry(
     return null
   }
 
-  const desc = buildInvoiceDescription('Inbetalning kundfaktura', invoice.invoice_number, customerName)
-  const bookedSekAmount = resolveSekAmount(invoice.total, invoice.total_sek, invoice.currency, invoice.exchange_rate)
+  const isPartial = paymentAmount != null
+  const desc = buildInvoiceDescription(
+    isPartial ? 'Delbetalning kundfaktura' : 'Inbetalning kundfaktura',
+    invoice.invoice_number,
+    customerName
+  )
+
+  // When paymentAmount is provided, use it for the 1930/1510 line amounts.
+  // Otherwise use the full invoice total (backward compatible).
+  const bookedSekAmount = isPartial
+    ? resolveSekAmount(paymentAmount, null, invoice.currency, invoice.exchange_rate)
+    : resolveSekAmount(invoice.total, invoice.total_sek, invoice.currency, invoice.exchange_rate)
+
   const lines: CreateJournalEntryLineInput[] = []
 
-  if (exchangeRateDifference && exchangeRateDifference !== 0) {
+  if (!isPartial && exchangeRateDifference && exchangeRateDifference !== 0) {
     // Foreign currency with exchange rate difference
     // For receivables: positive diff = gain (received more), negative = loss (received less)
     const actualSekReceived = bookedSekAmount + exchangeRateDifference
