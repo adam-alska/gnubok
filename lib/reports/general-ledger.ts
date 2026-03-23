@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
+import { getOpeningBalances } from './opening-balances'
 
 export interface GeneralLedgerLine {
   date: string
@@ -30,6 +31,17 @@ export interface GeneralLedgerReport {
 /**
  * Generate general ledger (huvudbok) for a fiscal period.
  * BFL 5 kap. 1 § — systematisk ordning: all transactions grouped by account.
+ *
+ * Uses joined queries with pagination to handle any number of entries.
+ * Avoids the broken .in(entryIds) pattern that silently truncated at 1000 rows.
+ *
+ * Opening balances use the opening_balance_entry set by year-end closing
+ * when available; falls back to summing prior-period entries.
+ *
+ * The account range filter (accountFrom/accountTo) is applied post-hoc
+ * during result building, not in the queries. Opening balances are computed
+ * for all accounts — the wasted Map entries for filtered-out accounts are
+ * trivially cheap compared to the cost of the queries themselves.
  */
 export async function generateGeneralLedger(
   supabase: SupabaseClient,
@@ -39,10 +51,10 @@ export async function generateGeneralLedger(
   accountTo?: string
 ): Promise<GeneralLedgerReport> {
 
-  // Get fiscal period dates
+  // Get fiscal period dates and opening_balance_entry_id
   const { data: period } = await supabase
     .from('fiscal_periods')
-    .select('period_start, period_end')
+    .select('period_start, period_end, opening_balance_entry_id')
     .eq('id', periodId)
     .eq('user_id', userId)
     .single()
@@ -51,28 +63,52 @@ export async function generateGeneralLedger(
     return { accounts: [], period: { start: '', end: '' } }
   }
 
-  // Fetch posted and reversed entries for this period (reversed entries must appear alongside their storno)
-  const { data: entries } = await supabase
-    .from('journal_entries')
-    .select('id, entry_date, voucher_number, voucher_series, description, source_type')
-    .eq('user_id', userId)
-    .eq('fiscal_period_id', periodId)
-    .in('status', ['posted', 'reversed'])
+  // ── Opening balances (IB) ──────────────────────────────────────
+  const { balances: openingByAccount, obEntryId } = await getOpeningBalances(
+    supabase, userId, period
+  )
 
-  if (!entries || entries.length === 0) {
-    return { accounts: [], period: { start: period.period_start, end: period.period_end } }
+  // Convert to net balance (debit - credit) for GL running balance
+  const openingBalances = new Map<string, number>()
+  for (const [accNum, { debit, credit }] of openingByAccount) {
+    openingBalances.set(accNum, debit - credit)
   }
 
-  const entryIds = entries.map((e) => e.id)
-  const entryMap = new Map(entries.map((e) => [e.id, e]))
+  // ── Period lines via joined query (excluding OB entry) ─────────
+  // Race condition note: if year-end closing runs concurrently and creates
+  // the OB entry between the period query and this query, the entry could
+  // be missed. The window is sub-second and the consequence is a single
+  // stale report — acceptable.
+  // Supabase types !inner joins as arrays; for many-to-one (line → entry)
+  // it returns a single object at runtime. Cast via `as any` on the query.
+  const rawLines = await fetchAllRows<{
+    account_number: string
+    debit_amount: number
+    credit_amount: number
+    journal_entries: {
+      entry_date: string
+      voucher_number: number
+      voucher_series: string
+      description: string
+      source_type: string
+    }
+  }>(({ from, to }) => {
+    let query = supabase
+      .from('journal_entry_lines')
+      .select('account_number, debit_amount, credit_amount, journal_entries!inner(entry_date, voucher_number, voucher_series, description, source_type, user_id, fiscal_period_id, status)')
+      .eq('journal_entries.user_id', userId)
+      .eq('journal_entries.fiscal_period_id', periodId)
+      .in('journal_entries.status', ['posted', 'reversed'])
 
-  // Fetch lines for these entries
-  const { data: lines } = await supabase
-    .from('journal_entry_lines')
-    .select('account_number, debit_amount, credit_amount, journal_entry_id')
-    .in('journal_entry_id', entryIds)
+    if (obEntryId) {
+      query = query.neq('journal_entry_id', obEntryId)
+    }
 
-  if (!lines) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return query.range(from, to) as any
+  })
+
+  if (rawLines.length === 0 && openingBalances.size === 0) {
     return { accounts: [], period: { start: period.period_start, end: period.period_end } }
   }
 
@@ -90,39 +126,11 @@ export async function generateGeneralLedger(
     accountNameMap.set(acc.account_number, acc.account_name)
   }
 
-  // Compute opening balances: sum all posted/reversed lines from entries before this period
-  const { data: priorEntries } = await supabase
-    .from('journal_entries')
-    .select('id')
-    .eq('user_id', userId)
-    .in('status', ['posted', 'reversed'])
-    .lt('entry_date', period.period_start)
-
-  const openingBalances = new Map<string, number>()
-
-  if (priorEntries && priorEntries.length > 0) {
-    const priorIds = priorEntries.map((e) => e.id)
-    const { data: priorLines } = await supabase
-      .from('journal_entry_lines')
-      .select('account_number, debit_amount, credit_amount')
-      .in('journal_entry_id', priorIds)
-
-    for (const line of priorLines || []) {
-      const current = openingBalances.get(line.account_number) || 0
-      openingBalances.set(
-        line.account_number,
-        current + (Number(line.debit_amount) || 0) - (Number(line.credit_amount) || 0)
-      )
-    }
-  }
-
   // Group lines by account
   const accountLines = new Map<string, GeneralLedgerLine[]>()
 
-  for (const line of lines) {
-    const entry = entryMap.get(line.journal_entry_id)
-    if (!entry) continue
-
+  for (const line of rawLines) {
+    const entry = line.journal_entries
     const accNum = line.account_number
     if (!accountLines.has(accNum)) {
       accountLines.set(accNum, [])
@@ -138,6 +146,13 @@ export async function generateGeneralLedger(
       credit: Math.round((Number(line.credit_amount) || 0) * 100) / 100,
       balance: 0, // computed below
     })
+  }
+
+  // Include accounts that have opening balance but no period lines
+  for (const [accNum, balance] of openingBalances) {
+    if (!accountLines.has(accNum) && Math.abs(balance) > 0.005) {
+      accountLines.set(accNum, [])
+    }
   }
 
   // Build account summaries

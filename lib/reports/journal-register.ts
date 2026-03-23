@@ -31,6 +31,13 @@ export interface JournalRegisterReport {
 /**
  * Generate journal register (grundbok) for a fiscal period.
  * BFL 5 kap. 1 § — registreringsordning: all vouchers in chronological registration order.
+ *
+ * Uses a joined query with pagination to handle any number of entries.
+ * Avoids the broken .in(entryIds) pattern that silently truncated at 1000 rows.
+ *
+ * Unlike the general ledger and trial balance, the grundbok includes ALL
+ * entries — the opening_balance_entry is NOT excluded, because it is a
+ * real voucher that should appear in registration order.
  */
 export async function generateJournalRegister(
   supabase: SupabaseClient,
@@ -50,27 +57,38 @@ export async function generateJournalRegister(
     return { entries: [], total_entries: 0, total_debit: 0, total_credit: 0, period: { start: '', end: '' } }
   }
 
-  // Fetch posted/reversed entries ordered by voucher series then number (registration order)
-  const { data: entries } = await supabase
-    .from('journal_entries')
-    .select('id, entry_date, voucher_number, voucher_series, description, source_type, status')
-    .eq('user_id', userId)
-    .eq('fiscal_period_id', periodId)
-    .in('status', ['posted', 'reversed'])
-    .order('voucher_series', { ascending: true })
-    .order('voucher_number', { ascending: true })
+  // Fetch all lines with joined entry data — single paginated query,
+  // no entry ID array, no truncation at 1000 rows
+  // Supabase types !inner joins as arrays; for many-to-one (line → entry)
+  // it returns a single object at runtime. Cast via `as any` on the query.
+  const rawLines = await fetchAllRows<{
+    account_number: string
+    debit_amount: number
+    credit_amount: number
+    journal_entry_id: string
+    journal_entries: {
+      id: string
+      entry_date: string
+      voucher_number: number
+      voucher_series: string
+      description: string
+      source_type: string
+      status: string
+    }
+  }>(({ from, to }) =>
+    supabase
+      .from('journal_entry_lines')
+      .select('account_number, debit_amount, credit_amount, journal_entry_id, journal_entries!inner(id, entry_date, voucher_number, voucher_series, description, source_type, status, user_id, fiscal_period_id)')
+      .eq('journal_entries.user_id', userId)
+      .eq('journal_entries.fiscal_period_id', periodId)
+      .in('journal_entries.status', ['posted', 'reversed'])
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .range(from, to) as any
+  )
 
-  if (!entries || entries.length === 0) {
+  if (rawLines.length === 0) {
     return { entries: [], total_entries: 0, total_debit: 0, total_credit: 0, period: { start: period.period_start, end: period.period_end } }
   }
-
-  const entryIds = entries.map((e) => e.id)
-
-  // Fetch lines for these entries
-  const { data: lines } = await supabase
-    .from('journal_entry_lines')
-    .select('account_number, debit_amount, credit_amount, journal_entry_id')
-    .in('journal_entry_id', entryIds)
 
   // Fetch account names
   const accounts = await fetchAllRows<{ account_number: string; account_name: string }>(({ from, to }) =>
@@ -86,13 +104,23 @@ export async function generateJournalRegister(
     accountNameMap.set(acc.account_number, acc.account_name)
   }
 
-  // Group lines by entry
+  // Extract unique entries and group lines by entry
+  const entryMap = new Map<string, typeof rawLines[0]['journal_entries']>()
   const linesByEntry = new Map<string, JournalRegisterLine[]>()
-  for (const line of lines || []) {
-    if (!linesByEntry.has(line.journal_entry_id)) {
-      linesByEntry.set(line.journal_entry_id, [])
+
+  for (const line of rawLines) {
+    const entryId = line.journal_entry_id
+    const entry = line.journal_entries
+
+    if (!entryMap.has(entryId)) {
+      entryMap.set(entryId, entry)
     }
-    linesByEntry.get(line.journal_entry_id)!.push({
+
+    if (!linesByEntry.has(entryId)) {
+      linesByEntry.set(entryId, [])
+    }
+
+    linesByEntry.get(entryId)!.push({
       account_number: line.account_number,
       account_name: accountNameMap.get(line.account_number) || `Konto ${line.account_number}`,
       debit: Math.round((Number(line.debit_amount) || 0) * 100) / 100,
@@ -100,9 +128,16 @@ export async function generateJournalRegister(
     })
   }
 
-  // Build result
-  const result: JournalRegisterEntry[] = entries.map((entry) => {
-    const entryLines = linesByEntry.get(entry.id) || []
+  // Build entries sorted by voucher_series, then voucher_number (registration order)
+  const sortedEntries = Array.from(entryMap.entries())
+    .sort(([, a], [, b]) => {
+      const seriesCompare = (a.voucher_series || 'A').localeCompare(b.voucher_series || 'A')
+      if (seriesCompare !== 0) return seriesCompare
+      return a.voucher_number - b.voucher_number
+    })
+
+  const result: JournalRegisterEntry[] = sortedEntries.map(([entryId, entry]) => {
+    const entryLines = linesByEntry.get(entryId) || []
     // Sort lines by account number within each entry
     entryLines.sort((a, b) => a.account_number.localeCompare(b.account_number))
 
