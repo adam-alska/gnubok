@@ -81,7 +81,11 @@ export async function GET(request: Request) {
       .single()
 
     if (findError || !pendingConnection) {
-      console.error('No pending connection for oauth_state:', findError)
+      console.error('[enable-banking] No pending connection for oauth_state', {
+        findError: findError ? { message: findError.message, code: findError.code, details: findError.details } : null,
+        state,
+        hasCode: !!code,
+      })
       return NextResponse.redirect(
         `${baseUrl}/settings?bank_error=${encodeURIComponent('invalid_state')}`
       )
@@ -89,9 +93,22 @@ export async function GET(request: Request) {
 
     const userId = pendingConnection.user_id
 
+    console.log('[enable-banking] Exchanging code for session', {
+      connectionId: pendingConnection.id,
+      userId,
+      codeLength: code.length,
+    })
+
     const sessionData = await createSession(code)
     const { session_id, accounts, access } = sessionData
     const consentExpiresAt = access.valid_until
+
+    console.log('[enable-banking] Session created successfully', {
+      connectionId: pendingConnection.id,
+      sessionId: session_id,
+      accountCount: accounts.length,
+      consentExpiresAt,
+    })
 
     const accountsWithBalances: StoredAccount[] = await Promise.all(
       accounts.map(async (account: AccountInfo) => {
@@ -130,7 +147,12 @@ export async function GET(request: Request) {
       .eq('id', pendingConnection.id)
 
     if (updateError) {
-      throw new Error('Failed to update connection')
+      console.error('[enable-banking] Failed to update connection after session creation', {
+        connectionId: pendingConnection.id,
+        updateError: { message: updateError.message, code: updateError.code, details: updateError.details },
+        sessionId: session_id,
+      })
+      throw new Error(`Failed to update connection: ${updateError.message}`)
     }
 
     const connectionId = pendingConnection.id
@@ -147,16 +169,24 @@ export async function GET(request: Request) {
 
     return NextResponse.redirect(`${baseUrl}${redirectTarget}`)
   } catch (error) {
-    console.error('Bank callback error:', error)
+    console.error('[enable-banking] Callback error', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined,
+      state,
+      hasCode: !!code,
+    })
 
     try {
       await supabase
         .from('bank_connections')
-        .update({ status: 'error', oauth_state: null })
+        .update({ status: 'error', error_message: error instanceof Error ? error.message : 'Connection failed', oauth_state: null })
         .eq('oauth_state', state)
         .eq('status', 'pending')
-    } catch {
-      // Ignore cleanup errors
+    } catch (cleanupError) {
+      console.error('[enable-banking] Callback cleanup failed', {
+        cleanupError: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+      })
     }
 
     return NextResponse.redirect(
