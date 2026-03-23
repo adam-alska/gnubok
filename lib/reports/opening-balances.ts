@@ -36,13 +36,23 @@ export async function getOpeningBalances(
 
   if (obEntryId) {
     // Use the explicit opening balance entry (set by year-end closing).
-    // Typically ~50 rows — one per balance sheet account.
-    const { data: obLines } = await supabase
-      .from('journal_entry_lines')
-      .select('account_number, debit_amount, credit_amount')
-      .eq('journal_entry_id', obEntryId)
+    // Typically ~50 rows — one per balance sheet account. Uses fetchAllRows
+    // for consistency (avoids silent truncation) and joins journal_entries
+    // to enforce user_id ownership (defense in depth alongside RLS).
+    const obLines = await fetchAllRows<{
+      account_number: string
+      debit_amount: number
+      credit_amount: number
+    }>(({ from, to }) =>
+      supabase
+        .from('journal_entry_lines')
+        .select('account_number, debit_amount, credit_amount, journal_entries!inner(user_id)')
+        .eq('journal_entry_id', obEntryId)
+        .eq('journal_entries.user_id', userId)
+        .range(from, to)
+    )
 
-    for (const line of obLines || []) {
+    for (const line of obLines) {
       const existing = balances.get(line.account_number) || { debit: 0, credit: 0 }
       existing.debit += Number(line.debit_amount) || 0
       existing.credit += Number(line.credit_amount) || 0
