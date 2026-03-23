@@ -10,7 +10,6 @@ import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-ent
 import { eventBus } from '@/lib/events/bus'
 import { getVatRules, getAvailableVatRates } from '@/lib/invoices/vat-rules'
 import { fetchExchangeRate, convertToSEK } from '@/lib/currency/riksbanken'
-import { uploadDocument } from '@/lib/core/documents/document-service'
 import { generateIncomeStatement } from '@/lib/reports/income-statement'
 import {
   calculateGrossMargin,
@@ -24,7 +23,7 @@ import { generateMonthlyBreakdown } from '@/lib/reports/monthly-breakdown'
 import { RECEIPT_MATCHER_HTML } from './widget-html'
 // ensureInitialized() is called by the extension router (ext/[...path]/route.ts)
 // which dispatches to this handler — no duplicate call needed here.
-import type { Transaction, TransactionCategory, EntityType, VatTreatment, Invoice, Currency, DocumentUploadSource } from '@/types'
+import type { Transaction, TransactionCategory, EntityType, VatTreatment, Invoice, Currency } from '@/types'
 
 // ── JSON-RPC types ───────────────────────────────────────────
 
@@ -439,91 +438,6 @@ const tools: McpTool[] = [
         transactions: data ?? [],
         categories: [...VALID_CATEGORIES],
         vat_treatments: [...VALID_VAT_TREATMENTS],
-      }
-    },
-  },
-
-  {
-    name: 'gnubok_categorize_with_receipt',
-    description:
-      'Categorize a transaction and attach a receipt document in one operation. ' +
-      'Called by the receipt matcher widget — not typically used directly.\n\n' +
-      'Args:\n' +
-      '  - transaction_id (string, required): UUID of the transaction\n' +
-      '  - category (string, required): One of: ' + VALID_CATEGORIES.join(', ') + '\n' +
-      '  - vat_treatment (string, optional): One of: ' + VALID_VAT_TREATMENTS.join(', ') + '\n' +
-      '  - file_data (string, required): Data URI of the receipt file\n' +
-      '  - filename (string, required): Original filename\n' +
-      '  - mime_type (string, required): MIME type (image/jpeg, image/png, application/pdf)\n\n' +
-      'Returns JSON:\n' +
-      '  { success: boolean, journal_entry_created: boolean, journal_entry_id?: string,\n' +
-      '    document_id?: string, category: string, debit_account: string, credit_account: string }',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        transaction_id: { type: 'string', description: 'UUID of the transaction' },
-        category: { type: 'string', description: 'Transaction category', enum: [...VALID_CATEGORIES] },
-        vat_treatment: { type: 'string', description: 'VAT treatment override', enum: [...VALID_VAT_TREATMENTS] },
-        file_data: { type: 'string', description: 'Data URI of the receipt (e.g. data:image/jpeg;base64,...)' },
-        filename: { type: 'string', description: 'Original filename' },
-        mime_type: { type: 'string', description: 'MIME type' },
-      },
-      required: ['transaction_id', 'category', 'file_data', 'filename', 'mime_type'],
-    },
-    annotations: {
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    async execute(args, userId, supabase) {
-      const fileData = args.file_data as string
-      const filename = args.filename as string
-      const mimeType = args.mime_type as string
-
-      // Validate data URI
-      const commaIdx = fileData.indexOf(',')
-      if (!fileData.startsWith('data:') || commaIdx === -1) {
-        throw new Error('Invalid file_data: expected a data URI (data:<mime>;base64,...)')
-      }
-
-      const base64 = fileData.slice(commaIdx + 1)
-      const buffer = Buffer.from(base64, 'base64')
-
-      // Categorize transaction
-      const result = await categorizeTransactionCore(
-        args.transaction_id as string,
-        args.category as TransactionCategory,
-        args.vat_treatment as VatTreatment | undefined,
-        userId,
-        supabase
-      )
-
-      // Upload document and link to journal entry
-      let documentId: string | null = null
-      let documentError: string | null = null
-
-      if (result.journal_entry_created && result.journal_entry_id) {
-        try {
-          const doc = await uploadDocument(supabase, userId, {
-            name: filename,
-            buffer: buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer,
-            type: mimeType,
-          }, {
-            upload_source: 'api' as DocumentUploadSource,
-            journal_entry_id: result.journal_entry_id,
-          })
-          documentId = doc.id
-        } catch (err) {
-          documentError = err instanceof Error ? err.message : 'Document upload failed'
-        }
-      }
-
-      const { transaction: _tx, ...publicResult } = result
-      return {
-        ...publicResult,
-        document_id: documentId,
-        document_error: documentError,
       }
     },
   },
