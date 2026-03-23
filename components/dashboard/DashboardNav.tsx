@@ -57,23 +57,28 @@ const navItems: NavItem[] = [
   { href: '/', label: 'Översikt', icon: LayoutDashboard, group: 'main' },
   { href: '/kpi', label: 'Nyckeltal', icon: TrendingUp, group: 'main' },
   { href: '/deadlines', label: 'Deadlines', icon: Calendar, group: 'main' },
-  { href: '/invoices', label: 'Fakturor', icon: Receipt, group: 'finans' },
-  { href: '/customers', label: 'Kunder', icon: Users, group: 'finans' },
-  { href: '/expenses', label: 'Utgifter', icon: Wallet, group: 'finans' },
+  // AR — Accounts Receivable
+  { href: '/invoices', label: 'Fakturor', icon: Receipt, group: 'försäljning' },
+  { href: '/customers', label: 'Kunder', icon: Users, group: 'försäljning' },
+  // AP — Accounts Payable
+  { href: '/expenses', label: 'Utgifter', icon: Wallet, group: 'inköp' },
   // Temporarily hidden pending module rework (see feedback #49)
-  { href: '/suppliers', label: 'Leverantörer', icon: Building2, group: 'finans', hidden: true },
-  { href: '/supplier-invoices', label: 'Leverantörsfakturor', icon: FileInput, group: 'finans', hidden: true },
-  { href: '/transactions', label: 'Transaktioner', icon: ArrowLeftRight, group: 'finans' },
-  { href: '/bookkeeping', label: 'Bokföring', icon: BookOpen, group: 'finans' },
-  { href: '/reports', label: 'Rapporter', icon: BarChart3, group: 'finans' },
-  { href: '/import', label: 'Importera', icon: Upload, group: 'finans' },
+  { href: '/suppliers', label: 'Leverantörer', icon: Building2, group: 'inköp', hidden: true },
+  { href: '/supplier-invoices', label: 'Leverantörsfakturor', icon: FileInput, group: 'inköp', hidden: true },
+  // General accounting
+  { href: '/transactions', label: 'Transaktioner', icon: ArrowLeftRight, group: 'redovisning' },
+  { href: '/bookkeeping', label: 'Bokföring', icon: BookOpen, group: 'redovisning' },
+  { href: '/reports', label: 'Rapporter', icon: BarChart3, group: 'redovisning' },
+  { href: '/import', label: 'Importera', icon: Upload, group: 'redovisning' },
   { href: '/help', label: 'Hjälp', icon: HelpCircle, group: 'övrigt' },
   { href: '/settings', label: 'Inställningar', icon: Settings, group: 'övrigt' },
 ]
 
 const groupLabels: Record<string, string> = {
   main: 'Huvudmeny',
-  finans: 'Finans',
+  försäljning: 'Försäljning',
+  inköp: 'Inköp',
+  redovisning: 'Redovisning',
   övrigt: 'Övrigt',
 }
 
@@ -124,7 +129,9 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
   )
 
   const mainItems = filteredItems.filter(i => i.group === 'main')
-  const finansItems = filteredItems.filter(i => i.group === 'finans')
+  const försäljningItems = filteredItems.filter(i => i.group === 'försäljning')
+  const inköpItems = filteredItems.filter(i => i.group === 'inköp')
+  const redovisningItems = filteredItems.filter(i => i.group === 'redovisning')
   const övrigtItems = filteredItems.filter(i => i.group === 'övrigt')
 
   const mobileNavItems = [
@@ -179,13 +186,75 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                 </div>
               </div>
 
-              {/* Finans group */}
-              <div className="mb-6">
+              {/* Försäljning group (AR) */}
+              <div className="mb-4">
                 <p className="px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em]">
-                  {groupLabels.finans}
+                  {groupLabels.försäljning}
                 </p>
                 <div className="space-y-px">
-                  {finansItems.map((item) => {
+                  {försäljningItems.map((item) => {
+                    const Icon = item.icon
+                    const active = isActive(item.href)
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
+                          active
+                            ? 'bg-primary/12 text-foreground font-medium'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                        )}
+                      >
+                        <Icon className={cn(
+                          "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
+                          active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                        )} />
+                        {item.label}
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Inköp group (AP) */}
+              <div className="mb-4">
+                <p className="px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em]">
+                  {groupLabels.inköp}
+                </p>
+                <div className="space-y-px">
+                  {inköpItems.map((item) => {
+                    const Icon = item.icon
+                    const active = isActive(item.href)
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
+                          active
+                            ? 'bg-primary/12 text-foreground font-medium'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                        )}
+                      >
+                        <Icon className={cn(
+                          "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
+                          active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                        )} />
+                        {item.label}
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Redovisning group */}
+              <div className="mb-6">
+                <p className="px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em]">
+                  {groupLabels.redovisning}
+                </p>
+                <div className="space-y-px">
+                  {redovisningItems.map((item) => {
                     const Icon = item.icon
                     const active = isActive(item.href)
                     const badge = item.href === '/transactions' && uncategorizedTransactionCount > 0
@@ -416,15 +485,75 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                 })}
               </div>
 
-              {/* Finans divider */}
+              {/* Försäljning divider (AR) */}
               <div className="flex items-center gap-3 my-1.5 px-3">
-                <span className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-[0.08em]">Finans</span>
+                <span className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-[0.08em]">{groupLabels.försäljning}</span>
                 <div className="flex-1 h-px bg-border/30" />
               </div>
 
-              {/* Finance items */}
+              {/* Sales items */}
               <div className="space-y-0.5">
-                {finansItems.map((item) => {
+                {försäljningItems.map((item) => {
+                  const Icon = item.icon
+                  const active = isActive(item.href)
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={closeMobileMenu}
+                      className={cn(
+                        'flex items-center gap-3 px-3 min-h-[44px] rounded-lg transition-colors',
+                        active
+                          ? 'bg-primary/10 text-primary font-medium'
+                          : 'text-foreground active:bg-muted/60'
+                      )}
+                    >
+                      <Icon className={cn("h-[18px] w-[18px] flex-shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+                      <span className="text-sm">{item.label}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+
+              {/* Inköp divider (AP) */}
+              <div className="flex items-center gap-3 my-1.5 px-3">
+                <span className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-[0.08em]">{groupLabels.inköp}</span>
+                <div className="flex-1 h-px bg-border/30" />
+              </div>
+
+              {/* Purchase items */}
+              <div className="space-y-0.5">
+                {inköpItems.map((item) => {
+                  const Icon = item.icon
+                  const active = isActive(item.href)
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={closeMobileMenu}
+                      className={cn(
+                        'flex items-center gap-3 px-3 min-h-[44px] rounded-lg transition-colors',
+                        active
+                          ? 'bg-primary/10 text-primary font-medium'
+                          : 'text-foreground active:bg-muted/60'
+                      )}
+                    >
+                      <Icon className={cn("h-[18px] w-[18px] flex-shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+                      <span className="text-sm">{item.label}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+
+              {/* Redovisning divider */}
+              <div className="flex items-center gap-3 my-1.5 px-3">
+                <span className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-[0.08em]">{groupLabels.redovisning}</span>
+                <div className="flex-1 h-px bg-border/30" />
+              </div>
+
+              {/* Accounting items */}
+              <div className="space-y-0.5">
+                {redovisningItems.map((item) => {
                   const Icon = item.icon
                   const active = isActive(item.href)
                   const badge = item.href === '/transactions' && uncategorizedTransactionCount > 0
