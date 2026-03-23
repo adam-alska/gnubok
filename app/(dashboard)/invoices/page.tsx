@@ -267,7 +267,7 @@ export default function InvoicesPage() {
             return (
               <Link key={invoice.id} href={`/invoices/${invoice.id}`}>
                 <Card className={cn(
-                  'hover:border-primary/50 transition-colors cursor-pointer',
+                  'cursor-pointer transition-all duration-150 hover:border-primary/50 hover:bg-accent/50 hover:shadow-sm active:scale-[0.99] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
                   isCreditNote ? 'border-destructive/30' : isProforma ? 'border-primary/30' : isDeliveryNote ? 'border-success/30' : status.borderColor,
                   invoice.status === 'overdue' && 'ring-1 ring-destructive/20'
                 )}>
