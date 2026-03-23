@@ -100,10 +100,13 @@ export async function POST(
       await reverseEntry(supabase, user.id, transaction.journal_entry_id)
 
       // Clear the journal_entry_id on the transaction
-      await supabase
+      const { error: clearJeError } = await supabase
         .from('transactions')
         .update({ journal_entry_id: null })
         .eq('id', transactionId)
+      if (clearJeError) {
+        console.error('Failed to clear journal_entry_id after storno:', clearJeError)
+      }
 
       logMatchEvent(supabase, user.id, transactionId, 'storno_conflict_resolved', {
         invoiceId: invoice_id,
@@ -251,6 +254,7 @@ export async function POST(
       )
     }
     console.error('Failed to record invoice payment:', paymentInsertError)
+    return NextResponse.json({ error: 'Failed to record invoice payment' }, { status: 500 })
   }
 
   // Update transaction to link to invoice and clear potential match

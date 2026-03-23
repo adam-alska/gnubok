@@ -173,6 +173,7 @@ export async function POST(
       )
     }
     console.error('Failed to record supplier invoice payment:', paymentInsertError)
+    return NextResponse.json({ error: 'Failed to record invoice payment' }, { status: 500 })
   }
 
   // Update transaction

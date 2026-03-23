@@ -36,10 +36,15 @@ CREATE TABLE public.invoice_payments (
   journal_entry_id  uuid REFERENCES public.journal_entries ON DELETE SET NULL,
   transaction_id    uuid REFERENCES public.transactions ON DELETE SET NULL,
   notes             text,
-  created_at        timestamptz NOT NULL DEFAULT now()
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  updated_at        timestamptz NOT NULL DEFAULT now()
 );
 
 ALTER TABLE public.invoice_payments ENABLE ROW LEVEL SECURITY;
+
+CREATE TRIGGER update_invoice_payments_updated_at
+  BEFORE UPDATE ON public.invoice_payments
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 CREATE POLICY "invoice_payments_select" ON public.invoice_payments
   FOR SELECT USING (auth.uid() = user_id);
@@ -79,3 +84,6 @@ BEGIN
   END IF;
 END
 $$;
+
+ALTER TABLE public.supplier_invoice_payments
+  ALTER COLUMN user_id SET NOT NULL;

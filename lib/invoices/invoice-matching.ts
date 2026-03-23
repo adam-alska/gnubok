@@ -183,7 +183,12 @@ export async function findMatchingInvoices(
     const compareAmount =
       invoice.currency === transaction.currency
         ? invoiceAmount
-        : invoice.total_sek || invoiceAmount
+        : (() => {
+            if (invoice.total_sek && invoice.total) {
+              return Math.round((invoiceAmount / invoice.total) * invoice.total_sek * 100) / 100
+            }
+            return invoiceAmount
+          })()
 
     const transactionAmount = transaction.amount
 
