@@ -2027,7 +2027,16 @@ export interface KPIReport {
   vatLiability: number             // SEK, ruta 49 (positive = owe, negative = refund)
   totalRevenue: number             // SEK
   totalExpenses: number            // SEK
+  grossMargin: number | null       // percentage, null if no revenue
+  expenseRatio: number | null      // percentage, null if no revenue
+  avgPaymentDays: number | null    // days, null if fewer than 5 paid invoices
   periodComplete: boolean          // whether selected period is closed/complete
   months: { label: string; income: number; expenses: number; net: number }[]
   period: { start: string; end: string }
+}
+
+export interface KPIPreferences {
+  visibleKpis: string[]
+  kpiOrder: string[]
+  accountOverrides: Record<string, string[]>
 }
