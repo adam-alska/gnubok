@@ -34,6 +34,7 @@ import {
 import { useTheme } from 'next-themes'
 import type { CompanySettings } from '@/types'
 import { validateBankgiroNumber, formatBankgiroNumber } from '@/lib/bankgiro/luhn'
+import { BankNameCombobox } from '@/components/settings/BankNameCombobox'
 import { CalendarFeedSettings } from '@/components/settings/CalendarFeedSettings'
 import { getSettingsPanel } from '@/lib/extensions/settings-panel-registry'
 import { SecuritySettings } from '@/components/settings/SecuritySettings'
@@ -420,13 +421,10 @@ export default function SettingsPage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="bank_name">Bank</Label>
-                    <Input
-                      id="bank_name"
-                      name="bank_name"
-                      placeholder="t.ex. Nordea"
-                      maxLength={100}
+                    <Label>Bank</Label>
+                    <BankNameCombobox
                       defaultValue={settings?.bank_name || ''}
+                      enableBankingEnabled={hasBankingExtension}
                     />
                   </div>
                   <div className="space-y-2">
