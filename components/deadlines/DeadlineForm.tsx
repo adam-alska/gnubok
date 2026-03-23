@@ -26,6 +26,7 @@ interface DeadlineFormProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSubmit: (data: Omit<Deadline, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>
+  onDelete?: (deadline: Partial<Deadline>) => void
   initialData?: Partial<Deadline>
   initialDate?: Date | null
   customers: { id: string; name: string }[]
@@ -35,10 +36,12 @@ export function DeadlineForm({
   open,
   onOpenChange,
   onSubmit,
+  onDelete,
   initialData,
   initialDate,
   customers,
 }: DeadlineFormProps) {
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     title: '',
@@ -53,6 +56,7 @@ export function DeadlineForm({
   // Reset form when dialog opens with new data
   useEffect(() => {
     if (open) {
+      setConfirmDelete(false)
       if (initialData) {
         setFormData({
           title: initialData.title || '',
@@ -245,17 +249,61 @@ export function DeadlineForm({
             />
           </div>
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Avbryt
-            </Button>
-            <Button type="submit" disabled={isLoading || !formData.title}>
-              {isLoading ? 'Sparar...' : initialData?.id ? 'Spara' : 'Skapa'}
-            </Button>
+          <DialogFooter className="flex-row justify-between sm:justify-between gap-2">
+            {/* Delete (only when editing an existing deadline) */}
+            {initialData?.id && onDelete ? (
+              <div className="flex items-center gap-2">
+                {confirmDelete ? (
+                  <>
+                    <span className="text-sm text-muted-foreground mr-1">Ta bort?</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setConfirmDelete(false)}
+                    >
+                      Avbryt
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        onDelete(initialData)
+                        onOpenChange(false)
+                      }}
+                    >
+                      Ta bort
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => setConfirmDelete(true)}
+                  >
+                    Ta bort
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div />
+            )}
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                Avbryt
+              </Button>
+              <Button type="submit" disabled={isLoading || !formData.title}>
+                {isLoading ? 'Sparar...' : initialData?.id ? 'Spara' : 'Skapa'}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>

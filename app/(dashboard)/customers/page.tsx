@@ -179,7 +179,7 @@ export default function CustomersPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredCustomers.map((customer) => (
               <Link key={customer.id} href={`/customers/${customer.id}`}>
-                <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full group">
+                <Card className="cursor-pointer transition-all duration-150 hover:border-primary/50 hover:bg-accent/50 hover:shadow-sm active:scale-[0.99] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-full group">
                   <CardHeader className="pb-3">
                     <div className="flex items-center gap-3.5">
                       <div className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-sm font-semibold text-primary tracking-tight">

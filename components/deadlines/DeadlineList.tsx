@@ -7,7 +7,7 @@ import { DeadlineCard } from './DeadlineCard'
 import { DeadlineFilters } from './DeadlineFilters'
 import { DeadlineForm } from './DeadlineForm'
 import { isDeadlineOverdue } from '@/lib/calendar/utils'
-import { Plus, Calendar } from 'lucide-react'
+import { Plus } from 'lucide-react'
 
 interface DeadlineListProps {
   deadlines: Deadline[]
@@ -33,18 +33,13 @@ export function DeadlineList({
 
   const filteredDeadlines = useMemo(() => {
     return deadlines.filter((d) => {
-      // Status filter
       if (statusFilter === 'pending' && d.is_completed) return false
       if (statusFilter === 'completed' && !d.is_completed) return false
-
-      // Type filter
       if (typeFilter !== 'all' && d.deadline_type !== typeFilter) return false
-
       return true
     })
   }, [deadlines, statusFilter, typeFilter])
 
-  // Group by overdue, today, upcoming
   const groupedDeadlines = useMemo(() => {
     const today = new Date().toISOString().split('T')[0]
     const overdue: Deadline[] = []
@@ -92,9 +87,16 @@ export function DeadlineList({
     setEditingDeadline(null)
   }
 
+  const sections = [
+    { key: 'overdue', label: 'Förfallna', items: groupedDeadlines.overdue },
+    { key: 'today', label: 'Idag', items: groupedDeadlines.today },
+    { key: 'upcoming', label: 'Kommande', items: groupedDeadlines.upcoming },
+    { key: 'completed', label: 'Klara', items: groupedDeadlines.completed },
+  ].filter(s => s.items.length > 0)
+
   return (
-    <div className="space-y-4">
-      {/* Header */}
+    <div className="space-y-6">
+      {/* Toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <DeadlineFilters
           status={statusFilter}
@@ -109,33 +111,39 @@ export function DeadlineList({
         </Button>
       </div>
 
-      {/* Deadline groups */}
+      {/* Content */}
       {filteredDeadlines.length === 0 ? (
-        <div className="text-center py-16">
-          <Calendar className="h-10 w-10 text-muted-foreground/40 mx-auto mb-4" />
-          <h3 className="text-base font-medium">Inga deadlines</h3>
-          <p className="text-sm text-muted-foreground mt-1">
+        <div className="py-20 text-center">
+          <p className="text-sm text-muted-foreground">
             {statusFilter !== 'all' || typeFilter !== 'all'
-              ? 'Inga deadlines matchar dina filter'
-              : 'Skapa din första deadline för att komma igång'}
+              ? 'Inga deadlines matchar filtret.'
+              : 'Inga deadlines ännu.'}
           </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-4"
+            onClick={() => setShowForm(true)}
+          >
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            Skapa en deadline
+          </Button>
         </div>
       ) : (
         <div className="space-y-8">
-          {/* Overdue */}
-          {groupedDeadlines.overdue.length > 0 && (
-            <section>
-              <div className="flex items-center gap-3 mb-3">
+          {sections.map(({ key, label, items }) => (
+            <section key={key}>
+              <div className="flex items-center gap-3 mb-2 px-1">
                 <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Förfallna
+                  {label}
                 </h3>
-                <span className="text-xs tabular-nums text-muted-foreground/60">
-                  {groupedDeadlines.overdue.length}
+                <span className="text-xs tabular-nums text-muted-foreground/50">
+                  {items.length}
                 </span>
-                <div className="flex-1 h-px bg-border" />
+                <div className="flex-1 h-px bg-border/60" />
               </div>
-              <div className="space-y-2">
-                {groupedDeadlines.overdue.map((deadline) => (
+              <div className="space-y-1.5">
+                {items.map((deadline) => (
                   <DeadlineCard
                     key={deadline.id}
                     deadline={deadline}
@@ -146,93 +154,20 @@ export function DeadlineList({
                 ))}
               </div>
             </section>
-          )}
-
-          {/* Today */}
-          {groupedDeadlines.today.length > 0 && (
-            <section>
-              <div className="flex items-center gap-3 mb-3">
-                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Idag
-                </h3>
-                <span className="text-xs tabular-nums text-muted-foreground/60">
-                  {groupedDeadlines.today.length}
-                </span>
-                <div className="flex-1 h-px bg-border" />
-              </div>
-              <div className="space-y-2">
-                {groupedDeadlines.today.map((deadline) => (
-                  <DeadlineCard
-                    key={deadline.id}
-                    deadline={deadline}
-                    onToggle={onDeadlineToggle}
-                    onEdit={handleEdit}
-                    onDelete={onDeadlineDelete}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Upcoming */}
-          {groupedDeadlines.upcoming.length > 0 && (
-            <section>
-              <div className="flex items-center gap-3 mb-3">
-                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Kommande
-                </h3>
-                <span className="text-xs tabular-nums text-muted-foreground/60">
-                  {groupedDeadlines.upcoming.length}
-                </span>
-                <div className="flex-1 h-px bg-border" />
-              </div>
-              <div className="space-y-2">
-                {groupedDeadlines.upcoming.map((deadline) => (
-                  <DeadlineCard
-                    key={deadline.id}
-                    deadline={deadline}
-                    onToggle={onDeadlineToggle}
-                    onEdit={handleEdit}
-                    onDelete={onDeadlineDelete}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Completed */}
-          {groupedDeadlines.completed.length > 0 && (
-            <section>
-              <div className="flex items-center gap-3 mb-3">
-                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Klara
-                </h3>
-                <span className="text-xs tabular-nums text-muted-foreground/60">
-                  {groupedDeadlines.completed.length}
-                </span>
-                <div className="flex-1 h-px bg-border" />
-              </div>
-              <div className="space-y-2">
-                {groupedDeadlines.completed.map((deadline) => (
-                  <DeadlineCard
-                    key={deadline.id}
-                    deadline={deadline}
-                    onToggle={onDeadlineToggle}
-                    onEdit={handleEdit}
-                    onDelete={onDeadlineDelete}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
+          ))}
         </div>
       )}
 
-      {/* Deadline form dialog */}
       <DeadlineForm
         open={showForm}
         onOpenChange={handleFormClose}
         onSubmit={handleFormSubmit}
+        onDelete={(deadline) => {
+          if (deadline.id) {
+            const full = deadlines.find(d => d.id === deadline.id)
+            if (full) onDeadlineDelete(full)
+          }
+        }}
         initialData={editingDeadline || undefined}
         customers={customers}
       />

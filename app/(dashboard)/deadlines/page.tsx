@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/use-toast'
+import { ToastAction } from '@/components/ui/toast'
 import { DeadlineList } from '@/components/deadlines/DeadlineList'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { PageHeader } from '@/components/ui/page-header'
 import { AlertTriangle, ArrowRight } from 'lucide-react'
 import type { Deadline } from '@/types'
 
@@ -25,7 +25,6 @@ export default function DeadlinesPage() {
     try {
       const today = new Date().toISOString().split('T')[0]
 
-      // Fetch all data in parallel
       const [deadlinesRes, customersRes, overdueRes] = await Promise.all([
         supabase.from('deadlines').select('*, customer:customers(name)').order('due_date', { ascending: true }),
         supabase.from('customers').select('id, name').order('name', { ascending: true }),
@@ -92,11 +91,14 @@ export default function DeadlinesPage() {
   }
 
   const handleDeadlineToggle = async (deadline: Deadline) => {
+    const wasCompleted = deadline.is_completed
+    const newCompleted = !wasCompleted
+
     try {
       const response = await fetch(`/api/deadlines/${deadline.id}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_completed: !deadline.is_completed }),
+        body: JSON.stringify({ is_completed: newCompleted }),
       })
 
       if (!response.ok) {
@@ -104,11 +106,34 @@ export default function DeadlinesPage() {
         throw new Error(result.error || 'Failed to toggle deadline')
       }
 
-      toast({
-        title: deadline.is_completed ? 'Markerad som ej klar' : 'Markerad som klar',
-      })
-
       fetchData()
+
+      if (newCompleted) {
+        toast({
+          title: `"${deadline.title}" markerad som klar`,
+          action: (
+            <ToastAction altText="Ångra" onClick={async () => {
+              try {
+                await fetch(`/api/deadlines/${deadline.id}/complete`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ is_completed: false }),
+                })
+                fetchData()
+              } catch {
+                toast({
+                  title: 'Kunde inte ångra',
+                  variant: 'destructive',
+                })
+              }
+            }}>
+              Ångra
+            </ToastAction>
+          ),
+        })
+      } else {
+        toast({ title: `"${deadline.title}" markerad som ej klar` })
+      }
     } catch (error) {
       toast({
         title: 'Kunde inte uppdatera status',
@@ -157,10 +182,7 @@ export default function DeadlinesPage() {
         throw new Error(result.error || 'Failed to delete deadline')
       }
 
-      toast({
-        title: 'Deadline borttagen',
-      })
-
+      toast({ title: 'Deadline borttagen' })
       fetchData()
     } catch (error) {
       toast({
@@ -174,35 +196,21 @@ export default function DeadlinesPage() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">Deadlines</h1>
-        </div>
-        {/* Overdue alert skeleton */}
-        <div className="rounded-lg border p-4 animate-pulse">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-5 w-5 bg-muted rounded" />
-              <div className="space-y-1">
-                <div className="h-4 bg-muted rounded w-32" />
-                <div className="h-3 bg-muted rounded w-24" />
-              </div>
-            </div>
-            <div className="h-5 bg-muted rounded w-8" />
-          </div>
-        </div>
-        {/* Deadline list skeleton */}
-        <div className="space-y-3">
+        <PageHeader title="Deadlines" />
+        <div className="space-y-2">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="rounded-lg border p-4 animate-pulse">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
+              <div className="flex items-center gap-4">
+                <div className="w-12 space-y-1">
+                  <div className="h-5 bg-muted rounded w-8 mx-auto" />
+                  <div className="h-3 bg-muted rounded w-6 mx-auto" />
+                </div>
+                <div className="w-px h-8 bg-muted" />
+                <div className="flex-1 space-y-1.5">
                   <div className="h-4 bg-muted rounded w-48" />
-                  <div className="h-3 bg-muted rounded w-32" />
+                  <div className="h-3 bg-muted rounded w-24" />
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-5 bg-muted rounded w-16" />
-                  <div className="h-8 bg-muted rounded w-8" />
-                </div>
+                <div className="h-4 bg-muted rounded w-16" />
               </div>
             </div>
           ))}
@@ -213,32 +221,23 @@ export default function DeadlinesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">Deadlines</h1>
-      </div>
+      <PageHeader title="Deadlines" />
 
+      {/* Overdue invoices alert */}
       {overdueInvoices.count > 0 && (
-        <Link href="/invoices?status=unpaid" className="block group">
-          <Card className="border-destructive/50 bg-destructive/5 hover:bg-destructive/10 transition-colors">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0" />
-                  <div>
-                    <p className="font-medium text-sm">Forfallna fakturor</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {overdueInvoices.count} st totalt{' '}
-                      {overdueInvoices.total.toLocaleString('sv-SE')} kr
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="destructive">{overdueInvoices.count}</Badge>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <Link href="/invoices?status=unpaid" className="group block">
+          <div className="flex items-center justify-between rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 transition-colors hover:bg-destructive/10">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0" />
+              <p className="text-sm">
+                <span className="font-medium">{overdueInvoices.count} förfallna fakturor</span>
+                <span className="text-muted-foreground ml-1.5">
+                  {overdueInvoices.total.toLocaleString('sv-SE')} kr
+                </span>
+              </p>
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+          </div>
         </Link>
       )}
 
