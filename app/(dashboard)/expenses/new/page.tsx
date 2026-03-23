@@ -81,6 +81,7 @@ export default function NewExpensePage() {
   const [pendingData, setPendingData] = useState<FormData | null>(null)
   const [showNewSupplier, setShowNewSupplier] = useState(false)
   const [isCreatingSupplier, setIsCreatingSupplier] = useState(false)
+  const [pendingSupplierSelect, setPendingSupplierSelect] = useState<string | null>(null)
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [newSupplier, setNewSupplier] = useState<NewSupplierForm>({
     name: '',
@@ -145,6 +146,14 @@ export default function NewExpensePage() {
       }
     }
   }, [watchedSupplierId, suppliers])
+
+  // Auto-select newly created supplier once it's in the list
+  useEffect(() => {
+    if (pendingSupplierSelect && suppliers.find((s) => s.id === pendingSupplierSelect)) {
+      setValue('supplier_id', pendingSupplierSelect, { shouldDirty: true, shouldValidate: true })
+      setPendingSupplierSelect(null)
+    }
+  }, [suppliers, pendingSupplierSelect, setValue])
 
   async function fetchSuppliers() {
     const res = await fetch('/api/suppliers')
@@ -220,7 +229,7 @@ export default function NewExpensePage() {
     } else {
       const created = result.data as Supplier
       setSuppliers((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
-      setValue('supplier_id', created.id)
+      setPendingSupplierSelect(created.id)
       setShowNewSupplier(false)
       setNewSupplier({ name: '', supplier_type: 'swedish_business', org_number: '', bankgiro: '', plusgiro: '', default_expense_account: '' })
       toast({ title: 'Leverantör skapad', description: created.name })
