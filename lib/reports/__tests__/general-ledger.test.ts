@@ -1,26 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ============================================================
-// Mock — sequential result queue
+// Mock — table-keyed result queues
 // ============================================================
 
-let resultIdx: number
-let results: Array<{ data?: unknown; error?: unknown }>
+type MockResult = { data?: unknown; error?: unknown }
+let mockResults: Record<string, MockResult[]>
 
-function makeBuilder() {
+function makeBuilder(tableName: string) {
   const b: Record<string, unknown> = {}
-  for (const m of ['select', 'eq', 'in', 'lt', 'order', 'range']) {
+  for (const m of ['select', 'eq', 'in', 'lt', 'neq', 'order', 'range']) {
     b[m] = vi.fn().mockReturnValue(b)
   }
-  b.single = vi.fn().mockImplementation(async () => results[resultIdx++] ?? { data: null, error: null })
-  b.then = (resolve: (v: unknown) => void) => resolve(results[resultIdx++] ?? { data: null, error: null })
+  const consume = (): MockResult => {
+    const queue = mockResults[tableName]
+    if (!queue || queue.length === 0) return { data: null, error: null }
+    return queue.shift()!
+  }
+  b.single = vi.fn().mockImplementation(async () => consume())
+  b.then = (resolve: (v: unknown) => void) => resolve(consume())
   return b
 }
 
 function makeClient() {
   return {
-    from: vi.fn().mockImplementation(() => makeBuilder()),
-    rpc: vi.fn().mockImplementation(async () => results[resultIdx++] ?? { data: null, error: null }),
+    from: vi.fn().mockImplementation((table: string) => makeBuilder(table)),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any
 }
@@ -31,17 +35,15 @@ let supabase: ReturnType<typeof makeClient>
 
 beforeEach(() => {
   vi.clearAllMocks()
-  resultIdx = 0
-  results = []
+  mockResults = {}
   supabase = makeClient()
 })
 
 describe('generateGeneralLedger', () => {
   it('returns empty report when no fiscal period found', async () => {
-    results = [
-      // 0: fiscal_periods.single() → null
-      { data: null, error: null },
-    ]
+    mockResults = {
+      fiscal_periods: [{ data: null, error: null }],
+    }
 
     const report = await generateGeneralLedger(supabase, 'user-1', 'period-1')
     expect(report.accounts).toEqual([])
@@ -49,12 +51,17 @@ describe('generateGeneralLedger', () => {
   })
 
   it('returns empty report when no entries in period', async () => {
-    results = [
-      // 0: fiscal_periods.single()
-      { data: { period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
-      // 1: journal_entries (empty)
-      { data: [], error: null },
-    ]
+    mockResults = {
+      fiscal_periods: [
+        { data: { period_start: '2024-01-01', period_end: '2024-12-31', opening_balance_entry_id: null }, error: null },
+      ],
+      journal_entry_lines: [
+        // prior lines (from getOpeningBalances fallback) — empty
+        { data: [], error: null },
+        // period lines — empty
+        { data: [], error: null },
+      ],
+    }
 
     const report = await generateGeneralLedger(supabase, 'user-1', 'period-1')
     expect(report.accounts).toEqual([])
@@ -62,41 +69,37 @@ describe('generateGeneralLedger', () => {
   })
 
   it('groups lines by account with correct totals and running balance', async () => {
-    results = [
-      // 0: fiscal_periods.single()
-      { data: { period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
-      // 1: journal_entries for this period
-      {
-        data: [
-          { id: 'e1', entry_date: '2024-01-15', voucher_number: 1, voucher_series: 'A', description: 'Sale', source_type: 'invoice' },
-          { id: 'e2', entry_date: '2024-02-10', voucher_number: 2, voucher_series: 'A', description: 'Payment', source_type: 'transaction' },
-        ],
-        error: null,
-      },
-      // 2: journal_entry_lines
-      {
-        data: [
-          { account_number: '1510', debit_amount: 1250, credit_amount: 0, journal_entry_id: 'e1' },
-          { account_number: '3001', debit_amount: 0, credit_amount: 1000, journal_entry_id: 'e1' },
-          { account_number: '2611', debit_amount: 0, credit_amount: 250, journal_entry_id: 'e1' },
-          { account_number: '1930', debit_amount: 1250, credit_amount: 0, journal_entry_id: 'e2' },
-          { account_number: '1510', debit_amount: 0, credit_amount: 1250, journal_entry_id: 'e2' },
-        ],
-        error: null,
-      },
-      // 3: chart_of_accounts
-      {
-        data: [
-          { account_number: '1510', account_name: 'Kundfordringar' },
-          { account_number: '1930', account_name: 'Företagskonto' },
-          { account_number: '2611', account_name: 'Utgående moms 25%' },
-          { account_number: '3001', account_name: 'Försäljning 25%' },
-        ],
-        error: null,
-      },
-      // 4: prior entries (none)
-      { data: [], error: null },
-    ]
+    mockResults = {
+      fiscal_periods: [
+        { data: { period_start: '2024-01-01', period_end: '2024-12-31', opening_balance_entry_id: null }, error: null },
+      ],
+      journal_entry_lines: [
+        // prior lines — empty (first year)
+        { data: [], error: null },
+        // period lines (joined with entry data)
+        {
+          data: [
+            { account_number: '1510', debit_amount: 1250, credit_amount: 0, journal_entries: { entry_date: '2024-01-15', voucher_number: 1, voucher_series: 'A', description: 'Sale', source_type: 'invoice' } },
+            { account_number: '3001', debit_amount: 0, credit_amount: 1000, journal_entries: { entry_date: '2024-01-15', voucher_number: 1, voucher_series: 'A', description: 'Sale', source_type: 'invoice' } },
+            { account_number: '2611', debit_amount: 0, credit_amount: 250, journal_entries: { entry_date: '2024-01-15', voucher_number: 1, voucher_series: 'A', description: 'Sale', source_type: 'invoice' } },
+            { account_number: '1930', debit_amount: 1250, credit_amount: 0, journal_entries: { entry_date: '2024-02-10', voucher_number: 2, voucher_series: 'A', description: 'Payment', source_type: 'transaction' } },
+            { account_number: '1510', debit_amount: 0, credit_amount: 1250, journal_entries: { entry_date: '2024-02-10', voucher_number: 2, voucher_series: 'A', description: 'Payment', source_type: 'transaction' } },
+          ],
+          error: null,
+        },
+      ],
+      chart_of_accounts: [
+        {
+          data: [
+            { account_number: '1510', account_name: 'Kundfordringar' },
+            { account_number: '1930', account_name: 'Företagskonto' },
+            { account_number: '2611', account_name: 'Utgående moms 25%' },
+            { account_number: '3001', account_name: 'Försäljning 25%' },
+          ],
+          error: null,
+        },
+      ],
+    }
 
     const report = await generateGeneralLedger(supabase, 'user-1', 'period-1')
 
@@ -120,42 +123,37 @@ describe('generateGeneralLedger', () => {
   })
 
   it('computes opening balance from prior period entries', async () => {
-    results = [
-      // 0: fiscal_periods.single()
-      { data: { period_start: '2025-01-01', period_end: '2025-12-31' }, error: null },
-      // 1: journal_entries for this period
-      {
-        data: [
-          { id: 'e1', entry_date: '2025-03-01', voucher_number: 1, voucher_series: 'A', description: 'Purchase', source_type: 'manual' },
-        ],
-        error: null,
-      },
-      // 2: journal_entry_lines
-      {
-        data: [
-          { account_number: '1930', debit_amount: 0, credit_amount: 500, journal_entry_id: 'e1' },
-          { account_number: '5410', debit_amount: 500, credit_amount: 0, journal_entry_id: 'e1' },
-        ],
-        error: null,
-      },
-      // 3: chart_of_accounts
-      {
-        data: [
-          { account_number: '1930', account_name: 'Företagskonto' },
-          { account_number: '5410', account_name: 'Förbrukningsinventarier' },
-        ],
-        error: null,
-      },
-      // 4: prior entries
-      { data: [{ id: 'prior-1' }], error: null },
-      // 5: prior lines
-      {
-        data: [
-          { account_number: '1930', debit_amount: 10000, credit_amount: 0 },
-        ],
-        error: null,
-      },
-    ]
+    mockResults = {
+      fiscal_periods: [
+        { data: { period_start: '2025-01-01', period_end: '2025-12-31', opening_balance_entry_id: null }, error: null },
+      ],
+      journal_entry_lines: [
+        // prior lines (from getOpeningBalances fallback)
+        {
+          data: [
+            { account_number: '1930', debit_amount: 10000, credit_amount: 0 },
+          ],
+          error: null,
+        },
+        // period lines
+        {
+          data: [
+            { account_number: '1930', debit_amount: 0, credit_amount: 500, journal_entries: { entry_date: '2025-03-01', voucher_number: 1, voucher_series: 'A', description: 'Purchase', source_type: 'manual' } },
+            { account_number: '5410', debit_amount: 500, credit_amount: 0, journal_entries: { entry_date: '2025-03-01', voucher_number: 1, voucher_series: 'A', description: 'Purchase', source_type: 'manual' } },
+          ],
+          error: null,
+        },
+      ],
+      chart_of_accounts: [
+        {
+          data: [
+            { account_number: '1930', account_name: 'Företagskonto' },
+            { account_number: '5410', account_name: 'Förbrukningsinventarier' },
+          ],
+          error: null,
+        },
+      ],
+    }
 
     const report = await generateGeneralLedger(supabase, 'user-1', 'period-2')
 
@@ -166,30 +164,27 @@ describe('generateGeneralLedger', () => {
   })
 
   it('filters accounts by account_from and account_to', async () => {
-    results = [
-      // 0: fiscal_periods.single()
-      { data: { period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
-      // 1: journal_entries
-      {
-        data: [
-          { id: 'e1', entry_date: '2024-01-15', voucher_number: 1, voucher_series: 'A', description: 'Test', source_type: 'manual' },
-        ],
-        error: null,
-      },
-      // 2: lines across multiple accounts
-      {
-        data: [
-          { account_number: '1510', debit_amount: 1000, credit_amount: 0, journal_entry_id: 'e1' },
-          { account_number: '1930', debit_amount: 0, credit_amount: 500, journal_entry_id: 'e1' },
-          { account_number: '3001', debit_amount: 0, credit_amount: 500, journal_entry_id: 'e1' },
-        ],
-        error: null,
-      },
-      // 3: chart_of_accounts
-      { data: [], error: null },
-      // 4: prior entries (none)
-      { data: [], error: null },
-    ]
+    mockResults = {
+      fiscal_periods: [
+        { data: { period_start: '2024-01-01', period_end: '2024-12-31', opening_balance_entry_id: null }, error: null },
+      ],
+      journal_entry_lines: [
+        // prior lines — empty
+        { data: [], error: null },
+        // period lines across multiple accounts
+        {
+          data: [
+            { account_number: '1510', debit_amount: 1000, credit_amount: 0, journal_entries: { entry_date: '2024-01-15', voucher_number: 1, voucher_series: 'A', description: 'Test', source_type: 'manual' } },
+            { account_number: '1930', debit_amount: 0, credit_amount: 500, journal_entries: { entry_date: '2024-01-15', voucher_number: 1, voucher_series: 'A', description: 'Test', source_type: 'manual' } },
+            { account_number: '3001', debit_amount: 0, credit_amount: 500, journal_entries: { entry_date: '2024-01-15', voucher_number: 1, voucher_series: 'A', description: 'Test', source_type: 'manual' } },
+          ],
+          error: null,
+        },
+      ],
+      chart_of_accounts: [
+        { data: [], error: null },
+      ],
+    }
 
     const report = await generateGeneralLedger(supabase, 'user-1', 'period-1', '1500', '1999')
 
@@ -198,32 +193,27 @@ describe('generateGeneralLedger', () => {
   })
 
   it('sorts lines within account by date then voucher number', async () => {
-    results = [
-      // 0: fiscal_periods.single()
-      { data: { period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
-      // 1: entries out of order
-      {
-        data: [
-          { id: 'e2', entry_date: '2024-01-10', voucher_number: 2, voucher_series: 'A', description: 'Second', source_type: 'manual' },
-          { id: 'e1', entry_date: '2024-01-10', voucher_number: 1, voucher_series: 'A', description: 'First', source_type: 'manual' },
-          { id: 'e3', entry_date: '2024-01-05', voucher_number: 3, voucher_series: 'A', description: 'Earlier date', source_type: 'manual' },
-        ],
-        error: null,
-      },
-      // 2: lines all on same account
-      {
-        data: [
-          { account_number: '1930', debit_amount: 100, credit_amount: 0, journal_entry_id: 'e2' },
-          { account_number: '1930', debit_amount: 200, credit_amount: 0, journal_entry_id: 'e1' },
-          { account_number: '1930', debit_amount: 300, credit_amount: 0, journal_entry_id: 'e3' },
-        ],
-        error: null,
-      },
-      // 3: chart_of_accounts
-      { data: [{ account_number: '1930', account_name: 'Företagskonto' }], error: null },
-      // 4: prior entries
-      { data: [], error: null },
-    ]
+    mockResults = {
+      fiscal_periods: [
+        { data: { period_start: '2024-01-01', period_end: '2024-12-31', opening_balance_entry_id: null }, error: null },
+      ],
+      journal_entry_lines: [
+        // prior lines — empty
+        { data: [], error: null },
+        // period lines — out of order
+        {
+          data: [
+            { account_number: '1930', debit_amount: 100, credit_amount: 0, journal_entries: { entry_date: '2024-01-10', voucher_number: 2, voucher_series: 'A', description: 'Second', source_type: 'manual' } },
+            { account_number: '1930', debit_amount: 200, credit_amount: 0, journal_entries: { entry_date: '2024-01-10', voucher_number: 1, voucher_series: 'A', description: 'First', source_type: 'manual' } },
+            { account_number: '1930', debit_amount: 300, credit_amount: 0, journal_entries: { entry_date: '2024-01-05', voucher_number: 3, voucher_series: 'A', description: 'Earlier date', source_type: 'manual' } },
+          ],
+          error: null,
+        },
+      ],
+      chart_of_accounts: [
+        { data: [{ account_number: '1930', account_name: 'Företagskonto' }], error: null },
+      ],
+    }
 
     const report = await generateGeneralLedger(supabase, 'user-1', 'period-1')
     const acc = report.accounts[0]
@@ -235,23 +225,23 @@ describe('generateGeneralLedger', () => {
   })
 
   it('uses Math.round for monetary precision', async () => {
-    results = [
-      { data: { period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
-      {
-        data: [
-          { id: 'e1', entry_date: '2024-01-15', voucher_number: 1, voucher_series: 'A', description: 'Precision', source_type: 'manual' },
-        ],
-        error: null,
-      },
-      {
-        data: [
-          { account_number: '1930', debit_amount: 33.33, credit_amount: 0, journal_entry_id: 'e1' },
-        ],
-        error: null,
-      },
-      { data: [{ account_number: '1930', account_name: 'Företagskonto' }], error: null },
-      { data: [], error: null },
-    ]
+    mockResults = {
+      fiscal_periods: [
+        { data: { period_start: '2024-01-01', period_end: '2024-12-31', opening_balance_entry_id: null }, error: null },
+      ],
+      journal_entry_lines: [
+        { data: [], error: null },
+        {
+          data: [
+            { account_number: '1930', debit_amount: 33.33, credit_amount: 0, journal_entries: { entry_date: '2024-01-15', voucher_number: 1, voucher_series: 'A', description: 'Precision', source_type: 'manual' } },
+          ],
+          error: null,
+        },
+      ],
+      chart_of_accounts: [
+        { data: [{ account_number: '1930', account_name: 'Företagskonto' }], error: null },
+      ],
+    }
 
     const report = await generateGeneralLedger(supabase, 'user-1', 'period-1')
     const acc = report.accounts[0]
