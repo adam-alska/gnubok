@@ -1,12 +1,13 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Download, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react'
+import { Download, AlertCircle, ChevronDown, ChevronRight, ArrowRight } from 'lucide-react'
 import { AccountNumber } from '@/components/ui/account-number'
 import { NEDeclarationView } from '@/components/reports/NEDeclarationView'
 import { INK2DeclarationView } from '@/components/reports/INK2DeclarationView'
@@ -28,12 +29,53 @@ function formatAmount(amount: number): string {
   return amount.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+// Breadcrumb trail for drill-down navigation
+interface DrillDownStep {
+  tab: string
+  label: string
+  accountNumber?: string
+}
+
+const TAB_LABELS: Record<string, string> = {
+  'trial-balance': 'Saldobalans',
+  'income-statement': 'Resultaträkning',
+  'balance-sheet': 'Balansräkning',
+  'huvudbok': 'Huvudbok',
+}
+
 export default function ReportsPage() {
   const [periods, setPeriods] = useState<FiscalPeriod[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState('')
   const [activeTab, setActiveTab] = useState('trial-balance')
   const [entityType, setEntityType] = useState<string | null>(null)
   const [isLoadingInit, setIsLoadingInit] = useState(true)
+
+  // Drill-down state: when navigating from a report to the GL for a specific account
+  const [glAccountFilter, setGlAccountFilter] = useState<string | null>(null)
+  const [drillDownTrail, setDrillDownTrail] = useState<DrillDownStep[]>([])
+
+  const navigateToAccount = useCallback((accountNumber: string) => {
+    setDrillDownTrail((prev) => [
+      ...prev,
+      { tab: activeTab, label: TAB_LABELS[activeTab] || activeTab },
+    ])
+    setGlAccountFilter(accountNumber)
+    setActiveTab('huvudbok')
+  }, [activeTab])
+
+  const handleTabChange = useCallback((tab: string) => {
+    // Manual tab change clears drill-down state
+    setActiveTab(tab)
+    setGlAccountFilter(null)
+    setDrillDownTrail([])
+  }, [])
+
+  const navigateBack = useCallback((stepIndex: number) => {
+    const step = drillDownTrail[stepIndex]
+    setActiveTab(step.tab)
+    setGlAccountFilter(null)
+    setDrillDownTrail(drillDownTrail.slice(0, stepIndex))
+  }, [drillDownTrail])
 
   async function fetchPeriods() {
     const res = await fetch('/api/bookkeeping/fiscal-periods')
@@ -134,12 +176,33 @@ export default function ReportsPage() {
       </div>
 
       {selectedPeriod ? (
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <>
+        {/* Drill-down breadcrumb */}
+        {drillDownTrail.length > 0 && (
+          <nav className="flex items-center gap-1.5 text-sm">
+            {drillDownTrail.map((step, i) => (
+              <React.Fragment key={i}>
+                <button
+                  onClick={() => navigateBack(i)}
+                  className="text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4 decoration-muted-foreground/40"
+                >
+                  {step.label}
+                </button>
+                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
+              </React.Fragment>
+            ))}
+            <span className="font-medium">
+              Huvudbok {glAccountFilter && `— ${glAccountFilter}`}
+            </span>
+          </nav>
+        )}
+
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
           {/* Mobile: compact select dropdown */}
           <div className="sm:hidden mb-2">
             <select
               value={activeTab}
-              onChange={(e) => setActiveTab(e.target.value)}
+              onChange={(e) => handleTabChange(e.target.value)}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             >
               <optgroup label="Bokslut">
@@ -241,13 +304,13 @@ export default function ReportsPage() {
           </div>
 
           <TabsContent value="trial-balance">
-            <TrialBalanceView periodId={selectedPeriod} />
+            <TrialBalanceView periodId={selectedPeriod} onNavigateToAccount={navigateToAccount} />
           </TabsContent>
           <TabsContent value="income-statement">
-            <IncomeStatementView periodId={selectedPeriod} />
+            <IncomeStatementView periodId={selectedPeriod} onNavigateToAccount={navigateToAccount} />
           </TabsContent>
           <TabsContent value="balance-sheet">
-            <BalanceSheetView periodId={selectedPeriod} />
+            <BalanceSheetView periodId={selectedPeriod} onNavigateToAccount={navigateToAccount} />
           </TabsContent>
           <TabsContent value="vat-declaration">
             <VatDeclarationView />
@@ -263,7 +326,7 @@ export default function ReportsPage() {
             </TabsContent>
           )}
           <TabsContent value="huvudbok">
-            <GeneralLedgerView periodId={selectedPeriod} />
+            <GeneralLedgerView periodId={selectedPeriod} initialAccountFilter={glAccountFilter} />
           </TabsContent>
           <TabsContent value="grundbok">
             <JournalRegisterView periodId={selectedPeriod} />
@@ -278,6 +341,7 @@ export default function ReportsPage() {
             <BankReconciliationView />
           </TabsContent>
         </Tabs>
+        </>
       ) : (
         <Card>
           <CardContent className="p-8 text-center text-muted-foreground">
@@ -291,7 +355,7 @@ export default function ReportsPage() {
   )
 }
 
-function TrialBalanceView({ periodId }: { periodId: string }) {
+function TrialBalanceView({ periodId, onNavigateToAccount }: { periodId: string; onNavigateToAccount: (account: string) => void }) {
   const [data, setData] = useState<{
     rows: TrialBalanceRow[]
     totalDebit: number
@@ -300,6 +364,7 @@ function TrialBalanceView({ periodId }: { periodId: string }) {
   } | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'simplified' | 'detailed'>('simplified')
 
   useEffect(() => {
     setLoading(true)
@@ -351,6 +416,28 @@ function TrialBalanceView({ periodId }: { periodId: string }) {
     )
   }
 
+  function getNetBalance(row: TrialBalanceRow, type: 'opening' | 'period' | 'closing'): number {
+    let debit: number, credit: number
+    if (type === 'opening') {
+      debit = row.opening_debit; credit = row.opening_credit
+    } else if (type === 'period') {
+      debit = row.period_debit; credit = row.period_credit
+    } else {
+      debit = row.closing_debit; credit = row.closing_credit
+    }
+    // Credit-normal accounts (liabilities/equity class 2, revenue class 3): positive when credit > debit
+    // Debit-normal accounts (assets class 1, expenses class 4-9): positive when debit > credit
+    const creditNormal = row.account_class === 2 || row.account_class === 3
+    return Math.round((creditNormal ? credit - debit : debit - credit) * 100) / 100
+  }
+
+  function formatSigned(amount: number): string {
+    if (amount === 0) return ''
+    return amount < 0
+      ? `−${formatAmount(Math.abs(amount))}`
+      : formatAmount(amount)
+  }
+
   return (
     <div className="space-y-4">
       <TrialBalanceChart rows={data.rows} />
@@ -358,70 +445,143 @@ function TrialBalanceView({ periodId }: { periodId: string }) {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Saldobalans</CardTitle>
-            {data.isBalanced ? (
-              <Badge className="bg-success/10 text-success">Balanserad</Badge>
-            ) : (
-              <Badge variant="destructive">Ej balanserad</Badge>
-            )}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-0.5 rounded-md border p-0.5">
+                <button
+                  onClick={() => setViewMode('simplified')}
+                  className={`px-3 py-1 text-xs rounded-sm transition-colors ${
+                    viewMode === 'simplified'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Förenklad
+                </button>
+                <button
+                  onClick={() => setViewMode('detailed')}
+                  className={`px-3 py-1 text-xs rounded-sm transition-colors ${
+                    viewMode === 'detailed'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Detaljerad
+                </button>
+              </div>
+              {data.isBalanced ? (
+                <Badge className="bg-success/10 text-success">Balanserad</Badge>
+              ) : (
+                <Badge variant="destructive">Ej balanserad</Badge>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto -mx-2 px-2"><table className="w-full text-sm min-w-[600px]">
-            <thead>
-              <tr className="border-b text-left text-muted-foreground">
-                <th className="py-2 w-20">Konto</th>
-              <th className="py-2">Namn</th>
-              <th className="py-2 w-28 text-right">Period debet</th>
-              <th className="py-2 w-28 text-right">Period kredit</th>
-              <th className="py-2 w-28 text-right">Saldo debet</th>
-              <th className="py-2 w-28 text-right">Saldo kredit</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.rows.map((row) => (
-              <tr key={row.account_number} className="border-b last:border-0">
-                <td className="py-2"><AccountNumber number={row.account_number} name={row.account_name} /></td>
-                <td className="py-2">{row.account_name}</td>
-                <td className="py-2 text-right">
-                  {row.period_debit > 0 ? formatAmount(row.period_debit) : ''}
-                </td>
-                <td className="py-2 text-right">
-                  {row.period_credit > 0 ? formatAmount(row.period_credit) : ''}
-                </td>
-                <td className="py-2 text-right">
-                  {row.closing_debit > 0 ? formatAmount(row.closing_debit) : ''}
-                </td>
-                <td className="py-2 text-right">
-                  {row.closing_credit > 0 ? formatAmount(row.closing_credit) : ''}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="font-semibold border-t-2">
-              <td colSpan={2} className="py-2">Summa</td>
-              <td className="py-2 text-right">
-                {formatAmount(data.rows.reduce((s, r) => s + r.period_debit, 0))}
-              </td>
-              <td className="py-2 text-right">
-                {formatAmount(data.rows.reduce((s, r) => s + r.period_credit, 0))}
-              </td>
-              <td className={`py-2 text-right ${data.isBalanced ? 'text-success' : 'text-destructive'}`}>
-                {formatAmount(data.totalDebit)}
-              </td>
-              <td className={`py-2 text-right ${data.isBalanced ? 'text-success' : 'text-destructive'}`}>
-                {formatAmount(data.totalCredit)}
-              </td>
-            </tr>
-          </tfoot>
-        </table></div>
-      </CardContent>
-    </Card>
+          <div className="overflow-x-auto -mx-2 px-2">
+            {viewMode === 'simplified' ? (
+              <table className="w-full text-sm min-w-[500px]">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="py-2 w-20">Konto</th>
+                    <th className="py-2">Namn</th>
+                    <th className="py-2 w-32 text-right">Ingående saldo</th>
+                    <th className="py-2 w-32 text-right">Förändring</th>
+                    <th className="py-2 w-32 text-right">Utgående saldo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.rows.map((row) => {
+                    const ob = getNetBalance(row, 'opening')
+                    const ch = getNetBalance(row, 'period')
+                    const cb = getNetBalance(row, 'closing')
+                    return (
+                      <tr
+                        key={row.account_number}
+                        className="border-b last:border-0 cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => onNavigateToAccount(row.account_number)}
+                      >
+                        <td className="py-2">
+                          <AccountNumber number={row.account_number} name={row.account_name} />
+                        </td>
+                        <td className="py-2">{row.account_name}</td>
+                        <td className={`py-2 text-right tabular-nums ${ob < 0 ? 'text-destructive' : ''}`}>
+                          {formatSigned(ob)}
+                        </td>
+                        <td className={`py-2 text-right tabular-nums ${ch < 0 ? 'text-destructive' : ''}`}>
+                          {formatSigned(ch)}
+                        </td>
+                        <td className={`py-2 text-right tabular-nums font-medium ${cb < 0 ? 'text-destructive' : ''}`}>
+                          {formatSigned(cb)}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              <table className="w-full text-sm min-w-[600px]">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="py-2 w-20">Konto</th>
+                    <th className="py-2">Namn</th>
+                    <th className="py-2 w-28 text-right">Period debet</th>
+                    <th className="py-2 w-28 text-right">Period kredit</th>
+                    <th className="py-2 w-28 text-right">Saldo debet</th>
+                    <th className="py-2 w-28 text-right">Saldo kredit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.rows.map((row) => (
+                    <tr
+                      key={row.account_number}
+                      className="border-b last:border-0 cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => onNavigateToAccount(row.account_number)}
+                    >
+                      <td className="py-2">
+                        <AccountNumber number={row.account_number} name={row.account_name} />
+                      </td>
+                      <td className="py-2">{row.account_name}</td>
+                      <td className="py-2 text-right">
+                        {row.period_debit > 0 ? formatAmount(row.period_debit) : ''}
+                      </td>
+                      <td className="py-2 text-right">
+                        {row.period_credit > 0 ? formatAmount(row.period_credit) : ''}
+                      </td>
+                      <td className="py-2 text-right">
+                        {row.closing_debit > 0 ? formatAmount(row.closing_debit) : ''}
+                      </td>
+                      <td className="py-2 text-right">
+                        {row.closing_credit > 0 ? formatAmount(row.closing_credit) : ''}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="font-semibold border-t-2">
+                    <td colSpan={2} className="py-2">Summa</td>
+                    <td className="py-2 text-right">
+                      {formatAmount(data.rows.reduce((s, r) => s + r.period_debit, 0))}
+                    </td>
+                    <td className="py-2 text-right">
+                      {formatAmount(data.rows.reduce((s, r) => s + r.period_credit, 0))}
+                    </td>
+                    <td className={`py-2 text-right ${data.isBalanced ? 'text-success' : 'text-destructive'}`}>
+                      {formatAmount(data.totalDebit)}
+                    </td>
+                    <td className={`py-2 text-right ${data.isBalanced ? 'text-success' : 'text-destructive'}`}>
+                      {formatAmount(data.totalCredit)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
-
-function IncomeStatementView({ periodId }: { periodId: string }) {
+function IncomeStatementView({ periodId, onNavigateToAccount }: { periodId: string; onNavigateToAccount: (account: string) => void }) {
   const [data, setData] = useState<IncomeStatementReport | null>(null)
   const [monthlyData, setMonthlyData] = useState<MonthlyDataPoint[]>([])
   const [monthlyLoading, setMonthlyLoading] = useState(false)
@@ -504,7 +664,7 @@ function IncomeStatementView({ periodId }: { periodId: string }) {
           <CardTitle className="text-lg">Rörelseintäkter</CardTitle>
         </CardHeader>
         <CardContent>
-          <ReportSectionTable sections={data.revenue_sections} />
+          <ReportSectionTable sections={data.revenue_sections} onNavigateToAccount={onNavigateToAccount} />
           <div className="flex justify-between font-semibold pt-2 border-t mt-2">
             <span>Summa rörelseintäkter</span>
             <span>{formatAmount(data.total_revenue)} kr</span>
@@ -518,7 +678,7 @@ function IncomeStatementView({ periodId }: { periodId: string }) {
           <CardTitle className="text-lg">Rörelsekostnader</CardTitle>
         </CardHeader>
         <CardContent>
-          <ReportSectionTable sections={data.expense_sections} negate />
+          <ReportSectionTable sections={data.expense_sections} negate onNavigateToAccount={onNavigateToAccount} />
           <div className="flex justify-between font-semibold pt-2 border-t mt-2">
             <span>Summa rörelsekostnader</span>
             <span>-{formatAmount(data.total_expenses)} kr</span>
@@ -545,7 +705,7 @@ function IncomeStatementView({ periodId }: { periodId: string }) {
             <CardTitle className="text-lg">Finansiella poster</CardTitle>
           </CardHeader>
           <CardContent>
-            <ReportSectionTable sections={data.financial_sections} />
+            <ReportSectionTable sections={data.financial_sections} onNavigateToAccount={onNavigateToAccount} />
             <div className="flex justify-between font-semibold pt-2 border-t mt-2">
               <span>Summa finansiella poster</span>
               <span>{formatAmount(data.total_financial)} kr</span>
@@ -569,7 +729,7 @@ function IncomeStatementView({ periodId }: { periodId: string }) {
   )
 }
 
-function BalanceSheetView({ periodId }: { periodId: string }) {
+function BalanceSheetView({ periodId, onNavigateToAccount }: { periodId: string; onNavigateToAccount: (account: string) => void }) {
   const [data, setData] = useState<BalanceSheetReport | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -634,7 +794,7 @@ function BalanceSheetView({ periodId }: { periodId: string }) {
           <CardTitle className="text-lg">Tillgångar</CardTitle>
         </CardHeader>
         <CardContent>
-          <ReportSectionTable sections={data.asset_sections} />
+          <ReportSectionTable sections={data.asset_sections} onNavigateToAccount={onNavigateToAccount} />
           <div className="flex justify-between font-semibold pt-2 border-t mt-2">
             <span>Summa tillgångar</span>
             <span>{formatAmount(data.total_assets)} kr</span>
@@ -648,7 +808,7 @@ function BalanceSheetView({ periodId }: { periodId: string }) {
           <CardTitle className="text-lg">Eget kapital och skulder</CardTitle>
         </CardHeader>
         <CardContent>
-          <ReportSectionTable sections={data.equity_liability_sections} />
+          <ReportSectionTable sections={data.equity_liability_sections} onNavigateToAccount={onNavigateToAccount} />
           <div className="flex justify-between font-semibold pt-2 border-t mt-2">
             <span>Summa eget kapital och skulder</span>
             <span>{formatAmount(data.total_equity_liabilities)} kr</span>
@@ -685,9 +845,11 @@ function BalanceSheetView({ periodId }: { periodId: string }) {
 function ReportSectionTable({
   sections,
   negate,
+  onNavigateToAccount,
 }: {
   sections: { title: string; rows: { account_number: string; account_name: string; amount: number }[]; subtotal: number }[]
   negate?: boolean
+  onNavigateToAccount?: (account: string) => void
 }) {
   if (sections.length === 0) {
     return <p className="text-sm text-muted-foreground">Inga poster.</p>
@@ -701,7 +863,11 @@ function ReportSectionTable({
           <div className="overflow-x-auto -mx-2 px-2"><table className="w-full text-sm min-w-[400px]">
             <tbody>
               {section.rows.map((row) => (
-                <tr key={row.account_number} className="border-b last:border-0">
+                <tr
+                  key={row.account_number}
+                  className={`border-b last:border-0 ${onNavigateToAccount ? 'cursor-pointer hover:bg-muted/50 transition-colors' : ''}`}
+                  onClick={onNavigateToAccount ? () => onNavigateToAccount(row.account_number) : undefined}
+                >
                   <td className="py-1 w-16"><AccountNumber number={row.account_number} name={row.account_name} /></td>
                   <td className="py-1">{row.account_name}</td>
                   <td className="py-1 text-right w-28">
@@ -1303,6 +1469,7 @@ interface GeneralLedgerData {
       date: string
       voucher_series: string
       voucher_number: number
+      journal_entry_id: string
       description: string
       source_type: string
       debit: number
@@ -1316,20 +1483,22 @@ interface GeneralLedgerData {
   period: { start: string; end: string }
 }
 
-function GeneralLedgerView({ periodId }: { periodId: string }) {
+function GeneralLedgerView({ periodId, initialAccountFilter }: { periodId: string; initialAccountFilter: string | null }) {
   const [data, setData] = useState<GeneralLedgerData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [accountFrom, setAccountFrom] = useState('')
   const [accountTo, setAccountTo] = useState('')
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async (fromOverride?: string, toOverride?: string) => {
+    const from = fromOverride ?? accountFrom
+    const to = toOverride ?? accountTo
     setLoading(true)
     setError(null)
     try {
       const params = new URLSearchParams({ period_id: periodId })
-      if (accountFrom) params.set('account_from', accountFrom)
-      if (accountTo) params.set('account_to', accountTo)
+      if (from) params.set('account_from', from)
+      if (to) params.set('account_to', to)
       const res = await fetch(`/api/reports/general-ledger?${params}`)
       const result = await res.json()
       if (result.error) {
@@ -1342,11 +1511,18 @@ function GeneralLedgerView({ periodId }: { periodId: string }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [periodId, accountFrom, accountTo])
 
+  // When initialAccountFilter changes (drill-down from another report), apply it
   useEffect(() => {
-    if (periodId) fetchData()
-  }, [periodId])
+    if (initialAccountFilter) {
+      setAccountFrom(initialAccountFilter)
+      setAccountTo(initialAccountFilter)
+      fetchData(initialAccountFilter, initialAccountFilter)
+    } else {
+      fetchData()
+    }
+  }, [periodId, initialAccountFilter])
 
   if (loading) {
     return (
@@ -1405,7 +1581,7 @@ function GeneralLedgerView({ periodId }: { periodId: string }) {
                 className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
               />
             </div>
-            <Button onClick={fetchData} variant="outline">
+            <Button onClick={() => fetchData()} variant="outline">
               Filtrera
             </Button>
           </div>
@@ -1446,7 +1622,12 @@ function GeneralLedgerView({ periodId }: { periodId: string }) {
                 {account.lines.map((line, i) => (
                   <tr key={i} className="border-b last:border-0">
                     <td className="py-1.5 font-mono text-xs">
-                      {line.voucher_series}{line.voucher_number}
+                      <Link
+                        href={`/bookkeeping/${line.journal_entry_id}`}
+                        className="text-foreground underline underline-offset-4 decoration-muted-foreground/40 hover:decoration-foreground transition-colors"
+                      >
+                        {line.voucher_series}{line.voucher_number}
+                      </Link>
                     </td>
                     <td className="py-1.5">{line.date}</td>
                     <td className="py-1.5 truncate max-w-[200px]">{line.description}</td>
