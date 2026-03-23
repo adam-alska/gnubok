@@ -43,9 +43,8 @@ function makeClient(storageOverrides: Record<string, unknown> = {}) {
   }
 }
 
-// Keep createServiceClient mock since ensureDocumentsBucket still uses it
-vi.mock('@/lib/supabase/server', () => ({
-  createServiceClient: vi.fn(async () => makeClient()),
+vi.mock('@/lib/auth/api-keys', () => ({
+  createServiceClientNoCookies: vi.fn(() => makeClient()),
 }))
 
 import { uploadDocument, createNewVersion, verifyIntegrity, _resetBucketVerified } from '../document-service'

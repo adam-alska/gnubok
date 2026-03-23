@@ -3,10 +3,11 @@ import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import type { TrialBalanceRow } from '@/types'
 
 /**
- * Generate trial balance (Saldobalans) for a fiscal period
+ * Generate trial balance (Saldobalans) for a fiscal period.
  *
- * Aggregates all posted journal entry lines grouped by account number,
- * filtered by fiscal period. Verifies total debits = total credits.
+ * Uses a single joined query (journal_entry_lines → journal_entries)
+ * with pagination to handle any number of entries. Avoids the broken
+ * .in(entryIds) pattern that silently truncated at 1000 rows.
  */
 export async function generateTrialBalance(
   supabase: SupabaseClient,
@@ -19,72 +20,31 @@ export async function generateTrialBalance(
   isBalanced: boolean
 }> {
 
-  // Get all posted journal entry lines for this period, grouped by account
-  const { data, error } = await supabase.rpc('generate_trial_balance', {
-    p_user_id: userId,
-    p_fiscal_period_id: fiscalPeriodId,
-  })
+  // Single joined query — no entry ID array, no URL length limit
+  const lines = await fetchAllRows<{
+    account_number: string
+    debit_amount: number
+    credit_amount: number
+  }>(({ from, to }) =>
+    supabase
+      .from('journal_entry_lines')
+      .select('account_number, debit_amount, credit_amount, journal_entries!inner(user_id, fiscal_period_id, status)')
+      .eq('journal_entries.user_id', userId)
+      .eq('journal_entries.fiscal_period_id', fiscalPeriodId)
+      .in('journal_entries.status', ['posted', 'reversed'])
+      .range(from, to)
+  )
 
-  if (error) {
-    // Fallback: manual aggregation via SQL
-    return generateTrialBalanceManual(supabase, userId, fiscalPeriodId)
-  }
-
-  if (data) {
-    const rows = data as TrialBalanceRow[]
-    const totalDebit = rows.reduce((sum, r) => sum + r.closing_debit, 0)
-    const totalCredit = rows.reduce((sum, r) => sum + r.closing_credit, 0)
-
-    return {
-      rows,
-      totalDebit: Math.round(totalDebit * 100) / 100,
-      totalCredit: Math.round(totalCredit * 100) / 100,
-      isBalanced: Math.abs(totalDebit - totalCredit) < 0.01,
-    }
-  }
-
-  return generateTrialBalanceManual(supabase, userId, fiscalPeriodId)
-}
-
-/**
- * Manual trial balance generation using direct queries
- */
-async function generateTrialBalanceManual(
-  supabase: SupabaseClient,
-  userId: string,
-  fiscalPeriodId: string
-): Promise<{
-  rows: TrialBalanceRow[]
-  totalDebit: number
-  totalCredit: number
-  isBalanced: boolean
-}> {
-
-  // Get all journal entry lines for posted entries in this period
-  const { data: entries, error: entriesError } = await supabase
-    .from('journal_entries')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('fiscal_period_id', fiscalPeriodId)
-    .in('status', ['posted', 'reversed'])
-
-  if (entriesError || !entries || entries.length === 0) {
-    return { rows: [], totalDebit: 0, totalCredit: 0, isBalanced: true }
-  }
-
-  const entryIds = entries.map((e) => e.id)
-
-  const { data: lines, error: linesError } = await supabase
-    .from('journal_entry_lines')
-    .select('account_number, debit_amount, credit_amount')
-    .in('journal_entry_id', entryIds)
-
-  if (linesError || !lines) {
+  if (lines.length === 0) {
     return { rows: [], totalDebit: 0, totalCredit: 0, isBalanced: true }
   }
 
   // Get account names
-  const accounts = await fetchAllRows<{ account_number: string; account_name: string; account_class: number }>(({ from, to }) =>
+  const accounts = await fetchAllRows<{
+    account_number: string
+    account_name: string
+    account_class: number
+  }>(({ from, to }) =>
     supabase
       .from('chart_of_accounts')
       .select('account_number, account_name, account_class')
@@ -101,10 +61,7 @@ async function generateTrialBalanceManual(
   }
 
   // Aggregate by account
-  const balances = new Map<
-    string,
-    { debit: number; credit: number }
-  >()
+  const balances = new Map<string, { debit: number; credit: number }>()
 
   for (const line of lines) {
     const existing = balances.get(line.account_number) || { debit: 0, credit: 0 }
@@ -134,7 +91,6 @@ async function generateTrialBalanceManual(
     })
   }
 
-  // Sort by account number
   rows.sort((a, b) => a.account_number.localeCompare(b.account_number))
 
   const totalDebit = Math.round(rows.reduce((sum, r) => sum + r.closing_debit, 0) * 100) / 100

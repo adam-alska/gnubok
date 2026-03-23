@@ -30,7 +30,7 @@ npm run setup:extensions # Regenerate extension registry from extensions.config.
 - **All journal entry creation** routes through `lib/bookkeeping/engine.ts` via `createJournalEntry()`.
 - **API routes** that emit events must call `ensureInitialized()` (from `lib/init.ts`) at module level.
 - **Event bus** (`lib/events/bus.ts`) is a module-level singleton. Handlers run via `Promise.allSettled`.
-- **Supabase clients**: browser (`lib/supabase/client.ts`), server with cookies (`createClient()` from `server.ts`), service role (`createServiceClient()`).
+- **Supabase clients**: browser (`lib/supabase/client.ts`), server with cookies (`createClient()` from `server.ts`), service role (`createServiceClient()`), cookieless service role for API key auth (`createServiceClientNoCookies()` from `lib/auth/api-keys.ts`).
 - **Extension system**: Opt-in via `extensions.config.json`. Core builds and runs with zero extensions.
 - **NE-bilaga, INK2 declaration, SRU export, and full archive export** are core reports (in `lib/reports/`), not extensions.
 - **AI consent gate** (`lib/extensions/ai-consent.ts`): AI extensions (`receipt-ocr`, `ai-categorization`, `ai-chat`) require user consent before API calls. Returns `403 AI_CONSENT_REQUIRED` if missing.
@@ -111,6 +111,29 @@ Extensions are opt-in plugins in `extensions/general/<name>/`, controlled by `ex
 
 ---
 
+## MCP Server & API Keys
+
+gnubok exposes its bookkeeping engine as an MCP (Model Context Protocol) server, letting users do bookkeeping through Claude Desktop, Claude Code, or any MCP-compatible client.
+
+**MCP extension** (`extensions/general/mcp-server/`): 10 tools — transactions, categorization, customers, invoices, trial balance, VAT report, KPI report, income statement. JSON-RPC 2.0 protocol implemented directly (no SDK dependency). Endpoint: `/api/extensions/ext/mcp-server/mcp`.
+
+**API key infrastructure** (`lib/auth/api-keys.ts`, `api_keys` table): SHA-256 hashed keys with `gnubok_sk_` prefix. Rate limited at 100 RPM via atomic DB RPC (`validate_and_increment_api_key`). `createServiceClientNoCookies()` creates a Supabase service client without cookies for API key auth — all queries filter by `user_id` (defense in depth).
+
+**OAuth 2.1** for Claude Desktop connectors (beta — Claude's callback has a known issue, see #78):
+- `.well-known/oauth-protected-resource` and `.well-known/oauth-authorization-server` — discovery endpoints (excluded from auth middleware)
+- `/api/mcp-oauth/authorize` — consent page + auth code generation
+- `/api/mcp-oauth/token` — PKCE verification + API key creation
+- `/api/mcp-oauth/register` — dynamic client registration
+- Stateless encrypted auth codes (AES-256-GCM via `lib/auth/oauth-codes.ts`)
+- Single-use enforcement via `oauth_used_codes` table
+- Redirect URI allowlist: `claude.ai/api/*`, `claude.com/api/*`, `localhost`
+
+**npm package** (`packages/gnubok-mcp`): Published as `gnubok-mcp` on npm. Stdio-to-HTTP bridge for Claude Desktop. Users configure `npx gnubok-mcp` with their API key.
+
+**KPI page** (`/kpi`): 4 metrics (Resultat, Kassa, Kundfordringar, Moms) + monthly trend chart. API at `/api/reports/kpi`.
+
+---
+
 ## API Route Pattern
 
 ```typescript
@@ -153,7 +176,7 @@ export async function POST(request: Request) {
 
 ## Database & Migrations
 
-**Location**: `supabase/migrations/` — 65 files. Early migrations use sequential numbering (`20240101000001`–`20240101000038`), later ones use real timestamps.
+**Location**: `supabase/migrations/` — 70 files. Early migrations use sequential numbering (`20240101000001`–`20240101000038`), later ones use real timestamps.
 
 ### Migration Rules
 

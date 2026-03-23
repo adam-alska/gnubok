@@ -4,11 +4,10 @@ import { useState, useEffect } from 'react'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { KPIHeroCards } from '@/components/kpi/KPIHeroCards'
-import { KPIOperationalGrid } from '@/components/kpi/KPIOperationalGrid'
 import { KPITrendChart } from '@/components/kpi/KPITrendChart'
 import type { FiscalPeriod, KPIReport } from '@/types'
 
-export default function NyckeltalPage() {
+export default function KpiPage() {
   const [periods, setPeriods] = useState<FiscalPeriod[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState('')
   const [report, setReport] = useState<KPIReport | null>(null)
@@ -108,7 +107,6 @@ export default function NyckeltalPage() {
       {!isLoadingReport && !error && report && (
         <>
           <KPIHeroCards report={report} />
-          <KPIOperationalGrid report={report} />
           {report.months.length > 0 && <KPITrendChart months={report.months} />}
         </>
       )}
@@ -134,16 +132,6 @@ function LoadingSkeleton() {
               <div className="h-3 bg-muted rounded w-20 animate-pulse" />
               <div className="h-7 bg-muted rounded w-28 animate-pulse" />
               <div className="h-3 bg-muted rounded w-16 animate-pulse" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {[1, 2, 3, 4].map((i) => (
-          <Card key={i}>
-            <CardContent className="p-5 space-y-2">
-              <div className="h-3 bg-muted rounded w-24 animate-pulse" />
-              <div className="h-6 bg-muted rounded w-20 animate-pulse" />
             </CardContent>
           </Card>
         ))}
