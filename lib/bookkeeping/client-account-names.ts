@@ -16,7 +16,7 @@ const ACCOUNT_NAMES: Record<string, string> = {
   '2013': 'Övriga egna uttag',
   '2018': 'Egna insättningar',
   '2350': 'Långfristiga skulder',
-  '2393': 'Skuld till ägare',
+  '2393': 'Kortfristig skuld närstående',
   '2440': 'Leverantörsskulder',
   '2510': 'Personalskatt',
   '2611': 'Utg. moms 25%',

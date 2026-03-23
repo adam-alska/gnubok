@@ -129,10 +129,14 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
   )
 
   const mainItems = filteredItems.filter(i => i.group === 'main')
-  const försäljningItems = filteredItems.filter(i => i.group === 'försäljning')
-  const inköpItems = filteredItems.filter(i => i.group === 'inköp')
-  const redovisningItems = filteredItems.filter(i => i.group === 'redovisning')
   const övrigtItems = filteredItems.filter(i => i.group === 'övrigt')
+
+  // Groups rendered as distinct sidebar sections (AR, AP, Accounting)
+  const sidebarGroups = [
+    { key: 'försäljning', items: filteredItems.filter(i => i.group === 'försäljning'), spacing: 'mb-4' },
+    { key: 'inköp', items: filteredItems.filter(i => i.group === 'inköp'), spacing: 'mb-4' },
+    { key: 'redovisning', items: filteredItems.filter(i => i.group === 'redovisning'), spacing: 'mb-6' },
+  ] as const
 
   const mobileNavItems = [
     { href: '/', label: 'Översikt', icon: LayoutDashboard },
@@ -186,106 +190,46 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                 </div>
               </div>
 
-              {/* Försäljning group (AR) */}
-              <div className="mb-4">
-                <p className="px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em]">
-                  {groupLabels.försäljning}
-                </p>
-                <div className="space-y-px">
-                  {försäljningItems.map((item) => {
-                    const Icon = item.icon
-                    const active = isActive(item.href)
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={cn(
-                          'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
-                          active
-                            ? 'bg-primary/12 text-foreground font-medium'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-                        )}
-                      >
-                        <Icon className={cn(
-                          "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
-                          active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                        )} />
-                        {item.label}
-                      </Link>
-                    )
-                  })}
+              {/* AR / AP / Accounting groups */}
+              {sidebarGroups.map(({ key, items, spacing }) => (
+                <div key={key} className={spacing}>
+                  <p className="px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em]">
+                    {groupLabels[key]}
+                  </p>
+                  <div className="space-y-px">
+                    {items.map((item) => {
+                      const Icon = item.icon
+                      const active = isActive(item.href)
+                      const badge = item.href === '/transactions' && uncategorizedTransactionCount > 0
+                        ? uncategorizedTransactionCount
+                        : null
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={cn(
+                            'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
+                            active
+                              ? 'bg-primary/12 text-foreground font-medium'
+                              : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                          )}
+                        >
+                          <Icon className={cn(
+                            "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
+                            active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                          )} />
+                          <span className="flex-1">{item.label}</span>
+                          {badge !== null && (
+                            <span className="ml-auto min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-primary/15 text-primary text-[10px] font-semibold px-1">
+                              {badge > 99 ? '99+' : badge}
+                            </span>
+                          )}
+                        </Link>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-
-              {/* Inköp group (AP) */}
-              <div className="mb-4">
-                <p className="px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em]">
-                  {groupLabels.inköp}
-                </p>
-                <div className="space-y-px">
-                  {inköpItems.map((item) => {
-                    const Icon = item.icon
-                    const active = isActive(item.href)
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={cn(
-                          'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
-                          active
-                            ? 'bg-primary/12 text-foreground font-medium'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-                        )}
-                      >
-                        <Icon className={cn(
-                          "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
-                          active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                        )} />
-                        {item.label}
-                      </Link>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Redovisning group */}
-              <div className="mb-6">
-                <p className="px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em]">
-                  {groupLabels.redovisning}
-                </p>
-                <div className="space-y-px">
-                  {redovisningItems.map((item) => {
-                    const Icon = item.icon
-                    const active = isActive(item.href)
-                    const badge = item.href === '/transactions' && uncategorizedTransactionCount > 0
-                      ? uncategorizedTransactionCount
-                      : null
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={cn(
-                          'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
-                          active
-                            ? 'bg-primary/12 text-foreground font-medium'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-                        )}
-                      >
-                        <Icon className={cn(
-                          "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
-                          active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                        )} />
-                        <span className="flex-1">{item.label}</span>
-                        {badge !== null && (
-                          <span className="ml-auto min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-primary/15 text-primary text-[10px] font-semibold px-1">
-                            {badge > 99 ? '99+' : badge}
-                          </span>
-                        )}
-                      </Link>
-                    )
-                  })}
-                </div>
-              </div>
+              ))}
 
               {/* Övrigt group - collapsible */}
               <div className="mb-4">
@@ -485,103 +429,45 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                 })}
               </div>
 
-              {/* Försäljning divider (AR) */}
-              <div className="flex items-center gap-3 my-1.5 px-3">
-                <span className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-[0.08em]">{groupLabels.försäljning}</span>
-                <div className="flex-1 h-px bg-border/30" />
-              </div>
-
-              {/* Sales items */}
-              <div className="space-y-0.5">
-                {försäljningItems.map((item) => {
-                  const Icon = item.icon
-                  const active = isActive(item.href)
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={closeMobileMenu}
-                      className={cn(
-                        'flex items-center gap-3 px-3 min-h-[44px] rounded-lg transition-colors',
-                        active
-                          ? 'bg-primary/10 text-primary font-medium'
-                          : 'text-foreground active:bg-muted/60'
-                      )}
-                    >
-                      <Icon className={cn("h-[18px] w-[18px] flex-shrink-0", active ? "text-primary" : "text-muted-foreground")} />
-                      <span className="text-sm">{item.label}</span>
-                    </Link>
-                  )
-                })}
-              </div>
-
-              {/* Inköp divider (AP) */}
-              <div className="flex items-center gap-3 my-1.5 px-3">
-                <span className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-[0.08em]">{groupLabels.inköp}</span>
-                <div className="flex-1 h-px bg-border/30" />
-              </div>
-
-              {/* Purchase items */}
-              <div className="space-y-0.5">
-                {inköpItems.map((item) => {
-                  const Icon = item.icon
-                  const active = isActive(item.href)
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={closeMobileMenu}
-                      className={cn(
-                        'flex items-center gap-3 px-3 min-h-[44px] rounded-lg transition-colors',
-                        active
-                          ? 'bg-primary/10 text-primary font-medium'
-                          : 'text-foreground active:bg-muted/60'
-                      )}
-                    >
-                      <Icon className={cn("h-[18px] w-[18px] flex-shrink-0", active ? "text-primary" : "text-muted-foreground")} />
-                      <span className="text-sm">{item.label}</span>
-                    </Link>
-                  )
-                })}
-              </div>
-
-              {/* Redovisning divider */}
-              <div className="flex items-center gap-3 my-1.5 px-3">
-                <span className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-[0.08em]">{groupLabels.redovisning}</span>
-                <div className="flex-1 h-px bg-border/30" />
-              </div>
-
-              {/* Accounting items */}
-              <div className="space-y-0.5">
-                {redovisningItems.map((item) => {
-                  const Icon = item.icon
-                  const active = isActive(item.href)
-                  const badge = item.href === '/transactions' && uncategorizedTransactionCount > 0
-                    ? uncategorizedTransactionCount
-                    : null
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={closeMobileMenu}
-                      className={cn(
-                        'flex items-center gap-3 px-3 min-h-[44px] rounded-lg transition-colors',
-                        active
-                          ? 'bg-primary/10 text-primary font-medium'
-                          : 'text-foreground active:bg-muted/60'
-                      )}
-                    >
-                      <Icon className={cn("h-[18px] w-[18px] flex-shrink-0", active ? "text-primary" : "text-muted-foreground")} />
-                      <span className="text-sm flex-1">{item.label}</span>
-                      {badge !== null && (
-                        <span className="min-w-[20px] h-[20px] flex items-center justify-center rounded-full bg-primary/15 text-primary text-[10px] font-semibold px-1.5">
-                          {badge > 99 ? '99+' : badge}
-                        </span>
-                      )}
-                    </Link>
-                  )
-                })}
-              </div>
+              {/* AR / AP / Accounting groups (mobile) */}
+              {sidebarGroups.map(({ key, items }) => (
+                <div key={key}>
+                  <div className="flex items-center gap-3 my-1.5 px-3">
+                    <span className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-[0.08em]">{groupLabels[key]}</span>
+                    <div className="flex-1 h-px bg-border/30" />
+                  </div>
+                  <div className="space-y-0.5">
+                    {items.map((item) => {
+                      const Icon = item.icon
+                      const active = isActive(item.href)
+                      const badge = item.href === '/transactions' && uncategorizedTransactionCount > 0
+                        ? uncategorizedTransactionCount
+                        : null
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={closeMobileMenu}
+                          className={cn(
+                            'flex items-center gap-3 px-3 min-h-[44px] rounded-lg transition-colors',
+                            active
+                              ? 'bg-primary/10 text-primary font-medium'
+                              : 'text-foreground active:bg-muted/60'
+                          )}
+                        >
+                          <Icon className={cn("h-[18px] w-[18px] flex-shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+                          <span className="text-sm flex-1">{item.label}</span>
+                          {badge !== null && (
+                            <span className="min-w-[20px] h-[20px] flex items-center justify-center rounded-full bg-primary/15 text-primary text-[10px] font-semibold px-1.5">
+                              {badge > 99 ? '99+' : badge}
+                            </span>
+                          )}
+                        </Link>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
 
               {/* Övrigt divider */}
               <div className="flex items-center gap-3 my-1.5 px-3">

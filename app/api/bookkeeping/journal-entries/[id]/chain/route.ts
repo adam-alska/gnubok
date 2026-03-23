@@ -62,22 +62,31 @@ export async function GET(
 
     if (!batchEntries) continue
 
+    // Collect FK references from forward links
     for (const e of batchEntries) {
       for (const fk of [e.reverses_id, e.reversed_by_id, e.correction_of_id]) {
         if (fk && !visited.has(fk)) toVisit.add(fk)
       }
+    }
 
-      // Reverse lookup for this batch too
-      const { data: refs } = await supabase
-        .from('journal_entries')
-        .select('id')
-        .eq('user_id', user.id)
-        .or(`reverses_id.eq.${e.id},reversed_by_id.eq.${e.id},correction_of_id.eq.${e.id}`)
+    // Single reverse-lookup for the whole batch instead of one per entry
+    const batchOr = batch
+      .flatMap(bid => [
+        `reverses_id.eq.${bid}`,
+        `reversed_by_id.eq.${bid}`,
+        `correction_of_id.eq.${bid}`,
+      ])
+      .join(',')
 
-      if (refs) {
-        for (const r of refs) {
-          if (!visited.has(r.id)) toVisit.add(r.id)
-        }
+    const { data: refs } = await supabase
+      .from('journal_entries')
+      .select('id')
+      .eq('user_id', user.id)
+      .or(batchOr)
+
+    if (refs) {
+      for (const r of refs) {
+        if (!visited.has(r.id)) toVisit.add(r.id)
       }
     }
   }
