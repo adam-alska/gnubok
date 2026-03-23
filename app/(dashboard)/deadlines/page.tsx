@@ -119,7 +119,6 @@ export default function DeadlinesPage() {
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ is_completed: false }),
                 })
-                fetchData()
               } catch {
                 toast({
                   title: 'Kunde inte ångra',
