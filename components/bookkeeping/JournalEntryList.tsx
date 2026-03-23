@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -11,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { AccountNumber } from '@/components/ui/account-number'
 import JournalEntryAttachments from '@/components/bookkeeping/JournalEntryAttachments'
 import CorrectionEntryDialog from '@/components/bookkeeping/CorrectionEntryDialog'
+import JournalEntryStatusBadge from '@/components/bookkeeping/JournalEntryStatusBadge'
 import type { JournalEntry, JournalEntryLine } from '@/types'
 
 const NEEDS_ATTACHMENT = new Set([
@@ -229,12 +231,19 @@ export default function JournalEntryList({ periodId }: Props) {
                   ) : (
                     <ChevronRight className="h-4 w-4 shrink-0" />
                   )}
-                  <span className="font-mono text-sm text-muted-foreground w-16">
+                  <Link
+                    href={`/bookkeeping/${entry.id}`}
+                    className="font-mono text-sm text-primary hover:underline w-16"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     {entry.voucher_series}{entry.voucher_number}
-                  </span>
+                  </Link>
                   <span className="text-sm text-muted-foreground w-24">
                     {entry.entry_date}
                   </span>
+                  {(entry.status === 'reversed' || entry.source_type === 'storno' || entry.source_type === 'correction') && (
+                    <JournalEntryStatusBadge entry={entry} showStatus={entry.status === 'reversed'} />
+                  )}
                   <span className="flex-1 truncate">{entry.description}</span>
                   {attachmentCounts[entry.id] ? (
                     <span className="flex items-center gap-0.5 text-muted-foreground mr-1" title={`${attachmentCounts[entry.id]} underlag`}>
@@ -257,9 +266,13 @@ export default function JournalEntryList({ periodId }: Props) {
                     ) : (
                       <ChevronRight className="h-4 w-4 shrink-0" />
                     )}
-                    <span className="font-mono text-sm text-muted-foreground">
+                    <Link
+                      href={`/bookkeeping/${entry.id}`}
+                      className="font-mono text-sm text-primary hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {entry.voucher_series}{entry.voucher_number}
-                    </span>
+                    </Link>
                     <span className="text-sm text-muted-foreground">
                       {entry.entry_date}
                     </span>
@@ -383,8 +396,11 @@ export default function JournalEntryList({ periodId }: Props) {
                     onCountChange={(c) => handleAttachmentCountChange(entry.id, c)}
                   />
 
-                  {entry.status === 'posted' && entry.source_type !== 'storno' && entry.source_type !== 'correction' && (
-                    <div className="mt-4 pt-3 border-t flex gap-2">
+                  <div className="mt-4 pt-3 border-t flex gap-2">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/bookkeeping/${entry.id}`}>Visa detaljer</Link>
+                    </Button>
+                    {entry.status === 'posted' && entry.source_type !== 'storno' && entry.source_type !== 'correction' && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -392,8 +408,8 @@ export default function JournalEntryList({ periodId }: Props) {
                       >
                         Skapa ändringsverifikation
                       </Button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </CardContent>
               )}
             </Card>

@@ -184,7 +184,7 @@ export default function TransactionInboxCard({
                         key={ts.template_id}
                         size="sm"
                         variant={idx === 0 ? 'default' : 'outline'}
-                        className="h-9 text-xs"
+                        className="h-auto py-1.5 text-xs"
                         onClick={() => {
                           if (onOpenTemplateReview && tmpl) {
                             onOpenTemplateReview(transaction, ts.template_id)
@@ -194,13 +194,17 @@ export default function TransactionInboxCard({
                         }}
                         disabled={isProcessing || isDisabled}
                       >
-                        {isProcessing && idx === 0 ? (
-                          <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
-                        ) : null}
-                        {ts.name_sv}
-                        <span className="ml-1 opacity-70 font-normal">
-                          ({ts.debit_account})
-                        </span>
+                        <div className="flex flex-col items-start">
+                          <div className="flex items-center">
+                            {isProcessing && idx === 0 ? (
+                              <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                            ) : null}
+                            {ts.name_sv}
+                          </div>
+                          <span className="opacity-70 font-normal font-mono text-[10px]">
+                            D: {ts.debit_account} → K: {ts.credit_account}
+                          </span>
+                        </div>
                       </Button>
                     )
                   })}

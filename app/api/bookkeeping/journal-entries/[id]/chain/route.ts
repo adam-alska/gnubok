@@ -1,0 +1,101 @@
+import { createClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Fetch the requested entry with lines
+  const { data: entry, error } = await supabase
+    .from('journal_entries')
+    .select('*, lines:journal_entry_lines(*)')
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .single()
+
+  if (error || !entry) {
+    return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
+  }
+
+  // Collect all related entry IDs by following FK links iteratively
+  const visited = new Set<string>([id])
+  const toVisit = new Set<string>()
+
+  // Seed with direct FK references from this entry
+  for (const fk of [entry.reverses_id, entry.reversed_by_id, entry.correction_of_id]) {
+    if (fk && !visited.has(fk)) toVisit.add(fk)
+  }
+
+  // Also find entries that reference this entry (reverse lookup)
+  const { data: referencing } = await supabase
+    .from('journal_entries')
+    .select('id')
+    .eq('user_id', user.id)
+    .or(`reverses_id.eq.${id},reversed_by_id.eq.${id},correction_of_id.eq.${id}`)
+
+  if (referencing) {
+    for (const r of referencing) {
+      if (!visited.has(r.id)) toVisit.add(r.id)
+    }
+  }
+
+  // Iteratively expand (bounded) to handle multi-level correction chains
+  const MAX_ITERATIONS = 10
+  for (let i = 0; i < MAX_ITERATIONS && toVisit.size > 0; i++) {
+    const batch = Array.from(toVisit)
+    toVisit.clear()
+    for (const bid of batch) visited.add(bid)
+
+    const { data: batchEntries } = await supabase
+      .from('journal_entries')
+      .select('id, reverses_id, reversed_by_id, correction_of_id')
+      .eq('user_id', user.id)
+      .in('id', batch)
+
+    if (!batchEntries) continue
+
+    for (const e of batchEntries) {
+      for (const fk of [e.reverses_id, e.reversed_by_id, e.correction_of_id]) {
+        if (fk && !visited.has(fk)) toVisit.add(fk)
+      }
+
+      // Reverse lookup for this batch too
+      const { data: refs } = await supabase
+        .from('journal_entries')
+        .select('id')
+        .eq('user_id', user.id)
+        .or(`reverses_id.eq.${e.id},reversed_by_id.eq.${e.id},correction_of_id.eq.${e.id}`)
+
+      if (refs) {
+        for (const r of refs) {
+          if (!visited.has(r.id)) toVisit.add(r.id)
+        }
+      }
+    }
+  }
+
+  // Fetch all chain entries (excluding the main entry itself) with lines
+  const chainIds = Array.from(visited).filter((cid) => cid !== id)
+  let chain: typeof entry[] = []
+
+  if (chainIds.length > 0) {
+    const { data: chainEntries } = await supabase
+      .from('journal_entries')
+      .select('*, lines:journal_entry_lines(*)')
+      .eq('user_id', user.id)
+      .in('id', chainIds)
+      .order('created_at', { ascending: true })
+
+    chain = chainEntries || []
+  }
+
+  return NextResponse.json({ data: { entry, chain } })
+}

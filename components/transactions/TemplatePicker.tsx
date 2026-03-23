@@ -12,6 +12,7 @@ import {
   type BookingTemplate,
   type TemplateGroup,
 } from '@/lib/bookkeeping/booking-templates'
+import { formatAccountWithName } from '@/lib/bookkeeping/client-account-names'
 import type { EntityType } from '@/types'
 import type { SuggestedTemplate } from '@/lib/transactions/category-suggestions'
 
@@ -92,7 +93,7 @@ function TemplateCard({ template, selected, onClick, compact }: TemplateCardProp
           </p>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             <span className="text-xs font-mono text-muted-foreground">
-              D: {template.debit_account} &middot; K: {template.credit_account}
+              D: {formatAccountWithName(template.debit_account)} &middot; K: {formatAccountWithName(template.credit_account)}
             </span>
             {vatLabel && (
               <Badge

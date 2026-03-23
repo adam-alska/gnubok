@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Dialog,
   DialogContent,
@@ -33,6 +34,7 @@ interface Props {
 
 export default function CorrectionEntryDialog({ entry, open, onOpenChange, onCorrected }: Props) {
   const { toast } = useToast()
+  const router = useRouter()
   const [accounts, setAccounts] = useState<BASAccount[]>([])
   const [lines, setLines] = useState<CorrectionLine[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -104,12 +106,23 @@ export default function CorrectionEntryDialog({ entry, open, onOpenChange, onCor
         body: JSON.stringify({ lines: apiLines }),
       })
 
+      const result = await res.json()
+
       if (!res.ok) {
-        const { error } = await res.json()
-        throw new Error(error || 'Failed to create correction')
+        throw new Error(result.error || 'Failed to create correction')
       }
 
-      toast({ title: 'Ändringsverifikation skapad', description: 'Storno och rättelse har bokförts.' })
+      const correctedId = result.data?.corrected?.id
+
+      toast({
+        title: 'Ändringsverifikation skapad',
+        description: 'Storno och rättelse har bokförts.',
+        action: correctedId ? (
+          <Button variant="outline" size="sm" onClick={() => router.push(`/bookkeeping/${correctedId}`)}>
+            Visa rättelsen
+          </Button>
+        ) : undefined,
+      })
       onOpenChange(false)
       onCorrected()
     } catch (err) {
@@ -129,6 +142,16 @@ export default function CorrectionEntryDialog({ entry, open, onOpenChange, onCor
         <DialogHeader>
           <DialogTitle>Skapa ändringsverifikation</DialogTitle>
         </DialogHeader>
+
+        {/* Storno explanation */}
+        <div className="rounded-lg bg-muted/50 border p-3 text-sm text-muted-foreground">
+          <p className="font-medium text-foreground mb-1">Hur fungerar en ändringsverifikation?</p>
+          <p>En bokförd verifikation kan inte ändras direkt. Istället skapas automatiskt:</p>
+          <ol className="list-decimal list-inside mt-1 space-y-0.5">
+            <li>En <strong>stornoverifikation</strong> som nollställer den ursprungliga</li>
+            <li>En ny verifikation med dina rättade uppgifter</li>
+          </ol>
+        </div>
 
         {/* Original entry (read-only) */}
         <div className="space-y-2">
