@@ -9,6 +9,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { ArrowUpRight, ArrowDownRight, Check, Paperclip, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
 import { getDefaultAccountForCategory } from '@/lib/bookkeeping/category-mapping'
 import type { BookingTemplate } from '@/lib/bookkeeping/booking-templates'
+import { formatAccountWithName } from '@/lib/bookkeeping/client-account-names'
 import JournalEntryPreview from './JournalEntryPreview'
 import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
 import DocumentUploadZone from '@/components/bookkeeping/DocumentUploadZone'
@@ -194,6 +195,11 @@ export default function QuickReviewDialog({
               </button>
             )}
           </div>
+          {template && (
+            <p className="mt-1.5 text-xs font-mono text-muted-foreground">
+              D: {formatAccountWithName(template.debit_account)} → K: {formatAccountWithName(template.credit_account)}
+            </p>
+          )}
         </div>
 
         {/* Template special rules */}
