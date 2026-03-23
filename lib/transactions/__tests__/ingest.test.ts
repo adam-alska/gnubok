@@ -434,9 +434,10 @@ describe('ingestTransactions', () => {
     enqueue({ data: insertedNew, error: null })
     // Invoice match update for income transaction
     enqueue({ data: null, error: null })
-    // Auto-categorization update
+    // logMatchEvent insert (fire-and-forget)
     enqueue({ data: null, error: null })
     // rawDup: skipped (in Set) — no queue entry needed
+    // NOTE: auto-categorization is skipped because invoice match triggers `continue`
     // Transaction rawErr: insert fails
     enqueue({ data: null, error: { message: 'Insert failed' } })
 
@@ -464,7 +465,7 @@ describe('ingestTransactions', () => {
     expect(result.duplicates).toBe(1)
     expect(result.errors).toBe(1)
     expect(result.auto_matched_invoices).toBe(1)
-    expect(result.auto_categorized).toBe(1)
+    expect(result.auto_categorized).toBe(0) // Skipped: invoice match triggers continue
     expect(result.transaction_ids).toEqual(['tx-new'])
   })
 

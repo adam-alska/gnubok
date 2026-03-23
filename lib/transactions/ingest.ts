@@ -5,6 +5,7 @@ import { getBestInvoiceMatch } from '@/lib/invoices/invoice-matching'
 import { findSupplierInvoiceMatch } from '@/lib/invoices/supplier-invoice-matching'
 import { tryReconcileTransaction, fetchUnlinkedGLLines } from '@/lib/reconciliation/bank-reconciliation'
 import { fetchMultipleRates } from '@/lib/currency/riksbanken'
+import { logMatchEvent } from '@/lib/invoices/match-log'
 import type { UnlinkedGLLine } from '@/lib/reconciliation/bank-reconciliation'
 import type { Transaction, RawTransaction, IngestResult, SupplierInvoice, Currency, ExchangeRate } from '@/types'
 
@@ -137,6 +138,11 @@ export async function ingestTransactions(
     data?.forEach(r => existingExternalIds.add(r.external_id))
   }
 
+  // Track already-matched invoice IDs within this ingestion batch
+  // to prevent suggesting the same invoice for multiple transactions
+  const matchedInvoiceIds = new Set<string>()
+  const matchedSupplierInvoiceIds = new Set<string>()
+
   for (const raw of rawTransactions) {
     // 1. Check for duplicates via external_id (batch pre-fetched)
     if (existingExternalIds.has(raw.external_id)) {
@@ -229,13 +235,24 @@ export async function ingestTransactions(
           0.50
         )
 
-        if (bestMatch) {
+        if (bestMatch && !matchedInvoiceIds.has(bestMatch.invoice.id)) {
           await supabase
             .from('transactions')
             .update({ potential_invoice_id: bestMatch.invoice.id })
             .eq('id', newTransaction.id)
 
+          logMatchEvent(supabase, userId, newTransaction.id, 'auto_suggested', {
+            invoiceId: bestMatch.invoice.id,
+            matchConfidence: bestMatch.confidence,
+            matchMethod: bestMatch.matchReason,
+          })
+
+          matchedInvoiceIds.add(bestMatch.invoice.id)
           result.auto_matched_invoices++
+          // Skip mapping engine — transaction has an invoice match.
+          // Auto-categorization would create an orphaned journal entry
+          // that conflicts with the eventual invoice payment entry.
+          continue
         }
       } catch {
         // Non-critical — continue processing
@@ -250,7 +267,7 @@ export async function ingestTransactions(
           unpaidSupplierInvoices
         )
 
-        if (match) {
+        if (match && !matchedSupplierInvoiceIds.has(match.supplierInvoice.id)) {
           if (match.confidence >= 0.85) {
             // Auto-link at high confidence
             await supabase
@@ -258,13 +275,35 @@ export async function ingestTransactions(
               .update({ supplier_invoice_id: match.supplierInvoice.id })
               .eq('id', newTransaction.id)
 
+            // Log the match THEN drain the pool (captures which invoice was matched)
+            logMatchEvent(supabase, userId, newTransaction.id, 'auto_suggested', {
+              supplierInvoiceId: match.supplierInvoice.id,
+              matchConfidence: match.confidence,
+              matchMethod: match.matchMethod,
+            })
+
+            // Drain the pool — prevents next transaction from matching same invoice
+            unpaidSupplierInvoices = unpaidSupplierInvoices.filter(
+              inv => inv.id !== match.supplierInvoice.id
+            )
+            matchedSupplierInvoiceIds.add(match.supplierInvoice.id)
+
             result.auto_matched_invoices++
+            // Skip mapping engine — transaction has a supplier invoice match
+            continue
           } else {
             // Store as suggestion at lower confidence (0.70–0.85)
+            // Do NOT drain pool for suggestions — they are tentative
             await supabase
               .from('transactions')
               .update({ potential_supplier_invoice_id: match.supplierInvoice.id })
               .eq('id', newTransaction.id)
+
+            logMatchEvent(supabase, userId, newTransaction.id, 'auto_suggested', {
+              supplierInvoiceId: match.supplierInvoice.id,
+              matchConfidence: match.confidence,
+              matchMethod: match.matchMethod,
+            })
           }
         }
       } catch {

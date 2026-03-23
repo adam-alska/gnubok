@@ -33,6 +33,7 @@ export async function POST() {
   }
 
   let matched = 0
+  const matchedInvoiceIds = new Set<string>()
 
   for (const tx of transactions) {
     try {
@@ -43,12 +44,13 @@ export async function POST() {
         0.50
       )
 
-      if (bestMatch) {
+      if (bestMatch && !matchedInvoiceIds.has(bestMatch.invoice.id)) {
         await supabase
           .from('transactions')
           .update({ potential_invoice_id: bestMatch.invoice.id })
           .eq('id', tx.id)
 
+        matchedInvoiceIds.add(bestMatch.invoice.id)
         matched++
       }
     } catch {

@@ -32,7 +32,7 @@ export type CustomerType =
   | 'non_eu_business'   // Non-EU company
 
 // Invoice status
-export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled' | 'credited'
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled' | 'credited'
 
 // Invoice document type
 export type InvoiceDocumentType = 'invoice' | 'proforma' | 'delivery_note'
@@ -438,6 +438,25 @@ export interface SupplierInvoicePayment {
   created_at: string
 }
 
+// Invoice Payment (partial payments)
+export interface InvoicePayment {
+  id: string
+  user_id: string
+  invoice_id: string
+
+  payment_date: string
+  amount: number
+  currency: string
+  exchange_rate: number | null
+  exchange_rate_difference: number
+
+  journal_entry_id: string | null
+  transaction_id: string | null
+  notes: string | null
+
+  created_at: string
+}
+
 // Invoice
 export interface Invoice {
   id: string
@@ -498,6 +517,7 @@ export interface Invoice {
   // Payment tracking
   paid_at: string | null
   paid_amount: number | null
+  remaining_amount: number
 
   created_at: string
   updated_at: string
@@ -505,6 +525,7 @@ export interface Invoice {
   // Relations (populated when fetched)
   customer?: Customer
   items?: InvoiceItem[]
+  payments?: InvoicePayment[]
 }
 
 // Invoice Item

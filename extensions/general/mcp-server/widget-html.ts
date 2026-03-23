@@ -345,13 +345,10 @@ export const RECEIPT_MATCHER_HTML = `<!DOCTYPE html>
     tx._error = null;
     render();
 
-    callTool('gnubok_categorize_with_receipt', {
+    callTool('gnubok_categorize_transaction', {
       transaction_id: tx.id,
       category: catEl.value,
-      vat_treatment: vatEl.value,
-      file_data: tx._dataUri,
-      filename: tx._file,
-      mime_type: tx._mimeType
+      vat_treatment: vatEl.value
     }).then(function(res) {
       tx._booking = false;
       // The tool result comes back as content[0].text (JSON string)
@@ -369,7 +366,7 @@ export const RECEIPT_MATCHER_HTML = `<!DOCTYPE html>
       }
       render();
       sendNotification('ui/updateContext', {
-        content: [{ type: 'text', text: 'Bokf\\u00f6rt ' + booked + ' av ' + transactions.length + ' transaktioner med kvitton.' }]
+        content: [{ type: 'text', text: 'Bokf\\u00f6rt ' + booked + ' av ' + transactions.length + ' transaktioner.' }]
       });
     }).catch(function(err) {
       tx._booking = false;
