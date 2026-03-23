@@ -56,6 +56,8 @@ export default function SettingsPage() {
   const hasMcpExtension = ENABLED_EXTENSION_IDS.has('mcp-server')
   const [bankConnectionError, setBankConnectionError] = useState<string | null>(null)
   const [bankgiroError, setBankgiroError] = useState<string | null>(null)
+  const [clearingError, setClearingError] = useState<string | null>(null)
+  const [accountNumberError, setAccountNumberError] = useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
@@ -148,9 +150,39 @@ export default function SettingsPage() {
     e.preventDefault()
     if (!settings) return
 
-    setIsSaving(true)
-
     const formData = new FormData(e.currentTarget)
+
+    // Validate bank fields before saving
+    const clearingVal = (formData.get('clearing_number') as string || '').trim()
+    const accountVal = (formData.get('account_number') as string || '').trim()
+    const bankgiroVal = (formData.get('bankgiro') as string || '').trim()
+
+    let hasErrors = false
+
+    if (clearingVal && !/^\d{4,5}$/.test(clearingVal)) {
+      setClearingError('Clearingnummer måste vara 4-5 siffror')
+      hasErrors = true
+    } else {
+      setClearingError(null)
+    }
+
+    if (accountVal && !/^\d{6,12}$/.test(accountVal)) {
+      setAccountNumberError('Kontonummer måste vara 6-12 siffror')
+      hasErrors = true
+    } else {
+      setAccountNumberError(null)
+    }
+
+    if (bankgiroVal && !validateBankgiroNumber(bankgiroVal)) {
+      setBankgiroError('Ogiltigt bankgironummer (7-8 siffror med kontrollsiffra)')
+      hasErrors = true
+    } else {
+      setBankgiroError(null)
+    }
+
+    if (hasErrors) return
+
+    setIsSaving(true)
 
     // Disabled inputs are excluded from FormData by the browser,
     // so only include company_name/org_number when not locked
@@ -392,6 +424,8 @@ export default function SettingsPage() {
                     <Input
                       id="bank_name"
                       name="bank_name"
+                      placeholder="t.ex. Nordea"
+                      maxLength={100}
                       defaultValue={settings?.bank_name || ''}
                     />
                   </div>
@@ -400,16 +434,58 @@ export default function SettingsPage() {
                     <Input
                       id="clearing_number"
                       name="clearing_number"
+                      inputMode="numeric"
+                      placeholder="XXXX"
+                      maxLength={5}
                       defaultValue={settings?.clearing_number || ''}
+                      onChange={(e) => {
+                        e.target.value = e.target.value.replace(/\D/g, '')
+                      }}
+                      onBlur={(e) => {
+                        const val = e.target.value.trim()
+                        if (!val) {
+                          setClearingError(null)
+                          return
+                        }
+                        if (!/^\d{4,5}$/.test(val)) {
+                          setClearingError('Clearingnummer måste vara 4-5 siffror')
+                        } else {
+                          setClearingError(null)
+                        }
+                      }}
                     />
+                    {clearingError && (
+                      <p className="text-xs text-destructive">{clearingError}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="account_number">Kontonummer</Label>
                     <Input
                       id="account_number"
                       name="account_number"
+                      inputMode="numeric"
+                      placeholder="XXXXXXX"
+                      maxLength={12}
                       defaultValue={settings?.account_number || ''}
+                      onChange={(e) => {
+                        e.target.value = e.target.value.replace(/\D/g, '')
+                      }}
+                      onBlur={(e) => {
+                        const val = e.target.value.trim()
+                        if (!val) {
+                          setAccountNumberError(null)
+                          return
+                        }
+                        if (!/^\d{6,12}$/.test(val)) {
+                          setAccountNumberError('Kontonummer måste vara 6-12 siffror')
+                        } else {
+                          setAccountNumberError(null)
+                        }
+                      }}
                     />
+                    {accountNumberError && (
+                      <p className="text-xs text-destructive">{accountNumberError}</p>
+                    )}
                   </div>
                 </div>
                 <div className="max-w-xs space-y-2">
