@@ -58,7 +58,15 @@ export default function RegisterPage() {
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
+      console.log('[register] attempting signUp', {
+        email: emailValue,
+        hasPassword: !!passwordValue,
+        passwordLength: passwordValue.length,
+        redirectTo: `${window.location.origin}/auth/callback`,
+        supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      })
+
+      const { data, error } = await supabase.auth.signUp({
         email: emailValue,
         password: passwordValue,
         options: {
@@ -67,6 +75,15 @@ export default function RegisterPage() {
       })
 
       if (error) {
+        console.error('[register] signUp error', {
+          message: error.message,
+          code: error.code,
+          status: error.status,
+          name: error.name,
+          stack: error.stack,
+          cause: error.cause,
+          fullError: JSON.stringify(error, Object.getOwnPropertyNames(error)),
+        })
         toast({
           title: 'Registrering misslyckades',
           description: getErrorMessage(error, { context: 'auth' }),
@@ -75,9 +92,26 @@ export default function RegisterPage() {
         return
       }
 
+      console.log('[register] signUp response', {
+        userId: data.user?.id,
+        email: data.user?.email,
+        isAnonymous: data.user?.is_anonymous,
+        identities: data.user?.identities?.length,
+        hasSession: !!data.session,
+        confirmationSentAt: data.user?.confirmation_sent_at,
+        provider: data.user?.app_metadata?.provider,
+      })
+
       setEmail(emailValue)
       setIsRegistered(true)
     } catch (error) {
+      console.error('[register] unexpected exception', {
+        error,
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        type: typeof error,
+        constructor: error?.constructor?.name,
+      })
       toast({
         title: 'Registrering misslyckades',
         description: getErrorMessage(error, { context: 'auth' }),
