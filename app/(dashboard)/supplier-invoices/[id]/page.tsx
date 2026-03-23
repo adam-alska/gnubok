@@ -386,7 +386,7 @@ export default function SupplierInvoiceDetailPage() {
                       <td className="py-2 text-right font-mono">{formatAmount(p.amount)} {p.currency}</td>
                       <td className="py-2">
                         {p.journal_entry_id ? (
-                          <Link href={`/bookkeeping?entry=${p.journal_entry_id}`} className="text-primary hover:underline font-mono text-xs">
+                          <Link href={`/bookkeeping/${p.journal_entry_id}`} className="text-primary hover:underline font-mono text-xs">
                             {p.journal_entry_id.substring(0, 8)}...
                           </Link>
                         ) : '-'}
@@ -407,7 +407,7 @@ export default function SupplierInvoiceDetailPage() {
                   </div>
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     {p.journal_entry_id ? (
-                      <Link href={`/bookkeeping?entry=${p.journal_entry_id}`} className="text-primary hover:underline font-mono">
+                      <Link href={`/bookkeeping/${p.journal_entry_id}`} className="text-primary hover:underline font-mono">
                         {p.journal_entry_id.substring(0, 8)}...
                       </Link>
                     ) : <span>-</span>}
@@ -430,7 +430,7 @@ export default function SupplierInvoiceDetailPage() {
             <div className="flex justify-between">
               <span className="text-muted-foreground">Registreringsverifikation</span>
               <Link
-                href={`/bookkeeping?entry=${invoice.registration_journal_entry_id}`}
+                href={`/bookkeeping/${invoice.registration_journal_entry_id}`}
                 className="text-primary hover:underline font-mono"
               >
                 {invoice.registration_journal_entry_id.substring(0, 8)}...
@@ -443,7 +443,7 @@ export default function SupplierInvoiceDetailPage() {
             <div className="flex justify-between">
               <span className="text-muted-foreground">Betalningsverifikation</span>
               <Link
-                href={`/bookkeeping?entry=${invoice.payment_journal_entry_id}`}
+                href={`/bookkeeping/${invoice.payment_journal_entry_id}`}
                 className="text-primary hover:underline font-mono"
               >
                 {invoice.payment_journal_entry_id.substring(0, 8)}...

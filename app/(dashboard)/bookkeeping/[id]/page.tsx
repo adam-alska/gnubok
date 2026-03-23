@@ -1,0 +1,315 @@
+'use client'
+
+import { useState, useEffect, useCallback, use } from 'react'
+import Link from 'next/link'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { AccountNumber } from '@/components/ui/account-number'
+import { Loader2, ArrowLeft, Paperclip, AlertTriangle } from 'lucide-react'
+import JournalEntryAttachments from '@/components/bookkeeping/JournalEntryAttachments'
+import JournalEntryStatusBadge, { sourceTypeLabels } from '@/components/bookkeeping/JournalEntryStatusBadge'
+import CorrectionEntryDialog from '@/components/bookkeeping/CorrectionEntryDialog'
+import CorrectionChain from '@/components/bookkeeping/CorrectionChain'
+import type { JournalEntry, JournalEntryLine } from '@/types'
+
+export default function JournalEntryDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
+  const [entry, setEntry] = useState<JournalEntry | null>(null)
+  const [chain, setChain] = useState<JournalEntry[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [showCorrection, setShowCorrection] = useState(false)
+  const [attachmentCount, setAttachmentCount] = useState(0)
+
+  const fetchData = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/bookkeeping/journal-entries/${id}/chain`)
+      if (!res.ok) {
+        const { error: msg } = await res.json()
+        setError(msg || 'Kunde inte hämta verifikation')
+        return
+      }
+      const { data } = await res.json()
+      setEntry(data.entry)
+      setChain(data.chain)
+    } catch {
+      setError('Kunde inte hämta verifikation')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [id])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mb-3" />
+        <p className="text-sm text-muted-foreground">Laddar verifikation...</p>
+      </div>
+    )
+  }
+
+  if (error || !entry) {
+    return (
+      <div className="space-y-4">
+        <Link
+          href="/bookkeeping"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Tillbaka till bokföring
+        </Link>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <p className="text-sm text-muted-foreground">{error || 'Verifikation hittades inte'}</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const lines = ((entry.lines || []) as JournalEntryLine[])
+    .slice()
+    .sort((a, b) => a.sort_order - b.sort_order)
+
+  const totalDebit = lines.reduce((sum, l) => sum + (Number(l.debit_amount) || 0), 0)
+  const totalCredit = lines.reduce((sum, l) => sum + (Number(l.credit_amount) || 0), 0)
+
+  const canCorrect =
+    entry.status === 'posted' &&
+    entry.source_type !== 'storno' &&
+    entry.source_type !== 'correction'
+
+  // Include current entry in the chain for the visualization
+  const fullChain = [entry, ...chain]
+
+  return (
+    <div className="space-y-6">
+      {/* Back link */}
+      <Link
+        href="/bookkeeping"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Tillbaka till bokföring
+      </Link>
+
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight font-mono">
+              {entry.voucher_series}{entry.voucher_number}
+            </h1>
+            <JournalEntryStatusBadge entry={entry} />
+          </div>
+          <p className="text-muted-foreground">{entry.description}</p>
+        </div>
+
+        {canCorrect && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={() => setShowCorrection(true)}
+          >
+            Skapa ändringsverifikation
+          </Button>
+        )}
+      </div>
+
+      {/* Info cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Verifikationsdetaljer</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Datum</span>
+              <span>{entry.entry_date}</span>
+            </div>
+            {entry.committed_at && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Bokförd</span>
+                <span>{new Date(entry.committed_at).toLocaleDateString('sv-SE')}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Typ</span>
+              <span>{sourceTypeLabels[entry.source_type] || entry.source_type}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Summering</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Debet</span>
+              <span className="tabular-nums font-medium">
+                {totalDebit.toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Kredit</span>
+              <span className="tabular-nums font-medium">
+                {totalCredit.toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Antal rader</span>
+              <span>{lines.length}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Underlag</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm">
+            <div className="flex items-center gap-2">
+              {attachmentCount > 0 ? (
+                <>
+                  <Paperclip className="h-4 w-4 text-muted-foreground" />
+                  <span>{attachmentCount} {attachmentCount === 1 ? 'dokument' : 'dokument'}</span>
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="h-4 w-4 text-warning-foreground" />
+                  <span className="text-muted-foreground">Inga underlag bifogade</span>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Lines table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">Kontorader</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Desktop table */}
+          <div className="hidden sm:block">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-muted-foreground">
+                  <th className="py-2 w-48">Konto</th>
+                  <th className="py-2">Beskrivning</th>
+                  <th className="py-2 w-28 text-right">Debet</th>
+                  <th className="py-2 w-28 text-right">Kredit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lines.map((line) => (
+                  <tr key={line.id} className="border-b last:border-0">
+                    <td className="py-2"><AccountNumber number={line.account_number} showName /></td>
+                    <td className="py-2 text-muted-foreground">{line.line_description || ''}</td>
+                    <td className="py-2 text-right tabular-nums">
+                      {Number(line.debit_amount) > 0
+                        ? Number(line.debit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })
+                        : ''}
+                    </td>
+                    <td className="py-2 text-right tabular-nums">
+                      {Number(line.credit_amount) > 0
+                        ? Number(line.credit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })
+                        : ''}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="font-semibold">
+                  <td colSpan={2} className="py-2">Summa</td>
+                  <td className="py-2 text-right tabular-nums">
+                    {totalDebit.toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
+                  </td>
+                  <td className="py-2 text-right tabular-nums">
+                    {totalCredit.toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="sm:hidden space-y-2">
+            {lines.map((line) => (
+              <div key={line.id} className="flex items-center justify-between py-2 border-b last:border-0 gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm"><AccountNumber number={line.account_number} showName /></div>
+                  {line.line_description && (
+                    <p className="text-xs text-muted-foreground truncate">{line.line_description}</p>
+                  )}
+                </div>
+                <div className="text-right shrink-0 text-sm tabular-nums">
+                  {Number(line.debit_amount) > 0 && (
+                    <p>{Number(line.debit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} D</p>
+                  )}
+                  {Number(line.credit_amount) > 0 && (
+                    <p>{Number(line.credit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} K</p>
+                  )}
+                </div>
+              </div>
+            ))}
+            <div className="flex justify-between font-semibold text-sm pt-1">
+              <span>Summa</span>
+              <div className="flex gap-3 tabular-nums">
+                <span>D: {totalDebit.toLocaleString('sv-SE', { minimumFractionDigits: 2 })}</span>
+                <span>K: {totalCredit.toLocaleString('sv-SE', { minimumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Attachments */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">Underlag</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <JournalEntryAttachments
+            journalEntryId={entry.id}
+            onCountChange={setAttachmentCount}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Correction chain */}
+      {chain.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Ändringshistorik</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CorrectionChain currentEntryId={id} chain={fullChain} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Correction dialog */}
+      {showCorrection && entry && (
+        <CorrectionEntryDialog
+          entry={entry}
+          open={showCorrection}
+          onOpenChange={setShowCorrection}
+          onCorrected={() => {
+            setShowCorrection(false)
+            fetchData()
+          }}
+        />
+      )}
+    </div>
+  )
+}

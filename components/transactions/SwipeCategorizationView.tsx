@@ -424,6 +424,11 @@ export default function SwipeCategorizationView({
                 Byt mall
               </button>
             </div>
+            {selectedTemplate && (
+              <p className="mt-1.5 text-xs font-mono text-muted-foreground">
+                D: {formatAccountWithName(selectedTemplate.debit_account)} → K: {formatAccountWithName(selectedTemplate.credit_account)}
+              </p>
+            )}
           </div>
 
           {/* Template special rules warning */}
