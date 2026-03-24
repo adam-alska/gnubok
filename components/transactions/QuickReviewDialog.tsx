@@ -77,9 +77,9 @@ export default function QuickReviewDialog({
     async function fetchAccounts() {
       try {
         const res = await fetch('/api/bookkeeping/accounts')
-        const data = await res.json()
-        if (data.accounts) {
-          setAccounts(data.accounts)
+        const { data } = await res.json()
+        if (data) {
+          setAccounts(data)
         }
       } catch {
         // Non-critical

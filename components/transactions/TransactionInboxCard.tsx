@@ -202,7 +202,7 @@ export default function TransactionInboxCard({
                             {ts.name_sv}
                           </div>
                           <span className="opacity-70 font-normal font-mono text-[10px]">
-                            D: {ts.debit_account} → K: {ts.credit_account}
+                            D: {formatAccountWithName(ts.debit_account)} → K: {formatAccountWithName(ts.credit_account)}
                           </span>
                         </div>
                       </Button>
