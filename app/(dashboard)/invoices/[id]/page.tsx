@@ -963,7 +963,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           onSuccess={() => fetchInvoice()}
         />
       )}
-      />
     </div>
   )
 }

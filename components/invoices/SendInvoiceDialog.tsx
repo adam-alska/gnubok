@@ -49,6 +49,53 @@ export default function SendInvoiceDialog({
   const [periodName, setPeriodName] = useState('')
   const [isInitialized, setIsInitialized] = useState(false)
 
+  useEffect(() => {
+    if (!open) {
+      setIsInitialized(false)
+      setSentMessage(null)
+      return
+    }
+
+    let cancelled = false
+
+    async function init() {
+      try {
+        // Fetch company settings
+        const { data: settings, error } = await supabase
+          .from('company_settings')
+          .select('accounting_method, entity_type')
+          .single()
+
+        if (error) throw new Error('Kunde inte ladda företagsinställningar')
+        if (cancelled) return
+
+        // Fetch fiscal period for the invoice date
+        const { data: period } = await supabase
+          .from('fiscal_periods')
+          .select('name')
+          .lte('start_date', invoice.invoice_date)
+          .gte('end_date', invoice.invoice_date)
+          .single()
+
+        if (cancelled) return
+
+        setAccountingMethod((settings?.accounting_method || 'accrual') as 'accrual' | 'cash')
+        setEntityType((settings?.entity_type as EntityType) || 'enskild_firma')
+        setPeriodName(period?.name || '')
+        setIsInitialized(true)
+      } catch (err) {
+        if (cancelled) return
+        toast({
+          title: 'Kunde inte ladda inställningar',
+          description: err instanceof Error ? err.message : 'Försök igen.',
+          variant: 'destructive',
+        })
+        onOpenChange(false)
+      }
+    }
+
+    init()
+    return () => { cancelled = true }
   }, [open, invoice.id, invoice.invoice_date])
 
   const proposedLines = useMemo(() => {
