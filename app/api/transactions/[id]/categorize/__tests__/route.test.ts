@@ -34,6 +34,10 @@ vi.mock('@/lib/bookkeeping/mapping-engine', () => ({
   saveUserMappingRule: (...args: unknown[]) => mockSaveUserMappingRule(...args),
 }))
 
+vi.mock('@/lib/bookkeeping/counterparty-templates', () => ({
+  upsertCounterpartyTemplate: vi.fn().mockResolvedValue(undefined),
+}))
+
 import { POST } from '../route'
 
 describe('POST /api/transactions/[id]/categorize', () => {

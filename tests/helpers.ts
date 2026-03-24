@@ -17,6 +17,7 @@ import type {
   SupplierInvoice,
   CompanySettings,
   InvoiceInboxItem,
+  CategorizationTemplate,
 } from '@/types'
 
 // ============================================================
@@ -644,4 +645,28 @@ export function createQueuedMockSupabase() {
   }
 
   return { supabase, enqueue, enqueueMany, reset }
+}
+
+export function makeCategorizationTemplate(
+  overrides: Partial<CategorizationTemplate> = {}
+): CategorizationTemplate {
+  return {
+    id: nextId(),
+    user_id: 'user-1',
+    counterparty_name: 'telia',
+    counterparty_aliases: ['telia sverige ab'],
+    debit_account: '6200',
+    credit_account: '1930',
+    vat_treatment: 'standard_25',
+    vat_account: '2641',
+    category: 'expense_telecom',
+    occurrence_count: 5,
+    confidence: 0.7,
+    last_seen_date: '2024-06-15',
+    source: 'user_approved',
+    is_active: true,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-06-15T00:00:00Z',
+    ...overrides,
+  }
 }

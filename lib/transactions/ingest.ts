@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { evaluateMappingRules } from '@/lib/bookkeeping/mapping-engine'
 import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-entries'
+import { upsertCounterpartyTemplate } from '@/lib/bookkeeping/counterparty-templates'
 import { getBestInvoiceMatch } from '@/lib/invoices/invoice-matching'
 import { findSupplierInvoiceMatch } from '@/lib/invoices/supplier-invoice-matching'
 import { tryReconcileTransaction, fetchUnlinkedGLLines } from '@/lib/reconciliation/bank-reconciliation'
@@ -335,6 +336,16 @@ export async function ingestTransactions(
               is_business: !mappingResult.default_private,
             })
             .eq('id', newTransaction.id)
+
+          // Upsert counterparty template (auto-learned, lower confidence)
+          try {
+            await upsertCounterpartyTemplate(
+              supabase, userId, newTransaction as Transaction,
+              mappingResult, 'auto_learned'
+            )
+          } catch {
+            // Non-critical
+          }
 
           result.auto_categorized++
         }

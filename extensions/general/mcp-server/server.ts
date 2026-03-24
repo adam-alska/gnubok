@@ -7,6 +7,7 @@ import {
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildMappingResultFromCategory } from '@/lib/bookkeeping/category-mapping'
 import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-entries'
+import { upsertCounterpartyTemplate } from '@/lib/bookkeeping/counterparty-templates'
 import { eventBus } from '@/lib/events/bus'
 import { getVatRules, getAvailableVatRates } from '@/lib/invoices/vat-rules'
 import { fetchExchangeRate, convertToSEK } from '@/lib/currency/riksbanken'
@@ -237,6 +238,15 @@ async function categorizeTransactionCore(
       userId,
     },
   })
+
+  // Upsert counterparty template for future auto-matching
+  try {
+    await upsertCounterpartyTemplate(
+      supabase, userId, transaction as Transaction, mappingResult, 'user_approved'
+    )
+  } catch {
+    // Non-critical
+  }
 
   return {
     success: true,

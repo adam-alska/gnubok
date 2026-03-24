@@ -93,6 +93,7 @@ describe('formatPeriodLabel', () => {
 
 describe('getVatDeclarationSummary', () => {
   const emptyRc = { ruta20: 0, ruta21: 0, ruta22: 0, ruta23: 0, ruta24: 0, ruta30: 0, ruta31: 0, ruta32: 0 }
+  const zeroExtras = { ruta08: 0, ruta35: 0, ruta36: 0, ruta37: 0, ruta38: 0, ruta41: 0, ruta42: 0, ruta50: 0, ruta60: 0, ruta61: 0, ruta62: 0 }
 
   it('calculates totals and detects payment', () => {
     const declaration: VatDeclaration = {
@@ -104,6 +105,7 @@ describe('getVatDeclarationSummary', () => {
         ruta30: 0, ruta31: 0, ruta32: 0,
         ruta39: 0, ruta40: 0,
         ruta48: 1000, ruta49: 1500,
+        ...zeroExtras,
       },
       invoiceCount: 5,
       transactionCount: 10,
@@ -132,6 +134,7 @@ describe('getVatDeclarationSummary', () => {
         ruta30: 0, ruta31: 0, ruta32: 0,
         ruta39: 0, ruta40: 0,
         ruta48: 3000, ruta49: -2500,
+        ...zeroExtras,
       },
       invoiceCount: 1,
       transactionCount: 20,
@@ -158,6 +161,7 @@ describe('getVatDeclarationSummary', () => {
         ruta30: 1250, ruta31: 0, ruta32: 0,
         ruta39: 0, ruta40: 0,
         ruta48: 2250, ruta49: 1500,
+        ...zeroExtras,
       },
       invoiceCount: 2,
       transactionCount: 0,

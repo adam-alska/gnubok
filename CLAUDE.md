@@ -74,7 +74,7 @@ The `VatDeclarationRutor` type maps to the Swedish tax authority's momsdeklarati
 - **Ruta 10/11/12**: Utgående moms 25%/12%/6% — output VAT per rate (from 2611/2621/2631)
 - **Ruta 39/40**: EU services / Export (from 3308/3305)
 - **Ruta 48**: Ingående moms — input VAT (from 2641/2645)
-- **Ruta 49**: Moms att betala/återfå = (ruta 10 + 11 + 12) - ruta 48
+- **Ruta 49**: Moms att betala/återfå = (ruta 10 + 11 + 12 + 30 + 31 + 32 + 60 + 61 + 62) - ruta 48
 
 `VatDeclaration.breakdown.invoices` also includes `base25`/`base12`/`base6` for per-rate revenue breakdown in the UI.
 

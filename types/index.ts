@@ -937,6 +937,29 @@ export interface VatJournalLine {
   description: string
 }
 
+// Categorization template source
+export type CategorizationTemplateSource = 'sie_import' | 'user_approved' | 'sni_default' | 'auto_learned'
+
+// Per-tenant counterparty-based categorization template
+export interface CategorizationTemplate {
+  id: string
+  user_id: string
+  counterparty_name: string
+  counterparty_aliases: string[]
+  debit_account: string
+  credit_account: string
+  vat_treatment: VatTreatment | null
+  vat_account: string | null
+  category: TransactionCategory | null
+  occurrence_count: number
+  confidence: number
+  last_seen_date: string | null
+  source: CategorizationTemplateSource
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
 // Account Balance (cached)
 export interface AccountBalance {
   id: string
@@ -1561,11 +1584,13 @@ export const RECEIPT_STATUS_LABELS: Record<ReceiptStatus, string> = {
 export type VatPeriodType = 'monthly' | 'quarterly' | 'yearly'
 
 // VAT declaration rutor (boxes) according to SKV 4700
+// Complete set of all 30 boxes in the momsdeklaration form.
 export interface VatDeclarationRutor {
   // Momspliktig försäljning (taxable sales basis, all rates combined)
   ruta05: number  // Momspliktig försäljning (excl. ruta 06, 07, 08)
-  ruta06: number  // Momspliktiga uttag (unused, always 0)
-  ruta07: number  // Vinstmarginalbeskattning (unused, always 0)
+  ruta06: number  // Momspliktiga uttag (always 0 for most users)
+  ruta07: number  // Vinstmarginalbeskattning (always 0 for most users)
+  ruta08: number  // Hyresinkomster frivillig beskattning (always 0 for most users)
 
   // Utgående moms (Output VAT per rate)
   ruta10: number  // Utgående moms 25%
@@ -1573,10 +1598,10 @@ export interface VatDeclarationRutor {
   ruta12: number  // Utgående moms 6%
 
   // Inköp vid omvänd skattskyldighet (reverse charge purchase bases)
-  ruta20: number  // Inköp av varor från annat EU-land (unused, goods via Tullverket)
+  ruta20: number  // Inköp av varor från annat EU-land
   ruta21: number  // Inköp av tjänster från annat EU-land
   ruta22: number  // Inköp av tjänster från land utanför EU
-  ruta23: number  // Inköp av varor i Sverige (unused, construction reverse charge goods)
+  ruta23: number  // Inköp av varor i Sverige (construction reverse charge goods)
   ruta24: number  // Övriga inköp av tjänster i Sverige (domestic reverse charge)
 
   // Utgående moms omvänd skattskyldighet (self-assessed output VAT on reverse charge)
@@ -1584,15 +1609,27 @@ export interface VatDeclarationRutor {
   ruta31: number  // Utgående moms 12% omvänd skattskyldighet
   ruta32: number  // Utgående moms 6% omvänd skattskyldighet
 
-  // EU och export
+  // EU och export försäljning
+  ruta35: number  // Varuförsäljning till annat EU-land
+  ruta36: number  // Varuförsäljning utanför EU (export)
+  ruta37: number  // Mellanmans inköp vid trepartshandel
+  ruta38: number  // Mellanmans försäljning vid trepartshandel
   ruta39: number  // Försäljning av tjänster till annat EU-land (reverse charge)
-  ruta40: number  // Export utanför EU
+  ruta40: number  // Övrig försäljning av tjänster utomlands
+  ruta41: number  // Försäljning med omvänd skattskyldighet (Sverige)
+  ruta42: number  // Övrig momsfri försäljning m.m.
 
   // Ingående moms (Input VAT)
   ruta48: number  // Ingående moms att dra av
 
   // Moms att betala eller få tillbaka
   ruta49: number  // Moms att betala (positive) eller återfå (negative)
+
+  // Import (via Tullverket)
+  ruta50: number  // Beskattningsunderlag vid import
+  ruta60: number  // Utgående moms 25% import
+  ruta61: number  // Utgående moms 12% import
+  ruta62: number  // Utgående moms 6% import
 }
 
 // VAT declaration response
@@ -1655,6 +1692,7 @@ export const VAT_RUTA_LABELS: Record<keyof VatDeclarationRutor, string> = {
   ruta05: 'Momspliktig försäljning',
   ruta06: 'Momspliktiga uttag',
   ruta07: 'Vinstmarginalbeskattning',
+  ruta08: 'Hyresinkomster (frivillig beskattning)',
   ruta10: 'Utgående moms 25%',
   ruta11: 'Utgående moms 12%',
   ruta12: 'Utgående moms 6%',
@@ -1666,10 +1704,20 @@ export const VAT_RUTA_LABELS: Record<keyof VatDeclarationRutor, string> = {
   ruta30: 'Utgående moms 25% (omvänd skattskyldighet)',
   ruta31: 'Utgående moms 12% (omvänd skattskyldighet)',
   ruta32: 'Utgående moms 6% (omvänd skattskyldighet)',
+  ruta35: 'Varuförsäljning till annat EU-land',
+  ruta36: 'Varuförsäljning utanför EU (export)',
+  ruta37: 'Mellanmans inköp vid trepartshandel',
+  ruta38: 'Mellanmans försäljning vid trepartshandel',
   ruta39: 'Försäljning av tjänster till EU-land',
-  ruta40: 'Export utanför EU',
+  ruta40: 'Övrig försäljning av tjänster utomlands',
+  ruta41: 'Försäljning med omvänd skattskyldighet (Sverige)',
+  ruta42: 'Övrig momsfri försäljning m.m.',
   ruta48: 'Ingående moms att dra av',
   ruta49: 'Moms att betala/återfå',
+  ruta50: 'Beskattningsunderlag vid import',
+  ruta60: 'Utgående moms 25% import',
+  ruta61: 'Utgående moms 12% import',
+  ruta62: 'Utgående moms 6% import',
 }
 
 // ============================================================
