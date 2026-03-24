@@ -1,0 +1,134 @@
+import type { SkatteverketTokens } from '../types'
+
+/**
+ * Skatteverket OAuth2 helpers for the `per` (BankID) flow.
+ *
+ * Endpoints:
+ *   Authorize: GET  {base}/authorize
+ *   Token:     POST {base}/token
+ *
+ * The `per` flow is user-facing BankID authentication.
+ * No mTLS required (unlike the `org` flow).
+ */
+
+const DEFAULT_OAUTH_BASE_URL = 'https://peroauth2.test.skatteverket.se/oauth2/v1/per'
+const DEFAULT_SCOPES = 'momsdeklaration inkforetag ska skahmst'
+
+function getOAuthBaseUrl(): string {
+  return process.env.SKATTEVERKET_OAUTH_BASE_URL || DEFAULT_OAUTH_BASE_URL
+}
+
+function getClientId(): string {
+  const id = process.env.SKATTEVERKET_OAUTH2_CLIENT_ID
+  if (!id) throw new Error('SKATTEVERKET_OAUTH2_CLIENT_ID is required')
+  return id
+}
+
+function getClientSecret(): string {
+  const secret = process.env.SKATTEVERKET_OAUTH2_CLIENT_SECRET
+  if (!secret) throw new Error('SKATTEVERKET_OAUTH2_CLIENT_SECRET is required')
+  return secret
+}
+
+/**
+ * Build the Skatteverket OAuth2 authorization URL.
+ * User is redirected here to authenticate with BankID.
+ */
+export function buildAuthorizeUrl(
+  redirectUri: string,
+  state: string,
+  scope?: string
+): string {
+  const base = getOAuthBaseUrl()
+  const params = new URLSearchParams({
+    client_id: getClientId(),
+    response_type: 'code',
+    state,
+    redirect_uri: redirectUri,
+    scope: scope || DEFAULT_SCOPES,
+  })
+  return `${base}/authorize?${params.toString()}`
+}
+
+/**
+ * Exchange an authorization code for tokens.
+ * Must be called immediately upon receiving the callback — code expires in 5 minutes.
+ */
+export async function exchangeCodeForTokens(
+  code: string,
+  redirectUri: string
+): Promise<SkatteverketTokens> {
+  const base = getOAuthBaseUrl()
+
+  const body = new URLSearchParams({
+    grant_type: 'authorization_code',
+    client_id: getClientId(),
+    client_secret: getClientSecret(),
+    redirect_uri: redirectUri,
+    code,
+  })
+
+  const response = await fetch(`${base}/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+    body: body.toString(),
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Skatteverket token exchange failed (${response.status}): ${text}`)
+  }
+
+  const data = await response.json()
+
+  return {
+    access_token: data.access_token,
+    refresh_token: data.refresh_token ?? null,
+    expires_at: Date.now() + (data.expires_in ?? 3600) * 1000,
+    refresh_count: 0,
+    scope: data.scope ?? DEFAULT_SCOPES,
+  }
+}
+
+/**
+ * Refresh an access token using a stored refresh token.
+ *
+ * The `per` flow supports up to 10 refreshes per session.
+ * Each refresh returns a NEW refresh_token that must be stored.
+ * Refresh tokens are valid for 65 minutes.
+ */
+export async function refreshAccessToken(
+  refreshToken: string
+): Promise<SkatteverketTokens> {
+  const base = getOAuthBaseUrl()
+
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    client_id: getClientId(),
+    client_secret: getClientSecret(),
+    refresh_token: refreshToken,
+  })
+
+  const response = await fetch(`${base}/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+    body: body.toString(),
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Skatteverket token refresh failed (${response.status}): ${text}`)
+  }
+
+  const data = await response.json()
+
+  return {
+    access_token: data.access_token,
+    // Each refresh returns a new refresh_token — must be stored
+    refresh_token: data.refresh_token ?? null,
+    expires_at: Date.now() + (data.expires_in ?? 3600) * 1000,
+    // refresh_count is incremented by the caller
+    refresh_count: 0,
+    scope: data.scope ?? '',
+  }
+}

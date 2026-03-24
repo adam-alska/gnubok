@@ -4,6 +4,10 @@ import {
   generateReverseChargeLines,
 } from './vat-entries'
 import { findMatchingTemplates, buildMappingResultFromTemplate } from './booking-templates'
+import {
+  findCounterpartyTemplate,
+  buildMappingResultFromCounterpartyTemplate,
+} from './counterparty-templates'
 import type {
   MappingRule,
   MappingResult,
@@ -38,7 +42,9 @@ function getCapitalizationThreshold(year: number): number {
  * 2. MCC code rules (priority 50-69)
  * 3. Merchant name pattern rules (priority 70-89)
  * 4. Amount threshold rules (priority 90-99)
- * 5. Risk fallback (priority 100) → 2013 (private)
+ * 5. Counterparty templates (learned from history, fuzzy matching)
+ * 6. Static booking templates (keyword/MCC matching)
+ * 7. Default fallback (uncategorized)
  */
 export async function evaluateMappingRules(
   supabase: SupabaseClient,
@@ -55,7 +61,10 @@ export async function evaluateMappingRules(
     .order('priority', { ascending: true })
 
   if (error || !rules || rules.length === 0) {
-    // Try template-based matching before default fallback
+    // Try counterparty templates before static template fallback
+    const counterpartyResult = await evaluateCounterpartyTemplates(supabase, userId, transaction, entityType)
+    if (counterpartyResult) return counterpartyResult
+
     const templateResult = evaluateTemplateRules(transaction, entityType)
     if (templateResult) return templateResult
     return getDefaultResult(transaction)
@@ -67,6 +76,10 @@ export async function evaluateMappingRules(
       return buildResult(rule, transaction, entityType)
     }
   }
+
+  // Try counterparty templates before static template fallback
+  const counterpartyResult = await evaluateCounterpartyTemplates(supabase, userId, transaction, entityType)
+  if (counterpartyResult) return counterpartyResult
 
   // Try template-based matching before default fallback
   const templateResult = evaluateTemplateRules(transaction, entityType)
@@ -95,6 +108,35 @@ function evaluateTemplateRules(
   // Override the confidence with the auto-match confidence (not 1.0)
   result.confidence = best.confidence
   return result
+}
+
+/**
+ * Evaluate counterparty templates as a fallback when no DB mapping rule matches.
+ * Source-aware threshold: auto_learned needs 0.6 (require more evidence),
+ * user_approved/sie_import use 0.4 (human has validated the pattern).
+ */
+async function evaluateCounterpartyTemplates(
+  supabase: SupabaseClient,
+  userId: string,
+  transaction: Transaction,
+  entityType?: EntityType
+): Promise<MappingResult | null> {
+  try {
+    const match = await findCounterpartyTemplate(supabase, userId, transaction)
+    if (!match) return null
+
+    const threshold = match.template.source === 'auto_learned' ? 0.6 : 0.4
+    if (match.confidence < threshold) return null
+
+    return buildMappingResultFromCounterpartyTemplate(
+      match,
+      transaction,
+      entityType || 'enskild_firma'
+    )
+  } catch {
+    // Non-critical — fall through to next fallback
+    return null
+  }
 }
 
 /**

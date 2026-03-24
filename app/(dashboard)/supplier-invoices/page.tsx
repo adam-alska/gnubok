@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Plus, FileInput, AlertCircle, Clock } from 'lucide-react'
+import { Plus, FileInput } from 'lucide-react'
 import Link from 'next/link'
 import type { SupplierInvoice } from '@/types'
 
@@ -13,14 +13,14 @@ function formatAmount(amount: number): string {
   return amount.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-const statusColors: Record<string, string> = {
-  registered: 'bg-blue-100 text-blue-800',
-  approved: 'bg-yellow-100 text-yellow-800',
-  paid: 'bg-success/10 text-success',
-  partially_paid: 'bg-orange-100 text-orange-800',
-  overdue: 'bg-destructive/10 text-destructive',
-  disputed: 'bg-purple-100 text-purple-800',
-  credited: 'bg-gray-100 text-gray-800',
+const statusVariants: Record<string, 'default' | 'secondary' | 'success' | 'warning' | 'destructive'> = {
+  registered: 'secondary',
+  approved: 'default',
+  paid: 'success',
+  partially_paid: 'warning',
+  overdue: 'destructive',
+  disputed: 'warning',
+  credited: 'secondary',
 }
 
 const statusLabels: Record<string, string> = {
@@ -106,8 +106,7 @@ export default function SupplierInvoicesPage() {
           <>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-                  <FileInput className="h-4 w-4" />
+                <CardTitle className="text-sm text-muted-foreground">
                   Totalt obetalt
                 </CardTitle>
               </CardHeader>
@@ -120,8 +119,7 @@ export default function SupplierInvoicesPage() {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-destructive" />
+                <CardTitle className="text-sm text-muted-foreground">
                   Förfallet
                 </CardTitle>
               </CardHeader>
@@ -132,8 +130,7 @@ export default function SupplierInvoicesPage() {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
+                <CardTitle className="text-sm text-muted-foreground">
                   Antal fakturor
                 </CardTitle>
               </CardHeader>
@@ -230,7 +227,7 @@ export default function SupplierInvoicesPage() {
                         <td className="p-3 text-right font-mono">{formatAmount(inv.total)}</td>
                         <td className="p-3 text-right font-mono">{formatAmount(inv.remaining_amount)}</td>
                         <td className="p-3">
-                          <Badge className={statusColors[inv.status] || ''}>
+                          <Badge variant={statusVariants[inv.status] || 'secondary'}>
                             {statusLabels[inv.status] || inv.status}
                           </Badge>
                         </td>

@@ -12,18 +12,18 @@ import { PageHeader } from '@/components/ui/page-header'
 import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
-import { Plus, Search, Receipt, FileText, Send, CheckCircle, Clock, XCircle, ReceiptText, FileQuestion, Truck } from 'lucide-react'
+import { Plus, Search, Receipt } from 'lucide-react'
 import { EmptyInvoices } from '@/components/ui/empty-state'
 import type { Invoice, InvoiceStatus } from '@/types'
 
-const statusConfig: Record<InvoiceStatus, { label: string; variant: 'default' | 'secondary' | 'success' | 'warning' | 'destructive'; icon: React.ElementType; borderColor: string }> = {
-  draft: { label: 'Utkast', variant: 'secondary', icon: FileText, borderColor: 'border-muted-foreground/30' },
-  sent: { label: 'Skickad', variant: 'default', icon: Send, borderColor: 'border-warning/50' },
-  paid: { label: 'Betald', variant: 'success', icon: CheckCircle, borderColor: 'border-success/50' },
-  partially_paid: { label: 'Delbetalad', variant: 'warning', icon: Clock, borderColor: 'border-warning/50' },
-  overdue: { label: 'Förfallen', variant: 'destructive', icon: Clock, borderColor: 'border-destructive/50' },
-  cancelled: { label: 'Makulerad', variant: 'secondary', icon: XCircle, borderColor: 'border-muted-foreground/30' },
-  credited: { label: 'Krediterad', variant: 'secondary', icon: XCircle, borderColor: 'border-muted-foreground/30' },
+const statusConfig: Record<InvoiceStatus, { label: string; variant: 'default' | 'secondary' | 'success' | 'warning' | 'destructive'; borderColor: string }> = {
+  draft: { label: 'Utkast', variant: 'secondary', borderColor: 'border-muted-foreground/30' },
+  sent: { label: 'Skickad', variant: 'default', borderColor: 'border-warning/50' },
+  paid: { label: 'Betald', variant: 'success', borderColor: 'border-success/50' },
+  partially_paid: { label: 'Delbetalad', variant: 'warning', borderColor: 'border-warning/50' },
+  overdue: { label: 'Förfallen', variant: 'destructive', borderColor: 'border-destructive/50' },
+  cancelled: { label: 'Makulerad', variant: 'secondary', borderColor: 'border-muted-foreground/30' },
+  credited: { label: 'Krediterad', variant: 'secondary', borderColor: 'border-muted-foreground/30' },
 }
 
 function getRelativeTimeLabel(dueDateStr: string, status: InvoiceStatus): { text: string; color: string } | null {
@@ -126,12 +126,9 @@ export default function InvoicesPage() {
             {[1, 2, 3].map((i) => (
               <Card key={i}>
                 <CardContent className="pt-6">
-                  <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-lg bg-muted animate-pulse" />
-                    <div className="space-y-2">
-                      <div className="h-3.5 bg-muted rounded w-20 animate-pulse" />
-                      <div className="h-7 bg-muted rounded w-16 animate-pulse" />
-                    </div>
+                  <div className="space-y-2">
+                    <div className="h-3.5 bg-muted rounded w-20 animate-pulse" />
+                    <div className="h-7 bg-muted rounded w-16 animate-pulse" />
                   </div>
                 </CardContent>
               </Card>
@@ -141,48 +138,27 @@ export default function InvoicesPage() {
           <>
             <Card>
               <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center">
-                    <Receipt className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Totalt antal</p>
-                    <p className="font-display text-2xl font-medium tabular-nums">{invoices.length}</p>
-                  </div>
+                <p className="text-sm text-muted-foreground">Totalt antal</p>
+                <p className="font-display text-2xl font-medium tabular-nums">{invoices.length}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">Obetalda</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-display text-2xl font-medium tabular-nums">{stats.unpaid}</p>
+                  {stats.overdue > 0 && (
+                    <Badge variant="destructive" className="text-xs">
+                      {stats.overdue} förfallna
+                    </Badge>
+                  )}
                 </div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center">
-                    <Clock className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Obetalda</p>
-                    <div className="flex items-center gap-2">
-                      <p className="font-display text-2xl font-medium tabular-nums">{stats.unpaid}</p>
-                      {stats.overdue > 0 && (
-                        <Badge variant="destructive" className="text-xs">
-                          {stats.overdue} förfallna
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center">
-                    <Send className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Att få in</p>
-                    <p className="font-display text-2xl font-medium tabular-nums">{formatCurrency(stats.unpaidAmount)}</p>
-                  </div>
-                </div>
+                <p className="text-sm text-muted-foreground">Att få in</p>
+                <p className="font-display text-2xl font-medium tabular-nums">{formatCurrency(stats.unpaidAmount)}</p>
               </CardContent>
             </Card>
           </>
@@ -262,7 +238,6 @@ export default function InvoicesPage() {
             const docType = (invoice as Invoice & { document_type?: string }).document_type || 'invoice'
             const isProforma = docType === 'proforma'
             const isDeliveryNote = docType === 'delivery_note'
-            const StatusIcon = isCreditNote ? ReceiptText : isProforma ? FileQuestion : isDeliveryNote ? Truck : status.icon
             const relativeTime = invoice.due_date ? getRelativeTimeLabel(invoice.due_date, invoice.status) : null
             return (
               <Link key={invoice.id} href={`/invoices/${invoice.id}`}>
@@ -272,11 +247,7 @@ export default function InvoicesPage() {
                   invoice.status === 'overdue' && 'ring-1 ring-destructive/20'
                 )}>
                   <CardContent className="py-4">
-                    <div className="flex items-start gap-3 sm:gap-4 sm:items-center">
-                      <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${isCreditNote ? 'bg-destructive/10' : 'bg-muted'}`}>
-                        <StatusIcon className={`h-5 w-5 ${isCreditNote ? 'text-destructive' : 'text-muted-foreground'}`} />
-                      </div>
-                      <div className="flex-1 min-w-0">
+                    <div className="min-w-0">
                         <div className="flex items-start sm:items-center justify-between gap-2">
                           <p className="font-medium truncate">{invoice.invoice_number}</p>
                           <p className={`font-medium tabular-nums shrink-0 ${isCreditNote ? 'text-destructive' : ''}`}>
@@ -316,7 +287,6 @@ export default function InvoicesPage() {
                             {formatCurrency(Number(invoice.total_sek))}
                           </p>
                         )}
-                      </div>
                     </div>
                   </CardContent>
                 </Card>

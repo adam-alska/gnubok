@@ -19,11 +19,7 @@ import {
   FileText,
   Download,
   XCircle,
-  Clock,
-  Building,
   Mail,
-  Phone,
-  MapPin,
   ReceiptText,
   ExternalLink,
   Bell,
@@ -42,14 +38,14 @@ import {
 } from '@/components/ui/dialog'
 import type { Invoice, InvoiceItem, Customer, InvoiceStatus, InvoiceReminder, InvoiceDocumentType } from '@/types'
 
-const statusConfig: Record<InvoiceStatus, { label: string; variant: 'default' | 'secondary' | 'success' | 'warning' | 'destructive'; icon: React.ElementType }> = {
-  draft: { label: 'Utkast', variant: 'secondary', icon: FileText },
-  sent: { label: 'Skickad', variant: 'default', icon: Send },
-  paid: { label: 'Betald', variant: 'success', icon: CheckCircle },
-  partially_paid: { label: 'Delbetalad', variant: 'warning', icon: Clock },
-  overdue: { label: 'Förfallen', variant: 'destructive', icon: Clock },
-  cancelled: { label: 'Makulerad', variant: 'secondary', icon: XCircle },
-  credited: { label: 'Krediterad', variant: 'secondary', icon: XCircle },
+const statusConfig: Record<InvoiceStatus, { label: string; variant: 'default' | 'secondary' | 'success' | 'warning' | 'destructive' }> = {
+  draft: { label: 'Utkast', variant: 'secondary' },
+  sent: { label: 'Skickad', variant: 'default' },
+  paid: { label: 'Betald', variant: 'success' },
+  partially_paid: { label: 'Delbetalad', variant: 'warning' },
+  overdue: { label: 'Förfallen', variant: 'destructive' },
+  cancelled: { label: 'Makulerad', variant: 'secondary' },
+  credited: { label: 'Krediterad', variant: 'secondary' },
 }
 
 const reminderLevelLabels: Record<1 | 2 | 3, string> = {
@@ -383,7 +379,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const status = statusConfig[invoice.status]
-  const StatusIcon = status.icon
   const customer = invoice.customer
   const customerHasEmail = !!customer.email
   const docType = ((invoice as Invoice & { document_type?: InvoiceDocumentType }).document_type || 'invoice') as InvoiceDocumentType
@@ -408,7 +403,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 <Badge variant="secondary" className="bg-success/10 text-success">Följesedel</Badge>
               )}
               <Badge variant={status.variant as 'default' | 'secondary' | 'destructive'}>
-                <StatusIcon className="mr-1 h-3 w-3" />
                 {status.label}
               </Badge>
             </div>
@@ -477,10 +471,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           {/* Customer info */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building className="h-5 w-5" />
-                Kund
-              </CardTitle>
+              <CardTitle>Kund</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
@@ -491,31 +482,22 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 {customer.vat_number && (
                   <p className="text-muted-foreground">VAT: {customer.vat_number}</p>
                 )}
-                <div className="flex flex-wrap gap-4 pt-2">
+                <div className="flex flex-wrap gap-4 pt-2 text-sm text-muted-foreground">
                   {customer.email && (
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Mail className="h-4 w-4" />
-                      {customer.email}
-                    </div>
+                    <span>{customer.email}</span>
                   )}
                   {customer.phone && (
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Phone className="h-4 w-4" />
-                      {customer.phone}
-                    </div>
+                    <span>{customer.phone}</span>
                   )}
                 </div>
                 {(customer.address_line1 || customer.city) && (
-                  <div className="flex items-start gap-1 text-sm text-muted-foreground pt-1">
-                    <MapPin className="h-4 w-4 mt-0.5" />
-                    <div>
-                      {customer.address_line1 && <p>{customer.address_line1}</p>}
-                      {customer.address_line2 && <p>{customer.address_line2}</p>}
-                      <p>
-                        {customer.postal_code} {customer.city}
-                        {customer.country !== 'SE' && `, ${customer.country}`}
-                      </p>
-                    </div>
+                  <div className="text-sm text-muted-foreground pt-1">
+                    {customer.address_line1 && <p>{customer.address_line1}</p>}
+                    {customer.address_line2 && <p>{customer.address_line2}</p>}
+                    <p>
+                      {customer.postal_code} {customer.city}
+                      {customer.country !== 'SE' && `, ${customer.country}`}
+                    </p>
                   </div>
                 )}
               </div>

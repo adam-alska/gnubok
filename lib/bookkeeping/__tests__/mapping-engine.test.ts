@@ -10,6 +10,12 @@ vi.mock('../booking-templates', () => ({
   buildMappingResultFromTemplate: vi.fn(),
 }))
 
+// Mock counterparty-templates (needed by evaluateMappingRules)
+vi.mock('../counterparty-templates', () => ({
+  findCounterpartyTemplate: vi.fn().mockResolvedValue(null),
+  buildMappingResultFromCounterpartyTemplate: vi.fn(),
+}))
+
 describe('mapping-engine', () => {
   beforeEach(() => {
     vi.clearAllMocks()

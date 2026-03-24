@@ -6,6 +6,7 @@ import { buildMappingResultFromCategory } from '@/lib/bookkeeping/category-mappi
 import { getTemplateById, buildMappingResultFromTemplate, validateTemplateForEntity } from '@/lib/bookkeeping/booking-templates'
 import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-entries'
 import { saveUserMappingRule } from '@/lib/bookkeeping/mapping-engine'
+import { upsertCounterpartyTemplate } from '@/lib/bookkeeping/counterparty-templates'
 import { validateBody } from '@/lib/api/validate'
 import { CategorizeTransactionSchema } from '@/lib/api/schemas'
 import type { Transaction, TransactionCategory, EntityType } from '@/types'
@@ -284,6 +285,15 @@ export async function POST(
       console.error('Failed to save mapping rule:', err)
       // Non-critical, continue
     }
+  }
+
+  // Upsert counterparty template for future auto-matching
+  try {
+    await upsertCounterpartyTemplate(
+      supabase, user.id, transaction as Transaction, mappingResult, 'user_approved'
+    )
+  } catch {
+    // Non-critical
   }
 
   // Link receipt document to journal entry if both exist

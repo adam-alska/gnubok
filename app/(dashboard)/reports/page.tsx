@@ -13,6 +13,7 @@ import { INK2DeclarationView } from '@/components/reports/INK2DeclarationView'
 import { BankReconciliationView } from '@/components/reports/BankReconciliationView'
 import { TrialBalanceChart } from '@/components/reports/TrialBalanceChart'
 import { VatCompositionChart } from '@/components/reports/VatCompositionChart'
+import { SkatteverketPanel } from '@/components/reports/SkatteverketPanel'
 import { IncomeExpenseChart } from '@/components/reports/IncomeExpenseChart'
 import type { MonthlyDataPoint } from '@/components/reports/IncomeExpenseChart'
 import type {
@@ -1044,6 +1045,14 @@ function VatDeclarationView() {
           </Card>
         </>
       )}
+
+      {/* Skatteverket integration panel */}
+      <SkatteverketPanel
+        periodType={periodType}
+        year={year}
+        period={period}
+        hasData={data !== null}
+      />
 
       {!data && !loading && !error && (
         <Card>

@@ -18,7 +18,7 @@ import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
 import { proposePaymentLines } from '@/lib/bookkeeping/propose-payment-lines'
 import { formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Trash2, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, Loader2 } from 'lucide-react'
 import type { FormLine } from '@/components/bookkeeping/JournalEntryForm'
 import type { Invoice, InvoiceItem, Customer, BASAccount, EntityType } from '@/types'
 
@@ -356,13 +356,11 @@ export default function PaymentBookingDialog({
             <div className="flex items-center justify-between border-t pt-3">
               <div className="flex items-center gap-2">
                 {isBalanced ? (
-                  <Badge variant="secondary" className="bg-success/10 text-success gap-1">
-                    <CheckCircle2 className="h-3 w-3" />
+                  <Badge variant="secondary" className="bg-success/10 text-success">
                     Debet = Kredit
                   </Badge>
                 ) : (
-                  <Badge variant="destructive" className="gap-1">
-                    <AlertTriangle className="h-3 w-3" />
+                  <Badge variant="destructive">
                     Obalanserad ({formatCurrency(Math.abs(totalDebit - totalCredit))})
                   </Badge>
                 )}

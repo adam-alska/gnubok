@@ -26,7 +26,8 @@
           "email",
           "arcim-migration",
           "tic",
-          "mcp-server"
+          "mcp-server",
+          "skatteverket"
         ]
       },
       "description": "Extension IDs to enable. Each ID must match a manifest.json in the extensions/ directory."

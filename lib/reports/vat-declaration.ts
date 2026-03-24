@@ -164,12 +164,14 @@ export async function calculateVatDeclaration(
 
   // Map account balances to momsdeklaration boxes
   const rutor: VatDeclarationRutor = {
-    ruta05: 0, ruta06: 0, ruta07: 0,
+    ruta05: 0, ruta06: 0, ruta07: 0, ruta08: 0,
     ruta10: 0, ruta11: 0, ruta12: 0,
     ruta20: 0, ruta21: 0, ruta22: 0, ruta23: 0, ruta24: 0,
     ruta30: 0, ruta31: 0, ruta32: 0,
-    ruta39: 0, ruta40: 0,
+    ruta35: 0, ruta36: 0, ruta37: 0, ruta38: 0,
+    ruta39: 0, ruta40: 0, ruta41: 0, ruta42: 0,
     ruta48: 0, ruta49: 0,
+    ruta50: 0, ruta60: 0, ruta61: 0, ruta62: 0,
   }
 
   for (const [account, mapping] of Object.entries(ACCOUNT_RUTA)) {
@@ -181,9 +183,11 @@ export async function calculateVatDeclaration(
     rutor[mapping.box] = round(rutor[mapping.box] + balance)
   }
 
+  // FK009: summaMoms = (10 + 11 + 12 + 30 + 31 + 32 + 60 + 61 + 62) - 48
   rutor.ruta49 = round(
     rutor.ruta10 + rutor.ruta11 + rutor.ruta12 +
-    rutor.ruta30 + rutor.ruta31 + rutor.ruta32 -
+    rutor.ruta30 + rutor.ruta31 + rutor.ruta32 +
+    rutor.ruta60 + rutor.ruta61 + rutor.ruta62 -
     rutor.ruta48
   )
 
@@ -370,7 +374,10 @@ export function getVatDeclarationSummary(declaration: VatDeclaration): {
     declaration.rutor.ruta12 +
     declaration.rutor.ruta30 +
     declaration.rutor.ruta31 +
-    declaration.rutor.ruta32
+    declaration.rutor.ruta32 +
+    declaration.rutor.ruta60 +
+    declaration.rutor.ruta61 +
+    declaration.rutor.ruta62
   )
 
   const totalInputVat = declaration.rutor.ruta48
