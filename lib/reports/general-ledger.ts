@@ -6,6 +6,7 @@ export interface GeneralLedgerLine {
   date: string
   voucher_series: string
   voucher_number: number
+  journal_entry_id: string
   description: string
   source_type: string
   debit: number
@@ -85,6 +86,7 @@ export async function generateGeneralLedger(
     account_number: string
     debit_amount: number
     credit_amount: number
+    journal_entry_id: string
     journal_entries: {
       entry_date: string
       voucher_number: number
@@ -95,7 +97,7 @@ export async function generateGeneralLedger(
   }>(({ from, to }) => {
     let query = supabase
       .from('journal_entry_lines')
-      .select('account_number, debit_amount, credit_amount, journal_entries!inner(entry_date, voucher_number, voucher_series, description, source_type, user_id, fiscal_period_id, status)')
+      .select('account_number, debit_amount, credit_amount, journal_entry_id, journal_entries!inner(entry_date, voucher_number, voucher_series, description, source_type, user_id, fiscal_period_id, status)')
       .eq('journal_entries.user_id', userId)
       .eq('journal_entries.fiscal_period_id', periodId)
       .in('journal_entries.status', ['posted', 'reversed'])
@@ -140,6 +142,7 @@ export async function generateGeneralLedger(
       date: entry.entry_date,
       voucher_series: entry.voucher_series || 'A',
       voucher_number: entry.voucher_number,
+      journal_entry_id: line.journal_entry_id,
       description: entry.description || '',
       source_type: entry.source_type || '',
       debit: Math.round((Number(line.debit_amount) || 0) * 100) / 100,

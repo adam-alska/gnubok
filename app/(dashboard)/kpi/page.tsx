@@ -1,59 +1,95 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { KPIHeroCards } from '@/components/kpi/KPIHeroCards'
 import { KPITrendChart } from '@/components/kpi/KPITrendChart'
-import type { FiscalPeriod, KPIReport } from '@/types'
+import { KPISettingsDialog } from '@/components/kpi/KPISettingsDialog'
+import { getDefaultPreferences } from '@/lib/reports/kpi-definitions'
+import type { FiscalPeriod, KPIReport, KPIPreferences } from '@/types'
 
 export default function KpiPage() {
   const [periods, setPeriods] = useState<FiscalPeriod[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState('')
   const [report, setReport] = useState<KPIReport | null>(null)
+  const [preferences, setPreferences] = useState<KPIPreferences>(getDefaultPreferences())
   const [isLoadingInit, setIsLoadingInit] = useState(true)
   const [isLoadingReport, setIsLoadingReport] = useState(false)
+  const [isSavingPrefs, setIsSavingPrefs] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function fetchPeriods() {
+    async function init() {
       try {
-        const res = await fetch('/api/bookkeeping/fiscal-periods')
-        const { data } = await res.json()
-        setPeriods(data || [])
-        if (data && data.length > 0) {
-          setSelectedPeriod(data[0].id)
+        const [periodsRes, prefsRes] = await Promise.all([
+          fetch('/api/bookkeeping/fiscal-periods'),
+          fetch('/api/kpi/preferences'),
+        ])
+        const { data: periodsData } = await periodsRes.json()
+        const { data: prefsData } = await prefsRes.json()
+
+        setPeriods(periodsData || [])
+        if (prefsData) setPreferences(prefsData)
+        if (periodsData && periodsData.length > 0) {
+          setSelectedPeriod(periodsData[0].id)
         }
       } catch {
-        setError('Kunde inte hämta räkenskapsår')
+        setError('Kunde inte hämta data')
       } finally {
         setIsLoadingInit(false)
       }
     }
-    fetchPeriods()
+    init()
+  }, [])
+
+  const fetchReport = useCallback(async (periodId: string) => {
+    setIsLoadingReport(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/reports/kpi?period_id=${periodId}`)
+      if (!res.ok) throw new Error('Kunde inte hämta nyckeltal')
+      const { data } = await res.json()
+      setReport(data)
+    } catch {
+      setError('Kunde inte hämta nyckeltal')
+    } finally {
+      setIsLoadingReport(false)
+    }
   }, [])
 
   useEffect(() => {
     if (!selectedPeriod) return
     let cancelled = false
 
-    async function fetchReport() {
-      setIsLoadingReport(true)
-      setError(null)
-      try {
-        const res = await fetch(`/api/reports/kpi?period_id=${selectedPeriod}`)
-        if (!res.ok) throw new Error('Kunde inte hämta nyckeltal')
-        const { data } = await res.json()
-        if (!cancelled) setReport(data)
-      } catch {
-        if (!cancelled) setError('Kunde inte hämta nyckeltal')
-      } finally {
-        if (!cancelled) setIsLoadingReport(false)
-      }
-    }
-    fetchReport()
+    fetchReport(selectedPeriod).then(() => {
+      if (cancelled) setReport(null)
+    })
     return () => { cancelled = true }
-  }, [selectedPeriod])
+  }, [selectedPeriod, fetchReport])
+
+  async function handleSavePreferences(prefs: KPIPreferences) {
+    setIsSavingPrefs(true)
+    try {
+      const res = await fetch('/api/kpi/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(prefs),
+      })
+      if (!res.ok) throw new Error()
+      const { data } = await res.json()
+      setPreferences(data)
+
+      // Re-fetch report if account overrides changed (calculations may differ)
+      if (selectedPeriod) {
+        await fetchReport(selectedPeriod)
+      }
+    } catch {
+      // Silently fail — user can retry
+    } finally {
+      setIsSavingPrefs(false)
+    }
+  }
 
   if (isLoadingInit) {
     return (
@@ -74,6 +110,11 @@ export default function KpiPage() {
           <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">Nyckeltal</h1>
           <p className="text-muted-foreground">Översikt av företagets ekonomiska hälsa</p>
         </div>
+        <KPISettingsDialog
+          preferences={preferences}
+          onSave={handleSavePreferences}
+          saving={isSavingPrefs}
+        />
       </div>
 
       {/* Period selector */}
@@ -106,7 +147,7 @@ export default function KpiPage() {
 
       {!isLoadingReport && !error && report && (
         <>
-          <KPIHeroCards report={report} />
+          <KPIHeroCards report={report} preferences={preferences} />
           {report.months.length > 0 && <KPITrendChart months={report.months} />}
         </>
       )}

@@ -38,11 +38,26 @@ export async function syncAccountTransactions(
   toDate: string,
   ingest: IngestFn = defaultIngest
 ): Promise<SyncResult> {
+  console.log('[enable-banking] syncAccountTransactions starting', {
+    connectionId,
+    accountUid: account.uid,
+    accountIban: account.iban,
+    fromDate,
+    toDate,
+  })
+
   const { transactions, rawPages } = await getAllTransactionsWithRaw(
     account.uid,
     fromDate,
     toDate,
   )
+
+  console.log('[enable-banking] Fetched transactions from API', {
+    connectionId,
+    accountUid: account.uid,
+    transactionCount: transactions.length,
+    rawPageCount: rawPages.length,
+  })
 
   const bankTransactions = transactions.map(tx => convertTransaction(tx, account.currency))
 
@@ -61,6 +76,14 @@ export async function syncAccountTransactions(
   }))
 
   const ingestResult = await ingest(supabase, userId, rawTransactions)
+
+  console.log('[enable-banking] Ingest result', {
+    connectionId,
+    accountUid: account.uid,
+    imported: ingestResult.imported,
+    duplicates: ingestResult.duplicates,
+    errors: ingestResult.errors,
+  })
 
   // Archive raw PSD2 API responses as räkenskapsinformation (BFL 7 kap)
   for (let i = 0; i < rawPages.length; i++) {
