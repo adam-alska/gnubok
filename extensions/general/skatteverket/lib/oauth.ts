@@ -98,7 +98,8 @@ export async function exchangeCodeForTokens(
  * Refresh tokens are valid for 65 minutes.
  */
 export async function refreshAccessToken(
-  refreshToken: string
+  refreshToken: string,
+  previousRefreshCount: number
 ): Promise<SkatteverketTokens> {
   const base = getOAuthBaseUrl()
 
@@ -127,8 +128,7 @@ export async function refreshAccessToken(
     // Each refresh returns a new refresh_token — must be stored
     refresh_token: data.refresh_token ?? null,
     expires_at: Date.now() + (data.expires_in ?? 3600) * 1000,
-    // refresh_count is incremented by the caller
-    refresh_count: 0,
+    refresh_count: previousRefreshCount + 1,
     scope: data.scope ?? '',
   }
 }

@@ -19,6 +19,7 @@ import {
   ShieldAlert,
 } from 'lucide-react'
 import type { VatPeriodType } from '@/types'
+import { formatRedovisare, formatRedovisningsperiod } from '@/lib/skatteverket/format'
 
 interface SkatteverketStatus {
   connected: boolean
@@ -267,22 +268,11 @@ function SkatteverketPanelInner({ periodType, year, period, hasData }: Skattever
     const res = await fetch('/api/settings')
     const { data } = await res.json()
     if (!data?.org_number) throw new Error('Organisationsnummer saknas')
-    const clean = data.org_number.replace(/-/g, '')
-    if (clean.length === 12) return clean
-    if (data.entity_type === 'aktiebolag') return `16${clean}`
-    const yearDigits = parseInt(clean.substring(0, 2), 10)
-    const currentTwoDigitYear = new Date().getFullYear() % 100
-    return `${yearDigits > currentTwoDigitYear ? '19' : '20'}${clean}`
+    return formatRedovisare(data.org_number, data.entity_type)
   }
 
   const getRedovisningsperiod = (): string => {
-    let lastMonth: number
-    switch (periodType) {
-      case 'monthly': lastMonth = period; break
-      case 'quarterly': lastMonth = period * 3; break
-      case 'yearly': lastMonth = 12; break
-    }
-    return `${year}${String(lastMonth).padStart(2, '0')}`
+    return formatRedovisningsperiod(periodType, year, period)
   }
 
   if (loading) {

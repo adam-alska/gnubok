@@ -45,10 +45,10 @@ function getApiGwClientSecret(): string {
 async function enforceRateLimit(): Promise<void> {
   const now = Date.now()
   const elapsed = now - lastRequestTime
+  lastRequestTime = now // Claim the slot immediately to prevent concurrent bypass
   if (elapsed < MIN_REQUEST_INTERVAL_MS) {
     await new Promise(resolve => setTimeout(resolve, MIN_REQUEST_INTERVAL_MS - elapsed))
   }
-  lastRequestTime = Date.now()
 }
 
 /**
@@ -88,10 +88,9 @@ async function getValidToken(
   }
 
   // Refresh — returns NEW refresh_token that must be stored
-  const refreshed = await refreshAccessToken(tokens.refresh_token)
+  const refreshed = await refreshAccessToken(tokens.refresh_token, tokens.refresh_count)
   const updatedTokens: SkatteverketTokens = {
     ...refreshed,
-    refresh_count: tokens.refresh_count + 1,
     scope: tokens.scope,
   }
   await storeTokens(supabase, userId, updatedTokens)
