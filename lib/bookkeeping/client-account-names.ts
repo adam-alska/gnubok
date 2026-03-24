@@ -40,6 +40,12 @@ const ACCOUNT_NAMES: Record<string, string> = {
 
   // Cost of goods (4xxx)
   '4010': 'Varuinköp',
+  '4060': 'Varuinköp omvänd moms',
+  '4070': 'Varuinköp EU',
+  '4100': 'Inköp material/varor',
+  '4500': 'Övriga inköpskostnader',
+  '4531': 'Import-/tullkostnader',
+  '4600': 'Subentreprenader',
 
   // External expenses (5xxx)
   '5010': 'Lokalhyra',

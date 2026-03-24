@@ -32,6 +32,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import PaymentBookingDialog from '@/components/invoices/PaymentBookingDialog'
+import SendInvoiceDialog from '@/components/invoices/SendInvoiceDialog'
 import {
   Dialog,
   DialogContent,
@@ -76,11 +77,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [originalInvoice, setOriginalInvoice] = useState<Invoice | null>(null)
   const [convertedFromInvoice, setConvertedFromInvoice] = useState<Invoice | null>(null)
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
+  const [showSendDialog, setShowSendDialog] = useState(false)
+  const [sendDialogMode, setSendDialogMode] = useState<'email' | 'manual'>('email')
   const [isConverting, setIsConverting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
-  const [isSendingEmail, setIsSendingEmail] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -224,48 +226,9 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     setIsUpdating(false)
   }
 
-  async function sendInvoiceEmail() {
-    if (!invoice) return
-
-    // Check if customer has email
-    if (!invoice.customer.email) {
-      toast({
-        title: 'E-post saknas',
-        description: 'Kunden saknar e-postadress. Uppdatera kunduppgifterna först.',
-        variant: 'destructive',
-      })
-      return
-    }
-
-    setIsSendingEmail(true)
-
-    try {
-      const response = await fetch(`/api/invoices/${invoice.id}/send`, {
-        method: 'POST',
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Kunde inte skicka fakturan')
-      }
-
-      toast({
-        title: 'Faktura skickad',
-        description: data.message,
-      })
-
-      // Refresh to get updated status
-      fetchInvoice()
-    } catch (error) {
-      toast({
-        title: 'Kunde inte skicka faktura',
-        description: error instanceof Error ? error.message : 'Försök igen.',
-        variant: 'destructive',
-      })
-    }
-
-    setIsSendingEmail(false)
+  function openSendDialog(mode: 'email' | 'manual') {
+    setSendDialogMode(mode)
+    setShowSendDialog(true)
   }
 
   async function convertToInvoice() {
@@ -433,16 +396,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           )}
           {invoice.status === 'draft' && !isDeliveryNote && (
             customerHasEmail ? (
-              <Button onClick={sendInvoiceEmail} disabled={isSendingEmail}>
-                {isSendingEmail ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Mail className="mr-2 h-4 w-4" />
-                )}
+              <Button onClick={() => openSendDialog('email')}>
+                <Mail className="mr-2 h-4 w-4" />
                 Skicka via e-post
               </Button>
             ) : (
-              <Button variant="secondary" onClick={() => updateStatus('sent')} disabled={isUpdating}>
+              <Button variant="secondary" onClick={() => openSendDialog('manual')}>
                 <Send className="mr-2 h-4 w-4" />
                 Skickad manuellt
               </Button>
@@ -451,7 +410,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           {isDeliveryNote && invoice.status === 'draft' && (
             <Button variant="secondary" onClick={() => updateStatus('sent')} disabled={isUpdating}>
               <Send className="mr-2 h-4 w-4" />
-              Skickad manuellt
+              Markera som skickad
             </Button>
           )}
           {(invoice.status === 'sent' || invoice.status === 'overdue') && isRealInvoice && (
@@ -880,21 +839,15 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                       <>
                         <Button
                           className="w-full"
-                          onClick={sendInvoiceEmail}
-                          disabled={isSendingEmail}
+                          onClick={() => openSendDialog('email')}
                         >
-                          {isSendingEmail ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <Mail className="mr-2 h-4 w-4" />
-                          )}
+                          <Mail className="mr-2 h-4 w-4" />
                           Skicka via e-post
                         </Button>
                         <Button
                           variant="ghost"
                           className="w-full text-muted-foreground"
-                          onClick={() => updateStatus('sent')}
-                          disabled={isUpdating}
+                          onClick={() => openSendDialog('manual')}
                         >
                           <Send className="mr-2 h-4 w-4" />
                           Skickad manuellt
@@ -915,8 +868,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                         )}
                         <Button
                           className="w-full"
-                          onClick={() => updateStatus('sent')}
-                          disabled={isUpdating}
+                          onClick={() => openSendDialog('manual')}
                         >
                           <Send className="mr-2 h-4 w-4" />
                           Skickad manuellt
@@ -1001,6 +953,14 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             description: `Faktura ${invoice.invoice_number} har markerats som betald och bokförts`,
           })
         }}
+      />
+
+      <SendInvoiceDialog
+        open={showSendDialog}
+        onOpenChange={setShowSendDialog}
+        invoice={invoice}
+        mode={sendDialogMode}
+        onSuccess={() => fetchInvoice()}
       />
     </div>
   )
