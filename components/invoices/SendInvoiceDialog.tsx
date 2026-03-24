@@ -15,7 +15,7 @@ import { JournalEntryReviewContent } from '@/components/bookkeeping/JournalEntry
 import { proposeSendLines } from '@/lib/bookkeeping/propose-send-lines'
 import { formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { Loader2, Mail, Send } from 'lucide-react'
+import { CheckCircle2, Loader2, Mail, Send } from 'lucide-react'
 import type { Invoice, InvoiceItem, Customer, EntityType } from '@/types'
 
 interface InvoiceWithRelations extends Invoice {
@@ -43,6 +43,7 @@ export default function SendInvoiceDialog({
   const supabase = createClient()
 
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [sentMessage, setSentMessage] = useState<string | null>(null)
   const [accountingMethod, setAccountingMethod] = useState<'accrual' | 'cash'>('accrual')
   const [entityType, setEntityType] = useState<EntityType>('enskild_firma')
   const [periodName, setPeriodName] = useState('')
@@ -51,6 +52,7 @@ export default function SendInvoiceDialog({
   useEffect(() => {
     if (!open) {
       setIsInitialized(false)
+      setSentMessage(null)
       return
     }
 
@@ -142,20 +144,18 @@ export default function SendInvoiceDialog({
         throw new Error(data.error || 'Kunde inte skicka fakturan')
       }
 
-      onOpenChange(false)
       onSuccess()
 
       if (mode === 'email') {
-        toast({
-          title: 'Faktura skickad',
-          description: data.message,
-        })
+        setSentMessage(data.message || `Fakturan har skickats till ${invoice.customer.email}`)
       } else {
+        // For manual send, just close — no email to confirm
+        onOpenChange(false)
         toast({
           title: 'Faktura markerad som skickad',
           description: accountingMethod === 'accrual'
-            ? 'Fakturan har markerats som skickad och bokföringsverifikationen har skapats.'
-            : 'Fakturan har markerats som skickad.',
+            ? 'Bokföringsverifikationen har skapats.'
+            : undefined,
         })
       }
     } catch (error) {
@@ -167,6 +167,10 @@ export default function SendInvoiceDialog({
     }
 
     setIsSubmitting(false)
+  }
+
+  const handleClose = () => {
+    onOpenChange(false)
   }
 
   const showJournalPreview = accountingMethod === 'accrual' && proposedLines.length > 0
@@ -189,7 +193,18 @@ export default function SendInvoiceDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {!isInitialized ? (
+        {sentMessage ? (
+          <div className="flex items-start gap-3 rounded-lg border border-success/30 bg-success/5 p-4">
+            <CheckCircle2 className="h-5 w-5 text-success shrink-0 mt-0.5" />
+            <div className="space-y-1 text-sm">
+              <p className="font-medium">E-post skickad</p>
+              <p className="text-muted-foreground">{sentMessage}</p>
+              {accountingMethod === 'accrual' && (
+                <p className="text-muted-foreground">Bokföringsverifikationen har skapats.</p>
+              )}
+            </div>
+          </div>
+        ) : !isInitialized ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
@@ -224,28 +239,39 @@ export default function SendInvoiceDialog({
         )}
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isSubmitting}
-            className="w-full sm:w-auto min-h-11"
-          >
-            Avbryt
-          </Button>
-          <Button
-            onClick={handleConfirm}
-            disabled={isSubmitting || !isInitialized}
-            className="w-full sm:w-auto min-h-11"
-          >
-            {isSubmitting ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : mode === 'email' ? (
-              <Mail className="mr-2 h-4 w-4" />
-            ) : (
-              <Send className="mr-2 h-4 w-4" />
-            )}
-            {mode === 'email' ? 'Skicka faktura' : 'Markera som skickad'}
-          </Button>
+          {sentMessage ? (
+            <Button
+              onClick={handleClose}
+              className="w-full sm:w-auto min-h-11"
+            >
+              Stäng
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                onClick={handleClose}
+                disabled={isSubmitting}
+                className="w-full sm:w-auto min-h-11"
+              >
+                Avbryt
+              </Button>
+              <Button
+                onClick={handleConfirm}
+                disabled={isSubmitting || !isInitialized}
+                className="w-full sm:w-auto min-h-11"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : mode === 'email' ? (
+                  <Mail className="mr-2 h-4 w-4" />
+                ) : (
+                  <Send className="mr-2 h-4 w-4" />
+                )}
+                {mode === 'email' ? 'Skicka faktura' : 'Markera som skickad'}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
