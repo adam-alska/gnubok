@@ -954,13 +954,15 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           })
         }}
       />
-
-      <SendInvoiceDialog
-        open={showSendDialog}
-        onOpenChange={setShowSendDialog}
-        invoice={invoice}
-        mode={sendDialogMode}
-        onSuccess={() => fetchInvoice()}
+      {invoice && (
+        <SendInvoiceDialog
+          open={showSendDialog}
+          onOpenChange={setShowSendDialog}
+          invoice={invoice}
+          mode={sendDialogMode}
+          onSuccess={() => fetchInvoice()}
+        />
+      )}
       />
     </div>
   )
