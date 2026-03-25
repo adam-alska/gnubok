@@ -17,7 +17,7 @@ import type { UploadedFile } from '@/components/bookkeeping/DocumentUploadZone'
 import VatTreatmentSelect from './VatTreatmentSelect'
 import { VAT_TREATMENT_OPTIONS } from './transaction-types'
 import type { TransactionWithInvoice } from './transaction-types'
-import type { TransactionCategory, VatTreatment, BASAccount, EntityType } from '@/types'
+import type { TransactionCategory, VatTreatment, BASAccount, EntityType, LinePatternEntry } from '@/types'
 
 interface QuickReviewDialogProps {
   open: boolean
@@ -30,6 +30,7 @@ interface QuickReviewDialogProps {
   entityType?: EntityType
   template?: BookingTemplate | null
   templateId?: string
+  counterpartyLinePattern?: LinePatternEntry[] | null
   onConfirm: (
     id: string,
     category: TransactionCategory,
@@ -51,6 +52,7 @@ export default function QuickReviewDialog({
   entityType,
   template,
   templateId,
+  counterpartyLinePattern,
   onConfirm,
   onChangeTemplate,
 }: QuickReviewDialogProps) {
@@ -91,6 +93,8 @@ export default function QuickReviewDialog({
   if (!transaction || !category) return null
 
   const isIncome = transaction.amount > 0
+  const isCounterpartyTemplate = !!(counterpartyLinePattern && counterpartyLinePattern.length > 0)
+  const isTemplateBooking = !!templateId || isCounterpartyTemplate
   const isLiabilityAccount = accountOverride.startsWith('2')
 
   async function handleConfirm() {
@@ -151,7 +155,7 @@ export default function QuickReviewDialog({
         <DialogHeader>
           <DialogTitle>Granska bokföring</DialogTitle>
           <DialogDescription>
-            Kontrollera konto och moms innan du bokför
+            {isTemplateBooking ? 'Granska verifikationen innan du bokför' : 'Kontrollera konto och moms innan du bokför'}
           </DialogDescription>
         </DialogHeader>
 
@@ -179,13 +183,13 @@ export default function QuickReviewDialog({
         {/* Template or Category */}
         <div>
           <label className="text-sm font-medium text-muted-foreground">
-            {template ? 'Mall' : 'Kategori'}
+            {isCounterpartyTemplate ? 'Motpartsmall' : template ? 'Mall' : 'Kategori'}
           </label>
           <div className="mt-1 flex items-center gap-2">
             <Badge variant="outline" className="text-sm py-1 px-3">
               {template ? template.name_sv : categoryLabel}
             </Badge>
-            {onChangeTemplate && (
+            {onChangeTemplate && !isCounterpartyTemplate && (
               <button
                 type="button"
                 className="text-xs text-primary hover:underline"
@@ -195,7 +199,7 @@ export default function QuickReviewDialog({
               </button>
             )}
           </div>
-          {template && (
+          {template && !isCounterpartyTemplate && (
             <p className="mt-1.5 text-xs font-mono text-muted-foreground">
               D: {formatAccountWithName(template.debit_account)} → K: {formatAccountWithName(template.credit_account)}
             </p>
@@ -236,52 +240,57 @@ export default function QuickReviewDialog({
         <JournalEntryPreview
           amount={transaction.amount}
           currency={transaction.currency}
-          category={category}
-          vatTreatment={isLiabilityAccount ? 'none' : vatTreatment}
-          accountOverride={accountOverride}
-          entityType={entityType}
+          {...(isCounterpartyTemplate
+            ? { linePattern: counterpartyLinePattern ?? undefined }
+            : templateId && template
+              ? { templateDebitAccount: template.debit_account, templateCreditAccount: template.credit_account, templateVatRate: template.vat_rate }
+              : { category, vatTreatment: isLiabilityAccount ? 'none' : vatTreatment, accountOverride, entityType }
+          )}
         />
 
-        {/* Account */}
-        <div>
-          <label className="text-sm font-medium text-muted-foreground">Konto</label>
-          <div className="mt-1">
-            <AccountCombobox
-              value={accountOverride}
-              accounts={accounts}
-              onChange={handleAccountChange}
-            />
-          </div>
-        </div>
+        {/* Account & VAT — hidden for template bookings (accounts defined by the template) */}
+        {!isTemplateBooking && (
+          <>
+            <div>
+              <label className="text-sm font-medium text-muted-foreground">Konto</label>
+              <div className="mt-1">
+                <AccountCombobox
+                  value={accountOverride}
+                  accounts={accounts}
+                  onChange={handleAccountChange}
+                />
+              </div>
+            </div>
 
-        {/* VAT treatment */}
-        <div>
-          <label className="text-sm font-medium text-muted-foreground">Momsbehandling</label>
-          <div className="mt-1">
-            {isLiabilityAccount ? (
-              <p className="text-sm text-muted-foreground">
-                Ingen moms för skuld-/eget kapital-konton
-              </p>
-            ) : showVatDropdown ? (
-              <VatTreatmentSelect
-                value={vatTreatment}
-                onValueChange={setVatTreatment}
-              />
-            ) : (
-              <p className="text-sm">
-                {VAT_TREATMENT_OPTIONS.find(o => o.value === vatTreatment)?.label || 'Ingen moms'}
-                {' '}
-                <button
-                  type="button"
-                  className="text-xs text-primary hover:underline"
-                  onClick={() => setShowVatDropdown(true)}
-                >
-                  Ändra
-                </button>
-              </p>
-            )}
-          </div>
-        </div>
+            <div>
+              <label className="text-sm font-medium text-muted-foreground">Momsbehandling</label>
+              <div className="mt-1">
+                {isLiabilityAccount ? (
+                  <p className="text-sm text-muted-foreground">
+                    Ingen moms för skuld-/eget kapital-konton
+                  </p>
+                ) : showVatDropdown ? (
+                  <VatTreatmentSelect
+                    value={vatTreatment}
+                    onValueChange={setVatTreatment}
+                  />
+                ) : (
+                  <p className="text-sm">
+                    {VAT_TREATMENT_OPTIONS.find(o => o.value === vatTreatment)?.label || 'Ingen moms'}
+                    {' '}
+                    <button
+                      type="button"
+                      className="text-xs text-primary hover:underline"
+                      onClick={() => setShowVatDropdown(true)}
+                    >
+                      Ändra
+                    </button>
+                  </p>
+                )}
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Document upload */}
         <div className="rounded-lg border">
@@ -335,7 +344,7 @@ export default function QuickReviewDialog({
           <Button
             className="flex-1"
             onClick={handleConfirm}
-            disabled={isProcessing || !accountOverride}
+            disabled={isProcessing || (!isTemplateBooking && !accountOverride)}
           >
             <Check className="mr-2 h-4 w-4" />
             {isProcessing ? 'Bokför...' : 'Bokför'}

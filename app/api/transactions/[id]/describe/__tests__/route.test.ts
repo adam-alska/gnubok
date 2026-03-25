@@ -10,6 +10,12 @@ import {
 // Mock init
 vi.mock('@/lib/init', () => ({ ensureInitialized: vi.fn() }))
 
+// Mock counterparty template lookup
+vi.mock('@/lib/bookkeeping/counterparty-templates', () => ({
+  findCounterpartyTemplate: vi.fn().mockResolvedValue(null),
+  buildMappingResultFromCounterpartyTemplate: vi.fn(),
+}))
+
 // Mock extension registry
 const mockFindSimilarTemplates = vi.fn().mockResolvedValue([])
 vi.mock('@/lib/extensions/registry', () => ({

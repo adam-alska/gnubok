@@ -2,7 +2,7 @@ import { suggestCategory } from '@/lib/tax/expense-warnings'
 import { getExpenseAccountForCategory } from '@/lib/bookkeeping/category-mapping'
 import { findMatchingTemplates, getTemplateById, type TemplateMatch } from '@/lib/bookkeeping/booking-templates'
 import { extensionRegistry } from '@/lib/extensions/registry'
-import type { Transaction, TransactionCategory, EntityType, MappingRule } from '@/types'
+import type { Transaction, TransactionCategory, EntityType, MappingRule, LinePatternEntry } from '@/types'
 
 export interface SuggestedCategory {
   category: TransactionCategory
@@ -244,6 +244,7 @@ export interface SuggestedTemplate {
   description_sv: string
   risk_level: string
   requires_review: boolean
+  line_pattern?: LinePatternEntry[] | null
 }
 
 /**

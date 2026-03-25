@@ -86,8 +86,52 @@ export async function createTransactionJournalEntry(
         line_description: transaction.description,
       }
     )
+  } else if (mappingResult.all_lines_complete) {
+    // Multi-line pattern: vat_lines contains ALL non-settlement lines with correct amounts.
+    // Settlement line = full absAmount on the appropriate side.
+    const settlementAccount = isExpense
+      ? (mappingResult.credit_account || '1930')
+      : (mappingResult.debit_account || '1930')
+
+    if (isExpense) {
+      // All non-settlement lines (business, VAT, tax, rounding)
+      for (const line of mappingResult.vat_lines) {
+        lines.push({
+          account_number: line.account_number,
+          debit_amount: line.debit_amount,
+          credit_amount: line.credit_amount,
+          line_description: line.description || transaction.description,
+        })
+      }
+      // Credit bank for full amount
+      lines.push({
+        account_number: settlementAccount,
+        debit_amount: 0,
+        credit_amount: absAmount,
+        line_description: transaction.description,
+        ...(settlementAccount === '1930' ? currencyMeta : {}),
+      })
+    } else {
+      // Debit bank for full amount
+      lines.push({
+        account_number: settlementAccount,
+        debit_amount: absAmount,
+        credit_amount: 0,
+        line_description: transaction.description,
+        ...(settlementAccount === '1930' ? currencyMeta : {}),
+      })
+      // All non-settlement lines
+      for (const line of mappingResult.vat_lines) {
+        lines.push({
+          account_number: line.account_number,
+          debit_amount: line.debit_amount,
+          credit_amount: line.credit_amount,
+          line_description: line.description || transaction.description,
+        })
+      }
+    }
   } else if (isExpense) {
-    // Business expense
+    // Business expense (legacy single debit/credit path)
     const debitAccount = mappingResult.debit_account
     const creditAccount = mappingResult.credit_account || '1930'
 
@@ -134,7 +178,7 @@ export async function createTransactionJournalEntry(
       ...(creditAccount === '1930' ? currencyMeta : {}),
     })
   } else {
-    // Income
+    // Income (legacy single debit/credit path)
     const debitAccount = mappingResult.debit_account || '1930'
     const creditAccount = mappingResult.credit_account
 

@@ -8,8 +8,9 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import { ArrowUpRight, ArrowDownRight, FileText, Loader2, MessageSquareText, Paperclip } from 'lucide-react'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/info-tooltip'
-import { formatAccountWithName } from '@/lib/bookkeeping/client-account-names'
+import { getAccountName, formatAccountWithName } from '@/lib/bookkeeping/client-account-names'
 import { getTemplateById } from '@/lib/bookkeeping/booking-templates'
+import { isCounterpartyTemplateId } from '@/lib/bookkeeping/counterparty-templates'
 import type { TransactionWithInvoice, CategorizeHandler } from './transaction-types'
 import type { SuggestedCategory, SuggestedTemplate } from '@/lib/transactions/category-suggestions'
 
@@ -178,7 +179,8 @@ export default function TransactionInboxCard({
               ) : templateSuggestions && templateSuggestions.length > 0 ? (
                 <>
                   {templateSuggestions.slice(0, 2).map((ts, idx) => {
-                    const tmpl = getTemplateById(ts.template_id)
+                    const isCounterparty = isCounterpartyTemplateId(ts.template_id)
+                    const tmpl = isCounterparty ? null : getTemplateById(ts.template_id)
                     return (
                       <Button
                         key={ts.template_id}
@@ -186,7 +188,7 @@ export default function TransactionInboxCard({
                         variant={idx === 0 ? 'default' : 'outline'}
                         className="h-auto py-1.5 text-xs"
                         onClick={() => {
-                          if (onOpenTemplateReview && tmpl) {
+                          if (onOpenTemplateReview && (isCounterparty || tmpl)) {
                             onOpenTemplateReview(transaction, ts.template_id)
                           } else if (topSuggestion) {
                             handleSuggestionClick(topSuggestion)
@@ -201,8 +203,11 @@ export default function TransactionInboxCard({
                             ) : null}
                             {ts.name_sv}
                           </div>
-                          <span className="opacity-70 font-normal font-mono text-[10px]">
-                            D: {formatAccountWithName(ts.debit_account)} → K: {formatAccountWithName(ts.credit_account)}
+                          <span className="opacity-70 font-normal text-[10px]">
+                            {isCounterparty
+                              ? `${ts.description_sv}`
+                              : getAccountName(tmpl?.debit_account || ts.debit_account)
+                            }
                           </span>
                         </div>
                       </Button>

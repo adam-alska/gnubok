@@ -5,7 +5,7 @@ import { formatCurrency } from '@/lib/utils'
 import { formatAccountWithName } from '@/lib/bookkeeping/client-account-names'
 import { getVatRate, extractVatAmount, extractNetAmount } from '@/lib/bookkeeping/vat-entries'
 import { getCategoryAccountMapping } from '@/lib/bookkeeping/category-mapping'
-import type { TransactionCategory, VatTreatment, EntityType } from '@/types'
+import type { TransactionCategory, VatTreatment, EntityType, LinePatternEntry } from '@/types'
 
 interface PreviewLine {
   side: 'debet' | 'kredit'
@@ -24,6 +24,9 @@ interface JournalEntryPreviewProps {
   templateDebitAccount?: string
   templateCreditAccount?: string
   templateVatRate?: number
+  /** For multi-line counterparty template bookings */
+  linePattern?: LinePatternEntry[]
+  settlementAccount?: string
 }
 
 export default function JournalEntryPreview({
@@ -36,10 +39,51 @@ export default function JournalEntryPreview({
   templateDebitAccount,
   templateCreditAccount,
   templateVatRate,
+  linePattern,
+  settlementAccount = '1930',
 }: JournalEntryPreviewProps) {
   const lines = useMemo(() => {
     const result: PreviewLine[] = []
     const absAmount = Math.abs(amount)
+
+    // Multi-line counterparty template preview
+    if (linePattern && linePattern.length > 0) {
+      const isIncome = amount > 0
+      const settlementSide = isIncome ? 'debet' : 'kredit'
+
+      // Settlement line
+      result.push({ side: settlementSide, account: settlementAccount, amount: absAmount })
+
+      // VAT lines first (from rate)
+      let totalVat = 0
+      for (const entry of linePattern) {
+        if (entry.type === 'vat' && entry.vat_rate) {
+          const vatAmt = Math.round(absAmount * entry.vat_rate / (1 + entry.vat_rate) * 100) / 100
+          totalVat += vatAmt
+          result.push({ side: entry.side === 'debit' ? 'debet' : 'kredit', account: entry.account, amount: vatAmt })
+        }
+      }
+
+      // Business/tax lines (from ratio against non-VAT amount)
+      const nonVatAmt = Math.round((absAmount - totalVat) * 100) / 100
+      let allocated = 0
+      const ratioEntries = linePattern.filter(e => e.ratio !== undefined)
+      for (const entry of ratioEntries) {
+        const amt = Math.round(nonVatAmt * (entry.ratio ?? 0) * 100) / 100
+        allocated += amt
+        result.push({ side: entry.side === 'debit' ? 'debet' : 'kredit', account: entry.account, amount: amt })
+      }
+
+      // Rounding difference to 3740
+      const totalAllocated = Math.round((totalVat + allocated) * 100) / 100
+      const diff = Math.round((absAmount - totalAllocated) * 100) / 100
+      if (diff !== 0) {
+        const businessSide = linePattern.find(e => e.type === 'business')?.side ?? 'credit'
+        result.push({ side: businessSide === 'debit' ? 'debet' : 'kredit', account: '3740', amount: Math.abs(diff) })
+      }
+
+      return result
+    }
 
     // Template-based preview
     if (templateDebitAccount && templateCreditAccount) {
@@ -93,7 +137,7 @@ export default function JournalEntryPreview({
     }
 
     return result
-  }, [amount, category, vatTreatment, accountOverride, entityType, templateDebitAccount, templateCreditAccount, templateVatRate])
+  }, [amount, category, vatTreatment, accountOverride, entityType, templateDebitAccount, templateCreditAccount, templateVatRate, linePattern, settlementAccount])
 
   if (lines.length === 0) return null
 

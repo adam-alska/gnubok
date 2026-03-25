@@ -926,6 +926,7 @@ export interface MappingResult {
   requires_review: boolean
   default_private: boolean
   vat_lines: VatJournalLine[]
+  all_lines_complete?: boolean  // when true, vat_lines contains ALL non-settlement lines
   description: string
 }
 
@@ -940,6 +941,15 @@ export interface VatJournalLine {
 // Categorization template source
 export type CategorizationTemplateSource = 'sie_import' | 'user_approved' | 'sni_default' | 'auto_learned'
 
+// Multi-line booking pattern entry
+export interface LinePatternEntry {
+  account: string
+  type: 'business' | 'vat' | 'tax'
+  side: 'debit' | 'credit'
+  ratio?: number      // proportion of NON-VAT amount (business + tax ratios sum to ~1.0)
+  vat_rate?: number   // applied to FULL amount via rate/(1+rate) (vat type only)
+}
+
 // Per-tenant counterparty-based categorization template
 export interface CategorizationTemplate {
   id: string
@@ -951,6 +961,7 @@ export interface CategorizationTemplate {
   vat_treatment: VatTreatment | null
   vat_account: string | null
   category: TransactionCategory | null
+  line_pattern: LinePatternEntry[] | null
   occurrence_count: number
   confidence: number
   last_seen_date: string | null

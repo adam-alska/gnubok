@@ -19,6 +19,7 @@ import type {
   InvoiceInboxItem,
   CategorizationTemplate,
 } from '@/types'
+import type { SIEVoucher, SIETransactionLine } from '@/lib/import/types'
 
 // ============================================================
 // Chainable Supabase mock
@@ -664,9 +665,27 @@ export function makeCategorizationTemplate(
     confidence: 0.7,
     last_seen_date: '2024-06-15',
     source: 'user_approved',
+    line_pattern: null,
     is_active: true,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-06-15T00:00:00Z',
+    ...overrides,
+  }
+}
+
+export function makeSIEVoucher(
+  overrides: Partial<Omit<SIEVoucher, 'lines'>> & { lines?: SIETransactionLine[] } = {}
+): SIEVoucher {
+  return {
+    series: 'A',
+    number: 1,
+    date: new Date(2024, 5, 15), // June 15, 2024
+    description: 'Faktura',
+    lines: [
+      { account: '1930', amount: -1000 },
+      { account: '6200', amount: 800 },
+      { account: '2641', amount: 200 },
+    ],
     ...overrides,
   }
 }
