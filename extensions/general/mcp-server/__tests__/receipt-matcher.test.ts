@@ -17,11 +17,18 @@ vi.mock('@/lib/supabase/server', () => ({
   }),
 }))
 
-vi.mock('@/lib/auth/api-keys', () => ({
-  extractBearerToken: vi.fn().mockReturnValue('test-token'),
-  validateApiKey: vi.fn().mockResolvedValue({ userId: 'user-1' }),
-  createServiceClientNoCookies: vi.fn(),
-}))
+vi.mock('@/lib/auth/api-keys', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/auth/api-keys')>()
+  return {
+    ...actual,
+    extractBearerToken: vi.fn().mockReturnValue('test-token'),
+    validateApiKey: vi.fn().mockResolvedValue({
+      userId: 'user-1',
+      scopes: ['transactions:read', 'transactions:write', 'customers:read', 'customers:write', 'invoices:read', 'invoices:write', 'reports:read'],
+    }),
+    createServiceClientNoCookies: vi.fn(),
+  }
+})
 
 vi.mock('@/lib/bookkeeping/category-mapping', () => ({
   buildMappingResultFromCategory: vi.fn().mockReturnValue({

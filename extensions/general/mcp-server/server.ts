@@ -3,6 +3,8 @@ import {
   extractBearerToken,
   validateApiKey,
   createServiceClientNoCookies,
+  hasScope,
+  TOOL_SCOPE_MAP,
 } from '@/lib/auth/api-keys'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildMappingResultFromCategory } from '@/lib/bookkeeping/category-mapping'
@@ -1368,7 +1370,7 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
     })
   }
 
-  const { userId } = authResult
+  const { userId, scopes: keyScopes } = authResult
   const supabase = createServiceClientNoCookies()
 
   // ── Parse JSON-RPC ──
@@ -1418,10 +1420,14 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
     case 'ping':
       return NextResponse.json(jsonRpc(id ?? null, {}))
 
-    case 'tools/list':
+    case 'tools/list': {
+      const allowedTools = tools.filter((t) => {
+        const required = TOOL_SCOPE_MAP[t.name]
+        return !required || hasScope(keyScopes, required)
+      })
       return NextResponse.json(
         jsonRpc(id ?? null, {
-          tools: tools.map((t) => ({
+          tools: allowedTools.map((t) => ({
             name: t.name,
             description: t.description,
             inputSchema: t.inputSchema,
@@ -1430,6 +1436,7 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
           })),
         })
       )
+    }
 
     case 'tools/call': {
       const toolName = (params as Record<string, unknown>)?.name as string
@@ -1443,6 +1450,14 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
         const available = tools.map((t) => t.name).join(', ')
         return NextResponse.json(
           jsonRpcError(id ?? null, -32602, `Unknown tool: "${toolName}". Available tools: ${available}`)
+        )
+      }
+
+      // Enforce scope
+      const requiredScope = TOOL_SCOPE_MAP[toolName]
+      if (requiredScope && !hasScope(keyScopes, requiredScope)) {
+        return NextResponse.json(
+          jsonRpcError(id ?? null, -32600, `Insufficient scope: this API key does not have the "${requiredScope}" scope`)
         )
       }
 

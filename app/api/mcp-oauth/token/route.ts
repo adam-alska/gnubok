@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { decryptAuthCode, verifyPkce, hashAuthCode } from '@/lib/auth/oauth-codes'
-import { generateApiKey } from '@/lib/auth/api-keys'
-import { createServiceClientNoCookies } from '@/lib/auth/api-keys'
+import { generateApiKey, createServiceClientNoCookies, ALL_SCOPES } from '@/lib/auth/api-keys'
 
 /**
  * OAuth 2.0 Token Endpoint.
@@ -111,6 +110,7 @@ export async function POST(request: Request) {
       key_hash: hash,
       key_prefix: prefix,
       name: 'MCP-klient (OAuth)',
+      scopes: ALL_SCOPES,
     })
 
   if (insertError) {
