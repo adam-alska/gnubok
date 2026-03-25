@@ -172,7 +172,18 @@ export function InvoiceReviewContent({
               </div>
             </div>
           )}
-          {ourReference && <p>Vår referens: {ourReference}</p>}
+          {ourReference && (
+            <div>
+              <span>Vår referens:</span>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {ourReference.split(',').map((ref, i) => (
+                  <Badge key={i} variant="secondary" className="text-xs font-normal">
+                    {ref.trim()}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
           {notes && <p>Anteckning: {notes}</p>}
         </div>
       )}

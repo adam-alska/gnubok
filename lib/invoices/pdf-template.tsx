@@ -360,9 +360,15 @@ export function InvoicePDF({ invoice, customer, items, company, originalInvoiceN
               </View>
             )}
             {invoice.our_reference && (
-              <View style={styles.row}>
+              <View style={{ marginBottom: 4 }}>
                 <Text style={styles.label}>Vår referens:</Text>
-                <Text style={styles.value}>{invoice.our_reference}</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
+                  {invoice.our_reference.split(',').map((ref, i) => (
+                    <Text key={i} style={{ backgroundColor: '#f0f0f0', borderRadius: 3, paddingHorizontal: 6, paddingVertical: 2, fontSize: 9, fontWeight: 'bold' }}>
+                      {ref.trim()}
+                    </Text>
+                  ))}
+                </View>
               </View>
             )}
           </View>

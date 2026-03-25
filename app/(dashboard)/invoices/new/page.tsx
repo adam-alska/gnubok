@@ -669,7 +669,17 @@ export default function NewInvoicePage() {
 
                 <div className="space-y-2">
                   <Label>Vår referens</Label>
-                  <Input placeholder="Ditt namn" {...register('our_reference')} />
+                  <Controller
+                    name="our_reference"
+                    control={control}
+                    render={({ field }) => (
+                      <TagInput
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        placeholder="Ditt namn"
+                      />
+                    )}
+                  />
                 </div>
               </CardContent>
             </Card>
