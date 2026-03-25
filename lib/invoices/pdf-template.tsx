@@ -348,9 +348,15 @@ export function InvoicePDF({ invoice, customer, items, company, originalInvoiceN
               <Text style={styles.value}>{formatDate(invoice.due_date)}</Text>
             </View>
             {invoice.your_reference && (
-              <View style={styles.row}>
+              <View style={{ marginBottom: 4 }}>
                 <Text style={styles.label}>Er referens:</Text>
-                <Text style={styles.value}>{invoice.your_reference}</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
+                  {invoice.your_reference.split(',').map((ref, i) => (
+                    <Text key={i} style={{ backgroundColor: '#f0f0f0', borderRadius: 3, paddingHorizontal: 6, paddingVertical: 2, fontSize: 9, fontWeight: 'bold' }}>
+                      {ref.trim()}
+                    </Text>
+                  ))}
+                </View>
               </View>
             )}
             {invoice.our_reference && (

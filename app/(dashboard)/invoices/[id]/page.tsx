@@ -613,9 +613,15 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 </span>
               </div>
               {invoice.your_reference && (
-                <div className="flex justify-between">
+                <div className="space-y-1">
                   <span className="text-muted-foreground">Er referens</span>
-                  <span>{invoice.your_reference}</span>
+                  <div className="flex flex-wrap gap-1">
+                    {invoice.your_reference.split(',').map((ref, i) => (
+                      <Badge key={i} variant="secondary" className="text-xs font-normal">
+                        {ref.trim()}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
               )}
               {invoice.our_reference && (

@@ -159,8 +159,19 @@ export function InvoiceReviewContent({
 
       {/* References/notes */}
       {(yourReference || ourReference || notes) && (
-        <div className="border-t pt-3 space-y-1 text-sm text-muted-foreground">
-          {yourReference && <p>Er referens: {yourReference}</p>}
+        <div className="border-t pt-3 space-y-2 text-sm text-muted-foreground">
+          {yourReference && (
+            <div>
+              <span>Er referens:</span>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {yourReference.split(',').map((ref, i) => (
+                  <Badge key={i} variant="secondary" className="text-xs font-normal">
+                    {ref.trim()}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
           {ourReference && <p>Vår referens: {ourReference}</p>}
           {notes && <p>Anteckning: {notes}</p>}
         </div>
