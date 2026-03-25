@@ -28,6 +28,7 @@ import {
 import JournalEntryPreview from './JournalEntryPreview'
 import { formatAccountWithName } from '@/lib/bookkeeping/client-account-names'
 import type { TransactionWithInvoice } from './transaction-types'
+import type { LinePatternEntry } from '@/types'
 
 interface TemplateMatch {
   template_id: string
@@ -46,6 +47,18 @@ interface TemplateMatch {
   risk_level: string
 }
 
+interface CounterpartyMatch {
+  id: string
+  counterparty_name: string
+  debit_account: string
+  credit_account: string
+  vat_treatment: string | null
+  confidence: number
+  occurrence_count: number
+  source: string
+  line_pattern: LinePatternEntry[] | null
+}
+
 interface AiSuggestion {
   debit_account: string
   credit_account: string
@@ -59,6 +72,7 @@ interface AiSuggestion {
 
 interface DescribeResult {
   templates: TemplateMatch[]
+  counterparty_match: CounterpartyMatch | null
   ai_suggestion: AiSuggestion | null
   needs_more_detail: boolean
   user_description: string
@@ -75,7 +89,7 @@ interface DescribeTransactionDialogProps {
 }
 
 type Step = 'describe' | 'pick' | 'batch'
-type Selection = { type: 'template'; templateId: string } | { type: 'ai' }
+type Selection = { type: 'template'; templateId: string } | { type: 'ai' } | { type: 'counterparty' }
 
 function getExamplePrompts(transaction: TransactionWithInvoice): string[] {
   const desc = (transaction.description || '').toLowerCase()
@@ -191,7 +205,14 @@ export default function DescribeTransactionDialog({
       // Build categorize request based on selection type
       let body: Record<string, unknown>
 
-      if (selection.type === 'template') {
+      if (selection.type === 'counterparty') {
+        const cp = describeResult.counterparty_match!
+        body = {
+          is_business: true,
+          counterparty_template_id: cp.id,
+          user_description: describeResult.user_description,
+        }
+      } else if (selection.type === 'template') {
         body = {
           is_business: true,
           template_id: selection.templateId,
@@ -323,6 +344,8 @@ export default function DescribeTransactionDialog({
   if (!transaction) return null
 
   const isIncome = transaction.amount > 0
+  const counterpartyMatch = describeResult?.counterparty_match
+  const isCounterpartySelected = selection?.type === 'counterparty'
   const aiSuggestion = describeResult?.ai_suggestion
   // Check if AI agrees with top template
   const topTemplate = describeResult?.templates[0]
@@ -424,6 +447,66 @@ export default function DescribeTransactionDialog({
             )}
 
             <div className="overflow-y-auto max-h-[40vh] space-y-2 pr-1">
+              {/* Counterparty Match Card */}
+              {counterpartyMatch && (
+                <Card
+                  className={`cursor-pointer transition-colors hover:border-primary/50 ${
+                    isCounterpartySelected ? 'border-primary bg-primary/5' : ''
+                  }`}
+                  onClick={() => setSelection({ type: 'counterparty' })}
+                >
+                  <CardContent className="py-3 px-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                            Tidigare bokföring
+                          </Badge>
+                        </div>
+                        <p className="text-sm font-medium">{counterpartyMatch.counterparty_name}</p>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                          {counterpartyMatch.line_pattern && counterpartyMatch.line_pattern.length > 0 ? (
+                            counterpartyMatch.line_pattern.map((lp, i) => (
+                              <Badge key={i} variant="secondary" className="text-[10px] px-1.5 py-0">
+                                {formatAccountWithName(lp.account)}
+                              </Badge>
+                            ))
+                          ) : (
+                            <>
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                D: {formatAccountWithName(counterpartyMatch.debit_account)}
+                              </Badge>
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                K: {formatAccountWithName(counterpartyMatch.credit_account)}
+                              </Badge>
+                              {counterpartyMatch.vat_treatment && counterpartyMatch.vat_treatment !== 'exempt' && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                  Moms {Math.round(getVatRateFromTreatment(counterpartyMatch.vat_treatment) * 100)}%
+                                </Badge>
+                              )}
+                            </>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {counterpartyMatch.occurrence_count} tidigare bokföringar
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Badge
+                          variant={counterpartyMatch.confidence >= 0.7 ? 'default' : 'outline'}
+                          className="text-[10px] px-1.5 py-0"
+                        >
+                          {Math.round(counterpartyMatch.confidence * 100)}%
+                        </Badge>
+                        {isCounterpartySelected && (
+                          <Check className="h-4 w-4 text-primary" />
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* AI Suggestion Card */}
               {aiSuggestion && (
                 <Card
@@ -581,8 +664,20 @@ export default function DescribeTransactionDialog({
               )}
             </div>
 
-            {/* Journal entry preview for selected template or AI suggestion */}
+            {/* Journal entry preview for selected template, AI suggestion, or counterparty match */}
             {selection && (() => {
+              if (selection.type === 'counterparty' && counterpartyMatch) {
+                return (
+                  <JournalEntryPreview
+                    amount={transaction.amount}
+                    currency={transaction.currency}
+                    templateDebitAccount={counterpartyMatch.line_pattern ? undefined : counterpartyMatch.debit_account}
+                    templateCreditAccount={counterpartyMatch.line_pattern ? undefined : counterpartyMatch.credit_account}
+                    templateVatRate={counterpartyMatch.line_pattern ? undefined : getVatRateFromTreatment(counterpartyMatch.vat_treatment)}
+                    linePattern={counterpartyMatch.line_pattern ?? undefined}
+                  />
+                )
+              }
               if (selection.type === 'ai' && aiSuggestion) {
                 return (
                   <JournalEntryPreview

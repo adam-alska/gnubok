@@ -6,7 +6,8 @@ import { buildMappingResultFromCategory } from '@/lib/bookkeeping/category-mappi
 import { getTemplateById, buildMappingResultFromTemplate, validateTemplateForEntity } from '@/lib/bookkeeping/booking-templates'
 import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-entries'
 import { saveUserMappingRule } from '@/lib/bookkeeping/mapping-engine'
-import { upsertCounterpartyTemplate } from '@/lib/bookkeeping/counterparty-templates'
+import { upsertCounterpartyTemplate, buildMappingResultFromCounterpartyTemplate } from '@/lib/bookkeeping/counterparty-templates'
+import type { CategorizationTemplate } from '@/types'
 import { validateBody } from '@/lib/api/validate'
 import { CategorizeTransactionSchema } from '@/lib/api/schemas'
 import type { Transaction, TransactionCategory, EntityType } from '@/types'
@@ -179,9 +180,30 @@ export async function POST(
     console.log(`[categorize] tx=${id} will confirm inbox item=${body.inbox_item_id} and link document`)
   }
 
-  // Build mapping result from template or category
+  // Build mapping result from template, counterparty template, or category
   let mappingResult
-  if (body.template_id) {
+  if (body.counterparty_template_id && is_business) {
+    // Counterparty template — look up and build full multi-line MappingResult
+    const { data: cpTemplate } = await supabase
+      .from('categorization_templates')
+      .select('*')
+      .eq('id', body.counterparty_template_id)
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (!cpTemplate) {
+      return NextResponse.json({ error: 'Counterparty template not found' }, { status: 404 })
+    }
+
+    const match = {
+      template: cpTemplate as CategorizationTemplate,
+      matchMethod: 'exact_alias' as const,
+      confidence: Number(cpTemplate.confidence),
+    }
+    mappingResult = buildMappingResultFromCounterpartyTemplate(match, transaction as Transaction, entityType)
+    console.log(`[categorize] tx=${id} using counterparty template="${cpTemplate.counterparty_name}" lines=${cpTemplate.line_pattern ? 'multi' : 'simple'}`)
+  } else if (body.template_id) {
     const template = getTemplateById(body.template_id)!
     mappingResult = buildMappingResultFromTemplate(
       template,
@@ -201,11 +223,12 @@ export async function POST(
   console.log(`[categorize] tx=${id} mapping result:`, {
     debit: mappingResult.debit_account,
     credit: mappingResult.credit_account,
+    allLinesComplete: mappingResult.all_lines_complete || false,
     vatLines: mappingResult.vat_lines.map((v) => `${v.account_number} debit=${v.debit_amount} credit=${v.credit_amount}`),
   })
 
   // Apply account override if provided (only for category-based booking, not templates)
-  if (is_business && body.account_override && !body.template_id) {
+  if (is_business && body.account_override && !body.template_id && !body.counterparty_template_id) {
     // Validate the account exists in the user's chart of accounts
     const { data: accountExists } = await supabase
       .from('chart_of_accounts')

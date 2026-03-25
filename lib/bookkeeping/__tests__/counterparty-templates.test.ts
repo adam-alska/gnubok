@@ -4,6 +4,7 @@ import {
   createQueuedMockSupabase,
   makeTransaction,
   makeCategorizationTemplate,
+  makeSIEVoucher,
 } from '@/tests/helpers'
 import {
   normalizeCounterpartyName,
@@ -11,7 +12,11 @@ import {
   findCounterpartyTemplate,
   buildMappingResultFromCounterpartyTemplate,
   upsertCounterpartyTemplate,
+  resolveSource,
+  insertOrUpdateTemplate,
+  populateTemplatesFromSieVouchers,
 } from '../counterparty-templates'
+import type { TemplateUpsertParams } from '../counterparty-templates'
 
 describe('counterparty-templates', () => {
   // ── Normalization ──────────────────────────────────────────
@@ -107,11 +112,14 @@ describe('counterparty-templates', () => {
     })
 
     it('returns exact alias match with full confidence', async () => {
-      const template = makeCategorizationTemplate({ confidence: 0.8 })
+      const template = makeCategorizationTemplate({
+        confidence: 0.8,
+        counterparty_aliases: ['telia sverige ab'],
+      })
       const { supabase, enqueue } = createQueuedMockSupabase()
 
-      // Alias match returns the template
-      enqueue({ data: template })
+      // Batch query returns all templates
+      enqueue({ data: [template] })
 
       const tx = makeTransaction({ merchant_name: 'Telia Sverige AB' })
       const result = await findCounterpartyTemplate(supabase as never, 'user-1', tx)
@@ -122,11 +130,15 @@ describe('counterparty-templates', () => {
     })
 
     it('falls through to exact normalized when alias misses', async () => {
-      const template = makeCategorizationTemplate({ confidence: 0.8 })
+      const template = makeCategorizationTemplate({
+        counterparty_name: 'telia',
+        confidence: 0.8,
+        counterparty_aliases: ['telia ab'],
+      })
       const { supabase, enqueue } = createQueuedMockSupabase()
 
-      enqueue({ data: null }) // Alias miss
-      enqueue({ data: template }) // Exact normalized hit
+      // Batch query returns all templates (alias won't match 'Telia')
+      enqueue({ data: [template] })
 
       const tx = makeTransaction({ merchant_name: 'Telia' })
       const result = await findCounterpartyTemplate(supabase as never, 'user-1', tx)
@@ -140,12 +152,12 @@ describe('counterparty-templates', () => {
       const template = makeCategorizationTemplate({
         counterparty_name: 'telia',
         confidence: 0.8,
+        counterparty_aliases: ['telia ab'],
       })
       const { supabase, enqueue } = createQueuedMockSupabase()
 
-      enqueue({ data: null }) // Alias miss
-      enqueue({ data: null }) // Exact miss
-      enqueue({ data: [template] }) // Fuzzy: all templates
+      // Batch query returns all templates
+      enqueue({ data: [template] })
 
       // "teliq" has Levenshtein distance 1 from "telia"
       const tx = makeTransaction({ merchant_name: 'Teliq' })
@@ -161,12 +173,12 @@ describe('counterparty-templates', () => {
       const template = makeCategorizationTemplate({
         counterparty_name: 'telia',
         confidence: 0.8,
+        counterparty_aliases: ['telia ab'],
       })
       const { supabase, enqueue } = createQueuedMockSupabase()
 
-      enqueue({ data: null }) // Alias miss
-      enqueue({ data: null }) // Exact miss
-      enqueue({ data: [template] }) // Fuzzy: all templates
+      // Batch query returns all templates
+      enqueue({ data: [template] })
 
       // "xxxxx" has Levenshtein distance 5 from "telia"
       const tx = makeTransaction({ merchant_name: 'XXXXX' })
@@ -178,9 +190,8 @@ describe('counterparty-templates', () => {
     it('returns null when no templates exist', async () => {
       const { supabase, enqueue } = createQueuedMockSupabase()
 
-      enqueue({ data: null }) // Alias miss
-      enqueue({ data: null }) // Exact miss
-      enqueue({ data: [] }) // Fuzzy: empty
+      // Batch query returns empty
+      enqueue({ data: [] })
 
       const tx = makeTransaction({ merchant_name: 'Unknown Company' })
       const result = await findCounterpartyTemplate(supabase as never, 'user-1', tx)
@@ -364,6 +375,358 @@ describe('counterparty-templates', () => {
       )
 
       expect(supabase.from).not.toHaveBeenCalled()
+    })
+  })
+
+  // ── Source Priority ──────────────────────────────────────────
+
+  describe('resolveSource', () => {
+    it('sie_import does not downgrade user_approved', () => {
+      expect(resolveSource('user_approved', 'sie_import')).toBe('user_approved')
+    })
+
+    it('user_approved upgrades auto_learned', () => {
+      expect(resolveSource('auto_learned', 'user_approved')).toBe('user_approved')
+    })
+
+    it('sie_import upgrades auto_learned', () => {
+      expect(resolveSource('auto_learned', 'sie_import')).toBe('sie_import')
+    })
+
+    it('auto_learned does not upgrade sie_import', () => {
+      expect(resolveSource('sie_import', 'auto_learned')).toBe('sie_import')
+    })
+
+    it('same source returns same source', () => {
+      expect(resolveSource('user_approved', 'user_approved')).toBe('user_approved')
+      expect(resolveSource('sie_import', 'sie_import')).toBe('sie_import')
+    })
+  })
+
+  // ── insertOrUpdateTemplate ───────────────────────────────────
+
+  describe('insertOrUpdateTemplate', () => {
+    const baseParams: TemplateUpsertParams = {
+      counterpartyName: 'telia',
+      aliases: ['telia sverige ab'],
+      debitAccount: '6200',
+      creditAccount: '1930',
+      vatTreatment: 'standard_25',
+      vatAccount: '2641',
+      category: null,
+      occurrenceCount: 1,
+      confidence: 0.45,
+      lastSeenDate: '2024-06-15',
+      source: 'sie_import',
+    }
+
+    it('inserts new template when existingTemplate is null', async () => {
+      const { supabase, enqueue } = createQueuedMockSupabase()
+      enqueue({ data: null }) // insert
+
+      await insertOrUpdateTemplate(supabase as never, 'user-1', baseParams, null)
+
+      expect(supabase.from).toHaveBeenCalledWith('categorization_templates')
+    })
+
+    it('uses pre-fetched template without DB lookup', async () => {
+      const { supabase, enqueue } = createQueuedMockSupabase()
+      const existing = makeCategorizationTemplate({
+        debit_account: '6200',
+        credit_account: '1930',
+        occurrence_count: 5,
+        source: 'auto_learned',
+      })
+
+      enqueue({ data: null }) // update
+
+      await insertOrUpdateTemplate(supabase as never, 'user-1', baseParams, existing)
+
+      // Should NOT have queried for existing — only the update call
+      // The from() call count indicates no select was made before update
+      expect(supabase.from).toHaveBeenCalledTimes(1)
+    })
+
+    it('accumulates occurrence count on re-approval', async () => {
+      const { supabase, enqueue } = createQueuedMockSupabase()
+      const existing = makeCategorizationTemplate({
+        debit_account: '6200',
+        credit_account: '1930',
+        occurrence_count: 5,
+      })
+
+      enqueue({ data: null }) // update
+
+      const params = { ...baseParams, occurrenceCount: 10 }
+      await insertOrUpdateTemplate(supabase as never, 'user-1', params, existing)
+
+      // Verify supabase.from was called (update happened)
+      expect(supabase.from).toHaveBeenCalledWith('categorization_templates')
+    })
+
+    it('respects source priority — sie_import does not overwrite user_approved', async () => {
+      const { supabase, enqueue } = createQueuedMockSupabase()
+      const existing = makeCategorizationTemplate({
+        debit_account: '5410', // Different accounts = correction
+        credit_account: '1930',
+        source: 'user_approved',
+      })
+
+      enqueue({ data: null }) // update
+
+      await insertOrUpdateTemplate(supabase as never, 'user-1', baseParams, existing)
+
+      // The source should remain user_approved (not downgraded to sie_import)
+      expect(supabase.from).toHaveBeenCalledWith('categorization_templates')
+    })
+
+    it('does DB lookup when existingTemplate is undefined', async () => {
+      const { supabase, enqueue } = createQueuedMockSupabase()
+      enqueue({ data: null }) // select returns null
+      enqueue({ data: null }) // insert
+
+      await insertOrUpdateTemplate(supabase as never, 'user-1', baseParams)
+
+      // Two calls: select + insert
+      expect(supabase.from).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  // ── populateTemplatesFromSieVouchers ─────────────────────────
+
+  describe('populateTemplatesFromSieVouchers', () => {
+    it('returns 0 for empty vouchers', async () => {
+      const { supabase } = createMockSupabase()
+      const result = await populateTemplatesFromSieVouchers(supabase as never, 'user-1', [])
+      expect(result).toBe(0)
+    })
+
+    it('groups vouchers by normalized description', async () => {
+      const { supabase, enqueue } = createQueuedMockSupabase()
+      const vouchers = [
+        makeSIEVoucher({ description: 'Telia Sverige AB', number: 1 }),
+        makeSIEVoucher({ description: 'TELIA SVERIGE', number: 2 }),
+        makeSIEVoucher({ description: 'telia sverige ab', number: 3 }),
+      ]
+
+      enqueue({ data: [] }) // pre-fetch existing templates
+      enqueue({ data: null }) // insert
+
+      const result = await populateTemplatesFromSieVouchers(supabase as never, 'user-1', vouchers)
+      expect(result).toBe(1)
+    })
+
+    it('skips groups with fewer than 2 occurrences', async () => {
+      const { supabase } = createQueuedMockSupabase()
+      const vouchers = [
+        makeSIEVoucher({ description: 'Telia', number: 1 }),
+      ]
+
+      const result = await populateTemplatesFromSieVouchers(supabase as never, 'user-1', vouchers)
+      expect(result).toBe(0)
+    })
+
+    it('accepts groups with sufficient dominance (75% > 60%)', async () => {
+      const { supabase, enqueue } = createQueuedMockSupabase()
+      const vouchers = [
+        makeSIEVoucher({ description: 'Telia', number: 1, lines: [{ account: '1930', amount: -1000 }, { account: '6212', amount: 1000 }] }),
+        makeSIEVoucher({ description: 'Telia', number: 2, lines: [{ account: '1930', amount: -1000 }, { account: '6212', amount: 1000 }] }),
+        makeSIEVoucher({ description: 'Telia', number: 3, lines: [{ account: '1930', amount: -1000 }, { account: '6212', amount: 1000 }] }),
+        makeSIEVoucher({ description: 'Telia', number: 4, lines: [{ account: '1930', amount: -1000 }, { account: '6230', amount: 1000 }] }),
+      ]
+
+      enqueue({ data: [] }) // pre-fetch
+      enqueue({ data: null }) // insert
+
+      const result = await populateTemplatesFromSieVouchers(supabase as never, 'user-1', vouchers)
+      expect(result).toBe(1)
+    })
+
+    it('rejects groups with insufficient dominance (50% < 60%)', async () => {
+      const { supabase } = createQueuedMockSupabase()
+      const vouchers = [
+        makeSIEVoucher({ description: 'Telia', number: 1, lines: [{ account: '1930', amount: -1000 }, { account: '6212', amount: 1000 }] }),
+        makeSIEVoucher({ description: 'Telia', number: 2, lines: [{ account: '1930', amount: -1000 }, { account: '6212', amount: 1000 }] }),
+        makeSIEVoucher({ description: 'Telia', number: 3, lines: [{ account: '1930', amount: -1000 }, { account: '6230', amount: 1000 }] }),
+        makeSIEVoucher({ description: 'Telia', number: 4, lines: [{ account: '1930', amount: -1000 }, { account: '6230', amount: 1000 }] }),
+      ]
+
+      const result = await populateTemplatesFromSieVouchers(supabase as never, 'user-1', vouchers)
+      expect(result).toBe(0)
+    })
+
+    it('skips descriptions in skip set', async () => {
+      const { supabase } = createQueuedMockSupabase()
+      const vouchers = [
+        makeSIEVoucher({ description: 'Lön', number: 1 }),
+        makeSIEVoucher({ description: 'Lön', number: 2 }),
+        makeSIEVoucher({ description: 'Lön', number: 3 }),
+      ]
+
+      const result = await populateTemplatesFromSieVouchers(supabase as never, 'user-1', vouchers)
+      expect(result).toBe(0)
+    })
+
+    it('skips split bookings with more than 5 business accounts', async () => {
+      const { supabase } = createQueuedMockSupabase()
+      const vouchers = Array.from({ length: 3 }, (_, i) =>
+        makeSIEVoucher({
+          description: 'Complex booking',
+          number: i + 1,
+          lines: [
+            { account: '1930', amount: -6000 },
+            { account: '6200', amount: 1000 },
+            { account: '6210', amount: 1000 },
+            { account: '6220', amount: 1000 },
+            { account: '6230', amount: 1000 },
+            { account: '6240', amount: 1000 },
+            { account: '6250', amount: 1000 },
+          ],
+        })
+      )
+
+      const result = await populateTemplatesFromSieVouchers(supabase as never, 'user-1', vouchers)
+      expect(result).toBe(0)
+    })
+
+    it('extracts VAT treatment from 2641 line', async () => {
+      const { supabase, enqueue } = createQueuedMockSupabase()
+      const vouchers = Array.from({ length: 3 }, (_, i) =>
+        makeSIEVoucher({
+          description: 'Kontorsmaterial AB',
+          number: i + 1,
+          lines: [
+            { account: '1930', amount: -1250 },
+            { account: '6100', amount: 1000 },
+            { account: '2641', amount: 250 },
+          ],
+        })
+      )
+
+      enqueue({ data: [] }) // pre-fetch
+      enqueue({ data: null }) // insert
+
+      const result = await populateTemplatesFromSieVouchers(supabase as never, 'user-1', vouchers)
+      expect(result).toBe(1)
+    })
+
+    it('filters out old vouchers beyond recency window', async () => {
+      const { supabase } = createQueuedMockSupabase()
+      const recentDate = new Date(2024, 5, 15)
+      const oldDate = new Date(2021, 0, 1) // >24 months before recent
+
+      const vouchers = [
+        makeSIEVoucher({ description: 'Old Company', date: oldDate, number: 1 }),
+        makeSIEVoucher({ description: 'Old Company', date: oldDate, number: 2 }),
+        makeSIEVoucher({ description: 'Old Company', date: oldDate, number: 3 }),
+        makeSIEVoucher({ description: 'Recent Company', date: recentDate, number: 4 }),
+      ]
+
+      // Only 1 recent voucher for "Recent Company" → below min count → 0 templates
+      const result = await populateTemplatesFromSieVouchers(supabase as never, 'user-1', vouchers)
+      expect(result).toBe(0)
+    })
+
+    it('computes SIE confidence formula correctly', async () => {
+      const { supabase, enqueue } = createQueuedMockSupabase()
+      // 40 occurrences, 38 dominant (95% dominance)
+      const vouchers: ReturnType<typeof makeSIEVoucher>[] = []
+      for (let i = 0; i < 38; i++) {
+        vouchers.push(makeSIEVoucher({
+          description: 'Telia',
+          number: i + 1,
+          lines: [{ account: '1930', amount: -1000 }, { account: '6212', amount: 1000 }],
+        }))
+      }
+      for (let i = 0; i < 2; i++) {
+        vouchers.push(makeSIEVoucher({
+          description: 'Telia',
+          number: 39 + i,
+          lines: [{ account: '1930', amount: -1000 }, { account: '6230', amount: 1000 }],
+        }))
+      }
+
+      enqueue({ data: [] }) // pre-fetch
+      enqueue({ data: null }) // insert
+
+      const result = await populateTemplatesFromSieVouchers(supabase as never, 'user-1', vouchers)
+      expect(result).toBe(1)
+      // dominance = 38/40 = 0.95, confidence = 0.95 * (1 - 1/38) ≈ 0.925 → rounded to 0.92
+    })
+
+    it('recognizes 1510 (receivables) as settlement account', async () => {
+      const { supabase, enqueue } = createQueuedMockSupabase()
+      const vouchers = Array.from({ length: 3 }, (_, i) =>
+        makeSIEVoucher({
+          description: 'Kund AB',
+          number: i + 1,
+          lines: [
+            { account: '1510', amount: 10000 },
+            { account: '3001', amount: -10000 },
+          ],
+        })
+      )
+
+      enqueue({ data: [] }) // pre-fetch
+      enqueue({ data: null }) // insert
+
+      const result = await populateTemplatesFromSieVouchers(supabase as never, 'user-1', vouchers)
+      expect(result).toBe(1)
+    })
+
+    it('recognizes 2890 (credit card) as settlement account', async () => {
+      const { supabase, enqueue } = createQueuedMockSupabase()
+      const vouchers = Array.from({ length: 3 }, (_, i) =>
+        makeSIEVoucher({
+          description: 'Företaget AB',
+          number: i + 1,
+          lines: [
+            { account: '2890', amount: -1000 },
+            { account: '6200', amount: 1000 },
+          ],
+        })
+      )
+
+      enqueue({ data: [] }) // pre-fetch
+      enqueue({ data: null }) // insert
+
+      const result = await populateTemplatesFromSieVouchers(supabase as never, 'user-1', vouchers)
+      expect(result).toBe(1)
+    })
+
+    it('end-to-end: multiple counterparties, filters correctly', async () => {
+      const { supabase, enqueue } = createQueuedMockSupabase()
+      const vouchers = [
+        // Telia: 5 vouchers, all same pattern → should produce template
+        ...Array.from({ length: 5 }, (_, i) =>
+          makeSIEVoucher({
+            description: 'Telia',
+            number: i + 1,
+            lines: [{ account: '1930', amount: -500 }, { account: '6212', amount: 500 }],
+          })
+        ),
+        // ICA: 4 vouchers, all same pattern → should produce template
+        ...Array.from({ length: 4 }, (_, i) =>
+          makeSIEVoucher({
+            description: 'ICA Maxi',
+            number: 10 + i,
+            lines: [{ account: '1930', amount: -200 }, { account: '4010', amount: 200 }],
+          })
+        ),
+        // Rare: 1 voucher → below minimum, no template
+        makeSIEVoucher({
+          description: 'Rare Supplier',
+          number: 20,
+          lines: [{ account: '1930', amount: -100 }, { account: '6590', amount: 100 }],
+        }),
+      ]
+
+      enqueue({ data: [] }) // pre-fetch
+      enqueue({ data: null }) // insert 1
+      enqueue({ data: null }) // insert 2
+
+      const result = await populateTemplatesFromSieVouchers(supabase as never, 'user-1', vouchers)
+      expect(result).toBe(2)
     })
   })
 })

@@ -5,6 +5,7 @@ import { validateBody } from '@/lib/api/validate'
 import { DescribeTransactionSchema } from '@/lib/api/schemas'
 import { extensionRegistry } from '@/lib/extensions/registry'
 import { findMatchingTemplates, type TemplateMatch } from '@/lib/bookkeeping/booking-templates'
+import { findCounterpartyTemplate, buildMappingResultFromCounterpartyTemplate, formatCounterpartyName } from '@/lib/bookkeeping/counterparty-templates'
 import type { Transaction, EntityType, VatTreatment } from '@/types'
 import type { Extension } from '@/lib/extensions/types'
 
@@ -108,14 +109,43 @@ export async function POST(
 
   const aiExt = extensionRegistry.get('ai-categorization')
 
-  // Run template matching and AI analysis in parallel
-  const [templates, aiSuggestion] = await Promise.all([
+  // Run template matching, counterparty lookup, and AI analysis in parallel
+  const [templates, counterpartyMatch, aiSuggestion] = await Promise.all([
     getTemplateMatches(aiExt, transaction as Transaction, entityType, description),
+    findCounterpartyTemplate(supabase, user.id, transaction as Transaction),
     getAiAnalysis(aiExt, transaction as Transaction, entityType, description),
   ])
 
-  // AI rescues weak templates: needs_more_detail is false when AI provided a suggestion
-  const needsMoreDetail = aiSuggestion
+  // Build counterparty suggestion if matched
+  let counterpartySuggestion: {
+    id: string
+    counterparty_name: string
+    debit_account: string
+    credit_account: string
+    vat_treatment: string | null
+    confidence: number
+    occurrence_count: number
+    source: string
+    line_pattern: unknown[] | null
+  } | null = null
+
+  if (counterpartyMatch) {
+    const tmpl = counterpartyMatch.template
+    counterpartySuggestion = {
+      id: tmpl.id,
+      counterparty_name: formatCounterpartyName(tmpl.counterparty_name),
+      debit_account: tmpl.debit_account,
+      credit_account: tmpl.credit_account,
+      vat_treatment: tmpl.vat_treatment,
+      line_pattern: tmpl.line_pattern ?? null,
+      confidence: counterpartyMatch.confidence,
+      occurrence_count: tmpl.occurrence_count,
+      source: tmpl.source,
+    }
+  }
+
+  // AI or counterparty match rescues weak templates
+  const needsMoreDetail = (aiSuggestion || counterpartySuggestion)
     ? false
     : templates.length === 0 || templates[0].confidence < 0.55
 
@@ -151,6 +181,7 @@ export async function POST(
         special_rules_sv: m.template.special_rules_sv || null,
         risk_level: m.template.risk_level,
       })),
+      counterparty_match: counterpartySuggestion,
       ai_suggestion: aiSuggestion ? {
         debit_account: aiSuggestion.debitAccount,
         credit_account: aiSuggestion.creditAccount,

@@ -21,6 +21,7 @@ import { mappingsToMap, getMappingStats } from './account-mapper'
 import { calculateFileHash } from './sie-parser'
 import { getBASReference } from '@/lib/bookkeeping/bas-reference'
 import { computeSRUCode } from '@/lib/bookkeeping/bas-data/sru-mapping'
+import { populateTemplatesFromSieVouchers } from '@/lib/bookkeeping/counterparty-templates'
 
 /**
  * Format a date to ISO date string (YYYY-MM-DD)
@@ -1531,6 +1532,20 @@ export async function executeSIEImport(
       options.fileContent,
       documentation
     )
+
+    // Populate counterparty templates from voucher patterns (non-blocking)
+    if (result.success && parsed.vouchers.length > 0) {
+      try {
+        const templateCount = await populateTemplatesFromSieVouchers(
+          supabase, userId, parsed.vouchers
+        )
+        if (templateCount > 0) {
+          console.info(`[sie-import] ${templateCount} counterparty templates extracted from voucher history`)
+        }
+      } catch (templateError) {
+        console.error('[sie-import] Failed to populate counterparty templates:', templateError)
+      }
+    }
 
     // Add warnings for any issues
     for (const issue of parsed.issues) {

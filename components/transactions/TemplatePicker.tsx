@@ -13,6 +13,8 @@ import {
   type TemplateGroup,
 } from '@/lib/bookkeeping/booking-templates'
 import { formatAccountWithName } from '@/lib/bookkeeping/client-account-names'
+import { isCounterpartyTemplateId } from '@/lib/bookkeeping/counterparty-templates'
+import { getAccountName } from '@/lib/bookkeeping/client-account-names'
 import type { EntityType } from '@/types'
 import type { SuggestedTemplate } from '@/lib/transactions/category-suggestions'
 
@@ -134,6 +136,7 @@ interface TemplatePickerProps {
   suggestedTemplates?: SuggestedTemplate[]
   recentTemplateIds?: string[]
   onSelect: (template: BookingTemplate) => void
+  onSelectCounterparty?: (templateId: string) => void
   selectedTemplateId?: string
 }
 
@@ -142,6 +145,7 @@ export default function TemplatePicker({
   entityType,
   suggestedTemplates,
   onSelect,
+  onSelectCounterparty,
   selectedTemplateId,
 }: TemplatePickerProps) {
   const [searchQuery, setSearchQuery] = useState('')
@@ -196,8 +200,17 @@ export default function TemplatePicker({
     onSelect(template)
   }
 
-  // Suggested templates section
-  const hasSuggestions = suggestedTemplates && suggestedTemplates.length > 0
+  // Split suggestions: counterparty templates vs regular booking templates
+  const counterpartySuggestions = useMemo(() => {
+    if (!suggestedTemplates) return []
+    return suggestedTemplates.filter(s => isCounterpartyTemplateId(s.template_id))
+  }, [suggestedTemplates])
+  const resolvedSuggestions = useMemo(() => {
+    if (!suggestedTemplates) return []
+    return suggestedTemplates.filter(s => !isCounterpartyTemplateId(s.template_id))
+  }, [suggestedTemplates])
+  const hasCounterparty = counterpartySuggestions.length > 0 && !!onSelectCounterparty
+  const hasSuggestions = resolvedSuggestions.length > 0
 
   return (
     <div className="flex flex-col h-full">
@@ -233,12 +246,51 @@ export default function TemplatePicker({
           </div>
         ) : (
           <>
+            {/* Counterparty templates — learned from history */}
+            {hasCounterparty && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">Tidigare motparter</p>
+                <div className="space-y-1.5">
+                  {counterpartySuggestions.slice(0, 3).map((s) => (
+                    <button
+                      key={s.template_id}
+                      type="button"
+                      onClick={() => onSelectCounterparty!(s.template_id)}
+                      className="w-full text-left rounded-lg border border-border px-3 py-2.5 transition-colors hover:bg-muted/50"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm leading-tight">{s.name_sv}</p>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            {s.line_pattern && s.line_pattern.length > 0 ? (
+                              s.line_pattern.filter(lp => lp.type === 'business').map((lp, i) => (
+                                <span key={i} className="text-xs font-mono text-muted-foreground">
+                                  {formatAccountWithName(lp.account)}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-xs font-mono text-muted-foreground">
+                                D: {getAccountName(s.debit_account)} &middot; K: {getAccountName(s.credit_account)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground flex-shrink-0 mt-0.5">
+                          {s.description_sv}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Suggested templates */}
             {hasSuggestions && (
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-2">Föreslagna</p>
                 <div className="space-y-1.5">
-                  {suggestedTemplates!.slice(0, 5).map((s) => {
+                  {resolvedSuggestions.slice(0, 5).map((s) => {
                     // Find the full template object
                     const fullTemplate = allCommon.find((t) => t.id === s.template_id) ||
                       allAdvanced.find((t) => t.id === s.template_id)

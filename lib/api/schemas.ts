@@ -320,6 +320,7 @@ export const CategorizeTransactionSchema = z.object({
   template_id: z.string().optional(),
   vat_treatment: VatTreatmentSchema.optional(),
   account_override: accountNumber.optional(),
+  counterparty_template_id: z.string().uuid().optional(),
   user_description: z.string().max(500).optional(),
   inbox_item_id: z.string().uuid().optional(),
 })

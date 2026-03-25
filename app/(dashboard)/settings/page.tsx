@@ -39,6 +39,7 @@ import { CalendarFeedSettings } from '@/components/settings/CalendarFeedSettings
 import { getSettingsPanel } from '@/lib/extensions/settings-panel-registry'
 import { SecuritySettings } from '@/components/settings/SecuritySettings'
 import { ApiKeysPanel } from '@/components/settings/ApiKeysPanel'
+import { CounterpartyTemplatesPanel } from '@/components/settings/CounterpartyTemplatesPanel'
 import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
 
 const BankingPanel = getSettingsPanel('enable-banking')
@@ -70,12 +71,10 @@ export default function SettingsPage() {
 
   const settingsTabs = [
     { value: 'company', label: 'Företag', show: true },
-    { value: 'banking', label: 'Bank (PSD2)', show: !settings?.is_sandbox },
-    { value: 'calendar', label: 'Kalender', show: hasCalendarExtension },
-    { value: 'security', label: 'Säkerhet', show: true },
-    { value: 'appearance', label: 'Utseende', show: true },
-    { value: 'api', label: 'API', show: hasMcpExtension },
+    { value: 'banking', label: 'Bank (PSD2)', show: !settings?.is_sandbox && hasBankingExtension },
+    { value: 'templates', label: 'Mallar', show: true },
     { value: 'account', label: 'Konto', show: true },
+    { value: 'api', label: 'API', show: hasMcpExtension },
   ].filter(t => t.show)
 
   useEffect(() => {
@@ -670,113 +669,9 @@ export default function SettingsPage() {
           </TabsContent>
         )}
 
-        {/* Calendar feed settings */}
-        {hasCalendarExtension && (
-          <TabsContent value="calendar">
-            <CalendarFeedSettings />
-          </TabsContent>
-        )}
-
-        {/* Security settings */}
-        <TabsContent value="security">
-          <SecuritySettings />
-        </TabsContent>
-
-        {/* Appearance settings */}
-        <TabsContent value="appearance">
-          <Card>
-            <CardHeader>
-              <CardTitle>Utseende</CardTitle>
-              <CardDescription>
-                Välj hur applikationen ska se ut
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {mounted && (
-                <div className="grid grid-cols-3 gap-4">
-                  {/* Light */}
-                  <button
-                    type="button"
-                    onClick={() => setTheme('light')}
-                    className={`group relative rounded-lg border-2 p-4 text-left transition-colors ${
-                      theme === 'light'
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border hover:border-primary/40'
-                    }`}
-                  >
-                    <div className="mb-3 flex h-20 items-end gap-1.5 rounded-md border bg-white p-2">
-                      <div className="h-full w-3 rounded-sm bg-[hsl(222,47%,35%)]" />
-                      <div className="flex flex-1 flex-col gap-1">
-                        <div className="h-2 w-3/4 rounded-sm bg-[hsl(220,14%,96%)]" />
-                        <div className="h-2 w-1/2 rounded-sm bg-[hsl(220,14%,96%)]" />
-                        <div className="h-2 w-2/3 rounded-sm bg-[hsl(220,14%,96%)]" />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Sun className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">Ljust</span>
-                    </div>
-                  </button>
-
-                  {/* Dark */}
-                  <button
-                    type="button"
-                    onClick={() => setTheme('dark')}
-                    className={`group relative rounded-lg border-2 p-4 text-left transition-colors ${
-                      theme === 'dark'
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border hover:border-primary/40'
-                    }`}
-                  >
-                    <div className="mb-3 flex h-20 items-end gap-1.5 rounded-md border bg-[hsl(222,16%,10%)] p-2">
-                      <div className="h-full w-3 rounded-sm bg-[hsl(222,50%,55%)]" />
-                      <div className="flex flex-1 flex-col gap-1">
-                        <div className="h-2 w-3/4 rounded-sm bg-[hsl(220,12%,20%)]" />
-                        <div className="h-2 w-1/2 rounded-sm bg-[hsl(220,12%,20%)]" />
-                        <div className="h-2 w-2/3 rounded-sm bg-[hsl(220,12%,20%)]" />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Moon className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">Mörkt</span>
-                    </div>
-                  </button>
-
-                  {/* System */}
-                  <button
-                    type="button"
-                    onClick={() => setTheme('system')}
-                    className={`group relative rounded-lg border-2 p-4 text-left transition-colors ${
-                      theme === 'system'
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border hover:border-primary/40'
-                    }`}
-                  >
-                    <div className="mb-3 flex h-20 overflow-hidden rounded-md border">
-                      <div className="flex flex-1 items-end gap-1 bg-white p-2">
-                        <div className="h-full w-2 rounded-sm bg-[hsl(222,47%,35%)]" />
-                        <div className="flex flex-1 flex-col gap-1">
-                          <div className="h-2 w-3/4 rounded-sm bg-[hsl(220,14%,96%)]" />
-                          <div className="h-2 w-1/2 rounded-sm bg-[hsl(220,14%,96%)]" />
-                        </div>
-                      </div>
-                      <div className="flex flex-1 items-end gap-1 bg-[hsl(222,16%,10%)] p-2">
-                        <div className="h-full w-2 rounded-sm bg-[hsl(222,50%,55%)]" />
-                        <div className="flex flex-1 flex-col gap-1">
-                          <div className="h-2 w-3/4 rounded-sm bg-[hsl(220,12%,20%)]" />
-                          <div className="h-2 w-1/2 rounded-sm bg-[hsl(220,12%,20%)]" />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Monitor className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">System</span>
-                    </div>
-                  </button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        {/* Counterparty templates */}
+        <TabsContent value="templates">
+          <CounterpartyTemplatesPanel />
         </TabsContent>
 
         {/* API keys */}
@@ -786,8 +681,47 @@ export default function SettingsPage() {
           </TabsContent>
         )}
 
-        {/* Account settings */}
+        {/* Account — security, appearance, calendar, logout, delete */}
         <TabsContent value="account" className="space-y-6">
+          {/* Appearance */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Utseende</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {mounted && (
+                <div className="flex gap-3">
+                  {([
+                    { value: 'light', label: 'Ljust', icon: Sun },
+                    { value: 'dark', label: 'Mörkt', icon: Moon },
+                    { value: 'system', label: 'System', icon: Monitor },
+                  ] as const).map(({ value, label, icon: Icon }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setTheme(value)}
+                      className={`flex items-center gap-2 rounded-lg border-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+                        theme === value
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/40'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4 text-muted-foreground" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Security */}
+          <SecuritySettings />
+
+          {/* Calendar feed */}
+          {hasCalendarExtension && <CalendarFeedSettings />}
+
+          {/* Logout & delete */}
           <Card>
             <CardHeader>
               <CardTitle>Kontoinställningar</CardTitle>

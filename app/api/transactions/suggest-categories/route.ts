@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getSuggestedCategories, mergeAiSuggestions, getSuggestedTemplates, type SuggestedCategory, type SuggestedTemplate } from '@/lib/transactions/category-suggestions'
+import { findCounterpartyTemplatesBatch, formatCounterpartyName, toCounterpartyTemplateId } from '@/lib/bookkeeping/counterparty-templates'
 import type { Transaction, EntityType } from '@/types'
 
 /**
@@ -93,6 +94,9 @@ export async function POST(request: Request) {
     .single()
   const entityType = (settings?.entity_type as EntityType) || undefined
 
+  // Batch counterparty template matching (1 DB query, in-memory matching)
+  const counterpartyMatches = await findCounterpartyTemplatesBatch(supabase, user.id, transactions as Transaction[])
+
   // Generate initial suggestions for each transaction
   const suggestions: Record<string, SuggestedCategory[]> = {}
   const template_suggestions: Record<string, SuggestedTemplate[]> = {}
@@ -112,6 +116,30 @@ export async function POST(request: Request) {
 
     suggestions[tx.id] = result
     template_suggestions[tx.id] = await getSuggestedTemplates(tx as Transaction, entityType, mappingRules || undefined)
+  }
+
+  // Inject counterparty template matches as top suggestions
+  for (const tx of transactions) {
+    const cpMatch = counterpartyMatches.get(tx.id)
+    if (!cpMatch) continue
+
+    const tmpl = cpMatch.template
+    const cpSuggestion: SuggestedTemplate = {
+      template_id: toCounterpartyTemplateId(tmpl.id),
+      name_sv: formatCounterpartyName(tmpl.counterparty_name),
+      name_en: formatCounterpartyName(tmpl.counterparty_name),
+      group: 'counterparty',
+      debit_account: tmpl.debit_account,
+      credit_account: tmpl.credit_account,
+      confidence: cpMatch.confidence,
+      description_sv: `${tmpl.occurrence_count} tidigare bokföringar`,
+      risk_level: 'NONE',
+      requires_review: false,
+      line_pattern: tmpl.line_pattern ?? null,
+    }
+
+    const existing = template_suggestions[tx.id] || []
+    template_suggestions[tx.id] = [cpSuggestion, ...existing]
   }
 
   // Inject document template suggestions from matched inbox items
