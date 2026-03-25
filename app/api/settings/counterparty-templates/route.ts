@@ -23,7 +23,13 @@ export async function DELETE(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { id } = await request.json()
+  let id: string | undefined
+  try {
+    const body = await request.json()
+    id = body?.id
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
 
   const { error } = await supabase

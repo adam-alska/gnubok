@@ -190,9 +190,8 @@ describe('counterparty-templates', () => {
     it('returns null when no templates exist', async () => {
       const { supabase, enqueue } = createQueuedMockSupabase()
 
-      enqueue({ data: null }) // Alias miss
-      enqueue({ data: null }) // Exact miss
-      enqueue({ data: [] }) // Fuzzy: empty
+      // Batch query returns empty
+      enqueue({ data: [] })
 
       const tx = makeTransaction({ merchant_name: 'Unknown Company' })
       const result = await findCounterpartyTemplate(supabase as never, 'user-1', tx)
