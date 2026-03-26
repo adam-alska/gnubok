@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
-import { ArrowLeftRight, ArrowRightLeft, FileText, ArrowLeft, Landmark, Loader2, Info } from 'lucide-react'
+import { ArrowLeftRight, ArrowRightLeft, FileText, ArrowLeft, Landmark, Loader2, Info, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { BankSelector, type Bank } from '@/extensions/general/enable-banking/components/BankSelector'
@@ -809,126 +809,149 @@ export default function ImportPage() {
             </div>
           )}
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="space-y-2">
+            {/* 1. Koppla bank */}
             {hasBankingExtension && (
-              <Card
+              <div
                 role="button"
                 tabIndex={isSandbox ? -1 : 0}
                 aria-disabled={isSandbox}
                 className={cn(
-                  'transition-all border-primary/20 relative',
+                  'group flex items-start gap-4 rounded-lg border bg-card p-5 transition-all',
                   isSandbox
                     ? 'opacity-50 cursor-not-allowed'
-                    : 'cursor-pointer hover:border-primary/50 active:scale-[0.98]'
+                    : 'cursor-pointer hover:border-foreground/15 hover:shadow-[var(--shadow-sm)] active:scale-[0.998]'
                 )}
                 onClick={() => { if (!isSandbox) setMode('psd2') }}
                 onKeyDown={(e) => { if (!isSandbox && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setMode('psd2') } }}
               >
-                <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
-                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Landmark className="h-6 w-6 text-primary" />
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-foreground/[0.06]">
+                  <Landmark className="h-[18px] w-[18px] text-foreground/60" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2.5">
+                    <h3 className="text-[15px] font-semibold leading-tight">Koppla bank</h3>
+                    <span className="text-[11px] font-medium text-success bg-success/10 px-2 py-0.5 rounded-full leading-none">
+                      Rekommenderat
+                    </span>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-semibold">Koppla bank</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Anslut ditt bankkonto direkt och synka transaktioner automatiskt via PSD2.
-                    </p>
-                  </div>
-                  <p className="text-xs text-primary font-medium">
-                    Rekommenderat
+                  <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed max-w-lg">
+                    Anslut ditt bankkonto direkt och synka transaktioner automatiskt via PSD2.
                   </p>
-                </CardContent>
-              </Card>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 mt-2.5 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
+              </div>
             )}
 
-            <Card
-              role="button"
-              tabIndex={isSandbox ? -1 : 0}
-              aria-disabled={isSandbox}
-              className={cn(
-                'transition-all',
-                isSandbox
-                  ? 'opacity-50 cursor-not-allowed'
-                  : 'cursor-pointer hover:border-primary/50 active:scale-[0.98]'
-              )}
-              onClick={() => { if (!isSandbox) setMode('bank') }}
-              onKeyDown={(e) => { if (!isSandbox && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setMode('bank') } }}
-            >
-              <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
-                <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                  <ArrowLeftRight className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold">Banktransaktioner</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Importera kontoutdrag från din bank. Stöder CSV, OFX och de flesta svenska banker.
-                  </p>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  CSV, OFX, SEB, Swedbank, Handelsbanken, Nordea m.fl.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card
-              role="button"
-              tabIndex={isSandbox ? -1 : 0}
-              aria-disabled={isSandbox}
-              className={cn(
-                'transition-all',
-                isSandbox
-                  ? 'opacity-50 cursor-not-allowed'
-                  : 'cursor-pointer hover:border-primary/50 active:scale-[0.98]'
-              )}
-              onClick={() => { if (!isSandbox) setMode('sie') }}
-              onKeyDown={(e) => { if (!isSandbox && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setMode('sie') } }}
-            >
-              <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
-                <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                  <FileText className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold">Bokföringsdata (SIE)</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Importera verifikationer och kontoplan från ett annat bokföringsprogram via SIE-filer.
-                  </p>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  SIE4-format (.se, .si)
-                </p>
-              </CardContent>
-            </Card>
-
+            {/* 2. Hämta från annat system */}
             {hasMigrationExtension === true && (
-              <Card
+              <div
                 role="button"
                 tabIndex={isSandbox ? -1 : 0}
                 aria-disabled={isSandbox}
                 className={cn(
-                  'transition-all',
+                  'group rounded-lg border bg-card p-5 transition-all',
                   isSandbox
                     ? 'opacity-50 cursor-not-allowed'
-                    : 'cursor-pointer hover:border-primary/50 active:scale-[0.98]'
+                    : 'cursor-pointer hover:border-foreground/15 hover:shadow-[var(--shadow-sm)] active:scale-[0.998]'
                 )}
                 onClick={() => { if (!isSandbox) setMode('migration') }}
                 onKeyDown={(e) => { if (!isSandbox && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setMode('migration') } }}
               >
-                <CardContent className="pt-6 pb-6 flex flex-col items-center text-center space-y-3">
-                  <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                    <ArrowRightLeft className="h-6 w-6 text-muted-foreground" />
+                <div className="flex items-start gap-4">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-foreground/[0.06]">
+                    <ArrowRightLeft className="h-[18px] w-[18px] text-foreground/60" />
                   </div>
-                  <div>
-                    <h3 className="text-lg font-semibold">Migrera från annat system</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Flytta bokföring, kunder, leverantörer och fakturor från Fortnox, Visma, Bokio, Björn Lundén eller Briox.
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-[15px] font-semibold leading-tight">Hämta från annat system</h3>
+                    <p className="text-sm mt-1.5 leading-relaxed max-w-lg underline decoration-foreground/20 underline-offset-2 text-muted-foreground">
+                      Inget ändras i ditt befintliga system.
                     </p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    SIE-data, kunder, leverantörer, fakturor
-                  </p>
-                </CardContent>
-              </Card>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 mt-2.5 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
+                </div>
+                <div className="flex flex-wrap gap-2 mt-3.5 ml-[52px]">
+                  {([
+                    { name: 'Fortnox', logo: '/logos/fortnox.svg' },
+                    { name: 'Visma', logo: '/logos/visma.jpeg' },
+                    { name: 'Bokio', logo: '/logos/bokio.png' },
+                    { name: 'Björn Lundén', logo: '/logos/bjornlunden.png' },
+                    { name: 'Briox', logo: '/logos/Briox_logo.png' },
+                  ] as const).map(provider => (
+                    <div key={provider.name} className="flex items-center gap-1.5 rounded border border-border/60 bg-muted/30 px-2 py-1">
+                      <img src={provider.logo} alt={provider.name} className="h-4 w-4 shrink-0 rounded-sm object-contain" />
+                      <span className="text-[11px] font-medium text-muted-foreground">{provider.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
+
+            {/* 3. Banktransaktioner */}
+            <div
+              role="button"
+              tabIndex={isSandbox ? -1 : 0}
+              aria-disabled={isSandbox}
+              className={cn(
+                'group flex items-start gap-4 rounded-lg border bg-card p-5 transition-all',
+                isSandbox
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'cursor-pointer hover:border-foreground/15 hover:shadow-[var(--shadow-sm)] active:scale-[0.998]'
+              )}
+              onClick={() => { if (!isSandbox) setMode('bank') }}
+              onKeyDown={(e) => { if (!isSandbox && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setMode('bank') } }}
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-foreground/[0.06]">
+                <ArrowLeftRight className="h-[18px] w-[18px] text-foreground/60" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-[15px] font-semibold leading-tight">Banktransaktioner</h3>
+                <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed max-w-lg">
+                  Importera kontoutdrag från din bank. Stöder de flesta svenska banker.
+                </p>
+                <div className="flex flex-wrap gap-1.5 mt-2.5">
+                  {['CSV', 'OFX', 'SEB', 'Swedbank', 'Nordea'].map(fmt => (
+                    <span key={fmt} className="text-[11px] text-muted-foreground/80 bg-muted/80 px-1.5 py-0.5 rounded leading-none">
+                      {fmt}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 mt-2.5 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
+            </div>
+
+            {/* 4. Bokföringsdata (SIE) */}
+            <div
+              role="button"
+              tabIndex={isSandbox ? -1 : 0}
+              aria-disabled={isSandbox}
+              className={cn(
+                'group flex items-start gap-4 rounded-lg border bg-card p-5 transition-all',
+                isSandbox
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'cursor-pointer hover:border-foreground/15 hover:shadow-[var(--shadow-sm)] active:scale-[0.998]'
+              )}
+              onClick={() => { if (!isSandbox) setMode('sie') }}
+              onKeyDown={(e) => { if (!isSandbox && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setMode('sie') } }}
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-foreground/[0.06]">
+                <FileText className="h-[18px] w-[18px] text-foreground/60" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-[15px] font-semibold leading-tight">Bokföringsdata (SIE)</h3>
+                <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed max-w-lg">
+                  Importera verifikationer och kontoplan från ett annat bokföringsprogram.
+                </p>
+                <div className="flex flex-wrap gap-1.5 mt-2.5">
+                  {['SIE4', '.se', '.si'].map(fmt => (
+                    <span key={fmt} className="text-[11px] text-muted-foreground/80 bg-muted/80 px-1.5 py-0.5 rounded leading-none">
+                      {fmt}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 mt-2.5 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
+            </div>
           </div>
         </>
       )}
