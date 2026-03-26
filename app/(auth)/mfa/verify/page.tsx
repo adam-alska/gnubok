@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { Loader2, ShieldCheck, LogOut } from 'lucide-react'
+import { SupportLink } from '@/components/ui/support-link'
 
 export default function MfaVerifyPage() {
   const [code, setCode] = useState('')
@@ -151,6 +152,13 @@ export default function MfaVerifyPage() {
           <LogOut className="mr-2 h-4 w-4" />
           Logga ut
         </Button>
+
+        <p className="text-xs text-muted-foreground text-center mt-4">
+          Förlorat din autentiseringsapp?{' '}
+          <SupportLink variant="muted" subject="MFA-problem — kan inte logga in" className="inline">
+            Kontakta support
+          </SupportLink>
+        </p>
       </div>
     </div>
   )
