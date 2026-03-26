@@ -473,7 +473,8 @@ async function commitMarkInvoicePaid(
 async function commitSendInvoice(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
-  params: Record<string, unknown>
+  params: Record<string, unknown>,
+  userEmail?: string
 ): Promise<{ data?: Record<string, unknown>; error?: string; status?: number }> {
   const invoiceId = params.invoice_id as string
 
@@ -490,6 +491,9 @@ async function commitSendInvoice(
     .single()
 
   if (invoiceError || !invoice) return { error: 'Invoice not found', status: 404 }
+  if (invoice.status === 'sent' || invoice.status === 'paid' || invoice.status === 'overdue') {
+    return { error: 'Invoice has already been sent', status: 409 }
+  }
 
   const customer = invoice.customer as Customer
   if (!customer.email) return { error: 'Customer has no email address', status: 400 }
@@ -534,8 +538,7 @@ async function commitSendInvoice(
   else if (docType === 'delivery_note') filename = `foljesedel-${invoice.invoice_number}.pdf`
   else filename = `faktura-${invoice.invoice_number}.pdf`
 
-  const { data: { user: authUser } } = await supabase.auth.admin.getUserById(userId)
-  const ccAddress = company.email || authUser?.email
+  const ccAddress = company.email || userEmail
 
   const emailData = { invoice: invoice as Invoice, customer, company: company as CompanySettings }
   const result = await emailService.sendEmail({
@@ -708,7 +711,7 @@ async function commitMatchTransactionInvoice(
     log.error('Failed to create match journal entry:', err)
   }
 
-  const { error: updateInvError } = await supabase
+  const { data: updatedRows, error: updateInvError } = await supabase
     .from('invoices')
     .update({
       status: newStatus,
@@ -718,8 +721,12 @@ async function commitMatchTransactionInvoice(
     })
     .eq('id', invoiceId)
     .in('status', ['sent', 'overdue', 'partially_paid'])
+    .select('id')
 
   if (updateInvError) return { error: 'Failed to update invoice status', status: 500 }
+  if (!updatedRows || updatedRows.length === 0) {
+    return { error: 'Invoice has already been fully paid or is no longer matchable', status: 409 }
+  }
 
   const paymentNotes = (accountingMethod === 'cash' && !isFullyPaid)
     ? 'Kontantmetoden: intäkt bokförs vid slutbetalning' : null
@@ -809,7 +816,7 @@ export async function POST(
       result = await commitMarkInvoicePaid(supabase, user.id, pendingOp.params)
       break
     case 'send_invoice':
-      result = await commitSendInvoice(supabase, user.id, pendingOp.params)
+      result = await commitSendInvoice(supabase, user.id, pendingOp.params, user.email)
       break
     case 'mark_invoice_sent':
       result = await commitMarkInvoiceSent(supabase, user.id, pendingOp.params)

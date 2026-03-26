@@ -423,7 +423,7 @@ const tools: McpTool[] = [
       'Returns JSON:\n' +
       '  { staged: true, operation_id, message, preview: { debit_account, credit_account, amount, vat_lines } }\n\n' +
       'Examples:\n' +
-      '  - "Book that as office supplies, 25% VAT" → category="expense_software"\n' +
+      '  - "Book that as office supplies, 25% VAT" → category="expense_office"\n' +
       '  - "Mark as private" → category="private" (no journal entry created for private)\n' +
       '  - "Book as consulting income" → category="income_services"\n\n' +
       'Errors:\n' +
@@ -1991,7 +1991,7 @@ const tools: McpTool[] = [
 
       const { data: invoice, error: invError } = await supabase
         .from('invoices')
-        .select('id, invoice_number, total, currency, status, customer:customers(name)')
+        .select('*, customer:customers(*)')
         .eq('id', invoiceId)
         .eq('user_id', userId)
         .single()
@@ -2013,7 +2013,7 @@ const tools: McpTool[] = [
           invoice_number: invoice.invoice_number,
           invoice_total: invoice.total,
           invoice_currency: invoice.currency,
-          customer_name: invoice.customer?.name,
+          customer_name: (invoice.customer as Record<string, unknown>)?.name as string,
         }
       )
     },
