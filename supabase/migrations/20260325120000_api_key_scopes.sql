@@ -1,4 +1,7 @@
--- Update validate_and_increment_api_key to also return scopes
+-- Drop existing function first (return type is changing, CREATE OR REPLACE cannot do that)
+DROP FUNCTION IF EXISTS public.validate_and_increment_api_key(text);
+
+-- Recreate with scopes in return type
 CREATE OR REPLACE FUNCTION public.validate_and_increment_api_key(p_key_hash text)
 RETURNS TABLE(user_id uuid, rate_limited boolean, scopes text[])
 LANGUAGE plpgsql SECURITY DEFINER AS $$
