@@ -1,5 +1,10 @@
--- Update validate_and_increment_api_key to also return scopes
-CREATE OR REPLACE FUNCTION public.validate_and_increment_api_key(p_key_hash text)
+-- Fix: drop and recreate function to change return type (adding scopes)
+-- The previous migration (20260325120000) failed on CREATE OR REPLACE because
+-- PostgreSQL cannot change return types that way.
+
+DROP FUNCTION IF EXISTS public.validate_and_increment_api_key(text);
+
+CREATE FUNCTION public.validate_and_increment_api_key(p_key_hash text)
 RETURNS TABLE(user_id uuid, rate_limited boolean, scopes text[])
 LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
