@@ -536,3 +536,25 @@ export const PaginationQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().nonnegative().default(0),
 })
+
+// ============================================================
+// Event log schemas
+// ============================================================
+
+export const EventsQuerySchema = z.object({
+  after: z.coerce.number().int().nonnegative().optional(),
+  types: z.string()
+    .transform(s => s.split(',').map(t => t.trim()).filter(Boolean))
+    .optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+})
+
+// ============================================================
+// Pending operations schemas
+// ============================================================
+
+export const PendingOperationsQuerySchema = z.object({
+  status: z.enum(['pending', 'committed', 'rejected']).default('pending'),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().nonnegative().default(0),
+})

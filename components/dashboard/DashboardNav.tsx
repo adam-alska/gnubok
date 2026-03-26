@@ -25,6 +25,7 @@ import {
   FileInput,
   Wallet,
   TrendingUp,
+  ClipboardCheck,
 } from 'lucide-react'
 import { resolveIcon } from '@/lib/extensions/icon-resolver'
 import type { EntityType } from '@/types'
@@ -39,6 +40,7 @@ interface DashboardNavProps {
   companyName: string
   entityType: EntityType
   uncategorizedTransactionCount?: number
+  pendingOperationsCount?: number
   isSandbox?: boolean
   extensionNavItems?: ExtensionNavItem[]
 }
@@ -66,6 +68,7 @@ const navItems: NavItem[] = [
   { href: '/suppliers', label: 'Leverantörer', icon: Building2, group: 'inköp', hidden: true },
   { href: '/supplier-invoices', label: 'Leverantörsfakturor', icon: FileInput, group: 'inköp', hidden: true },
   // General accounting
+  { href: '/pending', label: 'Granskning', icon: ClipboardCheck, group: 'redovisning' },
   { href: '/transactions', label: 'Transaktioner', icon: ArrowLeftRight, group: 'redovisning' },
   { href: '/bookkeeping', label: 'Bokföring', icon: BookOpen, group: 'redovisning' },
   { href: '/reports', label: 'Rapporter', icon: BarChart3, group: 'redovisning' },
@@ -82,7 +85,7 @@ const groupLabels: Record<string, string> = {
   övrigt: 'Övrigt',
 }
 
-export default function DashboardNav({ companyName, entityType, uncategorizedTransactionCount = 0, isSandbox = false, extensionNavItems = [] }: DashboardNavProps) {
+export default function DashboardNav({ companyName, entityType, uncategorizedTransactionCount = 0, pendingOperationsCount = 0, isSandbox = false, extensionNavItems = [] }: DashboardNavProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -123,10 +126,14 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
     }, 200)
   }
 
-  // Filter nav items by entity type and hidden flag
-  const filteredItems = navItems.filter(item =>
-    !item.hidden && (!item.modes || item.modes.includes(entityType))
-  )
+  // Filter nav items by entity type, hidden flag, and conditional visibility
+  const filteredItems = navItems.filter(item => {
+    if (item.hidden) return false
+    if (item.modes && !item.modes.includes(entityType)) return false
+    // Only show Granskning when there are pending operations
+    if (item.href === '/pending' && pendingOperationsCount === 0) return false
+    return true
+  })
 
   const mainItems = filteredItems.filter(i => i.group === 'main')
   const övrigtItems = filteredItems.filter(i => i.group === 'övrigt')
@@ -202,7 +209,9 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                       const active = isActive(item.href)
                       const badge = item.href === '/transactions' && uncategorizedTransactionCount > 0
                         ? uncategorizedTransactionCount
-                        : null
+                        : item.href === '/pending' && pendingOperationsCount > 0
+                          ? pendingOperationsCount
+                          : null
                       return (
                         <Link
                           key={item.href}
@@ -442,7 +451,9 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                       const active = isActive(item.href)
                       const badge = item.href === '/transactions' && uncategorizedTransactionCount > 0
                         ? uncategorizedTransactionCount
-                        : null
+                        : item.href === '/pending' && pendingOperationsCount > 0
+                          ? pendingOperationsCount
+                          : null
                       return (
                         <Link
                           key={item.href}
