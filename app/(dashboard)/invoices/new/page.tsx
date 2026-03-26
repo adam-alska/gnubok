@@ -10,6 +10,7 @@ import { addDays, format } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { TagInput } from '@/components/ui/tag-input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -653,15 +654,32 @@ export default function NewInvoicePage() {
 
                 <div className="space-y-2">
                   <Label>Er referens</Label>
-                  <Input
-                    placeholder="Kontaktperson hos kund"
-                    {...register('your_reference')}
+                  <Controller
+                    name="your_reference"
+                    control={control}
+                    render={({ field }) => (
+                      <TagInput
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        placeholder="Kontaktperson hos kund"
+                      />
+                    )}
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label>Vår referens</Label>
-                  <Input placeholder="Ditt namn" {...register('our_reference')} />
+                  <Controller
+                    name="our_reference"
+                    control={control}
+                    render={({ field }) => (
+                      <TagInput
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        placeholder="Ditt namn"
+                      />
+                    )}
+                  />
                 </div>
               </CardContent>
             </Card>
