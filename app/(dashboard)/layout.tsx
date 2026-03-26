@@ -20,7 +20,7 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
-  const [{ data: settings }, { count: uncategorizedCount }] = await Promise.all([
+  const [{ data: settings }, { count: uncategorizedCount }, { count: pendingOpsCount }] = await Promise.all([
     supabase
       .from('company_settings')
       .select('company_name, onboarding_complete, entity_type, is_sandbox')
@@ -31,6 +31,11 @@ export default async function DashboardLayout({
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .is('is_business', null),
+    supabase
+      .from('pending_operations')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('status', 'pending'),
   ])
 
   if (!settings?.onboarding_complete) {
@@ -55,6 +60,7 @@ export default async function DashboardLayout({
         companyName={settings.company_name || 'Min verksamhet'}
         entityType={entityType}
         uncategorizedTransactionCount={uncategorizedCount ?? 0}
+        pendingOperationsCount={pendingOpsCount ?? 0}
         isSandbox={isSandbox}
         extensionNavItems={getExtensionNavItems()}
       />
