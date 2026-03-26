@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { CoreEvent, CoreEventType } from '@/lib/events/types'
-import type { EntityType, RawTransaction, IngestResult } from '@/types'
+import type { EntityType, RawTransaction, IngestResult, IngestOptions } from '@/types'
 
 // ============================================================
 // Extension Marketplace Types
@@ -142,7 +142,7 @@ export interface ExtensionStorage {
 
 /** Core services exposed to extensions */
 export interface ExtensionServices {
-  ingestTransactions(supabase: SupabaseClient, userId: string, raw: RawTransaction[]): Promise<IngestResult>
+  ingestTransactions(supabase: SupabaseClient, userId: string, raw: RawTransaction[], options?: IngestOptions): Promise<IngestResult>
 }
 
 /** Context passed to extension lifecycle hooks and event handlers */

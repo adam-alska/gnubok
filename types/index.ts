@@ -2040,6 +2040,15 @@ export interface RawTransaction {
   import_source?: string
 }
 
+/** Options for the transaction ingestion pipeline */
+export interface IngestOptions {
+  /** Skip auto-categorization (mapping engine + journal entry creation).
+   * Reconciliation and invoice matching still run.
+   * Used when SIE-imported entries overlap the sync date range
+   * to prevent double-booking. */
+  skipAutoCategorization?: boolean
+}
+
 /** Result of the transaction ingestion pipeline */
 export interface IngestResult {
   imported: number
