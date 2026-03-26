@@ -22,33 +22,51 @@ const SCOPE_GROUPS = [
     domain: 'transactions',
     label: 'Transaktioner',
     read: 'transactions:read' as const,
-    readLabel: 'Läs — lista transaktioner',
+    readLabel: 'Läs — lista transaktioner, mallförslag, kategoriförslag',
+    readTools: 3,
     write: 'transactions:write' as const,
-    writeLabel: 'Skriv — kategorisera, matcha kvitton',
+    writeLabel: 'Skriv — kategorisera, kvittomatchning, koppling mot faktura',
+    writeTools: 3,
   },
   {
     domain: 'customers',
     label: 'Kunder',
     read: 'customers:read' as const,
     readLabel: 'Läs — lista kunder',
+    readTools: 1,
     write: 'customers:write' as const,
     writeLabel: 'Skriv — skapa kunder',
+    writeTools: 1,
   },
   {
     domain: 'invoices',
     label: 'Fakturor',
     read: 'invoices:read' as const,
     readLabel: 'Läs — lista fakturor',
+    readTools: 1,
     write: 'invoices:write' as const,
-    writeLabel: 'Skriv — skapa fakturor',
+    writeLabel: 'Skriv — skapa, skicka, markera betald/skickad',
+    writeTools: 4,
+  },
+  {
+    domain: 'suppliers',
+    label: 'Leverantörer',
+    read: 'suppliers:read' as const,
+    readLabel: 'Läs — lista leverantörer och leverantörsfakturor',
+    readTools: 2,
+    write: null,
+    writeLabel: null,
+    writeTools: 0,
   },
   {
     domain: 'reports',
     label: 'Rapporter',
     read: 'reports:read' as const,
-    readLabel: 'Läs — huvudbok, moms, resultaträkning, KPI',
+    readLabel: 'Läs — kontoplan, huvudbok, balansräkning, resultaträkning, moms, KPI, kundreskontra, leverantörsreskontra, räkenskapsperioder, bankavstämning',
+    readTools: 11,
     write: null,
     writeLabel: null,
+    writeTools: 0,
   },
 ] as const
 
@@ -56,6 +74,7 @@ type Scope =
   | 'transactions:read' | 'transactions:write'
   | 'customers:read' | 'customers:write'
   | 'invoices:read' | 'invoices:write'
+  | 'suppliers:read'
   | 'reports:read'
 
 const ALL_SCOPES: Scope[] = SCOPE_GROUPS.flatMap((g) =>
@@ -70,6 +89,7 @@ const SCOPE_LABELS: Record<Scope, string> = {
   'customers:write': 'Kunder (skriv)',
   'invoices:read': 'Fakturor (läs)',
   'invoices:write': 'Fakturor (skriv)',
+  'suppliers:read': 'Leverantörer (läs)',
   'reports:read': 'Rapporter (läs)',
 }
 
@@ -357,6 +377,7 @@ export function ApiKeysPanel() {
                           }}
                         />
                         <span className="text-xs text-muted-foreground">{group.readLabel}</span>
+                        <span className="text-[10px] tabular-nums text-muted-foreground/60">{group.readTools} verktyg</span>
                       </label>
                       {group.write && (
                         <label className="flex items-center gap-2 cursor-pointer">
@@ -377,6 +398,7 @@ export function ApiKeysPanel() {
                             }}
                           />
                           <span className="text-xs text-muted-foreground">{group.writeLabel}</span>
+                          <span className="text-[10px] tabular-nums text-muted-foreground/60">{group.writeTools} verktyg</span>
                         </label>
                       )}
                     </div>

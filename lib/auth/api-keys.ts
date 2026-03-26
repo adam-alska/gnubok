@@ -6,13 +6,14 @@ const KEY_PREFIX = 'gnubok_sk_'
 // ── API Key Scopes ──────────────────────────────────────────
 
 export const API_KEY_SCOPES = {
-  'transactions:read':  { label: 'Transaktioner — läs',  description: 'Lista okategoriserade transaktioner' },
-  'transactions:write': { label: 'Transaktioner — skriv', description: 'Kategorisera och matcha kvitton' },
-  'customers:read':     { label: 'Kunder — läs',         description: 'Lista kunder' },
-  'customers:write':    { label: 'Kunder — skriv',       description: 'Skapa kunder' },
-  'invoices:read':      { label: 'Fakturor — läs',       description: 'Lista fakturor' },
-  'invoices:write':     { label: 'Fakturor — skriv',     description: 'Skapa fakturor' },
-  'reports:read':       { label: 'Rapporter — läs',      description: 'Huvudbok, moms, resultaträkning, KPI' },
+  'transactions:read':  { label: 'Transaktioner — läs',  description: 'Lista transaktioner, mallförslag, kategoriförslag (3 verktyg)' },
+  'transactions:write': { label: 'Transaktioner — skriv', description: 'Kategorisera, kvittomatchning, koppling mot faktura (3 verktyg)' },
+  'customers:read':     { label: 'Kunder — läs',         description: 'Lista kunder (1 verktyg)' },
+  'customers:write':    { label: 'Kunder — skriv',       description: 'Skapa kunder (1 verktyg)' },
+  'invoices:read':      { label: 'Fakturor — läs',       description: 'Lista fakturor (1 verktyg)' },
+  'invoices:write':     { label: 'Fakturor — skriv',     description: 'Skapa, skicka, markera betald/skickad (4 verktyg)' },
+  'suppliers:read':     { label: 'Leverantörer — läs',   description: 'Lista leverantörer och leverantörsfakturor (2 verktyg)' },
+  'reports:read':       { label: 'Rapporter — läs',      description: 'Kontoplan, huvudbok, balansräkning, resultaträkning, moms, KPI, reskontra, perioder, bankavstämning (11 verktyg)' },
 } as const
 
 export type ApiKeyScope = keyof typeof API_KEY_SCOPES
@@ -24,30 +25,52 @@ export const DEFAULT_SCOPES: ApiKeyScope[] = [
   'transactions:read',
   'customers:read',
   'invoices:read',
+  'suppliers:read',
   'reports:read',
 ]
 
 /** Scope domain groups for UI rendering */
 export const SCOPE_GROUPS = [
-  { domain: 'transactions', label: 'Transaktioner', read: 'transactions:read' as const, write: 'transactions:write' as const },
-  { domain: 'customers',    label: 'Kunder',        read: 'customers:read' as const,    write: 'customers:write' as const },
-  { domain: 'invoices',     label: 'Fakturor',      read: 'invoices:read' as const,     write: 'invoices:write' as const },
-  { domain: 'reports',      label: 'Rapporter',     read: 'reports:read' as const,      write: null },
+  { domain: 'transactions', label: 'Transaktioner',  read: 'transactions:read' as const, write: 'transactions:write' as const },
+  { domain: 'customers',    label: 'Kunder',         read: 'customers:read' as const,    write: 'customers:write' as const },
+  { domain: 'invoices',     label: 'Fakturor',       read: 'invoices:read' as const,     write: 'invoices:write' as const },
+  { domain: 'suppliers',    label: 'Leverantörer',   read: 'suppliers:read' as const,    write: null },
+  { domain: 'reports',      label: 'Rapporter',      read: 'reports:read' as const,      write: null },
 ] as const
 
 /** Map MCP tool name → required scope */
 export const TOOL_SCOPE_MAP: Record<string, ApiKeyScope> = {
+  // Transactions
   gnubok_list_uncategorized_transactions: 'transactions:read',
   gnubok_categorize_transaction:          'transactions:write',
   gnubok_receipt_matcher:                 'transactions:write',
+  gnubok_get_counterparty_templates:      'transactions:read',
+  gnubok_suggest_categories:              'transactions:read',
+  gnubok_match_transaction_to_invoice:    'transactions:write',
+  // Customers
   gnubok_list_customers:                  'customers:read',
   gnubok_create_customer:                 'customers:write',
+  // Invoices
   gnubok_list_invoices:                   'invoices:read',
   gnubok_create_invoice:                  'invoices:write',
+  gnubok_send_invoice:                    'invoices:write',
+  gnubok_mark_invoice_as_paid:            'invoices:write',
+  gnubok_mark_invoice_as_sent:            'invoices:write',
+  // Suppliers
+  gnubok_list_suppliers:                  'suppliers:read',
+  gnubok_list_supplier_invoices:          'suppliers:read',
+  // Reports
   gnubok_get_trial_balance:               'reports:read',
   gnubok_get_vat_report:                  'reports:read',
   gnubok_get_kpi_report:                  'reports:read',
   gnubok_get_income_statement:            'reports:read',
+  gnubok_list_accounts:                   'reports:read',
+  gnubok_get_balance_sheet:               'reports:read',
+  gnubok_get_general_ledger:              'reports:read',
+  gnubok_get_ar_ledger:                   'reports:read',
+  gnubok_get_supplier_ledger:             'reports:read',
+  gnubok_list_fiscal_periods:             'reports:read',
+  gnubok_get_reconciliation_status:       'reports:read',
 }
 
 export function validateScopes(scopes: unknown): ApiKeyScope[] | null {
