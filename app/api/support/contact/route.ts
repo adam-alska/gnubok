@@ -3,6 +3,10 @@ import { NextResponse } from 'next/server'
 import { getEmailService } from '@/lib/email/service'
 import { SUPPORT_RECIPIENT_EMAIL } from '@/lib/support'
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -33,16 +37,19 @@ export async function POST(request: Request) {
     )
   }
 
+  const safeSubject = escapeHtml(subject)
+  const safeMessage = escapeHtml(message).replace(/\n/g, '<br />')
+
   const result = await emailService.sendEmail({
     to: SUPPORT_RECIPIENT_EMAIL,
     subject: `[gnubok support] ${subject}`,
     replyTo: user.email,
     html: `
-      <p><strong>Från:</strong> ${user.email}</p>
+      <p><strong>Från:</strong> ${escapeHtml(user.email || '')}</p>
       <p><strong>User ID:</strong> ${user.id}</p>
-      <p><strong>Ämne:</strong> ${subject}</p>
+      <p><strong>Ämne:</strong> ${safeSubject}</p>
       <hr />
-      <p>${message.replace(/\n/g, '<br />')}</p>
+      <p>${safeMessage}</p>
     `,
     text: `Från: ${user.email}\nUser ID: ${user.id}\nÄmne: ${subject}\n\n${message}`,
   })

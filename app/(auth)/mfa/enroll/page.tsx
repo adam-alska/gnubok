@@ -31,7 +31,8 @@ function MfaEnrollContent() {
   const searchParams = useSearchParams()
   const supabase = createClient()
 
-  const returnTo = searchParams.get('returnTo') || '/'
+  const rawReturnTo = searchParams.get('returnTo') || '/'
+  const returnTo = rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//') ? rawReturnTo : '/'
 
   const handleEnroll = async () => {
     setIsEnrolling(true)
