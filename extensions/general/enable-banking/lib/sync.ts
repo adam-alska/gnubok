@@ -2,15 +2,21 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getAllTransactionsWithRaw, convertTransaction, getAccountBalance } from './api-client'
 import { uploadDocument } from '@/lib/core/documents/document-service'
 import { ingestTransactions as defaultIngest } from '@/lib/transactions/ingest'
-import type { RawTransaction, IngestResult } from '@/types'
+import type { RawTransaction, IngestResult, IngestOptions } from '@/types'
 import type { StoredAccount } from '../types'
 
 /** Ingest function signature — matches lib/transactions/ingest */
 export type IngestFn = (
   supabase: SupabaseClient,
   userId: string,
-  raw: RawTransaction[]
+  raw: RawTransaction[],
+  options?: IngestOptions
 ) => Promise<IngestResult>
+
+export interface SyncOptions {
+  /** Skip auto-categorization during ingestion (e.g. SIE overlap) */
+  skipAutoCategorization?: boolean
+}
 
 export interface SyncResult {
   imported: number
@@ -36,7 +42,8 @@ export async function syncAccountTransactions(
   account: StoredAccount,
   fromDate: string,
   toDate: string,
-  ingest: IngestFn = defaultIngest
+  ingest: IngestFn = defaultIngest,
+  syncOptions?: SyncOptions
 ): Promise<SyncResult> {
   console.log('[enable-banking] syncAccountTransactions starting', {
     connectionId,
@@ -75,7 +82,10 @@ export async function syncAccountTransactions(
     import_source: 'enable_banking',
   }))
 
-  const ingestResult = await ingest(supabase, userId, rawTransactions)
+  const ingestOptions: IngestOptions | undefined = syncOptions?.skipAutoCategorization
+    ? { skipAutoCategorization: true }
+    : undefined
+  const ingestResult = await ingest(supabase, userId, rawTransactions, ingestOptions)
 
   console.log('[enable-banking] Ingest result', {
     connectionId,

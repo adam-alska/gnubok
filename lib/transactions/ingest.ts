@@ -8,7 +8,7 @@ import { tryReconcileTransaction, fetchUnlinkedGLLines } from '@/lib/reconciliat
 import { fetchMultipleRates } from '@/lib/currency/riksbanken'
 import { logMatchEvent } from '@/lib/invoices/match-log'
 import type { UnlinkedGLLine } from '@/lib/reconciliation/bank-reconciliation'
-import type { Transaction, RawTransaction, IngestResult, SupplierInvoice, Currency, ExchangeRate } from '@/types'
+import type { Transaction, RawTransaction, IngestResult, IngestOptions, SupplierInvoice, Currency, ExchangeRate } from '@/types'
 
 // Re-export types for backward compatibility
 export type { RawTransaction, IngestResult } from '@/types'
@@ -71,7 +71,8 @@ async function buildBookedTransactionMap(
 export async function ingestTransactions(
   supabase: SupabaseClient,
   userId: string,
-  rawTransactions: RawTransaction[]
+  rawTransactions: RawTransaction[],
+  options?: IngestOptions
 ): Promise<IngestResult> {
   const result: IngestResult = {
     imported: 0,
@@ -313,45 +314,50 @@ export async function ingestTransactions(
     }
 
     // 4. Evaluate mapping rules for auto-categorization
-    try {
-      const mappingResult = await evaluateMappingRules(
-        supabase,
-        userId,
-        newTransaction as Transaction
-      )
-
-      if (mappingResult.confidence >= 0.8 && !mappingResult.requires_review) {
-        const journalEntry = await createTransactionJournalEntry(
+    // Skipped when SIE-imported entries overlap the sync range — prevents
+    // double-booking. Reconciliation (step 2.5) still links transactions to
+    // existing GL lines; only the "create new journal entry" path is suppressed.
+    if (!options?.skipAutoCategorization) {
+      try {
+        const mappingResult = await evaluateMappingRules(
           supabase,
           userId,
-          newTransaction as Transaction,
-          mappingResult
+          newTransaction as Transaction
         )
 
-        if (journalEntry) {
-          await supabase
-            .from('transactions')
-            .update({
-              journal_entry_id: journalEntry.id,
-              is_business: !mappingResult.default_private,
-            })
-            .eq('id', newTransaction.id)
+        if (mappingResult.confidence >= 0.8 && !mappingResult.requires_review) {
+          const journalEntry = await createTransactionJournalEntry(
+            supabase,
+            userId,
+            newTransaction as Transaction,
+            mappingResult
+          )
 
-          // Upsert counterparty template (auto-learned, lower confidence)
-          try {
-            await upsertCounterpartyTemplate(
-              supabase, userId, newTransaction as Transaction,
-              mappingResult, 'auto_learned'
-            )
-          } catch {
-            // Non-critical
+          if (journalEntry) {
+            await supabase
+              .from('transactions')
+              .update({
+                journal_entry_id: journalEntry.id,
+                is_business: !mappingResult.default_private,
+              })
+              .eq('id', newTransaction.id)
+
+            // Upsert counterparty template (auto-learned, lower confidence)
+            try {
+              await upsertCounterpartyTemplate(
+                supabase, userId, newTransaction as Transaction,
+                mappingResult, 'auto_learned'
+              )
+            } catch {
+              // Non-critical
+            }
+
+            result.auto_categorized++
           }
-
-          result.auto_categorized++
         }
+      } catch {
+        // Non-critical — continue processing
       }
-    } catch {
-      // Non-critical — continue processing
     }
   }
 
