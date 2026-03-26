@@ -2,6 +2,7 @@ import { loadExtensions } from '@/lib/extensions/loader'
 import { setContextFactory } from '@/lib/extensions/registry'
 import { createExtensionContext } from '@/lib/extensions/context-factory'
 import { registerSupplierInvoiceHandler } from '@/lib/bookkeeping/handlers/supplier-invoice-handler'
+import { registerEventLogHandler } from '@/lib/events/handlers/event-log-handler'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('init')
@@ -74,6 +75,7 @@ export function ensureInitialized(): void {
   validateEnvironment()
   setContextFactory(createExtensionContext)
   registerSupplierInvoiceHandler()
+  registerEventLogHandler()
   loadExtensions()
 
   initialized = true

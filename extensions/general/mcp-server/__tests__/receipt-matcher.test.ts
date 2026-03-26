@@ -226,15 +226,15 @@ describe('MCP Receipt Matcher', () => {
 
   // ── gnubok_categorize_transaction still works after refactor ──
 
-  describe('gnubok_categorize_transaction (refactored)', () => {
-    it('returns result without transaction field', async () => {
+  describe('gnubok_categorize_transaction (staging)', () => {
+    it('always stages the operation directly', async () => {
       const tx = makeTransaction({ id: 'tx-1', amount: -500 })
 
       enqueueMany([
-        { data: tx, error: null },           // fetch transaction
+        { data: tx, error: null },           // fetch transaction (preview)
         { data: { entity_type: 'enskild_firma', fiscal_year_start_month: 1 }, error: null },
-        { data: null, error: null },          // fiscal_periods upsert
-        { data: null, error: null },          // transaction update
+        { data: tx, error: null },            // fetch transaction for title
+        { data: { id: 'op-1' }, error: null }, // insert into pending_operations
       ])
 
       const res = await handleMcpRequest(
@@ -246,10 +246,11 @@ describe('MCP Receipt Matcher', () => {
       const result = await parseResult(res)
       const parsed = JSON.parse(result.content[0].text)
 
-      expect(parsed.success).toBe(true)
-      expect(parsed.journal_entry_created).toBe(true)
-      expect(parsed.category).toBe('expense_office')
-      expect(parsed.transaction).toBeUndefined()
+      expect(parsed.staged).toBe(true)
+      expect(parsed.operation_id).toBe('op-1')
+      expect(parsed.message).toContain('staged')
+      expect(parsed.preview).toBeDefined()
+      expect(parsed.preview.debit_account).toBeDefined()
     })
   })
 
@@ -273,8 +274,8 @@ describe('MCP Receipt Matcher', () => {
       enqueueMany([
         { data: tx, error: null },
         { data: { entity_type: 'enskild_firma', fiscal_year_start_month: 1 }, error: null },
-        { data: null, error: null },
-        { data: null, error: null },
+        { data: tx, error: null },            // fetch transaction for title
+        { data: { id: 'op-1' }, error: null }, // insert into pending_operations
       ])
 
       const res = await handleMcpRequest(

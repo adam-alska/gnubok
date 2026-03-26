@@ -1069,6 +1069,25 @@ export interface CreateFiscalPeriodInput {
   period_end: string
 }
 
+// ── Pending Operations ────────────────────────────────────────
+
+export type PendingOperationType = 'categorize_transaction' | 'create_customer' | 'create_invoice'
+export type PendingOperationStatus = 'pending' | 'committed' | 'rejected'
+
+export interface PendingOperation {
+  id: string
+  user_id: string
+  operation_type: PendingOperationType
+  status: PendingOperationStatus
+  title: string
+  params: Record<string, unknown>
+  preview_data: Record<string, unknown>
+  result_data: Record<string, unknown> | null
+  created_at: string
+  resolved_at: string | null
+  updated_at: string
+}
+
 // Onboarding progress for new user checklist
 export interface OnboardingProgress {
   hasCustomers: boolean
