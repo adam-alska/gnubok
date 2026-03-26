@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
-import { Loader2, ShieldCheck, Copy, Check } from 'lucide-react'
+import { Loader2, ShieldCheck, Copy, Check, ArrowLeft } from 'lucide-react'
 
 export default function MfaEnrollPage() {
   return (
@@ -31,12 +31,23 @@ function MfaEnrollContent() {
   const searchParams = useSearchParams()
   const supabase = createClient()
 
-  const returnTo = searchParams.get('returnTo') || '/'
+  const rawReturnTo = searchParams.get('returnTo') || '/'
+  const returnTo = rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//') ? rawReturnTo : '/'
 
   const handleEnroll = async () => {
     setIsEnrolling(true)
 
     try {
+      // Clean up any stale unverified factors from previous abandoned attempts
+      const { data: existingFactors } = await supabase.auth.mfa.listFactors()
+      if (existingFactors?.totp) {
+        for (const factor of existingFactors.totp) {
+          if (factor.status !== 'verified') {
+            await supabase.auth.mfa.unenroll({ factorId: factor.id })
+          }
+        }
+      }
+
       const { data, error } = await supabase.auth.mfa.enroll({
         factorType: 'totp',
         friendlyName: 'gnubok',
@@ -45,7 +56,7 @@ function MfaEnrollContent() {
       if (error) {
         toast({
           title: 'Kunde inte aktivera 2FA',
-          description: 'Försök igen senare.',
+          description: error.message,
           variant: 'destructive',
         })
         setIsEnrolling(false)
@@ -174,6 +185,15 @@ function MfaEnrollContent() {
               </Button>
             </div>
           </div>
+
+          <Button
+            variant="ghost"
+            className="w-full mt-4 text-muted-foreground"
+            onClick={() => router.push(returnTo)}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Tillbaka
+          </Button>
         </div>
       </div>
     )
@@ -264,6 +284,15 @@ function MfaEnrollContent() {
             </Button>
           </form>
         </div>
+
+        <Button
+          variant="ghost"
+          className="w-full mt-4 text-muted-foreground"
+          onClick={() => router.push(returnTo)}
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Tillbaka
+        </Button>
       </div>
     </div>
   )

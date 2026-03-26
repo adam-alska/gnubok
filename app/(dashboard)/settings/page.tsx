@@ -36,6 +36,7 @@ import type { CompanySettings } from '@/types'
 import { validateBankgiroNumber, formatBankgiroNumber } from '@/lib/bankgiro/luhn'
 import { BankNameCombobox } from '@/components/settings/BankNameCombobox'
 import { CalendarFeedSettings } from '@/components/settings/CalendarFeedSettings'
+import { SupportLink } from '@/components/ui/support-link'
 import { getSettingsPanel } from '@/lib/extensions/settings-panel-registry'
 import { SecuritySettings } from '@/components/settings/SecuritySettings'
 import { ApiKeysPanel } from '@/components/settings/ApiKeysPanel'
@@ -760,6 +761,10 @@ export default function SettingsPage() {
                     </p>
                     <p className="text-muted-foreground">
                       Enligt bokföringslagen (BFL 7 kap. 2§) ska räkenskapsinformation bevaras i 7 år. Du ansvarar själv för att exportera och arkivera din bokföringsdata innan du raderar kontot.
+                    </p>
+                    <p className="text-muted-foreground">
+                      Har du frågor?{' '}
+                      <SupportLink variant="inline" subject="Fråga om kontoradering" />
                     </p>
                   </div>
                 </div>

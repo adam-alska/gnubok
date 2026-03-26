@@ -11,6 +11,7 @@ import {
   FileText,
   ExternalLink,
   RotateCcw,
+  Info,
 } from 'lucide-react'
 import type { ImportResult } from '@/lib/import/types'
 
@@ -21,7 +22,12 @@ interface ImportResultStepProps {
 
 export default function ImportResultStep({ result, onNewImport }: ImportResultStepProps) {
   const hasErrors = result.errors.length > 0
-  const hasWarnings = result.warnings.length > 0
+  const skipped = result.details?.skippedVouchers
+
+  // Filter out raw "hoppades över" warnings when we have structured data
+  const otherWarnings = skipped && skipped.total > 0
+    ? result.warnings.filter((w) => !w.includes('hoppades över'))
+    : result.warnings
 
   return (
     <div className="space-y-6">
@@ -116,18 +122,66 @@ export default function ImportResultStep({ result, onNewImport }: ImportResultSt
         </Card>
       )}
 
-      {/* Warnings */}
-      {hasWarnings && (
+      {/* Skipped vouchers — structured breakdown */}
+      {skipped && skipped.total > 0 && (
+        <Card className="border-muted-foreground/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-muted-foreground">
+              <Info className="h-5 w-5" />
+              Hoppade över {skipped.total} verifikationer
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {skipped.empty > 0 && (
+                <div className="text-sm">
+                  <p className="font-medium">{skipped.empty} tomma verifikationer</p>
+                  <p className="text-muted-foreground">
+                    Platshållare utan bokföringsrader — vanligt i Fortnox och Visma. Påverkar inte din bokföring.
+                  </p>
+                </div>
+              )}
+              {skipped.unbalanced > 0 && (
+                <div className="text-sm">
+                  <p className="font-medium">{skipped.unbalanced} obalanserade verifikationer</p>
+                  <p className="text-muted-foreground">
+                    Debet och kredit stämmer inte överens i källsystemet. Saldon har justerats automatiskt.
+                  </p>
+                </div>
+              )}
+              {skipped.singleLine > 0 && (
+                <div className="text-sm">
+                  <p className="font-medium">{skipped.singleLine} enradsverifikationer</p>
+                  <p className="text-muted-foreground">
+                    Verifikationer med bara en rad (t.ex. periodiseringar). Kräver minst två rader för dubbelbokning.
+                  </p>
+                </div>
+              )}
+              {skipped.unmapped > 0 && (
+                <div className="text-sm">
+                  <p className="font-medium">{skipped.unmapped} verifikationer med ej kopplade konton</p>
+                  <p className="text-muted-foreground">
+                    Innehåller konton som inte kunde kopplas till din kontoplan.
+                  </p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Other warnings (filtered) */}
+      {otherWarnings.length > 0 && (
         <Card className="border-warning/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-warning">
               <AlertCircle className="h-5 w-5" />
-              Varningar ({result.warnings.length})
+              Varningar ({otherWarnings.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2 max-h-48 overflow-y-auto">
-              {result.warnings.map((warning, i) => (
+              {otherWarnings.map((warning, i) => (
                 <div key={i} className="text-sm flex gap-2">
                   <AlertCircle className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
                   <span>{warning}</span>

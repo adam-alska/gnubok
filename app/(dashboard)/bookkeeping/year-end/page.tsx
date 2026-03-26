@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Lock } from 'lucide-react'
+import { SupportLink } from '@/components/ui/support-link'
 
 export default function YearEndPage() {
   return (
@@ -25,6 +26,11 @@ export default function YearEndPage() {
           <p className="text-muted-foreground max-w-md">
             Årsbokslut är under utveckling och kommer att finnas tillgängligt i en kommande version.
           </p>
+          <div className="mt-4">
+            <SupportLink variant="muted" subject="Fråga om årsbokslut">
+              Behöver du hjälp med bokslut? Kontakta oss
+            </SupportLink>
+          </div>
         </CardContent>
       </Card>
     </div>

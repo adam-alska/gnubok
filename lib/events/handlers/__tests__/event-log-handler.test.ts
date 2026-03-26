@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { eventBus } from '@/lib/events/bus'
 import { makeTransaction, makeInvoice, makeCustomer, makeFiscalPeriod } from '@/tests/helpers'
 

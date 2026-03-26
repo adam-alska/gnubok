@@ -28,6 +28,7 @@ import {
   ClipboardCheck,
 } from 'lucide-react'
 import { resolveIcon } from '@/lib/extensions/icon-resolver'
+import { SupportLink } from '@/components/ui/support-link'
 import type { EntityType } from '@/types'
 
 interface ExtensionNavItem {
@@ -304,8 +305,11 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
             </nav>
           </div>
 
-          {/* Logout button */}
-          <div className="flex-shrink-0 px-3 py-3 border-t border-border/30">
+          {/* Support + Logout */}
+          <div className="flex-shrink-0 px-3 py-3 border-t border-border/30 space-y-1">
+            <div className="px-3 py-1.5">
+              <SupportLink variant="muted" />
+            </div>
             <Button
               variant="ghost"
               className="w-full justify-start text-muted-foreground hover:text-foreground text-[13px] h-9 px-3"
@@ -531,8 +535,11 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
               </div>
             </div>
 
-            {/* Logout */}
-            <div className="px-2 py-2 mt-1 border-t border-border/30">
+            {/* Support + Logout */}
+            <div className="px-2 py-2 mt-1 border-t border-border/30 space-y-1">
+              <div className="px-3 py-2">
+                <SupportLink variant="muted" />
+              </div>
               <Button
                 variant="ghost"
                 className="w-full justify-start text-muted-foreground active:text-foreground text-sm h-11 px-3"
