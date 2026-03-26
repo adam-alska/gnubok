@@ -22,6 +22,7 @@ const bankSetupSchema = z.object({
   iban: z.string().optional().or(z.literal('')),
   bic: z.string().optional().or(z.literal('')),
   invoice_prefix: z.string().optional().or(z.literal('')),
+  next_invoice_number: z.string().optional().or(z.literal('')),
 }).refine(
   (data) => {
     const hasAccount = !!data.clearing_number && !!data.account_number
@@ -43,6 +44,13 @@ const bankSetupSchema = z.object({
     return validateBankgiroNumber(data.bankgiro)
   },
   { message: 'Ogiltigt bankgironummer (7–8 siffror med kontrollsiffra)', path: ['bankgiro'] }
+).refine(
+  (data) => {
+    if (!data.next_invoice_number) return true
+    const num = parseInt(data.next_invoice_number, 10)
+    return !isNaN(num) && num >= 1
+  },
+  { message: 'Startnummer måste vara ett positivt heltal', path: ['next_invoice_number'] }
 )
 
 type BankSetupData = z.infer<typeof bankSetupSchema>
@@ -75,6 +83,7 @@ export function BankDetailsSetupDialog({ open, onOpenChange, onComplete }: BankD
       iban: '',
       bic: '',
       invoice_prefix: '',
+      next_invoice_number: '',
     },
   })
 
@@ -90,9 +99,14 @@ export function BankDetailsSetupDialog({ open, onOpenChange, onComplete }: BankD
     data.bank_name = bankName
 
     // Clean empty strings to null for API
-    const payload: Record<string, string | null> = {}
+    const payload: Record<string, string | number | null> = {}
     for (const [key, val] of Object.entries(data)) {
-      payload[key] = val || null
+      if (key === 'next_invoice_number') {
+        const num = val ? parseInt(val as string, 10) : null
+        if (num !== null) payload[key] = num
+      } else {
+        payload[key] = (val as string) || null
+      }
     }
 
     try {
@@ -133,7 +147,6 @@ export function BankDetailsSetupDialog({ open, onOpenChange, onComplete }: BankD
       <DialogContent
         className="sm:max-w-md"
         onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
       >
         <DialogHeader>
           <DialogTitle className="font-display text-xl tracking-tight">Betalningsuppgifter</DialogTitle>
@@ -245,19 +258,34 @@ export function BankDetailsSetupDialog({ open, onOpenChange, onComplete }: BankD
 
           <Separator />
 
-          {/* Invoice prefix */}
-          <div className="space-y-2">
-            <Label htmlFor="invoice_prefix">Fakturaprefix</Label>
-            <Input
-              id="invoice_prefix"
-              placeholder="t.ex. F-"
-              maxLength={10}
-              {...register('invoice_prefix')}
-            />
-            <p className="text-xs text-muted-foreground">
-              Valfritt prefix för fakturanummer, t.ex. &quot;F-&quot; ger F-2026001
-            </p>
+          {/* Invoice prefix + starting number */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="invoice_prefix">Fakturaprefix</Label>
+              <Input
+                id="invoice_prefix"
+                placeholder="t.ex. F-"
+                maxLength={10}
+                {...register('invoice_prefix')}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="next_invoice_number">Startnummer</Label>
+              <Input
+                id="next_invoice_number"
+                placeholder="1"
+                inputMode="numeric"
+                maxLength={6}
+                {...register('next_invoice_number')}
+              />
+            </div>
           </div>
+          <p className="text-xs text-muted-foreground -mt-2">
+            Prefix &quot;F-&quot; med startnummer 1 ger F-2026001. Lämna tomt för standard.
+          </p>
+          {errors.next_invoice_number && (
+            <p className="text-sm text-destructive -mt-2">{errors.next_invoice_number.message}</p>
+          )}
 
           {/* Actions */}
           <div className="flex justify-end gap-3 pt-2">

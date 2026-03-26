@@ -245,7 +245,7 @@ export default function NewInvoicePage() {
 
   function onSubmit(data: FormData) {
     setPendingData(data)
-    if (!hasBankDetails && watchDocumentType === 'invoice') {
+    if (hasBankDetails === false && watchDocumentType === 'invoice') {
       setShowBankSetup(true)
       return
     }
