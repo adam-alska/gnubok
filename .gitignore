@@ -46,6 +46,7 @@ supabase/.temp/
 
 # claude local settings
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
 
 # dev docs (internal reference, not published)
 /dev_docs
