@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/lib/supabase/client'
@@ -17,14 +17,11 @@ import Step1EntityType from '@/components/onboarding/Step1EntityType'
 import Step2CompanyDetails from '@/components/onboarding/Step2CompanyDetails'
 import Step3TaxRegistration from '@/components/onboarding/Step3TaxRegistration'
 import Step4VatAccounting from '@/components/onboarding/Step4VatAccounting'
-import Step5ConnectBank from '@/components/onboarding/Step6ConnectBank'
-
 const STEP_INFO = [
   { title: 'Välkommen', subtitle: 'Välj din företagsform för att komma igång.', label: 'Företagsform' },
   { title: 'Ditt företag', subtitle: 'Uppgifterna visas på fakturor och dokument.', label: 'Uppgifter' },
   { title: 'F-skatt & räkenskapsår', subtitle: 'Ange din skatteregistrering och räkenskapsår.', label: 'Skatt' },
   { title: 'Moms & bokföring', subtitle: 'Momsregistrering och bokföringsmetod.', label: 'Moms' },
-  { title: 'Bankuppgifter', subtitle: 'Dessa visas på dina fakturor.', label: 'Bank' },
 ]
 
 function translatePeriodError(msg: string): string {
@@ -68,7 +65,6 @@ function logError(message: string, extra?: Record<string, unknown>) {
 
 function OnboardingPageContent() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { toast } = useToast()
   const supabase = createClient()
 
@@ -79,7 +75,7 @@ function OnboardingPageContent() {
   const ticEnabled = ENABLED_EXTENSION_IDS.has('tic')
   const [ticLookup, setTicLookup] = useState<CompanyLookupResult | null>(null)
 
-  const totalSteps = 5
+  const totalSteps = 4
 
   // Detect stuck state: onboarding marked complete but still on this page
   useEffect(() => {
@@ -194,28 +190,6 @@ function OnboardingPageContent() {
       setIsSaving(false)
     }
   }
-
-  // Handle bank_connected callback from PSD2 flow
-  useEffect(() => {
-    if (searchParams.get('bank_connected') === 'true') {
-      toast({
-        title: 'Bank ansluten!',
-        description: 'Din bank har kopplats.',
-      })
-      // Complete onboarding after bank connection
-      saveSettings({ onboarding_complete: true }, totalSteps).then((success) => {
-        if (!success) {
-          logError('failed to complete onboarding after bank_connected callback')
-        } else {
-          toast({
-            title: 'Välkommen!',
-            description: 'Din profil är nu redo.',
-          })
-          router.push('/')
-        }
-      })
-    }
-  }, [searchParams])
 
   const handleNext = async (stepData: Partial<CompanySettings>) => {
     // Fix org number bug: clear dependent fields when entity type changes
@@ -502,52 +476,6 @@ function OnboardingPageContent() {
         />
       )}
 
-      {currentStep === 5 && (
-        <Step5ConnectBank
-          initialData={{
-            bank_name: settings.bank_name ?? undefined,
-            clearing_number: settings.clearing_number ?? undefined,
-            account_number: settings.account_number ?? undefined,
-            iban: settings.iban ?? (ticLookup?.bankAccounts.find((b) => b.type === 'iban')?.accountNumber) ?? undefined,
-            bic: settings.bic ?? (ticLookup?.bankAccounts.find((b) => b.type === 'iban')?.bic) ?? undefined,
-          }}
-          onComplete={async (data) => {
-            if (data) {
-              const bankSaved = await saveSettings(data, totalSteps)
-              if (!bankSaved) {
-                logError('failed to save bank details at step 5')
-                return
-              }
-            }
-            const finalSuccess = await saveSettings({ onboarding_complete: true }, totalSteps)
-            if (!finalSuccess) {
-              logError('failed to set onboarding_complete at step 5')
-              return
-            }
-            console.log(LOG, 'onboarding completed')
-            toast({
-              title: 'Välkommen!',
-              description: 'Din profil är nu redo.',
-            })
-            router.push('/')
-          }}
-          onBack={handleBack}
-          onSkip={async () => {
-            const finalSuccess = await saveSettings({ onboarding_complete: true }, totalSteps)
-            if (!finalSuccess) {
-              logError('failed to set onboarding_complete when skipping step 5')
-              return
-            }
-            console.log(LOG, 'onboarding completed')
-            toast({
-              title: 'Välkommen!',
-              description: 'Din profil är nu redo.',
-            })
-            router.push('/')
-          }}
-          isSaving={isSaving}
-        />
-      )}
     </>
   )
 

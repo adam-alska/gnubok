@@ -19,12 +19,13 @@ import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency } from '@/lib/utils'
 import { getVatRules, getAvailableVatRates } from '@/lib/invoices/vat-rules'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { Loader2, Plus, Trash2, ArrowLeft, Send, Eye } from 'lucide-react'
+import { Loader2, Plus, Trash2, ArrowLeft, Send, Eye, Landmark } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { InvoiceReviewContent } from '@/components/invoices/InvoiceReviewContent'
 import { getErrorMessage } from '@/lib/errors/get-error-message'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import CustomerForm from '@/components/customers/CustomerForm'
+import { BankDetailsSetupDialog } from '@/components/invoices/BankDetailsSetupDialog'
 import type { Customer, Currency, CreateInvoiceInput, CreateCustomerInput, InvoiceDocumentType } from '@/types'
 
 const itemSchema = z.object({
@@ -70,6 +71,8 @@ export default function NewInvoicePage() {
   const [, setDefaultNotes] = useState<string | null>(null)
   const [isCreateCustomerOpen, setIsCreateCustomerOpen] = useState(false)
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false)
+  const [hasBankDetails, setHasBankDetails] = useState<boolean | null>(null)
+  const [showBankSetup, setShowBankSetup] = useState(false)
   const pendingCustomerRef = useRef<Customer | null>(null)
 
   const {
@@ -127,12 +130,15 @@ export default function NewInvoicePage() {
   async function fetchDefaultNotes() {
     const { data } = await supabase
       .from('company_settings')
-      .select('invoice_default_notes')
+      .select('invoice_default_notes, clearing_number, account_number, bankgiro')
       .single()
     if (data?.invoice_default_notes) {
       setDefaultNotes(data.invoice_default_notes)
       setValue('notes', data.invoice_default_notes)
     }
+    setHasBankDetails(
+      !!(data?.clearing_number && data?.account_number) || !!data?.bankgiro
+    )
   }
 
   useEffect(() => {
@@ -239,7 +245,19 @@ export default function NewInvoicePage() {
 
   function onSubmit(data: FormData) {
     setPendingData(data)
+    if (hasBankDetails === false && watchDocumentType === 'invoice') {
+      setShowBankSetup(true)
+      return
+    }
     setShowReview(true)
+  }
+
+  function handleBankSetupComplete() {
+    setHasBankDetails(true)
+    setShowBankSetup(false)
+    if (pendingData) {
+      setShowReview(true)
+    }
   }
 
   async function handleConfirm() {
@@ -379,6 +397,16 @@ export default function NewInvoicePage() {
           </p>
         </div>
       </div>
+
+      {hasBankDetails === false && (
+        <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-sm">
+          <Landmark className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <p className="text-muted-foreground">Betalningsuppgifter saknas — du behöver lägga till dem innan du skapar en faktura.</p>
+          <Button variant="link" size="sm" className="ml-auto shrink-0 px-0" onClick={() => setShowBankSetup(true)}>
+            Lägg till nu
+          </Button>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid gap-6 lg:grid-cols-3">
@@ -797,6 +825,13 @@ export default function NewInvoicePage() {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Bank details setup dialog */}
+      <BankDetailsSetupDialog
+        open={showBankSetup}
+        onOpenChange={setShowBankSetup}
+        onComplete={handleBankSetupComplete}
+      />
 
       {/* Send now prompt dialog */}
       <Dialog open={showSendPrompt} onOpenChange={(open) => {

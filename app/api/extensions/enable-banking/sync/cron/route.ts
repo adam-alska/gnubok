@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { syncAccountTransactions } from '@/extensions/general/enable-banking/lib/sync'
+import { runReconciliation } from '@/lib/reconciliation/bank-reconciliation'
 import { isConsentExpiringSoon, getDaysUntilExpiry } from '@/extensions/general/enable-banking/lib/api-client'
 import { getEmailService } from '@/lib/email/service'
 import {
@@ -141,6 +142,21 @@ export async function GET(request: Request) {
 
       const accounts = (connection.accounts_data as StoredAccount[] || []).map(a => ({ ...a }))
 
+      // Detect SIE overlap — skip auto-categorization if the sync range
+      // overlaps with a completed SIE import to prevent double-booking
+      const { data: sieOverlap } = await supabase
+        .from('sie_imports')
+        .select('id')
+        .eq('user_id', connection.user_id)
+        .eq('status', 'completed')
+        .gte('fiscal_year_end', fromDate)
+        .limit(1)
+        .maybeSingle()
+
+      const syncOptions = sieOverlap
+        ? { skipAutoCategorization: true }
+        : undefined
+
       const syncResults = await Promise.all(
         accounts.map(account => syncAccountTransactions(
           supabase,
@@ -148,13 +164,27 @@ export async function GET(request: Request) {
           connection.id,
           account,
           fromDate,
-          toDate
+          toDate,
+          undefined,
+          syncOptions
         ))
       )
 
       const totalImported = syncResults.reduce((sum, r) => sum + r.imported, 0)
       const totalDuplicates = syncResults.reduce((sum, r) => sum + r.duplicates, 0)
       const totalErrors = syncResults.reduce((sum, r) => sum + r.errors, 0)
+
+      // Batch reconciliation sweep when SIE overlap detected
+      if (sieOverlap && totalImported > 0) {
+        try {
+          await runReconciliation(supabase, connection.user_id, {
+            dateFrom: fromDate,
+            dateTo: toDate,
+          })
+        } catch {
+          // Non-critical
+        }
+      }
 
       // Successful sync: update connection and clear any previous error state
       await supabase

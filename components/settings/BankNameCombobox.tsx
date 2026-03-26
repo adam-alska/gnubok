@@ -25,11 +25,19 @@ const FALLBACK_BANKS: BankOption[] = [
 
 interface BankNameComboboxProps {
   defaultValue?: string
+  value?: string
+  onChange?: (value: string) => void
   enableBankingEnabled?: boolean
 }
 
-export function BankNameCombobox({ defaultValue = '', enableBankingEnabled = false }: BankNameComboboxProps) {
-  const [value, setValue] = useState(defaultValue)
+export function BankNameCombobox({ defaultValue = '', value: controlledValue, onChange, enableBankingEnabled = false }: BankNameComboboxProps) {
+  const isControlled = controlledValue !== undefined
+  const [internalValue, setInternalValue] = useState(defaultValue)
+  const value = isControlled ? controlledValue : internalValue
+  const setValue = (v: string) => {
+    if (!isControlled) setInternalValue(v)
+    onChange?.(v)
+  }
   const [banks, setBanks] = useState<BankOption[]>(FALLBACK_BANKS)
   const [isOpen, setIsOpen] = useState(false)
   const [highlightedIndex, setHighlightedIndex] = useState(-1)

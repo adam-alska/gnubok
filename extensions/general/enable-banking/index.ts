@@ -8,6 +8,7 @@ import {
   type ASPSP,
 } from './lib/api-client'
 import { syncAccountTransactions } from './lib/sync'
+import { runReconciliation } from '@/lib/reconciliation/bank-reconciliation'
 import type { StoredAccount } from './types'
 import type { Transaction } from '@/types'
 
@@ -220,6 +221,30 @@ export const enableBankingExtension: Extension = {
           // Use ctx.services.ingestTransactions when available
           const ingestFn = ctx?.services.ingestTransactions
 
+          // Detect SIE overlap — skip auto-categorization if the sync range
+          // overlaps with a completed SIE import to prevent double-booking.
+          // Reconciliation still links bank transactions to existing GL lines.
+          const { data: sieOverlap } = await supabase
+            .from('sie_imports')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('status', 'completed')
+            .gte('fiscal_year_end', fromDate)
+            .limit(1)
+            .maybeSingle()
+
+          const syncOptions = sieOverlap
+            ? { skipAutoCategorization: true }
+            : undefined
+
+          if (sieOverlap) {
+            log.info('SIE import overlap detected — suppressing auto-categorization', {
+              sieImportId: sieOverlap.id,
+              fromDate,
+              toDate,
+            })
+          }
+
           const results = await Promise.all(
             accounts.map(account => syncAccountTransactions(
               supabase,
@@ -228,12 +253,34 @@ export const enableBankingExtension: Extension = {
               account,
               fromDate,
               toDate,
-              ingestFn
+              ingestFn,
+              syncOptions
             ))
           )
 
           const totalImported = results.reduce((sum, r) => sum + r.imported, 0)
           const totalDuplicates = results.reduce((sum, r) => sum + r.duplicates, 0)
+
+          // When SIE overlap is detected, run a batch reconciliation sweep.
+          // The greedy algorithm considers all candidates globally (highest-
+          // confidence first) and catches matches the inline per-transaction
+          // pass may have missed due to processing order.
+          if (sieOverlap && totalImported > 0) {
+            try {
+              const reconResult = await runReconciliation(supabase, user.id, {
+                dateFrom: fromDate,
+                dateTo: toDate,
+              })
+              if (reconResult.applied > 0) {
+                log.info('Post-sync batch reconciliation matched additional transactions', {
+                  applied: reconResult.applied,
+                  total: reconResult.matches.length,
+                })
+              }
+            } catch {
+              // Non-critical — transactions remain uncategorized for manual review
+            }
+          }
 
           const syncedAt = new Date().toISOString()
           await supabase
