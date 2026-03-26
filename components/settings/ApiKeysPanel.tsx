@@ -13,8 +13,85 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/components/ui/use-toast'
 import { Loader2, Plus, Copy, Check, Trash2, Key } from 'lucide-react'
+
+const SCOPE_GROUPS = [
+  {
+    domain: 'transactions',
+    label: 'Transaktioner',
+    read: 'transactions:read' as const,
+    readLabel: 'Läs — lista transaktioner, mallförslag, kategoriförslag',
+    readTools: 3,
+    write: 'transactions:write' as const,
+    writeLabel: 'Skriv — kategorisera, kvittomatchning, koppling mot faktura',
+    writeTools: 3,
+  },
+  {
+    domain: 'customers',
+    label: 'Kunder',
+    read: 'customers:read' as const,
+    readLabel: 'Läs — lista kunder',
+    readTools: 1,
+    write: 'customers:write' as const,
+    writeLabel: 'Skriv — skapa kunder',
+    writeTools: 1,
+  },
+  {
+    domain: 'invoices',
+    label: 'Fakturor',
+    read: 'invoices:read' as const,
+    readLabel: 'Läs — lista fakturor',
+    readTools: 1,
+    write: 'invoices:write' as const,
+    writeLabel: 'Skriv — skapa, skicka, markera betald/skickad',
+    writeTools: 4,
+  },
+  {
+    domain: 'suppliers',
+    label: 'Leverantörer',
+    read: 'suppliers:read' as const,
+    readLabel: 'Läs — lista leverantörer och leverantörsfakturor',
+    readTools: 2,
+    write: null,
+    writeLabel: null,
+    writeTools: 0,
+  },
+  {
+    domain: 'reports',
+    label: 'Rapporter',
+    read: 'reports:read' as const,
+    readLabel: 'Läs — kontoplan, huvudbok, balansräkning, resultaträkning, moms, KPI, kundreskontra, leverantörsreskontra, räkenskapsperioder, bankavstämning',
+    readTools: 11,
+    write: null,
+    writeLabel: null,
+    writeTools: 0,
+  },
+] as const
+
+type Scope =
+  | 'transactions:read' | 'transactions:write'
+  | 'customers:read' | 'customers:write'
+  | 'invoices:read' | 'invoices:write'
+  | 'suppliers:read'
+  | 'reports:read'
+
+const ALL_SCOPES: Scope[] = SCOPE_GROUPS.flatMap((g) =>
+  g.write ? [g.read, g.write] : [g.read]
+)
+
+/** Map scope key → display label for badges */
+const SCOPE_LABELS: Record<Scope, string> = {
+  'transactions:read': 'Transaktioner (läs)',
+  'transactions:write': 'Transaktioner (skriv)',
+  'customers:read': 'Kunder (läs)',
+  'customers:write': 'Kunder (skriv)',
+  'invoices:read': 'Fakturor (läs)',
+  'invoices:write': 'Fakturor (skriv)',
+  'suppliers:read': 'Leverantörer (läs)',
+  'reports:read': 'Rapporter (läs)',
+}
 
 interface ApiKey {
   id: string
@@ -36,6 +113,7 @@ export function ApiKeysPanel() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showKeyDialog, setShowKeyDialog] = useState(false)
   const [newKeyName, setNewKeyName] = useState('')
+  const [newKeyScopes, setNewKeyScopes] = useState<Set<Scope>>(new Set(ALL_SCOPES))
   const [newKeyValue, setNewKeyValue] = useState('')
   const [copied, setCopied] = useState(false)
   const [revokingId, setRevokingId] = useState<string | null>(null)
@@ -64,7 +142,7 @@ export function ApiKeysPanel() {
       const res = await fetch('/api/settings/api-keys', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newKeyName || 'MCP-nyckel' }),
+        body: JSON.stringify({ name: newKeyName || 'MCP-nyckel', scopes: Array.from(newKeyScopes) }),
       })
       const json = await res.json()
 
@@ -77,6 +155,7 @@ export function ApiKeysPanel() {
       setShowCreateDialog(false)
       setShowKeyDialog(true)
       setNewKeyName('')
+      setNewKeyScopes(new Set(ALL_SCOPES))
       fetchKeys()
     } catch {
       toast({ title: 'Fel', description: 'Kunde inte skapa nyckel', variant: 'destructive' })
@@ -161,6 +240,21 @@ export function ApiKeysPanel() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium truncate">{key.name}</p>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {(key.scopes ?? []).map((s) => (
+                          <span
+                            key={s}
+                            className="inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                          >
+                            {SCOPE_LABELS[s as Scope] ?? s}
+                          </span>
+                        ))}
+                        {(!key.scopes || key.scopes.length === 0) && (
+                          <span className="inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                            Enbart läs
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-3 mt-1">
                       <code className="text-xs text-muted-foreground font-mono">
@@ -244,21 +338,80 @@ export function ApiKeysPanel() {
               Ge nyckeln ett namn så du vet vad den används till.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
-            <Label htmlFor="key-name">Namn</Label>
-            <Input
-              id="key-name"
-              placeholder="t.ex. Claude Desktop"
-              value={newKeyName}
-              onChange={(e) => setNewKeyName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-            />
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="key-name">Namn</Label>
+              <Input
+                id="key-name"
+                placeholder="t.ex. Claude Desktop"
+                value={newKeyName}
+                onChange={(e) => setNewKeyName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Behörigheter</Label>
+              <p className="text-xs text-muted-foreground">
+                Välj vad nyckeln ska ha åtkomst till.
+              </p>
+              <div className="space-y-3 pt-1">
+                {SCOPE_GROUPS.map((group) => (
+                  <div key={group.domain} className="space-y-1.5">
+                    <p className="text-sm font-medium">{group.label}</p>
+                    <div className="space-y-1 pl-1">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <Checkbox
+                          checked={newKeyScopes.has(group.read)}
+                          onCheckedChange={(checked) => {
+                            setNewKeyScopes((prev) => {
+                              const next = new Set(prev)
+                              if (checked) {
+                                next.add(group.read)
+                              } else {
+                                next.delete(group.read)
+                                // Remove write too — write without read makes no sense
+                                if (group.write) next.delete(group.write)
+                              }
+                              return next
+                            })
+                          }}
+                        />
+                        <span className="text-xs text-muted-foreground">{group.readLabel}</span>
+                        <span className="text-[10px] tabular-nums text-muted-foreground/60">{group.readTools} verktyg</span>
+                      </label>
+                      {group.write && (
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <Checkbox
+                            checked={newKeyScopes.has(group.write)}
+                            onCheckedChange={(checked) => {
+                              setNewKeyScopes((prev) => {
+                                const next = new Set(prev)
+                                if (checked) {
+                                  next.add(group.write!)
+                                  // Auto-check read when write is checked
+                                  next.add(group.read)
+                                } else {
+                                  next.delete(group.write!)
+                                }
+                                return next
+                              })
+                            }}
+                          />
+                          <span className="text-xs text-muted-foreground">{group.writeLabel}</span>
+                          <span className="text-[10px] tabular-nums text-muted-foreground/60">{group.writeTools} verktyg</span>
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
               Avbryt
             </Button>
-            <Button onClick={handleCreate} disabled={isCreating}>
+            <Button onClick={handleCreate} disabled={isCreating || newKeyScopes.size === 0}>
               {isCreating && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
               Skapa
             </Button>

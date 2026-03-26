@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { generateApiKey, hashApiKey } from '@/lib/auth/api-keys'
+import { generateApiKey, hashApiKey, DEFAULT_SCOPES, validateScopes } from '@/lib/auth/api-keys'
+import type { ApiKeyScope } from '@/lib/auth/api-keys'
 
 /**
  * GET /api/settings/api-keys — List user's API keys (never exposes the key itself)
@@ -39,13 +40,18 @@ export async function POST(request: Request) {
   }
 
   let name = 'Unnamed key'
+  let scopes: ApiKeyScope[] = DEFAULT_SCOPES
   try {
     const body = await request.json()
     if (body.name && typeof body.name === 'string') {
       name = body.name.slice(0, 100)
     }
+    const parsed = validateScopes(body.scopes)
+    if (parsed) {
+      scopes = parsed
+    }
   } catch {
-    // Empty body is fine, use default name
+    // Empty body is fine, use defaults
   }
 
   // Limit to 10 active keys per user
@@ -71,8 +77,9 @@ export async function POST(request: Request) {
       key_hash: hash,
       key_prefix: prefix,
       name,
+      scopes,
     })
-    .select('id, key_prefix, name, created_at')
+    .select('id, key_prefix, name, scopes, created_at')
     .single()
 
   if (error) {

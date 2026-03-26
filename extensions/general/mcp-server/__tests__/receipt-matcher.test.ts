@@ -17,11 +17,18 @@ vi.mock('@/lib/supabase/server', () => ({
   }),
 }))
 
-vi.mock('@/lib/auth/api-keys', () => ({
-  extractBearerToken: vi.fn().mockReturnValue('test-token'),
-  validateApiKey: vi.fn().mockResolvedValue({ userId: 'user-1' }),
-  createServiceClientNoCookies: vi.fn(),
-}))
+vi.mock('@/lib/auth/api-keys', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/auth/api-keys')>()
+  return {
+    ...actual,
+    extractBearerToken: vi.fn().mockReturnValue('test-token'),
+    validateApiKey: vi.fn().mockResolvedValue({
+      userId: 'user-1',
+      scopes: ['transactions:read', 'transactions:write', 'customers:read', 'customers:write', 'invoices:read', 'invoices:write', 'suppliers:read', 'reports:read'],
+    }),
+    createServiceClientNoCookies: vi.fn(),
+  }
+})
 
 vi.mock('@/lib/bookkeeping/category-mapping', () => ({
   buildMappingResultFromCategory: vi.fn().mockReturnValue({
@@ -70,6 +77,64 @@ vi.mock('@/lib/reports/ar-ledger', () => ({
 
 vi.mock('@/lib/reports/monthly-breakdown', () => ({
   generateMonthlyBreakdown: vi.fn(),
+}))
+
+vi.mock('@/lib/reports/balance-sheet', () => ({
+  generateBalanceSheet: vi.fn(),
+}))
+
+vi.mock('@/lib/reports/general-ledger', () => ({
+  generateGeneralLedger: vi.fn(),
+}))
+
+vi.mock('@/lib/reports/supplier-ledger', () => ({
+  generateSupplierLedger: vi.fn(),
+}))
+
+vi.mock('@/lib/reconciliation/bank-reconciliation', () => ({
+  getReconciliationStatus: vi.fn(),
+}))
+
+vi.mock('@/lib/bookkeeping/invoice-entries', () => ({
+  createInvoicePaymentJournalEntry: vi.fn(),
+  createInvoiceCashEntry: vi.fn(),
+  createInvoiceJournalEntry: vi.fn(),
+}))
+
+vi.mock('@/lib/bookkeeping/engine', () => ({
+  reverseEntry: vi.fn(),
+}))
+
+vi.mock('@/lib/transactions/category-suggestions', () => ({
+  getSuggestedCategories: vi.fn(),
+}))
+
+vi.mock('@/lib/bookkeeping/counterparty-templates', () => ({
+  upsertCounterpartyTemplate: vi.fn(),
+  findCounterpartyTemplatesBatch: vi.fn(),
+  formatCounterpartyName: vi.fn(),
+}))
+
+vi.mock('@react-pdf/renderer', () => ({
+  renderToBuffer: vi.fn(),
+}))
+
+vi.mock('@/lib/invoices/pdf-template', () => ({
+  InvoicePDF: vi.fn(),
+}))
+
+vi.mock('@/lib/email/service', () => ({
+  getEmailService: vi.fn().mockReturnValue({ sendInvoice: vi.fn() }),
+}))
+
+vi.mock('@/lib/email/invoice-templates', () => ({
+  generateInvoiceEmailHtml: vi.fn(),
+  generateInvoiceEmailText: vi.fn(),
+  generateInvoiceEmailSubject: vi.fn(),
+}))
+
+vi.mock('@/lib/core/documents/document-service', () => ({
+  uploadDocument: vi.fn(),
 }))
 
 import { handleMcpRequest } from '../server'
