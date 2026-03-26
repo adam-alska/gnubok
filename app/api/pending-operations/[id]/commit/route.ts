@@ -8,6 +8,21 @@ import { upsertCounterpartyTemplate } from '@/lib/bookkeeping/counterparty-templ
 import { getVatRules, getAvailableVatRates } from '@/lib/invoices/vat-rules'
 import { fetchExchangeRate, convertToSEK } from '@/lib/currency/riksbanken'
 import { validateVatNumber } from '@/lib/vat/vies-client'
+import {
+  createInvoicePaymentJournalEntry,
+  createInvoiceCashEntry,
+  createInvoiceJournalEntry,
+} from '@/lib/bookkeeping/invoice-entries'
+import { reverseEntry } from '@/lib/bookkeeping/engine'
+import { getEmailService } from '@/lib/email/service'
+import {
+  generateInvoiceEmailHtml,
+  generateInvoiceEmailText,
+  generateInvoiceEmailSubject,
+} from '@/lib/email/invoice-templates'
+import { uploadDocument } from '@/lib/core/documents/document-service'
+import { renderToBuffer } from '@react-pdf/renderer'
+import { InvoicePDF } from '@/lib/invoices/pdf-template'
 import { createLogger } from '@/lib/logger'
 import type {
   Transaction,
@@ -18,6 +33,8 @@ import type {
   Invoice,
   Customer,
   PendingOperation,
+  CompanySettings,
+  InvoiceItem,
 } from '@/types'
 
 const log = createLogger('pending-operations/commit')
@@ -396,6 +413,350 @@ async function commitCreateInvoice(
   return { data: { invoice_id: invoice.id, invoice_number: invoiceNumber } }
 }
 
+async function commitMarkInvoicePaid(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  params: Record<string, unknown>
+): Promise<{ data?: Record<string, unknown>; error?: string; status?: number }> {
+  const invoiceId = params.invoice_id as string
+  const paymentDate = (params.payment_date as string) || new Date().toISOString().split('T')[0]
+
+  const { data: invoice, error: invoiceError } = await supabase
+    .from('invoices')
+    .select('*, customer:customers(*), items:invoice_items(*)')
+    .eq('id', invoiceId)
+    .eq('user_id', userId)
+    .single()
+
+  if (invoiceError || !invoice) return { error: 'Invoice not found', status: 404 }
+  if (invoice.status !== 'sent' && invoice.status !== 'overdue') {
+    return { error: 'Invoice can only be marked as paid when status is "sent" or "overdue"', status: 409 }
+  }
+
+  const { data: settings } = await supabase
+    .from('company_settings')
+    .select('accounting_method, entity_type')
+    .eq('user_id', userId)
+    .single()
+
+  const accountingMethod = settings?.accounting_method || 'accrual'
+  const entityType = (settings?.entity_type as EntityType) || 'enskild_firma'
+  const isRealInvoice = !invoice.document_type || invoice.document_type === 'invoice'
+  let journalEntryId: string | null = null
+
+  if (isRealInvoice) {
+    if (accountingMethod === 'accrual') {
+      const je = await createInvoicePaymentJournalEntry(
+        supabase, userId, invoice as Invoice, paymentDate, undefined, invoice.customer?.name
+      )
+      journalEntryId = je?.id ?? null
+    } else {
+      const je = await createInvoiceCashEntry(
+        supabase, userId, invoice as Invoice, paymentDate, entityType, invoice.customer?.name
+      )
+      journalEntryId = je?.id ?? null
+    }
+  }
+
+  const now = new Date().toISOString()
+  const { error: updateError } = await supabase
+    .from('invoices')
+    .update({ status: 'paid', paid_at: now, paid_amount: invoice.total })
+    .eq('id', invoiceId)
+    .eq('user_id', userId)
+
+  if (updateError) return { error: 'Failed to update invoice status', status: 500 }
+
+  return { data: { status: 'paid', journal_entry_id: journalEntryId } }
+}
+
+async function commitSendInvoice(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  params: Record<string, unknown>
+): Promise<{ data?: Record<string, unknown>; error?: string; status?: number }> {
+  const invoiceId = params.invoice_id as string
+
+  const emailService = getEmailService()
+  if (!emailService.isConfigured()) {
+    return { error: 'Email service not configured', status: 500 }
+  }
+
+  const { data: invoice, error: invoiceError } = await supabase
+    .from('invoices')
+    .select('*, customer:customers(*), items:invoice_items(*)')
+    .eq('id', invoiceId)
+    .eq('user_id', userId)
+    .single()
+
+  if (invoiceError || !invoice) return { error: 'Invoice not found', status: 404 }
+
+  const customer = invoice.customer as Customer
+  if (!customer.email) return { error: 'Customer has no email address', status: 400 }
+
+  const { data: company, error: companyError } = await supabase
+    .from('company_settings')
+    .select('*')
+    .eq('user_id', userId)
+    .single()
+
+  if (companyError || !company) return { error: 'Company settings missing', status: 500 }
+
+  const items = (invoice.items as InvoiceItem[]).sort(
+    (a: InvoiceItem, b: InvoiceItem) => a.sort_order - b.sort_order
+  )
+
+  let originalInvoiceNumber: string | undefined
+  if (invoice.credited_invoice_id) {
+    const { data: orig } = await supabase
+      .from('invoices')
+      .select('invoice_number')
+      .eq('id', invoice.credited_invoice_id)
+      .single()
+    if (orig) originalInvoiceNumber = orig.invoice_number
+  }
+
+  const pdfBuffer = await renderToBuffer(
+    InvoicePDF({
+      invoice: invoice as Invoice,
+      customer,
+      items,
+      company: company as CompanySettings,
+      originalInvoiceNumber,
+    })
+  )
+
+  const isCreditNote = !!invoice.credited_invoice_id
+  const docType = invoice.document_type || 'invoice'
+  let filename: string
+  if (isCreditNote) filename = `kreditfaktura-${invoice.invoice_number}.pdf`
+  else if (docType === 'proforma') filename = `proformafaktura-${invoice.invoice_number}.pdf`
+  else if (docType === 'delivery_note') filename = `foljesedel-${invoice.invoice_number}.pdf`
+  else filename = `faktura-${invoice.invoice_number}.pdf`
+
+  const { data: { user: authUser } } = await supabase.auth.admin.getUserById(userId)
+  const ccAddress = company.email || authUser?.email
+
+  const emailData = { invoice: invoice as Invoice, customer, company: company as CompanySettings }
+  const result = await emailService.sendEmail({
+    to: customer.email,
+    cc: ccAddress,
+    subject: generateInvoiceEmailSubject(emailData),
+    html: generateInvoiceEmailHtml(emailData),
+    text: generateInvoiceEmailText(emailData),
+    replyTo: company.email || undefined,
+    fromName: company.company_name,
+    attachments: [{ filename, content: pdfBuffer, contentType: 'application/pdf' }],
+  })
+
+  if (!result.success) return { error: `Failed to send email: ${result.error}`, status: 500 }
+
+  await supabase.from('invoices').update({ status: 'sent' }).eq('id', invoiceId).eq('user_id', userId)
+
+  const isRealInvoice = !invoice.document_type || invoice.document_type === 'invoice'
+  let createdJournalEntryId: string | undefined
+  if (isRealInvoice && (company.accounting_method === 'accrual' || !company.accounting_method)) {
+    try {
+      const je = await createInvoiceJournalEntry(
+        supabase, userId, invoice as Invoice, (company as CompanySettings).entity_type
+      )
+      if (je) {
+        createdJournalEntryId = je.id
+        await supabase.from('invoices').update({ journal_entry_id: je.id }).eq('id', invoiceId)
+      }
+    } catch { /* non-blocking */ }
+  }
+
+  if (isRealInvoice) {
+    try {
+      const pdfArrayBuffer = new Uint8Array(pdfBuffer).buffer as ArrayBuffer
+      await uploadDocument(supabase, userId, {
+        name: filename,
+        buffer: pdfArrayBuffer,
+        type: 'application/pdf',
+      }, {
+        upload_source: 'system',
+        journal_entry_id: createdJournalEntryId,
+      })
+    } catch { /* non-blocking */ }
+  }
+
+  await eventBus.emit({ type: 'invoice.sent', payload: { invoice: invoice as Invoice, userId } })
+
+  return { data: { message: `Invoice ${invoice.invoice_number} sent to ${customer.email}` } }
+}
+
+async function commitMarkInvoiceSent(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  params: Record<string, unknown>
+): Promise<{ data?: Record<string, unknown>; error?: string; status?: number }> {
+  const invoiceId = params.invoice_id as string
+
+  const { data: invoice, error: invoiceError } = await supabase
+    .from('invoices')
+    .select('*, customer:customers(*), items:invoice_items(*)')
+    .eq('id', invoiceId)
+    .eq('user_id', userId)
+    .single()
+
+  if (invoiceError || !invoice) return { error: 'Invoice not found', status: 404 }
+  if (invoice.status !== 'draft') return { error: 'Only draft invoices can be marked as sent', status: 409 }
+
+  const { error: updateError } = await supabase
+    .from('invoices')
+    .update({ status: 'sent' })
+    .eq('id', invoiceId)
+    .eq('user_id', userId)
+
+  if (updateError) return { error: 'Failed to update invoice status', status: 500 }
+
+  const { data: settings } = await supabase
+    .from('company_settings')
+    .select('accounting_method, entity_type')
+    .eq('user_id', userId)
+    .single()
+
+  const isRealInvoice = !invoice.document_type || invoice.document_type === 'invoice'
+  let journalEntryId: string | null = null
+
+  if (isRealInvoice && (settings?.accounting_method === 'accrual' || !settings?.accounting_method)) {
+    try {
+      const je = await createInvoiceJournalEntry(
+        supabase, userId, invoice as Invoice,
+        (settings?.entity_type as EntityType) || 'enskild_firma',
+        invoice.customer?.name
+      )
+      if (je) {
+        journalEntryId = je.id
+        await supabase.from('invoices').update({ journal_entry_id: je.id }).eq('id', invoiceId)
+      }
+    } catch { /* non-blocking */ }
+  }
+
+  return { data: { status: 'sent', journal_entry_id: journalEntryId } }
+}
+
+async function commitMatchTransactionInvoice(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  params: Record<string, unknown>
+): Promise<{ data?: Record<string, unknown>; error?: string; status?: number }> {
+  const transactionId = params.transaction_id as string
+  const invoiceId = params.invoice_id as string
+
+  const { data: transaction, error: txError } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('id', transactionId)
+    .eq('user_id', userId)
+    .single()
+
+  if (txError || !transaction) return { error: 'Transaction not found', status: 404 }
+  if (transaction.amount <= 0) return { error: 'Only income transactions can be matched', status: 400 }
+  if (transaction.invoice_id) return { error: 'Transaction already linked to an invoice', status: 409 }
+
+  const { data: invoice, error: invError } = await supabase
+    .from('invoices')
+    .select('*, customer:customers(*), items:invoice_items(*)')
+    .eq('id', invoiceId)
+    .eq('user_id', userId)
+    .single()
+
+  if (invError || !invoice) return { error: 'Invoice not found', status: 404 }
+  if (!['sent', 'overdue', 'partially_paid'].includes(invoice.status)) {
+    return { error: 'Invoice is not in a matchable state', status: 409 }
+  }
+
+  // Storno conflicting journal entry
+  if (transaction.journal_entry_id) {
+    await reverseEntry(supabase, userId, transaction.journal_entry_id)
+    await supabase.from('transactions').update({ journal_entry_id: null }).eq('id', transactionId)
+  }
+
+  const now = new Date().toISOString()
+  const paidAmount = transaction.amount
+  const newPaidAmount = Math.round(((invoice.paid_amount || 0) + paidAmount) * 100) / 100
+  const currentRemaining = invoice.remaining_amount ?? (invoice.total - (invoice.paid_amount || 0))
+  const newRemaining = Math.max(0, Math.round((currentRemaining - paidAmount) * 100) / 100)
+  const isFullyPaid = newRemaining <= 0
+  const newStatus = isFullyPaid ? 'paid' : 'partially_paid'
+
+  const { data: settings } = await supabase
+    .from('company_settings')
+    .select('accounting_method, entity_type')
+    .eq('user_id', userId)
+    .single()
+
+  const accountingMethod = settings?.accounting_method || 'accrual'
+  const entityType = (settings?.entity_type as EntityType) || 'enskild_firma'
+
+  let journalEntryId: string | null = null
+  try {
+    if (accountingMethod === 'cash' && isFullyPaid) {
+      const je = await createInvoiceCashEntry(
+        supabase, userId, invoice as Invoice, transaction.date, entityType, invoice.customer?.name
+      )
+      journalEntryId = je?.id ?? null
+    } else {
+      const je = await createInvoicePaymentJournalEntry(
+        supabase, userId, invoice as Invoice, transaction.date, undefined, invoice.customer?.name, paidAmount
+      )
+      journalEntryId = je?.id ?? null
+    }
+  } catch (err) {
+    log.error('Failed to create match journal entry:', err)
+  }
+
+  const { error: updateInvError } = await supabase
+    .from('invoices')
+    .update({
+      status: newStatus,
+      paid_at: isFullyPaid ? now : null,
+      paid_amount: newPaidAmount,
+      remaining_amount: newRemaining,
+    })
+    .eq('id', invoiceId)
+    .in('status', ['sent', 'overdue', 'partially_paid'])
+
+  if (updateInvError) return { error: 'Failed to update invoice status', status: 500 }
+
+  const paymentNotes = (accountingMethod === 'cash' && !isFullyPaid)
+    ? 'Kontantmetoden: intäkt bokförs vid slutbetalning' : null
+
+  await supabase.from('invoice_payments').insert({
+    user_id: userId,
+    invoice_id: invoiceId,
+    payment_date: transaction.date,
+    amount: paidAmount,
+    currency: invoice.currency,
+    exchange_rate: invoice.exchange_rate,
+    journal_entry_id: journalEntryId,
+    transaction_id: transactionId,
+    notes: paymentNotes,
+  })
+
+  await supabase
+    .from('transactions')
+    .update({
+      invoice_id: invoiceId,
+      potential_invoice_id: null,
+      journal_entry_id: journalEntryId,
+      is_business: true,
+      category: 'income_services',
+    })
+    .eq('id', transactionId)
+
+  try {
+    await eventBus.emit({
+      type: 'invoice.match_confirmed',
+      payload: { invoice: invoice as Invoice, transaction: transaction as Transaction, userId },
+    })
+  } catch { /* non-critical */ }
+
+  return { data: { invoice_status: newStatus, paid_amount: newPaidAmount, journal_entry_id: journalEntryId } }
+}
+
 // ── Route handler ─────────────────────────────────────────────
 
 export async function POST(
@@ -443,6 +804,18 @@ export async function POST(
       break
     case 'create_invoice':
       result = await commitCreateInvoice(supabase, user.id, pendingOp.params)
+      break
+    case 'mark_invoice_paid':
+      result = await commitMarkInvoicePaid(supabase, user.id, pendingOp.params)
+      break
+    case 'send_invoice':
+      result = await commitSendInvoice(supabase, user.id, pendingOp.params)
+      break
+    case 'mark_invoice_sent':
+      result = await commitMarkInvoiceSent(supabase, user.id, pendingOp.params)
+      break
+    case 'match_transaction_invoice':
+      result = await commitMatchTransactionInvoice(supabase, user.id, pendingOp.params)
       break
     default:
       return NextResponse.json({ error: 'Unknown operation type' }, { status: 400 })

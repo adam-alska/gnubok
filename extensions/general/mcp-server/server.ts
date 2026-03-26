@@ -1353,7 +1353,7 @@ const tools: McpTool[] = [
 
       const { data: invoice, error: invoiceError } = await supabase
         .from('invoices')
-        .select('*, customer:customers(*), items:invoice_items(*)')
+        .select('*, customer:customers(*)')
         .eq('id', invoiceId)
         .eq('user_id', userId)
         .single()
@@ -1363,49 +1363,19 @@ const tools: McpTool[] = [
         throw new Error('Invoice can only be marked as paid when status is "sent" or "overdue"')
       }
 
-      const now = new Date().toISOString()
-      const paymentDate = (args.payment_date as string) || now.split('T')[0]
+      const paymentDate = (args.payment_date as string) || new Date().toISOString().split('T')[0]
 
-      const { data: settings } = await supabase
-        .from('company_settings')
-        .select('accounting_method, entity_type')
-        .eq('user_id', userId)
-        .single()
-
-      const accountingMethod = settings?.accounting_method || 'accrual'
-      const entityType = (settings?.entity_type as EntityType) || 'enskild_firma'
-      const isRealInvoice = !invoice.document_type || invoice.document_type === 'invoice'
-      let journalEntryId: string | null = null
-
-      if (isRealInvoice) {
-        if (accountingMethod === 'accrual') {
-          const je = await createInvoicePaymentJournalEntry(
-            supabase, userId, invoice as Invoice, paymentDate, undefined, invoice.customer?.name
-          )
-          journalEntryId = je?.id ?? null
-        } else {
-          const je = await createInvoiceCashEntry(
-            supabase, userId, invoice as Invoice, paymentDate, entityType, invoice.customer?.name
-          )
-          journalEntryId = je?.id ?? null
+      return stagePendingOperation(supabase, userId, 'mark_invoice_paid',
+        `Betald: ${invoice.invoice_number} ${invoice.customer?.name || ''} ${invoice.total} ${invoice.currency}`,
+        { invoice_id: invoiceId, payment_date: paymentDate },
+        {
+          invoice_number: invoice.invoice_number,
+          customer_name: invoice.customer?.name,
+          total: invoice.total,
+          currency: invoice.currency,
+          payment_date: paymentDate,
         }
-      }
-
-      const { error: updateError } = await supabase
-        .from('invoices')
-        .update({ status: 'paid', paid_at: now, paid_amount: invoice.total })
-        .eq('id', invoiceId)
-        .eq('user_id', userId)
-
-      if (updateError) throw new Error('Failed to update invoice status')
-
-      return {
-        success: true,
-        status: 'paid',
-        paid_at: now,
-        paid_amount: invoice.total,
-        journal_entry_id: journalEntryId,
-      }
+      )
     },
   },
 
@@ -1450,7 +1420,7 @@ const tools: McpTool[] = [
 
       const { data: invoice, error: invoiceError } = await supabase
         .from('invoices')
-        .select('*, customer:customers(*), items:invoice_items(*)')
+        .select('*, customer:customers(*)')
         .eq('id', invoiceId)
         .eq('user_id', userId)
         .single()
@@ -1460,112 +1430,17 @@ const tools: McpTool[] = [
       const customer = invoice.customer as Customer
       if (!customer.email) throw new Error('Customer has no email address. Update customer details first.')
 
-      const { data: company, error: companyError } = await supabase
-        .from('company_settings')
-        .select('*')
-        .eq('user_id', userId)
-        .single()
-
-      if (companyError || !company) throw new Error('Company settings missing')
-
-      const items = (invoice.items as InvoiceItem[]).sort(
-        (a: InvoiceItem, b: InvoiceItem) => a.sort_order - b.sort_order
-      )
-
-      // If credit note, fetch original invoice number
-      let originalInvoiceNumber: string | undefined
-      if (invoice.credited_invoice_id) {
-        const { data: orig } = await supabase
-          .from('invoices')
-          .select('invoice_number')
-          .eq('id', invoice.credited_invoice_id)
-          .single()
-        if (orig) originalInvoiceNumber = orig.invoice_number
-      }
-
-      // Generate PDF
-      const pdfBuffer = await renderToBuffer(
-        InvoicePDF({
-          invoice: invoice as Invoice,
-          customer,
-          items,
-          company: company as CompanySettings,
-          originalInvoiceNumber,
-        })
-      )
-
-      // Determine filename
-      const isCreditNote = !!invoice.credited_invoice_id
-      const docType = invoice.document_type || 'invoice'
-      let filename: string
-      if (isCreditNote) filename = `kreditfaktura-${invoice.invoice_number}.pdf`
-      else if (docType === 'proforma') filename = `proformafaktura-${invoice.invoice_number}.pdf`
-      else if (docType === 'delivery_note') filename = `foljesedel-${invoice.invoice_number}.pdf`
-      else filename = `faktura-${invoice.invoice_number}.pdf`
-
-      // Get user email for CC
-      const { data: { user: authUser } } = await supabase.auth.admin.getUserById(userId)
-      const ccAddress = company.email || authUser?.email
-
-      // Send email
-      const emailData = { invoice: invoice as Invoice, customer, company: company as CompanySettings }
-      const result = await emailService.sendEmail({
-        to: customer.email,
-        cc: ccAddress,
-        subject: generateInvoiceEmailSubject(emailData),
-        html: generateInvoiceEmailHtml(emailData),
-        text: generateInvoiceEmailText(emailData),
-        replyTo: company.email || undefined,
-        fromName: company.company_name,
-        attachments: [{ filename, content: pdfBuffer, contentType: 'application/pdf' }],
-      })
-
-      if (!result.success) throw new Error(`Failed to send email: ${result.error}`)
-
-      // Update status to sent
-      await supabase.from('invoices').update({ status: 'sent' }).eq('id', invoiceId).eq('user_id', userId)
-
-      // Create journal entry (non-blocking)
-      const isRealInvoice = !invoice.document_type || invoice.document_type === 'invoice'
-      let createdJournalEntryId: string | undefined
-      if (isRealInvoice && (company.accounting_method === 'accrual' || !company.accounting_method)) {
-        try {
-          const je = await createInvoiceJournalEntry(
-            supabase, userId, invoice as Invoice, (company as CompanySettings).entity_type
-          )
-          if (je) {
-            createdJournalEntryId = je.id
-            await supabase.from('invoices').update({ journal_entry_id: je.id }).eq('id', invoiceId)
-          }
-        } catch {
-          // Non-blocking
+      return stagePendingOperation(supabase, userId, 'send_invoice',
+        `Skicka: ${invoice.invoice_number} till ${customer.email}`,
+        { invoice_id: invoiceId },
+        {
+          invoice_number: invoice.invoice_number,
+          customer_name: customer.name,
+          customer_email: customer.email,
+          total: invoice.total,
+          currency: invoice.currency,
         }
-      }
-
-      // Store PDF as document (non-blocking)
-      if (isRealInvoice) {
-        try {
-          const pdfArrayBuffer = new Uint8Array(pdfBuffer).buffer as ArrayBuffer
-          await uploadDocument(supabase, userId, {
-            name: filename,
-            buffer: pdfArrayBuffer,
-            type: 'application/pdf',
-          }, {
-            upload_source: 'system',
-            journal_entry_id: createdJournalEntryId,
-          })
-        } catch {
-          // Non-blocking
-        }
-      }
-
-      await eventBus.emit({ type: 'invoice.sent', payload: { invoice: invoice as Invoice, userId } })
-
-      return {
-        success: true,
-        message: `Invoice ${invoice.invoice_number} sent to ${customer.email}`,
-        messageId: result.messageId,
-      }
+      )
     },
   },
 
@@ -1601,7 +1476,7 @@ const tools: McpTool[] = [
 
       const { data: invoice, error: invoiceError } = await supabase
         .from('invoices')
-        .select('*, customer:customers(*), items:invoice_items(*)')
+        .select('*, customer:customers(*)')
         .eq('id', invoiceId)
         .eq('user_id', userId)
         .single()
@@ -1609,40 +1484,16 @@ const tools: McpTool[] = [
       if (invoiceError || !invoice) throw new Error('Invoice not found')
       if (invoice.status !== 'draft') throw new Error('Only draft invoices can be marked as sent')
 
-      const { error: updateError } = await supabase
-        .from('invoices')
-        .update({ status: 'sent' })
-        .eq('id', invoiceId)
-        .eq('user_id', userId)
-
-      if (updateError) throw new Error('Failed to update invoice status')
-
-      const { data: settings } = await supabase
-        .from('company_settings')
-        .select('accounting_method, entity_type')
-        .eq('user_id', userId)
-        .single()
-
-      const isRealInvoice = !invoice.document_type || invoice.document_type === 'invoice'
-      let journalEntryId: string | null = null
-
-      if (isRealInvoice && (settings?.accounting_method === 'accrual' || !settings?.accounting_method)) {
-        try {
-          const je = await createInvoiceJournalEntry(
-            supabase, userId, invoice as Invoice,
-            (settings?.entity_type as EntityType) || 'enskild_firma',
-            invoice.customer?.name
-          )
-          if (je) {
-            journalEntryId = je.id
-            await supabase.from('invoices').update({ journal_entry_id: je.id }).eq('id', invoiceId)
-          }
-        } catch {
-          // Non-blocking
+      return stagePendingOperation(supabase, userId, 'mark_invoice_sent',
+        `Markera skickad: ${invoice.invoice_number} ${invoice.customer?.name || ''}`,
+        { invoice_id: invoiceId },
+        {
+          invoice_number: invoice.invoice_number,
+          customer_name: invoice.customer?.name,
+          total: invoice.total,
+          currency: invoice.currency,
         }
-      }
-
-      return { success: true, status: 'sent', journal_entry_id: journalEntryId }
+      )
     },
   },
 
@@ -2126,10 +1977,10 @@ const tools: McpTool[] = [
       const invoiceId = args.invoice_id as string
       if (!transactionId || !invoiceId) throw new Error('transaction_id and invoice_id are required')
 
-      // Fetch transaction
+      // Validate both exist and are matchable
       const { data: transaction, error: txError } = await supabase
         .from('transactions')
-        .select('*')
+        .select('id, description, merchant_name, amount, currency, invoice_id')
         .eq('id', transactionId)
         .eq('user_id', userId)
         .single()
@@ -2138,10 +1989,9 @@ const tools: McpTool[] = [
       if (transaction.amount <= 0) throw new Error('Only income transactions (amount > 0) can be matched to invoices')
       if (transaction.invoice_id) throw new Error('Transaction is already linked to an invoice')
 
-      // Fetch invoice
       const { data: invoice, error: invError } = await supabase
         .from('invoices')
-        .select('*, customer:customers(*), items:invoice_items(*)')
+        .select('id, invoice_number, total, currency, status, customer:customers(name)')
         .eq('id', invoiceId)
         .eq('user_id', userId)
         .single()
@@ -2151,124 +2001,21 @@ const tools: McpTool[] = [
         throw new Error('Invoice is not in a matchable state (must be sent, overdue, or partially_paid)')
       }
 
-      // Storno conflicting journal entry if exists
-      if (transaction.journal_entry_id) {
-        await reverseEntry(supabase, userId, transaction.journal_entry_id)
-        await supabase.from('transactions').update({ journal_entry_id: null }).eq('id', transactionId)
-      }
+      const txDesc = transaction.merchant_name || transaction.description || transactionId
 
-      const now = new Date().toISOString()
-      const paidAmount = transaction.amount
-      const newPaidAmount = Math.round(((invoice.paid_amount || 0) + paidAmount) * 100) / 100
-      const currentRemaining = invoice.remaining_amount ?? (invoice.total - (invoice.paid_amount || 0))
-      const newRemaining = Math.max(0, Math.round((currentRemaining - paidAmount) * 100) / 100)
-      const isFullyPaid = newRemaining <= 0
-      const newStatus = isFullyPaid ? 'paid' : 'partially_paid'
-
-      // Fetch accounting method
-      const { data: settings } = await supabase
-        .from('company_settings')
-        .select('accounting_method, entity_type')
-        .eq('user_id', userId)
-        .single()
-
-      const accountingMethod = settings?.accounting_method || 'accrual'
-      const entityType = (settings?.entity_type as EntityType) || 'enskild_firma'
-
-      // Create journal entry (method-aware)
-      let journalEntryId: string | null = null
-      let journalEntryError: string | null = null
-
-      try {
-        if (accountingMethod === 'cash' && isFullyPaid) {
-          const je = await createInvoiceCashEntry(
-            supabase, userId, invoice as Invoice, transaction.date, entityType, invoice.customer?.name
-          )
-          journalEntryId = je?.id ?? null
-        } else {
-          const je = await createInvoicePaymentJournalEntry(
-            supabase, userId, invoice as Invoice, transaction.date, undefined, invoice.customer?.name, paidAmount
-          )
-          journalEntryId = je?.id ?? null
+      return stagePendingOperation(supabase, userId, 'match_transaction_invoice',
+        `Matcha: ${txDesc} → ${invoice.invoice_number}`,
+        { transaction_id: transactionId, invoice_id: invoiceId },
+        {
+          transaction_description: txDesc,
+          transaction_amount: transaction.amount,
+          transaction_currency: transaction.currency,
+          invoice_number: invoice.invoice_number,
+          invoice_total: invoice.total,
+          invoice_currency: invoice.currency,
+          customer_name: invoice.customer?.name,
         }
-      } catch (err) {
-        journalEntryError = err instanceof Error ? err.message : 'Unknown error'
-      }
-
-      // Optimistic lock update on invoice
-      const { data: updatedRows, error: updateInvError } = await supabase
-        .from('invoices')
-        .update({
-          status: newStatus,
-          paid_at: isFullyPaid ? now : null,
-          paid_amount: newPaidAmount,
-          remaining_amount: newRemaining,
-        })
-        .eq('id', invoiceId)
-        .in('status', ['sent', 'overdue', 'partially_paid'])
-        .select('id')
-
-      if (updateInvError) throw new Error('Failed to update invoice status')
-      if (!updatedRows || updatedRows.length === 0) {
-        throw new Error('Invoice has already been fully paid or is no longer matchable')
-      }
-
-      // Record payment
-      const paymentNotes = (accountingMethod === 'cash' && !isFullyPaid)
-        ? 'Kontantmetoden: intäkt bokförs vid slutbetalning'
-        : null
-
-      const { error: paymentError } = await supabase
-        .from('invoice_payments')
-        .insert({
-          user_id: userId,
-          invoice_id: invoiceId,
-          payment_date: transaction.date,
-          amount: paidAmount,
-          currency: invoice.currency,
-          exchange_rate: invoice.exchange_rate,
-          journal_entry_id: journalEntryId,
-          transaction_id: transactionId,
-          notes: paymentNotes,
-        })
-
-      if (paymentError) {
-        if (paymentError.code === '23505') throw new Error('This transaction is already matched to this invoice')
-        throw new Error('Failed to record invoice payment')
-      }
-
-      // Update transaction
-      const { error: updateTxError } = await supabase
-        .from('transactions')
-        .update({
-          invoice_id: invoiceId,
-          potential_invoice_id: null,
-          journal_entry_id: journalEntryId,
-          is_business: true,
-          category: 'income_services',
-        })
-        .eq('id', transactionId)
-
-      if (updateTxError) throw new Error('Failed to link transaction to invoice')
-
-      try {
-        eventBus.emit({
-          type: 'invoice.match_confirmed',
-          payload: { invoice: invoice as Invoice, transaction: transaction as Transaction, userId },
-        })
-      } catch {
-        // Non-critical
-      }
-
-      return {
-        success: true,
-        invoice_status: newStatus,
-        paid_at: isFullyPaid ? now : null,
-        paid_amount: newPaidAmount,
-        remaining_amount: newRemaining,
-        journal_entry_id: journalEntryId,
-        journal_entry_error: journalEntryError,
-      }
+      )
     },
   },
 

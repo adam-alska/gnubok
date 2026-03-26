@@ -1071,7 +1071,7 @@ export interface CreateFiscalPeriodInput {
 
 // ── Pending Operations ────────────────────────────────────────
 
-export type PendingOperationType = 'categorize_transaction' | 'create_customer' | 'create_invoice'
+export type PendingOperationType = 'categorize_transaction' | 'create_customer' | 'create_invoice' | 'mark_invoice_paid' | 'send_invoice' | 'mark_invoice_sent' | 'match_transaction_invoice'
 export type PendingOperationStatus = 'pending' | 'committed' | 'rejected'
 
 export interface PendingOperation {

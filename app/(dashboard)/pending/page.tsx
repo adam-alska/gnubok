@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Fragment } from 'react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -25,6 +25,10 @@ const operationLabels: Record<string, { label: string; icon: typeof ArrowLeftRig
   categorize_transaction: { label: 'Kategorisering', icon: ArrowLeftRight, variant: 'default' },
   create_customer: { label: 'Ny kund', icon: Users, variant: 'secondary' },
   create_invoice: { label: 'Ny faktura', icon: Receipt, variant: 'outline' },
+  mark_invoice_paid: { label: 'Betald faktura', icon: Receipt, variant: 'default' },
+  send_invoice: { label: 'Skicka faktura', icon: Receipt, variant: 'outline' },
+  mark_invoice_sent: { label: 'Markera skickad', icon: Receipt, variant: 'outline' },
+  match_transaction_invoice: { label: 'Fakturamatchning', icon: ArrowLeftRight, variant: 'secondary' },
 }
 
 function formatRelativeTime(dateStr: string): string {
@@ -133,6 +137,22 @@ function InvoicePreview({ data }: { data: Record<string, unknown> }) {
   )
 }
 
+function GenericPreview({ data }: { data: Record<string, unknown> }) {
+  const entries = Object.entries(data).filter(([, v]) => v != null && v !== '')
+  return (
+    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+      {entries.map(([key, value]) => (
+        <Fragment key={key}>
+          <span className="text-muted-foreground">{key.replace(/_/g, ' ')}</span>
+          <span className={typeof value === 'number' ? 'font-mono tabular-nums' : ''}>
+            {String(value)}
+          </span>
+        </Fragment>
+      ))}
+    </div>
+  )
+}
+
 function OperationPreview({ op }: { op: PendingOperation }) {
   switch (op.operation_type) {
     case 'categorize_transaction':
@@ -142,7 +162,7 @@ function OperationPreview({ op }: { op: PendingOperation }) {
     case 'create_invoice':
       return <InvoicePreview data={op.preview_data} />
     default:
-      return <pre className="text-xs">{JSON.stringify(op.preview_data, null, 2)}</pre>
+      return <GenericPreview data={op.preview_data} />
   }
 }
 
