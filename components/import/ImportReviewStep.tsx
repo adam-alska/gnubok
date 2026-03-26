@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -22,6 +22,7 @@ import {
   FileText,
   Database,
 } from 'lucide-react'
+import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import type { ImportPreview, AccountMapping } from '@/lib/import/types'
 
 interface ImportReviewStepProps {
@@ -52,6 +53,23 @@ export default function ImportReviewStep({
     importTransactions: true,
     voucherSeries: 'B',
   })
+  const [elapsed, setElapsed] = useState(0)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Block browser close/refresh during import
+  useUnsavedChanges(isLoading)
+
+  // Elapsed time counter during import
+  useEffect(() => {
+    if (isLoading) {
+      setElapsed(0)
+      intervalRef.current = setInterval(() => setElapsed((s) => s + 1), 1000)
+    } else {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      setElapsed(0)
+    }
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
+  }, [isLoading])
 
   const handleExecute = () => {
     onExecute(options)
@@ -68,6 +86,33 @@ export default function ImportReviewStep({
   const mappedCount = mappings.filter((m) => m.targetAccount).length
   const hasOpeningBalances = preview.openingBalanceTotal > 0
   const hasTransactions = preview.voucherCount > 0
+
+  // Full-screen loading takeover during import execution
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="pt-8 pb-8">
+            <div className="flex flex-col items-center text-center space-y-6">
+              <Loader2 className="h-10 w-10 text-primary animate-spin" />
+              <div className="space-y-1">
+                <p className="font-medium text-lg">Importerar bokföring...</p>
+                <p className="text-sm text-muted-foreground">
+                  {preview.voucherCount} verifikationer bearbetas
+                </p>
+              </div>
+              <div className="text-2xl font-display font-medium tabular-nums text-muted-foreground">
+                {elapsed}s
+              </div>
+              <p className="text-sm text-muted-foreground max-w-sm">
+                Stäng inte sidan. Importen kan ta upp till några minuter beroende på antalet verifikationer.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -247,21 +292,12 @@ export default function ImportReviewStep({
 
       {/* Actions */}
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
-        <Button variant="outline" className="min-h-11" onClick={onBack} disabled={isLoading}>
+        <Button variant="outline" className="min-h-11" onClick={onBack}>
           Tillbaka
         </Button>
-        <Button className="min-h-11" onClick={handleExecute} disabled={isLoading}>
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Importerar...
-            </>
-          ) : (
-            <>
-              Starta import
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </>
-          )}
+        <Button className="min-h-11" onClick={handleExecute}>
+          Starta import
+          <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
     </div>

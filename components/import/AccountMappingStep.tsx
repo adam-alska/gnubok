@@ -138,8 +138,8 @@ export default function AccountMappingStep({
         <CardHeader>
           <CardTitle>Kontomappning</CardTitle>
           <CardDescription>
-            Granska och justera mappningarna mellan importerade konton och din kontoplan.
-            Alla konton måste vara mappade innan importen kan genomföras.
+            Varje konto i SIE-filen kopplas till ett konto i din kontoplan.
+            De flesta matchas automatiskt — granska de osäkra nedan.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

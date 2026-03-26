@@ -1,9 +1,16 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { Upload, FileText, AlertCircle, CheckCircle } from 'lucide-react'
+import { Upload, FileText, AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
+
+const LOADING_PHASES = [
+  { message: 'Läser fil...', progress: 10 },
+  { message: 'Identifierar teckenkodning...', progress: 30 },
+  { message: 'Tolkar SIE-data...', progress: 55 },
+  { message: 'Matchar konton mot BAS-kontoplanen...', progress: 85 },
+] as const
 
 interface SIEUploadStepProps {
   onFileSelect: (file: File) => void
@@ -14,6 +21,23 @@ interface SIEUploadStepProps {
 export default function SIEUploadStep({ onFileSelect, isLoading, error }: SIEUploadStepProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [loadingPhase, setLoadingPhase] = useState(0)
+
+  // Cycle through loading phases on timers
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadingPhase(0)
+      return
+    }
+
+    const timers = [
+      setTimeout(() => setLoadingPhase(1), 2000),
+      setTimeout(() => setLoadingPhase(2), 4000),
+      setTimeout(() => setLoadingPhase(3), 7000),
+    ]
+
+    return () => timers.forEach(clearTimeout)
+  }, [isLoading])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -47,6 +71,33 @@ export default function SIEUploadStep({ onFileSelect, isLoading, error }: SIEUpl
     }
   }, [onFileSelect])
 
+  const phase = LOADING_PHASES[loadingPhase]
+
+  // Full-card takeover while analyzing the file
+  if (isLoading && selectedFile) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="pt-8 pb-8">
+            <div className="flex flex-col items-center text-center space-y-6">
+              <Loader2 className="h-10 w-10 text-primary animate-spin" />
+              <div className="space-y-1">
+                <p className="font-medium text-lg">{phase.message}</p>
+                <p className="text-sm text-muted-foreground">
+                  {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                </p>
+              </div>
+              <Progress value={phase.progress} className="w-64 mx-auto transition-all duration-1000" />
+              <p className="text-xs text-muted-foreground">
+                Lämna inte sidan förrän analysen är klar
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -64,10 +115,9 @@ export default function SIEUploadStep({ onFileSelect, isLoading, error }: SIEUpl
           {/* Drop zone */}
           <div
             className={`
-              relative border-2 border-dashed rounded-lg p-8 text-center transition-colors
+              relative border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer hover:border-primary/50
               ${isDragging ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'}
               ${error ? 'border-destructive bg-destructive/5' : ''}
-              ${isLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:border-primary/50'}
             `}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -83,13 +133,7 @@ export default function SIEUploadStep({ onFileSelect, isLoading, error }: SIEUpl
               disabled={isLoading}
             />
 
-            {isLoading ? (
-              <div className="space-y-4">
-                <FileText className="mx-auto h-12 w-12 text-muted-foreground animate-pulse" />
-                <p className="text-muted-foreground">Analyserar fil...</p>
-                <Progress value={33} className="w-48 mx-auto" />
-              </div>
-            ) : selectedFile ? (
+            {selectedFile ? (
               <div className="space-y-4">
                 <CheckCircle className="mx-auto h-12 w-12 text-success" />
                 <div>

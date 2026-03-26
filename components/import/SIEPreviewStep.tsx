@@ -238,7 +238,7 @@ export default function SIEPreviewStep({
       )}
 
       {/* Create missing accounts */}
-      {missingAccounts.length > 0 && (
+      {missingAccounts.length > 0 ? (
         <Card className="border-primary/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -246,8 +246,8 @@ export default function SIEPreviewStep({
               Skapa saknade konton
             </CardTitle>
             <CardDescription>
-              {missingAccounts.length} konton från SIE-filen finns inte i din kontoplan.
-              Du kan skapa dem automatiskt för att behålla samma kontostruktur som i ditt gamla system.
+              {missingAccounts.length} konton från SIE-filen finns inte i din kontoplan ännu.
+              Klicka nedan för att skapa dem — de kopplas sedan automatiskt i nästa steg.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -279,6 +279,11 @@ export default function SIEPreviewStep({
             </div>
           </CardContent>
         </Card>
+      ) : preview.mappingStatus.mapped === preview.mappingStatus.total && preview.mappingStatus.total > 0 && (
+        <div className="flex items-center gap-2 rounded-lg border border-success/50 bg-success/5 px-4 py-3 text-sm">
+          <CheckCircle className="h-4 w-4 text-success flex-shrink-0" />
+          <span>Alla konton skapade och automatiskt kopplade</span>
+        </div>
       )}
 
       {/* Issues */}

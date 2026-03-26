@@ -15,6 +15,7 @@ import {
   Plus,
   type LucideIcon,
 } from 'lucide-react'
+import { SupportLink } from '@/components/ui/support-link'
 
 interface EmptyStateProps {
   icon?: LucideIcon
@@ -25,6 +26,7 @@ interface EmptyStateProps {
   onAction?: () => void
   secondaryActionLabel?: string
   secondaryActionHref?: string
+  supportHint?: boolean
   className?: string
   children?: React.ReactNode
 }
@@ -41,6 +43,7 @@ export function EmptyState({
   onAction,
   secondaryActionLabel,
   secondaryActionHref,
+  supportHint,
   className,
   children,
 }: EmptyStateProps) {
@@ -55,6 +58,14 @@ export function EmptyState({
       )}
       <h3 className="text-lg font-medium mb-2">{title}</h3>
       <p className="text-sm text-muted-foreground max-w-sm mb-6 text-balance">{description}</p>
+
+      {supportHint && (
+        <div className="mb-6">
+          <SupportLink variant="muted" subject="Behöver hjälp att komma igång">
+            Behöver du hjälp? Kontakta support
+          </SupportLink>
+        </div>
+      )}
 
       {(actionLabel || children) && (
         <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -121,6 +132,7 @@ export function EmptyTransactions() {
       description="Importera kontoutdrag från din bank för att automatiskt bokföra och få koll på ekonomin."
       actionLabel="Importera transaktioner"
       actionHref="/import"
+      supportHint
     />
   )
 }
@@ -155,6 +167,7 @@ export function NoBankConnected() {
       description="Importera kontoutdrag från din bank för att automatiskt bokföra och få bättre koll på ekonomin."
       actionLabel="Importera transaktioner"
       actionHref="/import"
+      supportHint
     />
   )
 }
