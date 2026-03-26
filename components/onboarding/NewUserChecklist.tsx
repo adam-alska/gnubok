@@ -25,14 +25,14 @@ export default function NewUserChecklist({
 
   return (
     <div className={cn('min-h-[75vh] flex flex-col items-center justify-center stagger-enter', className)}>
-      <div className="w-full max-w-xl">
+      <div className="w-full max-w-2xl">
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">
             Välkommen till gnubok
           </h1>
           <p className="text-muted-foreground text-sm md:text-base leading-relaxed max-w-md mx-auto mt-3">
-            Börja med att flytta din bokföring, sedan kopplar du banken.
+            Börja med att hämta din bokföring, sedan kopplar du banken.
             Ingenting ändras i ditt nuvarande system.
           </p>
         </div>
@@ -44,7 +44,7 @@ export default function NewUserChecklist({
               1
             </span>
             <h2 className="font-display text-base font-medium tracking-tight">
-              Flytta din bokföring
+              Hämta din bokföring
             </h2>
           </div>
 
@@ -60,11 +60,25 @@ export default function NewUserChecklist({
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium group-hover:text-primary transition-colors">
-                      Migrera från Fortnox, Bokio eller Visma
+                      Hämta från annat system
                     </p>
-                    <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
-                      Flytta bokföring, kunder, leverantörer och fakturor automatiskt.
+                    <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed underline decoration-foreground/20 underline-offset-2">
+                      Inget ändras i ditt befintliga system.
                     </p>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {([
+                        { name: 'Fortnox', logo: '/logos/fortnox.svg' },
+                        { name: 'Visma', logo: '/logos/visma.jpeg' },
+                        { name: 'Bokio', logo: '/logos/bokio.png' },
+                        { name: 'Björn Lundén', logo: '/logos/bjornlunden.png' },
+                        { name: 'Briox', logo: '/logos/Briox_logo.png' },
+                      ] as const).map(provider => (
+                        <div key={provider.name} className="flex items-center gap-1.5 rounded border border-border/60 bg-muted/30 px-2 py-1">
+                          <img src={provider.logo} alt={provider.name} className="h-4 w-4 shrink-0 rounded-sm object-contain" />
+                          <span className="text-[11px] font-medium text-muted-foreground">{provider.name}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   <ArrowRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-primary/60 mt-1 flex-shrink-0 transition-colors" />
                 </div>
