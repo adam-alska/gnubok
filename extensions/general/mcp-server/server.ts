@@ -9,7 +9,7 @@ import {
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildMappingResultFromCategory } from '@/lib/bookkeeping/category-mapping'
 import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-entries'
-import { upsertCounterpartyTemplate } from '@/lib/bookkeeping/counterparty-templates'
+import { upsertCounterpartyTemplate, findCounterpartyTemplatesBatch, formatCounterpartyName } from '@/lib/bookkeeping/counterparty-templates'
 import { eventBus } from '@/lib/events/bus'
 import { getVatRules, getAvailableVatRates } from '@/lib/invoices/vat-rules'
 import { fetchExchangeRate, convertToSEK } from '@/lib/currency/riksbanken'
@@ -24,9 +24,25 @@ import { generateTrialBalance } from '@/lib/reports/trial-balance'
 import { generateARLedger } from '@/lib/reports/ar-ledger'
 import { generateMonthlyBreakdown } from '@/lib/reports/monthly-breakdown'
 import { RECEIPT_MATCHER_HTML } from './widget-html'
+import { generateBalanceSheet } from '@/lib/reports/balance-sheet'
+import { generateGeneralLedger } from '@/lib/reports/general-ledger'
+import { generateSupplierLedger } from '@/lib/reports/supplier-ledger'
+import { getReconciliationStatus } from '@/lib/reconciliation/bank-reconciliation'
+import { createInvoicePaymentJournalEntry, createInvoiceCashEntry, createInvoiceJournalEntry } from '@/lib/bookkeeping/invoice-entries'
+import { reverseEntry } from '@/lib/bookkeeping/engine'
+import { getSuggestedCategories } from '@/lib/transactions/category-suggestions'
+import { renderToBuffer } from '@react-pdf/renderer'
+import { InvoicePDF } from '@/lib/invoices/pdf-template'
+import { getEmailService } from '@/lib/email/service'
+import {
+  generateInvoiceEmailHtml,
+  generateInvoiceEmailText,
+  generateInvoiceEmailSubject,
+} from '@/lib/email/invoice-templates'
+import { uploadDocument } from '@/lib/core/documents/document-service'
 // ensureInitialized() is called by the extension router (ext/[...path]/route.ts)
 // which dispatches to this handler — no duplicate call needed here.
-import type { Transaction, TransactionCategory, EntityType, VatTreatment, Invoice, Currency } from '@/types'
+import type { Transaction, TransactionCategory, EntityType, VatTreatment, Invoice, Currency, CompanySettings, Customer, InvoiceItem } from '@/types'
 
 // ── JSON-RPC types ───────────────────────────────────────────
 
@@ -1301,6 +1317,1025 @@ const tools: McpTool[] = [
       }
     },
   },
+
+  // ── Invoice Operations ───────────────────────────────────────
+
+  {
+    name: 'gnubok_mark_invoice_as_paid',
+    description:
+      'Mark an invoice as paid and create the payment journal entry. ' +
+      'Supports both accrual (faktureringsmetoden) and cash (kontantmetoden) accounting.\n\n' +
+      'Args:\n' +
+      '  - invoice_id (string, required): UUID of the invoice\n' +
+      '  - payment_date (string, optional): ISO date YYYY-MM-DD (default: today)\n\n' +
+      'Returns JSON:\n' +
+      '  { success: true, status: "paid", paid_at: string, paid_amount: number, journal_entry_id?: string }\n\n' +
+      'Accrual: creates clearing entry (Debit 1930, Credit 1510).\n' +
+      'Cash: creates revenue entry (Debit 1930, Credit 30xx/26xx).\n\n' +
+      'Errors:\n' +
+      '  - Invoice must be in "sent" or "overdue" status\n' +
+      '  - Invoice not found if ID is invalid or belongs to another user',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        invoice_id: { type: 'string', description: 'UUID of the invoice' },
+        payment_date: { type: 'string', description: 'Payment date YYYY-MM-DD (default: today)' },
+      },
+      required: ['invoice_id'],
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    async execute(args, userId, supabase) {
+      const invoiceId = args.invoice_id as string
+      if (!invoiceId) throw new Error('invoice_id is required')
+
+      const { data: invoice, error: invoiceError } = await supabase
+        .from('invoices')
+        .select('*, customer:customers(*), items:invoice_items(*)')
+        .eq('id', invoiceId)
+        .eq('user_id', userId)
+        .single()
+
+      if (invoiceError || !invoice) throw new Error('Invoice not found')
+      if (invoice.status !== 'sent' && invoice.status !== 'overdue') {
+        throw new Error('Invoice can only be marked as paid when status is "sent" or "overdue"')
+      }
+
+      const now = new Date().toISOString()
+      const paymentDate = (args.payment_date as string) || now.split('T')[0]
+
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select('accounting_method, entity_type')
+        .eq('user_id', userId)
+        .single()
+
+      const accountingMethod = settings?.accounting_method || 'accrual'
+      const entityType = (settings?.entity_type as EntityType) || 'enskild_firma'
+      const isRealInvoice = !invoice.document_type || invoice.document_type === 'invoice'
+      let journalEntryId: string | null = null
+
+      if (isRealInvoice) {
+        if (accountingMethod === 'accrual') {
+          const je = await createInvoicePaymentJournalEntry(
+            supabase, userId, invoice as Invoice, paymentDate, undefined, invoice.customer?.name
+          )
+          journalEntryId = je?.id ?? null
+        } else {
+          const je = await createInvoiceCashEntry(
+            supabase, userId, invoice as Invoice, paymentDate, entityType, invoice.customer?.name
+          )
+          journalEntryId = je?.id ?? null
+        }
+      }
+
+      const { error: updateError } = await supabase
+        .from('invoices')
+        .update({ status: 'paid', paid_at: now, paid_amount: invoice.total })
+        .eq('id', invoiceId)
+        .eq('user_id', userId)
+
+      if (updateError) throw new Error('Failed to update invoice status')
+
+      return {
+        success: true,
+        status: 'paid',
+        paid_at: now,
+        paid_amount: invoice.total,
+        journal_entry_id: journalEntryId,
+      }
+    },
+  },
+
+  {
+    name: 'gnubok_send_invoice',
+    description:
+      'Send an invoice to the customer via email with a PDF attachment. ' +
+      'Also creates the revenue journal entry (accrual method) and stores the PDF.\n\n' +
+      'Args:\n' +
+      '  - invoice_id (string, required): UUID of the invoice to send\n\n' +
+      'Returns JSON:\n' +
+      '  { success: true, message: string, messageId?: string }\n\n' +
+      'Prerequisites:\n' +
+      '  - Customer must have an email address\n' +
+      '  - Email service must be configured (RESEND_API_KEY)\n' +
+      '  - Company settings must exist\n\n' +
+      'Errors:\n' +
+      '  - "Email service not configured" if RESEND_API_KEY is missing\n' +
+      '  - "Customer has no email address" if customer email is empty\n' +
+      '  - "Company settings missing" if not set up',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        invoice_id: { type: 'string', description: 'UUID of the invoice to send' },
+      },
+      required: ['invoice_id'],
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    async execute(args, userId, supabase) {
+      const invoiceId = args.invoice_id as string
+      if (!invoiceId) throw new Error('invoice_id is required')
+
+      const emailService = getEmailService()
+      if (!emailService.isConfigured()) {
+        throw new Error('Email service not configured. Ensure RESEND_API_KEY and RESEND_FROM_EMAIL are set.')
+      }
+
+      const { data: invoice, error: invoiceError } = await supabase
+        .from('invoices')
+        .select('*, customer:customers(*), items:invoice_items(*)')
+        .eq('id', invoiceId)
+        .eq('user_id', userId)
+        .single()
+
+      if (invoiceError || !invoice) throw new Error('Invoice not found')
+
+      const customer = invoice.customer as Customer
+      if (!customer.email) throw new Error('Customer has no email address. Update customer details first.')
+
+      const { data: company, error: companyError } = await supabase
+        .from('company_settings')
+        .select('*')
+        .eq('user_id', userId)
+        .single()
+
+      if (companyError || !company) throw new Error('Company settings missing')
+
+      const items = (invoice.items as InvoiceItem[]).sort(
+        (a: InvoiceItem, b: InvoiceItem) => a.sort_order - b.sort_order
+      )
+
+      // If credit note, fetch original invoice number
+      let originalInvoiceNumber: string | undefined
+      if (invoice.credited_invoice_id) {
+        const { data: orig } = await supabase
+          .from('invoices')
+          .select('invoice_number')
+          .eq('id', invoice.credited_invoice_id)
+          .single()
+        if (orig) originalInvoiceNumber = orig.invoice_number
+      }
+
+      // Generate PDF
+      const pdfBuffer = await renderToBuffer(
+        InvoicePDF({
+          invoice: invoice as Invoice,
+          customer,
+          items,
+          company: company as CompanySettings,
+          originalInvoiceNumber,
+        })
+      )
+
+      // Determine filename
+      const isCreditNote = !!invoice.credited_invoice_id
+      const docType = invoice.document_type || 'invoice'
+      let filename: string
+      if (isCreditNote) filename = `kreditfaktura-${invoice.invoice_number}.pdf`
+      else if (docType === 'proforma') filename = `proformafaktura-${invoice.invoice_number}.pdf`
+      else if (docType === 'delivery_note') filename = `foljesedel-${invoice.invoice_number}.pdf`
+      else filename = `faktura-${invoice.invoice_number}.pdf`
+
+      // Get user email for CC
+      const { data: { user: authUser } } = await supabase.auth.admin.getUserById(userId)
+      const ccAddress = company.email || authUser?.email
+
+      // Send email
+      const emailData = { invoice: invoice as Invoice, customer, company: company as CompanySettings }
+      const result = await emailService.sendEmail({
+        to: customer.email,
+        cc: ccAddress,
+        subject: generateInvoiceEmailSubject(emailData),
+        html: generateInvoiceEmailHtml(emailData),
+        text: generateInvoiceEmailText(emailData),
+        replyTo: company.email || undefined,
+        fromName: company.company_name,
+        attachments: [{ filename, content: pdfBuffer, contentType: 'application/pdf' }],
+      })
+
+      if (!result.success) throw new Error(`Failed to send email: ${result.error}`)
+
+      // Update status to sent
+      await supabase.from('invoices').update({ status: 'sent' }).eq('id', invoiceId).eq('user_id', userId)
+
+      // Create journal entry (non-blocking)
+      const isRealInvoice = !invoice.document_type || invoice.document_type === 'invoice'
+      let createdJournalEntryId: string | undefined
+      if (isRealInvoice && (company.accounting_method === 'accrual' || !company.accounting_method)) {
+        try {
+          const je = await createInvoiceJournalEntry(
+            supabase, userId, invoice as Invoice, (company as CompanySettings).entity_type
+          )
+          if (je) {
+            createdJournalEntryId = je.id
+            await supabase.from('invoices').update({ journal_entry_id: je.id }).eq('id', invoiceId)
+          }
+        } catch {
+          // Non-blocking
+        }
+      }
+
+      // Store PDF as document (non-blocking)
+      if (isRealInvoice) {
+        try {
+          const pdfArrayBuffer = new Uint8Array(pdfBuffer).buffer as ArrayBuffer
+          await uploadDocument(supabase, userId, {
+            name: filename,
+            buffer: pdfArrayBuffer,
+            type: 'application/pdf',
+          }, {
+            upload_source: 'system',
+            journal_entry_id: createdJournalEntryId,
+          })
+        } catch {
+          // Non-blocking
+        }
+      }
+
+      await eventBus.emit({ type: 'invoice.sent', payload: { invoice: invoice as Invoice, userId } })
+
+      return {
+        success: true,
+        message: `Invoice ${invoice.invoice_number} sent to ${customer.email}`,
+        messageId: result.messageId,
+      }
+    },
+  },
+
+  {
+    name: 'gnubok_mark_invoice_as_sent',
+    description:
+      'Mark a draft invoice as sent without sending an email. Use this when the invoice ' +
+      'was delivered outside the system (e.g., printed or sent manually).\n\n' +
+      'Args:\n' +
+      '  - invoice_id (string, required): UUID of the draft invoice\n\n' +
+      'Returns JSON:\n' +
+      '  { success: true, status: "sent", journal_entry_id?: string }\n\n' +
+      'Under accrual method: creates the revenue journal entry.\n' +
+      'Under cash method: no journal entry (booking at payment).\n\n' +
+      'Errors:\n' +
+      '  - Invoice must be in "draft" status',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        invoice_id: { type: 'string', description: 'UUID of the draft invoice' },
+      },
+      required: ['invoice_id'],
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    async execute(args, userId, supabase) {
+      const invoiceId = args.invoice_id as string
+      if (!invoiceId) throw new Error('invoice_id is required')
+
+      const { data: invoice, error: invoiceError } = await supabase
+        .from('invoices')
+        .select('*, customer:customers(*), items:invoice_items(*)')
+        .eq('id', invoiceId)
+        .eq('user_id', userId)
+        .single()
+
+      if (invoiceError || !invoice) throw new Error('Invoice not found')
+      if (invoice.status !== 'draft') throw new Error('Only draft invoices can be marked as sent')
+
+      const { error: updateError } = await supabase
+        .from('invoices')
+        .update({ status: 'sent' })
+        .eq('id', invoiceId)
+        .eq('user_id', userId)
+
+      if (updateError) throw new Error('Failed to update invoice status')
+
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select('accounting_method, entity_type')
+        .eq('user_id', userId)
+        .single()
+
+      const isRealInvoice = !invoice.document_type || invoice.document_type === 'invoice'
+      let journalEntryId: string | null = null
+
+      if (isRealInvoice && (settings?.accounting_method === 'accrual' || !settings?.accounting_method)) {
+        try {
+          const je = await createInvoiceJournalEntry(
+            supabase, userId, invoice as Invoice,
+            (settings?.entity_type as EntityType) || 'enskild_firma',
+            invoice.customer?.name
+          )
+          if (je) {
+            journalEntryId = je.id
+            await supabase.from('invoices').update({ journal_entry_id: je.id }).eq('id', invoiceId)
+          }
+        } catch {
+          // Non-blocking
+        }
+      }
+
+      return { success: true, status: 'sent', journal_entry_id: journalEntryId }
+    },
+  },
+
+  // ── Supplier Operations (Read-Only) ──────────────────────────
+
+  {
+    name: 'gnubok_list_suppliers',
+    description:
+      'List all suppliers (leverantörer) with contact and payment details.\n\n' +
+      'Args: none\n\n' +
+      'Returns JSON:\n' +
+      '  { suppliers: [{ id, name, supplier_type, email, org_number, vat_number,\n' +
+      '    default_expense_account, default_payment_terms, city, country }], count: number }',
+    inputSchema: { type: 'object', properties: {} },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    async execute(_args, userId, supabase) {
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('id, name, supplier_type, email, phone, org_number, vat_number, default_expense_account, default_payment_terms, default_currency, city, country')
+        .eq('user_id', userId)
+        .order('name', { ascending: true })
+
+      if (error) throw new Error(`Database error: ${error.message}`)
+
+      return { suppliers: data ?? [], count: data?.length ?? 0 }
+    },
+  },
+
+  {
+    name: 'gnubok_list_supplier_invoices',
+    description:
+      'List supplier invoices (leverantörsfakturor) with optional status filter.\n\n' +
+      'Args:\n' +
+      '  - status (string, optional): Filter by status — "registered", "approved", "overdue", "paid",\n' +
+      '    "to_pay" (approved + overdue), or "all" (default)\n' +
+      '  - limit (number, optional): Max results, 1–100 (default 50)\n\n' +
+      'Returns JSON:\n' +
+      '  { invoices: [{ id, supplier_invoice_number, invoice_date, due_date, status,\n' +
+      '    total, total_sek, currency, vat_treatment, supplier: { id, name } }],\n' +
+      '    count: number }',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: {
+          type: 'string',
+          description: 'Filter: registered, approved, overdue, paid, to_pay, all (default)',
+          enum: ['registered', 'approved', 'overdue', 'paid', 'to_pay', 'all'],
+        },
+        limit: { type: 'number', description: 'Max results 1–100 (default 50)' },
+      },
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    async execute(args, userId, supabase) {
+      const limit = Math.min(Math.max(1, Number(args.limit) || 50), 100)
+      const status = (args.status as string) || 'all'
+
+      let query = supabase
+        .from('supplier_invoices')
+        .select('id, supplier_invoice_number, invoice_date, due_date, status, total, total_sek, currency, vat_treatment, remaining_amount, supplier:suppliers(id, name)')
+        .eq('user_id', userId)
+
+      if (status !== 'all') {
+        if (status === 'to_pay') {
+          query = query.in('status', ['approved', 'overdue'])
+        } else {
+          query = query.eq('status', status)
+        }
+      }
+
+      const { data, error } = await query.order('due_date', { ascending: true }).limit(limit)
+
+      if (error) throw new Error(`Database error: ${error.message}`)
+
+      return { invoices: data ?? [], count: data?.length ?? 0 }
+    },
+  },
+
+  // ── Counterparty Templates & Suggestions ─────────────────────
+
+  {
+    name: 'gnubok_get_counterparty_templates',
+    description:
+      'List active counterparty categorization templates. These are learned patterns from ' +
+      'previous categorizations, used for auto-matching future transactions.\n\n' +
+      'Args:\n' +
+      '  - limit (number, optional): Max results, 1–200 (default 100)\n\n' +
+      'Returns JSON:\n' +
+      '  { templates: [{ id, counterparty_name, debit_account, credit_account,\n' +
+      '    vat_treatment, category, occurrence_count, confidence, source }],\n' +
+      '    count: number }',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Max results 1–200 (default 100)' },
+      },
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    async execute(args, userId, supabase) {
+      const limit = Math.min(Math.max(1, Number(args.limit) || 100), 200)
+
+      const { data, error } = await supabase
+        .from('categorization_templates')
+        .select('id, counterparty_name, counterparty_aliases, debit_account, credit_account, vat_treatment, vat_account, category, line_pattern, occurrence_count, confidence, last_seen_date, source')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .order('occurrence_count', { ascending: false })
+        .limit(limit)
+
+      if (error) throw new Error(`Database error: ${error.message}`)
+
+      return {
+        templates: (data ?? []).map((t) => ({
+          ...t,
+          counterparty_name_display: formatCounterpartyName(t.counterparty_name),
+        })),
+        count: data?.length ?? 0,
+      }
+    },
+  },
+
+  {
+    name: 'gnubok_suggest_categories',
+    description:
+      'Get category and template suggestions for uncategorized transactions. Uses mapping rules, ' +
+      'pattern matching, user history, and counterparty templates to suggest the most likely categories.\n\n' +
+      'Args:\n' +
+      '  - transaction_ids (string[], required): Up to 20 transaction UUIDs\n\n' +
+      'Returns JSON:\n' +
+      '  { suggestions: { [tx_id]: [{ category, label, account, confidence, source }] },\n' +
+      '    counterparty_matches: { [tx_id]: { template_name, confidence, match_method } } }\n\n' +
+      'Sources: "mapping_rule" (highest), "pattern" (keyword), "history" (past categorizations).\n' +
+      'Counterparty matches use exact, normalized, or fuzzy Levenshtein matching.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        transaction_ids: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Up to 20 transaction UUIDs',
+        },
+      },
+      required: ['transaction_ids'],
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    async execute(args, userId, supabase) {
+      const ids = args.transaction_ids as string[]
+      if (!ids || ids.length === 0) throw new Error('transaction_ids is required (non-empty array)')
+      const limitedIds = ids.slice(0, 20)
+
+      // Fetch transactions
+      const { data: transactions, error: txError } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', userId)
+        .in('id', limitedIds)
+
+      if (txError) throw new Error(`Database error: ${txError.message}`)
+      if (!transactions || transactions.length === 0) throw new Error('No transactions found')
+
+      // Fetch mapping rules
+      const { data: mappingRules } = await supabase
+        .from('mapping_rules')
+        .select('*')
+        .or(`user_id.eq.${userId},user_id.is.null`)
+        .eq('is_active', true)
+        .order('priority', { ascending: false })
+
+      // Build category history from past categorizations
+      const { data: historicalTxns } = await supabase
+        .from('transactions')
+        .select('category')
+        .eq('user_id', userId)
+        .not('is_business', 'is', null)
+        .neq('category', 'uncategorized')
+        .neq('category', 'private')
+        .limit(200)
+
+      const categoryHistory: Record<string, number> = {}
+      for (const tx of historicalTxns || []) {
+        if (tx.category) categoryHistory[tx.category] = (categoryHistory[tx.category] || 0) + 1
+      }
+
+      // Batch counterparty template matching
+      const counterpartyMatches = await findCounterpartyTemplatesBatch(
+        supabase, userId, transactions as Transaction[]
+      )
+
+      // Generate suggestions per transaction
+      const suggestions: Record<string, unknown[]> = {}
+      const counterpartyResult: Record<string, unknown> = {}
+
+      for (const tx of transactions) {
+        suggestions[tx.id] = getSuggestedCategories(
+          tx as Transaction, mappingRules ?? [], categoryHistory
+        )
+
+        const cpMatch = counterpartyMatches.get(tx.id)
+        if (cpMatch) {
+          counterpartyResult[tx.id] = {
+            template_name: formatCounterpartyName(cpMatch.template.counterparty_name),
+            debit_account: cpMatch.template.debit_account,
+            credit_account: cpMatch.template.credit_account,
+            category: cpMatch.template.category,
+            confidence: cpMatch.confidence,
+            match_method: cpMatch.matchMethod,
+            occurrence_count: cpMatch.template.occurrence_count,
+          }
+        }
+      }
+
+      return { suggestions, counterparty_matches: counterpartyResult }
+    },
+  },
+
+  // ── Accounts & Chart of Accounts ─────────────────────────────
+
+  {
+    name: 'gnubok_list_accounts',
+    description:
+      'List accounts from the chart of accounts (kontoplan) with optional filtering.\n\n' +
+      'Args:\n' +
+      '  - account_class (number, optional): Filter by class (1=assets, 2=liabilities, 3=revenue,\n' +
+      '    4–7=expenses, 8=financial)\n' +
+      '  - active_only (boolean, optional): Only show active accounts (default: true)\n\n' +
+      'Returns JSON:\n' +
+      '  { accounts: [{ account_number, account_name, account_class, account_type,\n' +
+      '    normal_balance, is_active }], count: number }',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        account_class: { type: 'number', description: 'Filter by class (1–8)' },
+        active_only: { type: 'boolean', description: 'Only active accounts (default: true)' },
+      },
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    async execute(args, userId, supabase) {
+      const activeOnly = args.active_only !== false
+      const accountClass = args.account_class as number | undefined
+
+      let query = supabase
+        .from('chart_of_accounts')
+        .select('account_number, account_name, account_class, account_group, account_type, normal_balance, is_active, description')
+        .eq('user_id', userId)
+        .order('sort_order')
+
+      if (activeOnly) query = query.eq('is_active', true)
+      if (accountClass !== undefined) query = query.eq('account_class', accountClass)
+
+      const { data, error } = await query
+
+      if (error) throw new Error(`Database error: ${error.message}`)
+
+      return { accounts: data ?? [], count: data?.length ?? 0 }
+    },
+  },
+
+  // ── Reports ──────────────────────────────────────────────────
+
+  {
+    name: 'gnubok_get_balance_sheet',
+    description:
+      'Generate balance sheet (balansräkning) for a fiscal period.\n\n' +
+      'Args:\n' +
+      '  - period_id (string, optional): Fiscal period UUID. If omitted, uses the most recent period.\n\n' +
+      'Returns JSON:\n' +
+      '  { assets: { sections, total }, equity_and_liabilities: { sections, total },\n' +
+      '    is_balanced: boolean, period_name: string, period: { start, end } }',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        period_id: { type: 'string', description: 'Fiscal period UUID (default: most recent)' },
+      },
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    async execute(args, userId, supabase) {
+      let periodId = args.period_id as string | undefined
+
+      if (!periodId) {
+        const { data: periods } = await supabase
+          .from('fiscal_periods')
+          .select('id')
+          .eq('user_id', userId)
+          .order('period_start', { ascending: false })
+          .limit(1)
+          .single()
+
+        if (!periods) throw new Error('No fiscal periods found. Create one first.')
+        periodId = periods.id
+      }
+
+      const { data: period } = await supabase
+        .from('fiscal_periods')
+        .select('id, name, period_start, period_end')
+        .eq('id', periodId)
+        .eq('user_id', userId)
+        .single()
+
+      if (!period) throw new Error('Fiscal period not found.')
+
+      const result = await generateBalanceSheet(supabase, userId, periodId!)
+
+      return {
+        period_name: period.name,
+        ...result,
+        period: { start: period.period_start, end: period.period_end },
+      }
+    },
+  },
+
+  {
+    name: 'gnubok_get_general_ledger',
+    description:
+      'Generate general ledger (huvudbok) for a fiscal period, optionally filtered by account range.\n\n' +
+      'Args:\n' +
+      '  - period_id (string, optional): Fiscal period UUID (default: most recent)\n' +
+      '  - account_from (string, optional): Starting account number (e.g., "1930")\n' +
+      '  - account_to (string, optional): Ending account number (e.g., "1939")\n\n' +
+      'Returns JSON:\n' +
+      '  { accounts: [{ account_number, account_name, opening_balance,\n' +
+      '    entries: [{ date, voucher, description, debit, credit, balance }],\n' +
+      '    closing_balance }] }',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        period_id: { type: 'string', description: 'Fiscal period UUID (default: most recent)' },
+        account_from: { type: 'string', description: 'Starting account number filter' },
+        account_to: { type: 'string', description: 'Ending account number filter' },
+      },
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    async execute(args, userId, supabase) {
+      let periodId = args.period_id as string | undefined
+
+      if (!periodId) {
+        const { data: periods } = await supabase
+          .from('fiscal_periods')
+          .select('id')
+          .eq('user_id', userId)
+          .order('period_start', { ascending: false })
+          .limit(1)
+          .single()
+
+        if (!periods) throw new Error('No fiscal periods found.')
+        periodId = periods.id
+      }
+
+      const accountFrom = args.account_from as string | undefined
+      const accountTo = args.account_to as string | undefined
+
+      return await generateGeneralLedger(supabase, userId, periodId!, accountFrom, accountTo)
+    },
+  },
+
+  {
+    name: 'gnubok_get_ar_ledger',
+    description:
+      'Generate accounts receivable ledger (kundreskontra). Shows outstanding customer invoices ' +
+      'with aging information.\n\n' +
+      'Args:\n' +
+      '  - as_of_date (string, optional): Balance date YYYY-MM-DD (default: today)\n\n' +
+      'Returns JSON:\n' +
+      '  { customers: [{ name, invoices: [{ invoice_number, date, due_date, total,\n' +
+      '    paid_amount, remaining, days_overdue }], total_outstanding }],\n' +
+      '    total_outstanding: number }',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        as_of_date: { type: 'string', description: 'Balance date YYYY-MM-DD (default: today)' },
+      },
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    async execute(args, userId, supabase) {
+      const asOfDate = args.as_of_date as string | undefined
+      return await generateARLedger(supabase, userId, asOfDate)
+    },
+  },
+
+  {
+    name: 'gnubok_get_supplier_ledger',
+    description:
+      'Generate accounts payable ledger (leverantörsreskontra). Shows outstanding supplier invoices ' +
+      'with aging information.\n\n' +
+      'Args:\n' +
+      '  - as_of_date (string, optional): Balance date YYYY-MM-DD (default: today)\n\n' +
+      'Returns JSON:\n' +
+      '  { suppliers: [{ name, invoices: [{ invoice_number, date, due_date, total,\n' +
+      '    paid_amount, remaining, days_overdue }], total_outstanding }],\n' +
+      '    total_outstanding: number }',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        as_of_date: { type: 'string', description: 'Balance date YYYY-MM-DD (default: today)' },
+      },
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    async execute(args, userId, supabase) {
+      const asOfDate = args.as_of_date as string | undefined
+      return await generateSupplierLedger(supabase, userId, asOfDate)
+    },
+  },
+
+  // ── Transaction Matching ─────────────────────────────────────
+
+  {
+    name: 'gnubok_match_transaction_to_invoice',
+    description:
+      'Match a bank transaction to a customer invoice. Links the transaction to the invoice, ' +
+      'creates the payment journal entry, and updates the invoice status. Supports partial payments.\n\n' +
+      'If the transaction was previously categorized, the old journal entry is automatically reversed (storno).\n\n' +
+      'Args:\n' +
+      '  - transaction_id (string, required): UUID of the bank transaction (must be income, amount > 0)\n' +
+      '  - invoice_id (string, required): UUID of the invoice to match\n\n' +
+      'Returns JSON:\n' +
+      '  { success: true, invoice_status: "paid"|"partially_paid", paid_amount: number,\n' +
+      '    remaining_amount: number, journal_entry_id?: string }\n\n' +
+      'Errors:\n' +
+      '  - Transaction must be income (amount > 0)\n' +
+      '  - Transaction must not already be linked to an invoice\n' +
+      '  - Invoice must be in "sent", "overdue", or "partially_paid" status',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        transaction_id: { type: 'string', description: 'UUID of the bank transaction' },
+        invoice_id: { type: 'string', description: 'UUID of the invoice to match' },
+      },
+      required: ['transaction_id', 'invoice_id'],
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    async execute(args, userId, supabase) {
+      const transactionId = args.transaction_id as string
+      const invoiceId = args.invoice_id as string
+      if (!transactionId || !invoiceId) throw new Error('transaction_id and invoice_id are required')
+
+      // Fetch transaction
+      const { data: transaction, error: txError } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('id', transactionId)
+        .eq('user_id', userId)
+        .single()
+
+      if (txError || !transaction) throw new Error('Transaction not found')
+      if (transaction.amount <= 0) throw new Error('Only income transactions (amount > 0) can be matched to invoices')
+      if (transaction.invoice_id) throw new Error('Transaction is already linked to an invoice')
+
+      // Fetch invoice
+      const { data: invoice, error: invError } = await supabase
+        .from('invoices')
+        .select('*, customer:customers(*), items:invoice_items(*)')
+        .eq('id', invoiceId)
+        .eq('user_id', userId)
+        .single()
+
+      if (invError || !invoice) throw new Error('Invoice not found')
+      if (invoice.status !== 'sent' && invoice.status !== 'overdue' && invoice.status !== 'partially_paid') {
+        throw new Error('Invoice is not in a matchable state (must be sent, overdue, or partially_paid)')
+      }
+
+      // Storno conflicting journal entry if exists
+      if (transaction.journal_entry_id) {
+        await reverseEntry(supabase, userId, transaction.journal_entry_id)
+        await supabase.from('transactions').update({ journal_entry_id: null }).eq('id', transactionId)
+      }
+
+      const now = new Date().toISOString()
+      const paidAmount = transaction.amount
+      const newPaidAmount = Math.round(((invoice.paid_amount || 0) + paidAmount) * 100) / 100
+      const currentRemaining = invoice.remaining_amount ?? (invoice.total - (invoice.paid_amount || 0))
+      const newRemaining = Math.max(0, Math.round((currentRemaining - paidAmount) * 100) / 100)
+      const isFullyPaid = newRemaining <= 0
+      const newStatus = isFullyPaid ? 'paid' : 'partially_paid'
+
+      // Fetch accounting method
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select('accounting_method, entity_type')
+        .eq('user_id', userId)
+        .single()
+
+      const accountingMethod = settings?.accounting_method || 'accrual'
+      const entityType = (settings?.entity_type as EntityType) || 'enskild_firma'
+
+      // Create journal entry (method-aware)
+      let journalEntryId: string | null = null
+      let journalEntryError: string | null = null
+
+      try {
+        if (accountingMethod === 'cash' && isFullyPaid) {
+          const je = await createInvoiceCashEntry(
+            supabase, userId, invoice as Invoice, transaction.date, entityType, invoice.customer?.name
+          )
+          journalEntryId = je?.id ?? null
+        } else {
+          const je = await createInvoicePaymentJournalEntry(
+            supabase, userId, invoice as Invoice, transaction.date, undefined, invoice.customer?.name, paidAmount
+          )
+          journalEntryId = je?.id ?? null
+        }
+      } catch (err) {
+        journalEntryError = err instanceof Error ? err.message : 'Unknown error'
+      }
+
+      // Optimistic lock update on invoice
+      const { data: updatedRows, error: updateInvError } = await supabase
+        .from('invoices')
+        .update({
+          status: newStatus,
+          paid_at: isFullyPaid ? now : null,
+          paid_amount: newPaidAmount,
+          remaining_amount: newRemaining,
+        })
+        .eq('id', invoiceId)
+        .in('status', ['sent', 'overdue', 'partially_paid'])
+        .select('id')
+
+      if (updateInvError) throw new Error('Failed to update invoice status')
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error('Invoice has already been fully paid or is no longer matchable')
+      }
+
+      // Record payment
+      const paymentNotes = (accountingMethod === 'cash' && !isFullyPaid)
+        ? 'Kontantmetoden: intäkt bokförs vid slutbetalning'
+        : null
+
+      const { error: paymentError } = await supabase
+        .from('invoice_payments')
+        .insert({
+          user_id: userId,
+          invoice_id: invoiceId,
+          payment_date: transaction.date,
+          amount: paidAmount,
+          currency: invoice.currency,
+          exchange_rate: invoice.exchange_rate,
+          journal_entry_id: journalEntryId,
+          transaction_id: transactionId,
+          notes: paymentNotes,
+        })
+
+      if (paymentError) {
+        if (paymentError.code === '23505') throw new Error('This transaction is already matched to this invoice')
+        throw new Error('Failed to record invoice payment')
+      }
+
+      // Update transaction
+      const { error: updateTxError } = await supabase
+        .from('transactions')
+        .update({
+          invoice_id: invoiceId,
+          potential_invoice_id: null,
+          journal_entry_id: journalEntryId,
+          is_business: true,
+          category: 'income_services',
+        })
+        .eq('id', transactionId)
+
+      if (updateTxError) throw new Error('Failed to link transaction to invoice')
+
+      try {
+        eventBus.emit({
+          type: 'invoice.match_confirmed',
+          payload: { invoice: invoice as Invoice, transaction: transaction as Transaction, userId },
+        })
+      } catch {
+        // Non-critical
+      }
+
+      return {
+        success: true,
+        invoice_status: newStatus,
+        paid_at: isFullyPaid ? now : null,
+        paid_amount: newPaidAmount,
+        remaining_amount: newRemaining,
+        journal_entry_id: journalEntryId,
+        journal_entry_error: journalEntryError,
+      }
+    },
+  },
+
+  // ── Fiscal Periods ───────────────────────────────────────────
+
+  {
+    name: 'gnubok_list_fiscal_periods',
+    description:
+      'List all fiscal periods (räkenskapsperioder) with their status.\n\n' +
+      'Args: none\n\n' +
+      'Returns JSON:\n' +
+      '  { periods: [{ id, name, period_start, period_end, status }], count: number }\n\n' +
+      'Status values: "active" (open), "locked" (no new entries), "closed" (year-end completed).',
+    inputSchema: { type: 'object', properties: {} },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    async execute(_args, userId, supabase) {
+      const { data, error } = await supabase
+        .from('fiscal_periods')
+        .select('id, name, period_start, period_end, status')
+        .eq('user_id', userId)
+        .order('period_start', { ascending: false })
+
+      if (error) throw new Error(`Database error: ${error.message}`)
+
+      return { periods: data ?? [], count: data?.length ?? 0 }
+    },
+  },
+
+  // ── Reconciliation ───────────────────────────────────────────
+
+  {
+    name: 'gnubok_get_reconciliation_status',
+    description:
+      'Get bank reconciliation status showing matched vs unmatched transactions and ledger entries.\n\n' +
+      'Args:\n' +
+      '  - date_from (string, optional): Start date YYYY-MM-DD\n' +
+      '  - date_to (string, optional): End date YYYY-MM-DD\n\n' +
+      'Returns JSON:\n' +
+      '  { total_transactions: number, matched: number, unmatched: number,\n' +
+      '    match_rate: number, bank_balance: number, ledger_balance: number,\n' +
+      '    difference: number }',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        date_from: { type: 'string', description: 'Start date YYYY-MM-DD' },
+        date_to: { type: 'string', description: 'End date YYYY-MM-DD' },
+      },
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    async execute(args, userId, supabase) {
+      const dateFrom = args.date_from as string | undefined
+      const dateTo = args.date_to as string | undefined
+      return await getReconciliationStatus(supabase, userId, dateFrom, dateTo)
+    },
+  },
 ]
 
 // ── MCP Protocol Handler ─────────────────────────────────────
@@ -1408,7 +2443,7 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
             resources: { listChanged: false },
           },
           serverInfo: SERVER_INFO,
-          instructions: 'gnubok — Swedish bookkeeping via conversation. List transactions, categorize, create invoices, view reports.',
+          instructions: 'gnubok — Swedish bookkeeping via conversation. Categorize transactions, manage invoices (create, send, mark paid), view suppliers, match payments, get reports (trial balance, income statement, balance sheet, VAT, KPI, general ledger, AR/AP ledgers), and explore chart of accounts.',
         })
       )
     }
