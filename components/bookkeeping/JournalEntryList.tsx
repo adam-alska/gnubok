@@ -44,7 +44,46 @@ export default function JournalEntryList({ periodId }: Props) {
   const [dateToInput, setDateToInput] = useState('')
   const pageSize = 20
 
-  const isValidDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(Date.parse(v))
+  const normalizeDate = (v: string): string | null => {
+    const trimmed = v.trim()
+    if (!trimmed) return null
+    // YYYY
+    if (/^\d{4}$/.test(trimmed)) {
+      const y = parseInt(trimmed, 10)
+      if (y < 1900 || y > 2100) return null
+      return `${trimmed}-01-01`
+    }
+    // YYYY-MM
+    if (/^\d{4}-\d{2}$/.test(trimmed)) {
+      const [y, m] = trimmed.split('-').map(Number)
+      if (y < 1900 || y > 2100 || m < 1 || m > 12) return null
+      return `${trimmed}-01`
+    }
+    // YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      const d = new Date(trimmed + 'T00:00:00')
+      if (isNaN(d.getTime())) return null
+      // Verify the date didn't roll over (e.g. 2024-02-31 → March)
+      const [y, m, day] = trimmed.split('-').map(Number)
+      if (d.getFullYear() !== y || d.getMonth() + 1 !== m || d.getDate() !== day) return null
+      return trimmed
+    }
+    return null
+  }
+
+  const applyDateFilter = () => {
+    const fromVal = dateFromInput.trim()
+    const toVal = dateToInput.trim()
+    const nextFrom = fromVal === '' ? '' : normalizeDate(fromVal) ?? dateFrom
+    const nextTo = toVal === '' ? '' : normalizeDate(toVal) ?? dateTo
+    setDateFromInput(nextFrom)
+    setDateToInput(nextTo)
+    if (nextFrom !== dateFrom || nextTo !== dateTo) {
+      setDateFrom(nextFrom)
+      setDateTo(nextTo)
+      setPage(0)
+    }
+  }
 
   const fetchAttachmentCounts = useCallback(async (entryIds: string[]) => {
     if (entryIds.length === 0) return
@@ -174,12 +213,15 @@ export default function JournalEntryList({ periodId }: Props) {
             onChange={(e) => setDateFromInput(e.target.value)}
             onBlur={() => {
               const v = dateFromInput.trim()
-              const next = v === '' ? '' : isValidDate(v) ? v : dateFrom
-              setDateFromInput(next)
-              if (next !== dateFrom) { setDateFrom(next); setPage(0) }
+              if (v === '') return
+              const normalized = normalizeDate(v)
+              if (normalized) setDateFromInput(normalized)
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                applyDateFilter()
+              }
             }}
             className="h-8 w-[145px] text-xs"
           />
@@ -190,15 +232,26 @@ export default function JournalEntryList({ periodId }: Props) {
             onChange={(e) => setDateToInput(e.target.value)}
             onBlur={() => {
               const v = dateToInput.trim()
-              const next = v === '' ? '' : isValidDate(v) ? v : dateTo
-              setDateToInput(next)
-              if (next !== dateTo) { setDateTo(next); setPage(0) }
+              if (v === '') return
+              const normalized = normalizeDate(v)
+              if (normalized) setDateToInput(normalized)
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                applyDateFilter()
+              }
             }}
             className="h-8 w-[145px] text-xs"
           />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={applyDateFilter}
+          >
+            Filtrera
+          </Button>
           {(dateFrom || dateTo) && (
             <button
               type="button"
