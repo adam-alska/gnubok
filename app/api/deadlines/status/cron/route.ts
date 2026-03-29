@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { updateDeadlineStatuses } from '@/lib/deadlines/status-engine'
+import { verifyCronSecret } from '@/lib/auth/cron'
 
 /**
  * GET /api/deadlines/status/cron
@@ -10,13 +11,8 @@ import { updateDeadlineStatuses } from '@/lib/deadlines/status-engine'
  * Vercel Cron: "0 6 * * *"
  */
 export async function GET(request: Request) {
-  // Verify cron secret for security
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const authError = verifyCronSecret(request)
+  if (authError) return authError
 
   // Create a service role client for accessing all user data
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL

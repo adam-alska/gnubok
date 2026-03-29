@@ -2,6 +2,22 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { generateCalendarFeed } from '@/lib/calendar/ics-generator'
 
+// In-memory rate limiting: token -> { count, resetAt }
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
+const RATE_LIMIT_WINDOW_MS = 60_000 // 1 minute
+const RATE_LIMIT_MAX = 60 // 60 requests per minute per token
+
+// Periodic cleanup to prevent memory leaks (every 5 minutes)
+let lastCleanup = Date.now()
+function cleanupRateLimitMap() {
+  const now = Date.now()
+  if (now - lastCleanup < 5 * 60_000) return
+  lastCleanup = now
+  for (const [key, value] of rateLimitMap) {
+    if (now > value.resetAt) rateLimitMap.delete(key)
+  }
+}
+
 /**
  * GET /api/calendar/feed/[token]
  * Returns an ICS calendar feed for the given token
@@ -17,6 +33,19 @@ export async function GET(
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   if (!uuidRegex.test(token)) {
     return new NextResponse('Invalid token', { status: 400 })
+  }
+
+  // Rate limiting per token
+  cleanupRateLimitMap()
+  const nowMs = Date.now()
+  const rateEntry = rateLimitMap.get(token)
+  if (rateEntry && nowMs < rateEntry.resetAt) {
+    if (rateEntry.count >= RATE_LIMIT_MAX) {
+      return new NextResponse('Too many requests', { status: 429 })
+    }
+    rateEntry.count++
+  } else {
+    rateLimitMap.set(token, { count: 1, resetAt: nowMs + RATE_LIMIT_WINDOW_MS })
   }
 
   // Create service client (no user auth required)
@@ -39,6 +68,11 @@ export async function GET(
 
   if (feedError || !feed) {
     return new NextResponse('Feed not found or inactive', { status: 404 })
+  }
+
+  // Check token expiry
+  if (feed.expires_at && new Date(feed.expires_at) < new Date()) {
+    return new NextResponse('Feed token has expired', { status: 410 })
   }
 
   // Update access tracking

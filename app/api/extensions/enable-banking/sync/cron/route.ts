@@ -10,6 +10,7 @@ import {
   generateConsentExpiryEmailSubject,
 } from '@/lib/email/consent-notification-templates'
 import { ensureInitialized } from '@/lib/init'
+import { verifyCronSecret } from '@/lib/auth/cron'
 import type { StoredAccount } from '@/extensions/general/enable-banking/types'
 
 ensureInitialized()
@@ -24,13 +25,8 @@ ensureInitialized()
  * Deduplication via external_id makes repeated runs safe.
  */
 export async function GET(request: Request) {
-  // Verify cron secret
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const authError = verifyCronSecret(request)
+  if (authError) return authError
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -212,7 +208,7 @@ export async function GET(request: Request) {
         connectionId: connection.id,
         userId: connection.user_id,
         bankName: connection.bank_name,
-        sessionId: connection.session_id,
+        sessionId: '[REDACTED]',
         consentExpires: connection.consent_expires,
         lastSyncedAt: connection.last_synced_at,
         message,

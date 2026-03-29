@@ -1,16 +1,13 @@
 import { NextResponse } from 'next/server'
 import { extensionRegistry } from '@/lib/extensions/registry'
 import { ensureInitialized } from '@/lib/init'
+import { verifyCronSecret } from '@/lib/auth/cron'
 
 ensureInitialized()
 
 export async function POST(request: Request) {
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const authError = verifyCronSecret(request)
+  if (authError) return authError
 
   const aiExt = extensionRegistry.get('ai-categorization')
   if (!aiExt?.services?.seedAllTemplateEmbeddings || !aiExt?.services?.getSchemaVersion) {
