@@ -69,6 +69,12 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${baseUrl}/settings?bank_error=missing_parameters`)
   }
 
+  // Validate authorization code format
+  const codePattern = /^[a-zA-Z0-9._~+\/-]{8,2048}$/
+  if (!codePattern.test(code)) {
+    return NextResponse.redirect(`${baseUrl}/settings?bank_error=invalid_code_format`)
+  }
+
   const supabase = await createServiceClient()
 
   try {
@@ -105,7 +111,7 @@ export async function GET(request: Request) {
 
     console.log('[enable-banking] Session created successfully', {
       connectionId: pendingConnection.id,
-      sessionId: session_id,
+      sessionId: '[REDACTED]',
       accountCount: accounts.length,
       consentExpiresAt,
     })
@@ -150,7 +156,7 @@ export async function GET(request: Request) {
       console.error('[enable-banking] Failed to update connection after session creation', {
         connectionId: pendingConnection.id,
         updateError: { message: updateError.message, code: updateError.code, details: updateError.details },
-        sessionId: session_id,
+        sessionId: '[REDACTED]',
       })
       throw new Error(`Failed to update connection: ${updateError.message}`)
     }

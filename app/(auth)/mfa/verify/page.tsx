@@ -14,6 +14,9 @@ export default function MfaVerifyPage() {
   const [code, setCode] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [factorId, setFactorId] = useState<string | null>(null)
+  const [failedAttempts, setFailedAttempts] = useState(0)
+  const [lockoutUntil, setLockoutUntil] = useState<number | null>(null)
+  const [lockoutRemaining, setLockoutRemaining] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
   const router = useRouter()
@@ -34,6 +37,19 @@ export default function MfaVerifyPage() {
     inputRef.current?.focus()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Lockout countdown timer
+  useEffect(() => {
+    if (!lockoutUntil) return
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((lockoutUntil - Date.now()) / 1000))
+      setLockoutRemaining(remaining)
+      if (remaining <= 0) setLockoutUntil(null)
+    }
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [lockoutUntil])
 
   const handleVerify = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -63,6 +79,16 @@ export default function MfaVerifyPage() {
       })
 
       if (verifyError) {
+        const attempts = failedAttempts + 1
+        setFailedAttempts(attempts)
+
+        // Exponential backoff after 3 failed attempts: 5s, 15s, 30s
+        if (attempts >= 3) {
+          const delays = [5_000, 15_000, 30_000]
+          const delay = delays[Math.min(attempts - 3, delays.length - 1)]
+          setLockoutUntil(Date.now() + delay)
+        }
+
         toast({
           title: 'Fel kod',
           description: 'Kontrollera koden och försök igen.',
@@ -130,13 +156,15 @@ export default function MfaVerifyPage() {
             <Button
               type="submit"
               className="w-full h-11"
-              disabled={isLoading || code.length !== 6}
+              disabled={isLoading || code.length !== 6 || !!lockoutUntil}
             >
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Verifierar...
                 </>
+              ) : lockoutUntil ? (
+                `Vänta ${lockoutRemaining}s`
               ) : (
                 'Verifiera'
               )}

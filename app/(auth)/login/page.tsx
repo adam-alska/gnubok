@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -18,9 +18,24 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isEmailSent, setIsEmailSent] = useState(false)
   const [showResetPassword, setShowResetPassword] = useState(false)
+  const [resetCooldownUntil, setResetCooldownUntil] = useState<number | null>(null)
+  const [resetCooldownRemaining, setResetCooldownRemaining] = useState(0)
   const { toast } = useToast()
   const router = useRouter()
   const supabase = createClient()
+
+  // Reset cooldown timer
+  useEffect(() => {
+    if (!resetCooldownUntil) return
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((resetCooldownUntil - Date.now()) / 1000))
+      setResetCooldownRemaining(remaining)
+      if (remaining <= 0) setResetCooldownUntil(null)
+    }
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [resetCooldownUntil])
 
   const handlePasswordLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -31,27 +46,12 @@ export default function LoginPage() {
     const passwordValue = (formData.get('password') as string) || password
 
     try {
-      console.log('[login] attempting signInWithPassword', {
-        email: emailValue,
-        hasPassword: !!passwordValue,
-        supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-      })
-
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email: emailValue,
         password: passwordValue,
       })
 
       if (error) {
-        console.error('[login] signInWithPassword error', {
-          message: error.message,
-          code: error.code,
-          status: error.status,
-          name: error.name,
-          stack: error.stack,
-          cause: error.cause,
-          fullError: JSON.stringify(error, Object.getOwnPropertyNames(error)),
-        })
         toast({
           title: 'Inloggning misslyckades',
           description: error.message === 'Invalid login credentials'
@@ -62,24 +62,8 @@ export default function LoginPage() {
         return
       }
 
-      console.log('[login] signInWithPassword success', {
-        userId: data.user?.id,
-        email: data.user?.email,
-        hasSession: !!data.session,
-        provider: data.user?.app_metadata?.provider,
-      })
-
       // Check MFA status
-      const { data: aal, error: mfaError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-      if (mfaError) {
-        console.error('[login] MFA check error', {
-          message: mfaError.message,
-          code: mfaError.code,
-          status: mfaError.status,
-          fullError: JSON.stringify(mfaError, Object.getOwnPropertyNames(mfaError)),
-        })
-      }
-      console.log('[login] MFA status', { currentLevel: aal?.currentLevel, nextLevel: aal?.nextLevel })
+      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
 
       if (aal?.nextLevel === 'aal2' && aal?.currentLevel === 'aal1') {
         router.push('/mfa/verify')
@@ -89,13 +73,6 @@ export default function LoginPage() {
       router.push('/')
       router.refresh()
     } catch (error) {
-      console.error('[login] unexpected exception', {
-        error,
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        type: typeof error,
-        constructor: error?.constructor?.name,
-      })
       toast({
         title: 'Inloggning misslyckades',
         description: getErrorMessage(error, { context: 'auth' }),
@@ -114,25 +91,11 @@ export default function LoginPage() {
     const emailValue = (formData.get('email') as string) || email
 
     try {
-      console.log('[login] attempting resetPasswordForEmail', {
-        email: emailValue,
-        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
-      })
-
       const { error } = await supabase.auth.resetPasswordForEmail(emailValue, {
         redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
       })
 
       if (error) {
-        console.error('[login] resetPasswordForEmail error', {
-          message: error.message,
-          code: error.code,
-          status: error.status,
-          name: error.name,
-          stack: error.stack,
-          cause: error.cause,
-          fullError: JSON.stringify(error, Object.getOwnPropertyNames(error)),
-        })
         toast({
           title: 'Kunde inte skicka återställningslänk',
           description: getErrorMessage(error, { context: 'auth' }),
@@ -141,21 +104,14 @@ export default function LoginPage() {
         return
       }
 
-      console.log('[login] resetPasswordForEmail success', { email: emailValue })
       setEmail(emailValue)
+      setResetCooldownUntil(Date.now() + 60_000)
       setIsEmailSent(true)
       toast({
         title: 'Återställningslänk skickad!',
         description: 'Kolla din inkorg för att återställa lösenordet.',
       })
     } catch (error) {
-      console.error('[login] resetPasswordForEmail unexpected exception', {
-        error,
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        type: typeof error,
-        constructor: error?.constructor?.name,
-      })
       toast({
         title: 'Kunde inte skicka återställningslänk',
         description: getErrorMessage(error, { context: 'auth' }),
@@ -242,12 +198,14 @@ export default function LoginPage() {
                   className="h-11"
                 />
               </div>
-              <Button type="submit" className="w-full h-11" disabled={isLoading}>
+              <Button type="submit" className="w-full h-11" disabled={isLoading || !!resetCooldownUntil}>
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Skickar...
                   </>
+                ) : resetCooldownUntil ? (
+                  `Vänta ${resetCooldownRemaining}s`
                 ) : (
                   'Skicka återställningslänk'
                 )}

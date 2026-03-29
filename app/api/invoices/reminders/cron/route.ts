@@ -1,34 +1,11 @@
 import { NextResponse } from 'next/server'
 import { processOverdueReminders } from '@/lib/invoices/reminder-processor'
 import { getEmailService } from '@/lib/email/service'
-
-// Verify cron secret for security
-function verifyCronSecret(request: Request): boolean {
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-
-  if (!cronSecret) {
-    console.error('CRON_SECRET not configured')
-    return false
-  }
-
-  if (!authHeader) {
-    return false
-  }
-
-  // Support both "Bearer <token>" and just "<token>" formats
-  const token = authHeader.startsWith('Bearer ')
-    ? authHeader.substring(7)
-    : authHeader
-
-  return token === cronSecret
-}
+import { verifyCronSecret } from '@/lib/auth/cron'
 
 export async function GET(request: Request) {
-  // Verify cron authentication
-  if (!verifyCronSecret(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const authError = verifyCronSecret(request)
+  if (authError) return authError
 
   // Check if email service is configured
   if (!getEmailService().isConfigured()) {
