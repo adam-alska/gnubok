@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -26,6 +26,7 @@ export default function BankingSettingsPanel() {
   const [syncingConnectionId, setSyncingConnectionId] = useState<string | null>(null)
   const [isConnecting, setIsConnecting] = useState(false)
   const [connectingBankName, setConnectingBankName] = useState<string | null>(null)
+  const connectingRef = useRef(false)
   const [isLoading, setIsLoading] = useState(true)
   const [showCsvFallback, setShowCsvFallback] = useState(false)
 
@@ -49,6 +50,8 @@ export default function BankingSettingsPanel() {
   }
 
   async function handleConnectBank(bank: Bank) {
+    if (connectingRef.current) return
+    connectingRef.current = true
     setIsConnecting(true)
     setConnectingBankName(bank.name)
 
@@ -92,6 +95,7 @@ export default function BankingSettingsPanel() {
         description: error instanceof Error ? error.message : 'Kunde inte ansluta bank',
         variant: 'destructive',
       })
+      connectingRef.current = false
       setIsConnecting(false)
       setConnectingBankName(null)
       setShowCsvFallback(true)

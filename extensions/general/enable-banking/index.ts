@@ -101,18 +101,37 @@ export const enableBankingExtension: Extension = {
             psu_type: psuType,
           })
 
-          // Clean up any stale pending connections for this user+bank
-          // to avoid conflicts with the new authorization
-          const { data: staleConnections } = await supabase
+          // Reject if there's already a recent pending connection for this user+bank
+          // to prevent double-click race conditions that confuse the bank's consent flow
+          const { data: recentPending } = await supabase
             .from('bank_connections')
-            .select('id')
+            .select('id, created_at')
             .eq('user_id', user.id)
             .eq('bank_name', aspsp_name)
             .eq('status', 'pending')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
 
-          if (staleConnections && staleConnections.length > 0) {
+          if (recentPending) {
+            const pendingAge = Date.now() - new Date(recentPending.created_at).getTime()
+            const STALE_THRESHOLD_MS = 5 * 60 * 1000 // 5 minutes
+
+            if (pendingAge < STALE_THRESHOLD_MS) {
+              log.info('[enable-banking] Rejecting duplicate connect — recent pending exists', {
+                existing_id: recentPending.id,
+                age_ms: pendingAge,
+              })
+              return NextResponse.json(
+                { error: 'En anslutning pågår redan. Vänta och försök igen.' },
+                { status: 409 }
+              )
+            }
+
+            // Clean up stale pending connections (older than threshold)
             log.info('[enable-banking] Cleaning up stale pending connections', {
-              count: staleConnections.length,
+              stale_id: recentPending.id,
+              age_ms: pendingAge,
             })
             await supabase
               .from('bank_connections')
