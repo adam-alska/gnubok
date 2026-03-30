@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { validateBody } from '@/lib/api/validate'
 import { CreateSupplierSchema } from '@/lib/api/schemas'
+import { requireCompanyId } from '@/lib/company/context'
 
 export async function GET() {
   const supabase = await createClient()
@@ -12,10 +13,12 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { data, error } = await supabase
     .from('suppliers')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .order('name', { ascending: true })
 
   if (error) {
@@ -34,6 +37,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const result = await validateBody(request, CreateSupplierSchema)
   if (!result.success) return result.response
   const body = result.data
@@ -42,6 +47,7 @@ export async function POST(request: Request) {
     .from('suppliers')
     .insert({
       user_id: user.id,
+      company_id: companyId,
       name: body.name,
       supplier_type: body.supplier_type,
       email: body.email,

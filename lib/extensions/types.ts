@@ -148,6 +148,7 @@ export interface ExtensionServices {
 /** Context passed to extension lifecycle hooks and event handlers */
 export interface ExtensionContext {
   userId: string
+  companyId: string
   extensionId: string
   supabase: SupabaseClient
   emit(event: CoreEvent): Promise<void>

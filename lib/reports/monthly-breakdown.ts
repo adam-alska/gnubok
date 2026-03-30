@@ -25,7 +25,7 @@ const MONTH_LABELS = [
  */
 export async function generateMonthlyBreakdown(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   fiscalPeriodId: string
 ): Promise<MonthlyBreakdown> {
 
@@ -34,7 +34,7 @@ export async function generateMonthlyBreakdown(
     .from('fiscal_periods')
     .select('period_start, period_end')
     .eq('id', fiscalPeriodId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (periodError || !period) {
@@ -51,12 +51,12 @@ export async function generateMonthlyBreakdown(
       journal_entry:journal_entries!inner(
         entry_date,
         status,
-        user_id,
+        company_id,
         fiscal_period_id
       )
     `)
     .eq('journal_entries.fiscal_period_id', fiscalPeriodId)
-    .eq('journal_entries.user_id', userId)
+    .eq('journal_entries.company_id', companyId)
     .eq('journal_entries.status', 'posted')
 
   if (linesError || !lines) {
@@ -84,7 +84,7 @@ export async function generateMonthlyBreakdown(
     const entry = line.journal_entry as unknown as {
       entry_date: string
       status: string
-      user_id: string
+      company_id: string
       fiscal_period_id: string
     }
     const accountClass = parseInt(line.account_number.charAt(0))

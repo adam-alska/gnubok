@@ -307,6 +307,7 @@ describe('ingestTransactions', () => {
     expect(mockCreateTransactionJournalEntry).toHaveBeenCalledWith(
       expect.anything(),
       USER_ID,
+      USER_ID,
       expect.objectContaining({ id: 'tx-cat' }),
       expect.objectContaining({ confidence: 0.85 })
     )

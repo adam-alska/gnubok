@@ -11,6 +11,11 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: () => Promise.resolve(mockSupabase),
 }))
 
+vi.mock('@/lib/company/context', () => ({
+  requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+  getActiveCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
 // Mock API key auth
 const mockValidateApiKey = vi.fn()
 const mockExtractBearerToken = vi.fn()

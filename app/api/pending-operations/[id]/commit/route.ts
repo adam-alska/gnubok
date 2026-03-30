@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { eventBus } from '@/lib/events'
 import { ensureInitialized } from '@/lib/init'
+import { requireCompanyId } from '@/lib/company/context'
 import { buildMappingResultFromCategory } from '@/lib/bookkeeping/category-mapping'
 import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-entries'
 import { upsertCounterpartyTemplate } from '@/lib/bookkeeping/counterparty-templates'
@@ -48,13 +49,14 @@ ensureInitialized()
 async function ensureFiscalPeriod(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
+  companyId: string,
   date: string,
   fiscalYearStartMonth: number = 1
 ): Promise<boolean> {
   const { data: existing } = await supabase
     .from('fiscal_periods')
     .select('id')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .lte('period_start', date)
     .gte('period_end', date)
     .eq('is_closed', false)
@@ -91,6 +93,7 @@ async function ensureFiscalPeriod(
     .from('fiscal_periods')
     .upsert({
       user_id: userId,
+      company_id: companyId,
       name: periodName,
       period_start: periodStart,
       period_end: periodEnd,
@@ -108,6 +111,7 @@ async function ensureFiscalPeriod(
 async function commitCategorizeTransaction(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
+  companyId: string,
   params: Record<string, unknown>
 ): Promise<{ data?: Record<string, unknown>; error?: string; status?: number }> {
   const txId = params.transaction_id as string
@@ -119,7 +123,7 @@ async function commitCategorizeTransaction(
     .from('transactions')
     .select('*')
     .eq('id', txId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (fetchError || !transaction) {
@@ -136,7 +140,7 @@ async function commitCategorizeTransaction(
   const { data: settings } = await supabase
     .from('company_settings')
     .select('entity_type, fiscal_year_start_month')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   const entityType: EntityType = (settings?.entity_type as EntityType) || 'enskild_firma'
@@ -156,13 +160,13 @@ async function commitCategorizeTransaction(
   }
 
   // Ensure fiscal period exists
-  await ensureFiscalPeriod(supabase, userId, transaction.date, fiscalYearStartMonth)
+  await ensureFiscalPeriod(supabase, userId, companyId, transaction.date, fiscalYearStartMonth)
 
   // Create journal entry
   let journalEntryId: string | null = null
   try {
     const journalEntry = await createTransactionJournalEntry(
-      supabase, userId, transaction as Transaction, mappingResult
+      supabase, companyId, userId, transaction as Transaction, mappingResult
     )
     if (journalEntry) {
       journalEntryId = journalEntry.id
@@ -202,6 +206,7 @@ async function commitCategorizeTransaction(
       account: mappingResult.debit_account,
       taxCode: mappingResult.vat_lines[0]?.account_number || '',
       userId,
+      companyId,
     },
   })
 
@@ -211,12 +216,14 @@ async function commitCategorizeTransaction(
 async function commitCreateCustomer(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
+  companyId: string,
   params: Record<string, unknown>
 ): Promise<{ data?: Record<string, unknown>; error?: string; status?: number }> {
   const { data, error } = await supabase
     .from('customers')
     .insert({
       user_id: userId,
+      company_id: companyId,
       name: params.name as string,
       customer_type: params.customer_type as string,
       email: (params.email as string) || null,
@@ -247,7 +254,7 @@ async function commitCreateCustomer(
             vat_number_validated_at: new Date().toISOString(),
           })
           .eq('id', data.id)
-          .eq('user_id', userId)
+          .eq('company_id', companyId)
       }
     } catch (err) {
       log.warn('Auto-VIES validation failed:', err)
@@ -256,7 +263,7 @@ async function commitCreateCustomer(
 
   await eventBus.emit({
     type: 'customer.created',
-    payload: { customer: data as Customer, userId },
+    payload: { customer: data as Customer, userId, companyId },
   })
 
   return { data: { customer_id: data.id } }
@@ -265,6 +272,7 @@ async function commitCreateCustomer(
 async function commitCreateInvoice(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
+  companyId: string,
   params: Record<string, unknown>
 ): Promise<{ data?: Record<string, unknown>; error?: string; status?: number }> {
   const customerId = params.customer_id as string
@@ -281,7 +289,7 @@ async function commitCreateInvoice(
     .from('customers')
     .select('*')
     .eq('id', customerId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (customerError || !customer) {
@@ -340,6 +348,7 @@ async function commitCreateInvoice(
     .from('invoices')
     .insert({
       user_id: userId,
+      company_id: companyId,
       customer_id: customerId,
       invoice_number: invoiceNumber,
       invoice_date: (params.invoice_date as string) || new Date().toISOString().split('T')[0],
@@ -406,7 +415,7 @@ async function commitCreateInvoice(
   if (completeInvoice) {
     await eventBus.emit({
       type: 'invoice.created',
-      payload: { invoice: completeInvoice as Invoice, userId },
+      payload: { invoice: completeInvoice as Invoice, userId, companyId },
     })
   }
 
@@ -416,6 +425,7 @@ async function commitCreateInvoice(
 async function commitMarkInvoicePaid(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
+  companyId: string,
   params: Record<string, unknown>
 ): Promise<{ data?: Record<string, unknown>; error?: string; status?: number }> {
   const invoiceId = params.invoice_id as string
@@ -425,7 +435,7 @@ async function commitMarkInvoicePaid(
     .from('invoices')
     .select('*, customer:customers(*), items:invoice_items(*)')
     .eq('id', invoiceId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (invoiceError || !invoice) return { error: 'Invoice not found', status: 404 }
@@ -436,7 +446,7 @@ async function commitMarkInvoicePaid(
   const { data: settings } = await supabase
     .from('company_settings')
     .select('accounting_method, entity_type')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   const accountingMethod = settings?.accounting_method || 'accrual'
@@ -447,12 +457,12 @@ async function commitMarkInvoicePaid(
   if (isRealInvoice) {
     if (accountingMethod === 'accrual') {
       const je = await createInvoicePaymentJournalEntry(
-        supabase, userId, invoice as Invoice, paymentDate, undefined, invoice.customer?.name
+        supabase, companyId, userId, invoice as Invoice, paymentDate, undefined, invoice.customer?.name
       )
       journalEntryId = je?.id ?? null
     } else {
       const je = await createInvoiceCashEntry(
-        supabase, userId, invoice as Invoice, paymentDate, entityType, invoice.customer?.name
+        supabase, companyId, userId, invoice as Invoice, paymentDate, entityType, invoice.customer?.name
       )
       journalEntryId = je?.id ?? null
     }
@@ -463,7 +473,7 @@ async function commitMarkInvoicePaid(
     .from('invoices')
     .update({ status: 'paid', paid_at: now, paid_amount: invoice.total })
     .eq('id', invoiceId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
 
   if (updateError) return { error: 'Failed to update invoice status', status: 500 }
 
@@ -473,6 +483,7 @@ async function commitMarkInvoicePaid(
 async function commitSendInvoice(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
+  companyId: string,
   params: Record<string, unknown>,
   userEmail?: string
 ): Promise<{ data?: Record<string, unknown>; error?: string; status?: number }> {
@@ -487,7 +498,7 @@ async function commitSendInvoice(
     .from('invoices')
     .select('*, customer:customers(*), items:invoice_items(*)')
     .eq('id', invoiceId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (invoiceError || !invoice) return { error: 'Invoice not found', status: 404 }
@@ -501,7 +512,7 @@ async function commitSendInvoice(
   const { data: company, error: companyError } = await supabase
     .from('company_settings')
     .select('*')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (companyError || !company) return { error: 'Company settings missing', status: 500 }
@@ -554,14 +565,14 @@ async function commitSendInvoice(
 
   if (!result.success) return { error: `Failed to send email: ${result.error}`, status: 500 }
 
-  await supabase.from('invoices').update({ status: 'sent' }).eq('id', invoiceId).eq('user_id', userId)
+  await supabase.from('invoices').update({ status: 'sent' }).eq('id', invoiceId).eq('company_id', companyId)
 
   const isRealInvoice = !invoice.document_type || invoice.document_type === 'invoice'
   let createdJournalEntryId: string | undefined
   if (isRealInvoice && (company.accounting_method === 'accrual' || !company.accounting_method)) {
     try {
       const je = await createInvoiceJournalEntry(
-        supabase, userId, invoice as Invoice, (company as CompanySettings).entity_type
+        supabase, companyId, userId, invoice as Invoice, (company as CompanySettings).entity_type
       )
       if (je) {
         createdJournalEntryId = je.id
@@ -573,7 +584,7 @@ async function commitSendInvoice(
   if (isRealInvoice) {
     try {
       const pdfArrayBuffer = new Uint8Array(pdfBuffer).buffer as ArrayBuffer
-      await uploadDocument(supabase, userId, {
+      await uploadDocument(supabase, userId, companyId, {
         name: filename,
         buffer: pdfArrayBuffer,
         type: 'application/pdf',
@@ -584,7 +595,7 @@ async function commitSendInvoice(
     } catch { /* non-blocking */ }
   }
 
-  await eventBus.emit({ type: 'invoice.sent', payload: { invoice: invoice as Invoice, userId } })
+  await eventBus.emit({ type: 'invoice.sent', payload: { invoice: invoice as Invoice, userId, companyId } })
 
   return { data: { message: `Invoice ${invoice.invoice_number} sent to ${customer.email}` } }
 }
@@ -592,6 +603,7 @@ async function commitSendInvoice(
 async function commitMarkInvoiceSent(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
+  companyId: string,
   params: Record<string, unknown>
 ): Promise<{ data?: Record<string, unknown>; error?: string; status?: number }> {
   const invoiceId = params.invoice_id as string
@@ -600,7 +612,7 @@ async function commitMarkInvoiceSent(
     .from('invoices')
     .select('*, customer:customers(*), items:invoice_items(*)')
     .eq('id', invoiceId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (invoiceError || !invoice) return { error: 'Invoice not found', status: 404 }
@@ -610,14 +622,14 @@ async function commitMarkInvoiceSent(
     .from('invoices')
     .update({ status: 'sent' })
     .eq('id', invoiceId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
 
   if (updateError) return { error: 'Failed to update invoice status', status: 500 }
 
   const { data: settings } = await supabase
     .from('company_settings')
     .select('accounting_method, entity_type')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   const isRealInvoice = !invoice.document_type || invoice.document_type === 'invoice'
@@ -626,7 +638,7 @@ async function commitMarkInvoiceSent(
   if (isRealInvoice && (settings?.accounting_method === 'accrual' || !settings?.accounting_method)) {
     try {
       const je = await createInvoiceJournalEntry(
-        supabase, userId, invoice as Invoice,
+        supabase, companyId, userId, invoice as Invoice,
         (settings?.entity_type as EntityType) || 'enskild_firma',
         invoice.customer?.name
       )
@@ -643,6 +655,7 @@ async function commitMarkInvoiceSent(
 async function commitMatchTransactionInvoice(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
+  companyId: string,
   params: Record<string, unknown>
 ): Promise<{ data?: Record<string, unknown>; error?: string; status?: number }> {
   const transactionId = params.transaction_id as string
@@ -652,7 +665,7 @@ async function commitMatchTransactionInvoice(
     .from('transactions')
     .select('*')
     .eq('id', transactionId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (txError || !transaction) return { error: 'Transaction not found', status: 404 }
@@ -663,7 +676,7 @@ async function commitMatchTransactionInvoice(
     .from('invoices')
     .select('*, customer:customers(*), items:invoice_items(*)')
     .eq('id', invoiceId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (invError || !invoice) return { error: 'Invoice not found', status: 404 }
@@ -673,7 +686,7 @@ async function commitMatchTransactionInvoice(
 
   // Storno conflicting journal entry
   if (transaction.journal_entry_id) {
-    await reverseEntry(supabase, userId, transaction.journal_entry_id)
+    await reverseEntry(supabase, companyId, userId, transaction.journal_entry_id)
     await supabase.from('transactions').update({ journal_entry_id: null }).eq('id', transactionId)
   }
 
@@ -688,7 +701,7 @@ async function commitMatchTransactionInvoice(
   const { data: settings } = await supabase
     .from('company_settings')
     .select('accounting_method, entity_type')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   const accountingMethod = settings?.accounting_method || 'accrual'
@@ -698,12 +711,12 @@ async function commitMatchTransactionInvoice(
   try {
     if (accountingMethod === 'cash' && isFullyPaid) {
       const je = await createInvoiceCashEntry(
-        supabase, userId, invoice as Invoice, transaction.date, entityType, invoice.customer?.name
+        supabase, companyId, userId, invoice as Invoice, transaction.date, entityType, invoice.customer?.name
       )
       journalEntryId = je?.id ?? null
     } else {
       const je = await createInvoicePaymentJournalEntry(
-        supabase, userId, invoice as Invoice, transaction.date, undefined, invoice.customer?.name, paidAmount
+        supabase, companyId, userId, invoice as Invoice, transaction.date, undefined, invoice.customer?.name, paidAmount
       )
       journalEntryId = je?.id ?? null
     }
@@ -733,6 +746,7 @@ async function commitMatchTransactionInvoice(
 
   await supabase.from('invoice_payments').insert({
     user_id: userId,
+    company_id: companyId,
     invoice_id: invoiceId,
     payment_date: transaction.date,
     amount: paidAmount,
@@ -757,7 +771,7 @@ async function commitMatchTransactionInvoice(
   try {
     await eventBus.emit({
       type: 'invoice.match_confirmed',
-      payload: { invoice: invoice as Invoice, transaction: transaction as Transaction, userId },
+      payload: { invoice: invoice as Invoice, transaction: transaction as Transaction, userId, companyId },
     })
   } catch { /* non-critical */ }
 
@@ -778,12 +792,14 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Fetch the pending operation
   const { data: op, error: fetchError } = await supabase
     .from('pending_operations')
     .select('*')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (fetchError || !op) {
@@ -804,25 +820,25 @@ export async function POST(
 
   switch (pendingOp.operation_type) {
     case 'categorize_transaction':
-      result = await commitCategorizeTransaction(supabase, user.id, pendingOp.params)
+      result = await commitCategorizeTransaction(supabase, user.id, companyId, pendingOp.params)
       break
     case 'create_customer':
-      result = await commitCreateCustomer(supabase, user.id, pendingOp.params)
+      result = await commitCreateCustomer(supabase, user.id, companyId, pendingOp.params)
       break
     case 'create_invoice':
-      result = await commitCreateInvoice(supabase, user.id, pendingOp.params)
+      result = await commitCreateInvoice(supabase, user.id, companyId, pendingOp.params)
       break
     case 'mark_invoice_paid':
-      result = await commitMarkInvoicePaid(supabase, user.id, pendingOp.params)
+      result = await commitMarkInvoicePaid(supabase, user.id, companyId, pendingOp.params)
       break
     case 'send_invoice':
-      result = await commitSendInvoice(supabase, user.id, pendingOp.params, user.email)
+      result = await commitSendInvoice(supabase, user.id, companyId, pendingOp.params, user.email)
       break
     case 'mark_invoice_sent':
-      result = await commitMarkInvoiceSent(supabase, user.id, pendingOp.params)
+      result = await commitMarkInvoiceSent(supabase, user.id, companyId, pendingOp.params)
       break
     case 'match_transaction_invoice':
-      result = await commitMatchTransactionInvoice(supabase, user.id, pendingOp.params)
+      result = await commitMatchTransactionInvoice(supabase, user.id, companyId, pendingOp.params)
       break
     default:
       return NextResponse.json({ error: 'Unknown operation type' }, { status: 400 })

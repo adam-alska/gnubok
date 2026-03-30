@@ -4,6 +4,7 @@ import { eventBus } from '@/lib/events'
 import { ensureInitialized } from '@/lib/init'
 import { ingestTransactions, type RawTransaction } from '@/lib/transactions/ingest'
 import { generateExternalId } from '@/lib/import/bank-file/parser'
+import { requireCompanyId } from '@/lib/company/context'
 import type { ParsedBankTransaction, BankFileFormatId } from '@/lib/import/bank-file/types'
 import type { Transaction } from '@/types'
 
@@ -33,6 +34,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const body: ExecuteRequest = await request.json()
   const { transactions, format, filename, file_hash, skip_duplicates: _skip_duplicates = true, auto_categorize: _auto_categorize = true } = body
 
@@ -46,6 +49,7 @@ export async function POST(request: Request) {
       .from('bank_file_imports')
       .upsert({
         user_id: user.id,
+        company_id: companyId,
         filename,
         file_hash,
         file_format: format,
@@ -106,6 +110,7 @@ export async function POST(request: Request) {
             payload: {
               transactions: importedTransactions as Transaction[],
               userId: user.id,
+              companyId,
             },
           })
         }

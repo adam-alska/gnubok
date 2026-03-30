@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getSuggestedCategories, mergeAiSuggestions, getSuggestedTemplates, type SuggestedCategory, type SuggestedTemplate } from '@/lib/transactions/category-suggestions'
 import { findCounterpartyTemplatesBatch, formatCounterpartyName, toCounterpartyTemplateId } from '@/lib/bookkeeping/counterparty-templates'
+import { requireCompanyId } from '@/lib/company/context'
 import type { Transaction, EntityType } from '@/types'
 
 /**
@@ -17,6 +18,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { transaction_ids } = await request.json()
 
   if (!Array.isArray(transaction_ids) || transaction_ids.length === 0) {
@@ -30,7 +33,7 @@ export async function POST(request: Request) {
   const { data: transactions, error: txError } = await supabase
     .from('transactions')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .in('id', ids)
 
   if (txError || !transactions) {
@@ -41,7 +44,7 @@ export async function POST(request: Request) {
   const { data: mappingRules } = await supabase
     .from('mapping_rules')
     .select('*')
-    .or(`user_id.eq.${user.id},user_id.is.null`)
+    .or(`company_id.eq.${companyId},company_id.is.null`)
     .eq('is_active', true)
     .order('priority', { ascending: false })
 
@@ -49,7 +52,7 @@ export async function POST(request: Request) {
   const { data: historicalTxns } = await supabase
     .from('transactions')
     .select('category')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .not('is_business', 'is', null)
     .neq('category', 'uncategorized')
     .neq('category', 'private')
@@ -67,7 +70,7 @@ export async function POST(request: Request) {
   const { data: aiRecords } = await supabase
     .from('extension_data')
     .select('key, value')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .eq('extension_id', 'ai-categorization')
     .in('key', aiKeys)
 
@@ -90,7 +93,7 @@ export async function POST(request: Request) {
   const { data: settings } = await supabase
     .from('company_settings')
     .select('entity_type')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
   const entityType = (settings?.entity_type as EntityType) || undefined
 
@@ -147,7 +150,7 @@ export async function POST(request: Request) {
     const { data: matchedInboxItems } = await supabase
       .from('invoice_inbox_items')
       .select('matched_transaction_id, suggested_template_id, suggested_template_confidence')
-      .eq('user_id', user.id)
+      .eq('company_id', companyId)
       .in('matched_transaction_id', ids)
       .not('suggested_template_id', 'is', null)
 

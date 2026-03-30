@@ -6,7 +6,7 @@ import type { Invoice, InvoiceItem, CreateJournalEntryInput } from '@/types'
 vi.mock('../engine', () => ({
   findFiscalPeriod: vi.fn().mockResolvedValue('period-1'),
   createJournalEntry: vi.fn().mockImplementation(
-    async (_supabase: unknown, _userId: string, input: CreateJournalEntryInput) => ({
+    async (_supabase: unknown, _companyId: string, _userId: string, input: CreateJournalEntryInput) => ({
       id: 'entry-1',
       ...input,
       lines: input.lines,
@@ -169,10 +169,10 @@ describe('createInvoiceJournalEntry — per-line VAT', () => {
       ],
     })
 
-    await createInvoiceJournalEntry(null as never, 'user-1', invoice)
+    await createInvoiceJournalEntry(null as never, 'company-1', 'user-1', invoice)
 
     expect(mockedCreateEntry).toHaveBeenCalledOnce()
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     // Should have 3 lines: 1510 debit, 3001 credit, 2611 credit
     expect(input.lines).toHaveLength(3)
@@ -208,10 +208,10 @@ describe('createInvoiceJournalEntry — per-line VAT', () => {
     invoice.vat_amount = 198
     invoice.total = 1198
 
-    await createInvoiceJournalEntry(null as never, 'user-1', invoice)
+    await createInvoiceJournalEntry(null as never, 'company-1', 'user-1', invoice)
 
     expect(mockedCreateEntry).toHaveBeenCalledOnce()
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     // Should have 5 lines: 1510, 3001(25%), 2611(25%), 3002(12%), 2621(12%)
     expect(input.lines).toHaveLength(5)
@@ -249,10 +249,10 @@ describe('createInvoiceJournalEntry — per-line VAT', () => {
       ],
     })
 
-    await createInvoiceJournalEntry(null as never, 'user-1', invoice)
+    await createInvoiceJournalEntry(null as never, 'company-1', 'user-1', invoice)
 
     expect(mockedCreateEntry).toHaveBeenCalledOnce()
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     // Should have 2 lines: 1510 debit, 3308 credit (no VAT)
     expect(input.lines).toHaveLength(2)
@@ -286,9 +286,9 @@ describe('createInvoiceJournalEntry — per-line VAT', () => {
     invoice.vat_amount = 378
     invoice.total = 2378
 
-    await createInvoiceJournalEntry(null as never, 'user-1', invoice)
+    await createInvoiceJournalEntry(null as never, 'company-1', 'user-1', invoice)
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     const totalDebit = input.lines.reduce((sum, l) => sum + l.debit_amount, 0)
     const totalCredit = input.lines.reduce((sum, l) => sum + l.credit_amount, 0)
@@ -316,10 +316,10 @@ describe('createCreditNoteJournalEntry — per-line VAT', () => {
       ],
     })
 
-    await createCreditNoteJournalEntry(null as never, 'user-1', creditNote)
+    await createCreditNoteJournalEntry(null as never, 'company-1', 'user-1', creditNote)
 
     expect(mockedCreateEntry).toHaveBeenCalledOnce()
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     // Revenue and VAT lines should be debits (reversed)
     const debit3001 = input.lines.find((l) => l.account_number === '3001')
@@ -364,10 +364,10 @@ describe('createInvoiceCashEntry — per-line VAT', () => {
       ],
     })
 
-    await createInvoiceCashEntry(null as never, 'user-1', invoice, '2024-07-01')
+    await createInvoiceCashEntry(null as never, 'company-1', 'user-1', invoice, '2024-07-01')
 
     expect(mockedCreateEntry).toHaveBeenCalledOnce()
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     // Debit 1930 (bank account) instead of 1510
     const debit1930 = input.lines.find((l) => l.account_number === '1930')
@@ -412,10 +412,10 @@ describe('createInvoiceJournalEntry — EUR foreign currency', () => {
       ],
     })
 
-    await createInvoiceJournalEntry(null as never, 'user-1', invoice)
+    await createInvoiceJournalEntry(null as never, 'company-1', 'user-1', invoice)
 
     expect(mockedCreateEntry).toHaveBeenCalledOnce()
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     // All amounts should be in SEK
     const debit1510 = input.lines.find((l) => l.account_number === '1510')
@@ -455,9 +455,9 @@ describe('createInvoiceJournalEntry — EUR foreign currency', () => {
       ],
     })
 
-    await createInvoiceJournalEntry(null as never, 'user-1', invoice)
+    await createInvoiceJournalEntry(null as never, 'company-1', 'user-1', invoice)
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     // Revenue should be computed via exchange rate
     const credit3305 = input.lines.find((l) => l.account_number === '3305')
@@ -478,9 +478,9 @@ describe('createInvoiceJournalEntry — EUR foreign currency', () => {
       ],
     })
 
-    await createInvoiceJournalEntry(null as never, 'user-1', invoice)
+    await createInvoiceJournalEntry(null as never, 'company-1', 'user-1', invoice)
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     const debit1510 = input.lines.find((l) => l.account_number === '1510')
     expect(debit1510?.debit_amount).toBe(1000)
 
@@ -500,9 +500,9 @@ describe('BFL-compliant descriptions with counterparty names', () => {
       items: [makeItem()],
     })
 
-    await createInvoiceJournalEntry(null as never, 'user-1', invoice, 'enskild_firma', 'Foretag AB')
+    await createInvoiceJournalEntry(null as never, 'company-1', 'user-1', invoice, 'enskild_firma', 'Foretag AB')
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.description).toBe('Kundfaktura 1001, Foretag AB')
   })
 
@@ -511,27 +511,27 @@ describe('BFL-compliant descriptions with counterparty names', () => {
       items: [makeItem()],
     })
 
-    await createInvoiceJournalEntry(null as never, 'user-1', invoice, 'enskild_firma')
+    await createInvoiceJournalEntry(null as never, 'company-1', 'user-1', invoice, 'enskild_firma')
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.description).toBe('Kundfaktura 1001')
   })
 
   it('createInvoicePaymentJournalEntry includes customer name', async () => {
     const invoice = makeInvoice({ total: 1250 })
 
-    await createInvoicePaymentJournalEntry(null as never, 'user-1', invoice, '2024-07-15', undefined, 'Foretag AB')
+    await createInvoicePaymentJournalEntry(null as never, 'company-1', 'user-1', invoice, '2024-07-15', undefined, 'Foretag AB')
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.description).toBe('Inbetalning kundfaktura 1001, Foretag AB')
   })
 
   it('createInvoicePaymentJournalEntry falls back without customer name', async () => {
     const invoice = makeInvoice({ total: 1250 })
 
-    await createInvoicePaymentJournalEntry(null as never, 'user-1', invoice, '2024-07-15')
+    await createInvoicePaymentJournalEntry(null as never, 'company-1', 'user-1', invoice, '2024-07-15')
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.description).toBe('Inbetalning kundfaktura 1001')
   })
 
@@ -544,9 +544,9 @@ describe('BFL-compliant descriptions with counterparty names', () => {
       items: [makeItem({ quantity: -1, line_total: -1000, vat_amount: -250 })],
     })
 
-    await createCreditNoteJournalEntry(null as never, 'user-1', creditNote, 'enskild_firma', 'Foretag AB')
+    await createCreditNoteJournalEntry(null as never, 'company-1', 'user-1', creditNote, 'enskild_firma', 'Foretag AB')
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.description).toBe('Kreditfaktura KR-1001, Foretag AB')
   })
 
@@ -555,9 +555,9 @@ describe('BFL-compliant descriptions with counterparty names', () => {
       items: [makeItem()],
     })
 
-    await createInvoiceCashEntry(null as never, 'user-1', invoice, '2024-07-01', 'enskild_firma', 'Foretag AB')
+    await createInvoiceCashEntry(null as never, 'company-1', 'user-1', invoice, '2024-07-01', 'enskild_firma', 'Foretag AB')
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.description).toBe('Kontantbetalning kundfaktura 1001, Foretag AB')
   })
 
@@ -566,9 +566,9 @@ describe('BFL-compliant descriptions with counterparty names', () => {
       items: [makeItem()],
     })
 
-    await createInvoiceCashEntry(null as never, 'user-1', invoice, '2024-07-01', 'enskild_firma')
+    await createInvoiceCashEntry(null as never, 'company-1', 'user-1', invoice, '2024-07-01', 'enskild_firma')
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.description).toBe('Kontantbetalning kundfaktura 1001')
   })
 })
@@ -581,9 +581,9 @@ describe('createInvoicePaymentJournalEntry — exchange rate difference', () => 
   it('SEK payment creates simple 2-line entry', async () => {
     const invoice = makeInvoice({ total: 1250 })
 
-    await createInvoicePaymentJournalEntry(null as never, 'user-1', invoice, '2024-07-15')
+    await createInvoicePaymentJournalEntry(null as never, 'company-1', 'user-1', invoice, '2024-07-15')
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.lines).toHaveLength(2)
 
     const debit1930 = input.lines.find((l) => l.account_number === '1930')
@@ -602,9 +602,9 @@ describe('createInvoicePaymentJournalEntry — exchange rate difference', () => 
     })
 
     // Gain of 200 SEK (received more than booked)
-    await createInvoicePaymentJournalEntry(null as never, 'user-1', invoice, '2024-07-15', 200)
+    await createInvoicePaymentJournalEntry(null as never, 'company-1', 'user-1', invoice, '2024-07-15', 200)
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.lines).toHaveLength(3)
 
     // Debit 1930: actual SEK received = 11500 + 200 = 11700
@@ -634,9 +634,9 @@ describe('createInvoicePaymentJournalEntry — exchange rate difference', () => 
     })
 
     // Loss of 300 SEK (received less than booked)
-    await createInvoicePaymentJournalEntry(null as never, 'user-1', invoice, '2024-07-15', -300)
+    await createInvoicePaymentJournalEntry(null as never, 'company-1', 'user-1', invoice, '2024-07-15', -300)
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.lines).toHaveLength(3)
 
     // Debit 1930: actual SEK received = 11500 + (-300) = 11200

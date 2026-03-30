@@ -17,6 +17,11 @@ vi.mock('@/lib/init', () => ({
   ensureInitialized: vi.fn(),
 }))
 
+vi.mock('@/lib/company/context', () => ({
+  requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+  getActiveCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
 const mockBuildMappingResultFromCategory = vi.fn()
 vi.mock('@/lib/bookkeeping/category-mapping', () => ({
   buildMappingResultFromCategory: (...args: unknown[]) =>

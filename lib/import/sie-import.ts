@@ -93,7 +93,7 @@ export async function checkDuplicateImport(
   const { data } = await supabase
     .from('sie_imports')
     .select('*')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .eq('file_hash', fileHash)
     .eq('status', 'completed')
     .single()
@@ -115,7 +115,7 @@ async function cleanupStaleImportRecords(
   await supabase
     .from('sie_imports')
     .delete()
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .eq('file_hash', fileHash)
     .in('status', ['pending', 'failed'])
     .lt('created_at', oneHourAgo)
@@ -134,7 +134,7 @@ async function ensureFiscalPeriod(
   const { data: containing } = await supabase
     .from('fiscal_periods')
     .select('id')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .lte('period_start', formatDate(startDate))
     .gte('period_end', formatDate(endDate))
     .single()
@@ -148,7 +148,7 @@ async function ensureFiscalPeriod(
   const { data: overlapping } = await supabase
     .from('fiscal_periods')
     .select('id')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .lte('period_start', formatDate(endDate))
     .gte('period_end', formatDate(startDate))
     .order('period_start', { ascending: false })
@@ -319,7 +319,7 @@ async function createOpeningBalanceEntry(
   const fiscalYearStart = parsed.stats.fiscalYearStart
   const entryDate = fiscalYearStart ? formatDate(fiscalYearStart) : formatDate(new Date())
 
-  const entry = await createJournalEntry(supabase, userId, {
+  const entry = await createJournalEntry(supabase, userId, userId, {
     fiscal_period_id: fiscalPeriodId,
     entry_date: entryDate,
     description: 'Ingående balanser från SIE-import',
@@ -553,7 +553,7 @@ async function importVouchers(
   const { data: accounts } = await supabase
     .from('chart_of_accounts')
     .select('id, account_number')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .in('account_number', [...allAccountNumbers])
 
   const accountIdMap = new Map<string, string>()
@@ -916,7 +916,7 @@ async function createMigrationAdjustmentEntry(
   const firstDate = skippedDates[0] || '?'
   const lastDate = skippedDates[skippedDates.length - 1] || '?'
 
-  const entry = await createJournalEntry(supabase, userId, {
+  const entry = await createJournalEntry(supabase, userId, userId, {
     fiscal_period_id: fiscalPeriodId,
     entry_date: entryDate,
     description: `Omföringsverifikation: justering för ${skippedDetails.length} exkluderade verifikationer (${firstId}–${lastId}, ${firstDate}–${lastDate}) vid SIE-import`,
@@ -941,7 +941,7 @@ async function ensureAccountExists(
   const { data } = await supabase
     .from('chart_of_accounts')
     .select('id')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .eq('account_number', accountNumber)
     .single()
 
@@ -1122,7 +1122,7 @@ export async function loadMappings(supabase: SupabaseClient, userId: string): Pr
   const { data } = await supabase
     .from('sie_account_mappings')
     .select('*')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
 
   const map = new Map<string, AccountMapping>()
 
@@ -1238,7 +1238,7 @@ export async function executeSIEImport(
       const { data: existing } = await supabase
         .from('fiscal_periods')
         .select('id')
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .lte('period_start', formatDate(fiscalYearStart))
         .gte('period_end', formatDate(fiscalYearEnd))
         .single()

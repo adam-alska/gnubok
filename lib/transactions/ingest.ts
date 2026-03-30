@@ -35,7 +35,7 @@ async function buildBookedTransactionMap(
     const { data: booked } = await supabase
       .from('transactions')
       .select('date, amount')
-      .eq('user_id', userId)
+      .eq('company_id', userId)
       .not('journal_entry_id', 'is', null)
       .gte('date', dateFrom)
       .lte('date', dateTo)
@@ -103,7 +103,7 @@ export async function ingestTransactions(
     const { data } = await supabase
       .from('supplier_invoices')
       .select('*, supplier:suppliers(*)')
-      .eq('user_id', userId)
+      .eq('company_id', userId)
       .in('status', ['registered', 'approved'])
       .gt('remaining_amount', 0)
 
@@ -135,7 +135,7 @@ export async function ingestTransactions(
     const { data } = await supabase
       .from('transactions')
       .select('external_id')
-      .eq('user_id', userId)
+      .eq('company_id', userId)
       .in('external_id', chunk)
     data?.forEach(r => existingExternalIds.add(r.external_id))
   }
@@ -328,6 +328,7 @@ export async function ingestTransactions(
         if (mappingResult.confidence >= 0.8 && !mappingResult.requires_review) {
           const journalEntry = await createTransactionJournalEntry(
             supabase,
+            userId,
             userId,
             newTransaction as Transaction,
             mappingResult

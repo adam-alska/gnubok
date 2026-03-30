@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireCompanyId } from '@/lib/company/context'
 
 export async function GET(
   _request: Request,
@@ -13,12 +14,14 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const extensionId = `${sector}/${slug}`
 
   const { data } = await supabase
     .from('extension_data')
     .select('value')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .eq('extension_id', extensionId)
     .eq('key', 'settings')
     .single()
@@ -38,6 +41,8 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const body = await request.json()
   const extensionId = `${sector}/${slug}`
 
@@ -45,7 +50,7 @@ export async function PATCH(
   const { data: existing } = await supabase
     .from('extension_data')
     .select('value')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .eq('extension_id', extensionId)
     .eq('key', 'settings')
     .single()
@@ -57,6 +62,7 @@ export async function PATCH(
     .upsert(
       {
         user_id: user.id,
+        company_id: companyId,
         extension_id: extensionId,
         key: 'settings',
         value: mergedSettings,

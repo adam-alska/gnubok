@@ -16,6 +16,10 @@ vi.mock('@/lib/init', () => ({
   ensureInitialized: vi.fn(),
 }))
 
+vi.mock('@/lib/company/context', () => ({
+  requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
 const mockReverseEntry = vi.fn()
 vi.mock('@/lib/bookkeeping/engine', () => ({
   reverseEntry: (...args: unknown[]) => mockReverseEntry(...args),
@@ -64,7 +68,7 @@ describe('POST /api/bookkeeping/journal-entries/[id]/reverse', () => {
 
     expect(status).toBe(200)
     expect(body.data).toEqual(reversalEntry)
-    expect(mockReverseEntry).toHaveBeenCalledWith(expect.anything(), 'user-1', 'entry-1')
+    expect(mockReverseEntry).toHaveBeenCalledWith(expect.anything(), 'company-1', 'user-1', 'entry-1')
   })
 
   it('returns 400 when engine throws', async () => {

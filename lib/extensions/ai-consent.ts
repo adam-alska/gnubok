@@ -54,7 +54,7 @@ export const AI_DATA_DISCLOSURES: Record<AiExtensionId, {
  */
 export async function hasAiConsent(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   extensionId: string
 ): Promise<boolean> {
   if (!isAiExtension(extensionId)) {
@@ -64,7 +64,7 @@ export async function hasAiConsent(
   const { data } = await supabase
     .from('extension_data')
     .select('value')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .eq('extension_id', extensionId)
     .eq('key', 'ai_consent')
     .single()
@@ -81,6 +81,7 @@ export async function hasAiConsent(
 export async function grantAiConsent(
   supabase: SupabaseClient,
   userId: string,
+  companyId: string,
   extensionId: string
 ): Promise<void> {
   if (!isAiExtension(extensionId)) return
@@ -90,6 +91,7 @@ export async function grantAiConsent(
     .upsert(
       {
         user_id: userId,
+        company_id: companyId,
         extension_id: extensionId,
         key: 'ai_consent',
         value: {
@@ -108,6 +110,7 @@ export async function grantAiConsent(
 export async function revokeAiConsent(
   supabase: SupabaseClient,
   userId: string,
+  companyId: string,
   extensionId: string
 ): Promise<void> {
   if (!isAiExtension(extensionId)) return
@@ -117,6 +120,7 @@ export async function revokeAiConsent(
     .upsert(
       {
         user_id: userId,
+        company_id: companyId,
         extension_id: extensionId,
         key: 'ai_consent',
         value: {

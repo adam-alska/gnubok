@@ -24,6 +24,7 @@ import type {
  */
 export async function validateYearEndReadiness(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   fiscalPeriodId: string
 ): Promise<YearEndValidation> {
@@ -35,7 +36,7 @@ export async function validateYearEndReadiness(
     .from('fiscal_periods')
     .select('*')
     .eq('id', fiscalPeriodId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (fetchError || !period) {
@@ -63,7 +64,7 @@ export async function validateYearEndReadiness(
   const { count: draftCount } = await supabase
     .from('journal_entries')
     .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .eq('fiscal_period_id', fiscalPeriodId)
     .eq('status', 'draft')
 
@@ -75,7 +76,7 @@ export async function validateYearEndReadiness(
   // Check: voucher continuity
   let voucherGaps: VoucherGap[] = []
   const { data: gaps, error: gapsError } = await supabase.rpc('detect_voucher_gaps', {
-    p_user_id: userId,
+    p_company_id: companyId,
     p_fiscal_period_id: fiscalPeriodId,
     p_series: 'A',
   })
@@ -88,7 +89,7 @@ export async function validateYearEndReadiness(
   }
 
   // Check: trial balance is balanced
-  const trialBalance = await generateTrialBalance(supabase, userId, fiscalPeriodId)
+  const trialBalance = await generateTrialBalance(supabase, companyId, fiscalPeriodId)
   const trialBalanceBalanced = trialBalance.isBalanced
 
   if (!trialBalanceBalanced) {
@@ -101,7 +102,7 @@ export async function validateYearEndReadiness(
   const { count: entryCount } = await supabase
     .from('journal_entries')
     .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .eq('fiscal_period_id', fiscalPeriodId)
     .eq('status', 'posted')
 
@@ -113,7 +114,7 @@ export async function validateYearEndReadiness(
   const { count: revalCount } = await supabase
     .from('journal_entries')
     .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .eq('fiscal_period_id', fiscalPeriodId)
     .eq('source_type', 'currency_revaluation')
     .eq('status', 'posted')
@@ -123,7 +124,7 @@ export async function validateYearEndReadiness(
     const { count: fxReceivables } = await supabase
       .from('invoices')
       .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
+      .eq('company_id', companyId)
       .in('status', ['sent', 'overdue'])
       .neq('currency', 'SEK')
       .not('exchange_rate', 'is', null)
@@ -131,7 +132,7 @@ export async function validateYearEndReadiness(
     const { count: fxPayables } = await supabase
       .from('supplier_invoices')
       .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
+      .eq('company_id', companyId)
       .in('status', ['registered', 'approved', 'overdue', 'partially_paid'])
       .neq('currency', 'SEK')
       .not('exchange_rate', 'is', null)
@@ -159,6 +160,7 @@ export async function validateYearEndReadiness(
  */
 export async function previewYearEndClosing(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   fiscalPeriodId: string
 ): Promise<YearEndPreview> {
@@ -167,7 +169,7 @@ export async function previewYearEndClosing(
   const { data: settings } = await supabase
     .from('company_settings')
     .select('entity_type')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   const entityType = settings?.entity_type ?? 'aktiebolag'
@@ -178,11 +180,11 @@ export async function previewYearEndClosing(
       : 'Årets resultat'
 
   // Get income statement for net result
-  const incomeStatement = await generateIncomeStatement(supabase, userId, fiscalPeriodId)
+  const incomeStatement = await generateIncomeStatement(supabase, companyId, fiscalPeriodId)
   const netResult = incomeStatement.net_result
 
   // Get trial balance for individual account balances in class 3-8
-  const { rows } = await generateTrialBalance(supabase, userId, fiscalPeriodId)
+  const { rows } = await generateTrialBalance(supabase, companyId, fiscalPeriodId)
   const resultAccounts = rows.filter(
     (r) => r.account_class >= 3 && r.account_class <= 8
   )
@@ -255,14 +257,14 @@ export async function previewYearEndClosing(
     .from('fiscal_periods')
     .select('period_end')
     .eq('id', fiscalPeriodId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   let currencyRevaluation = null
   if (periodData) {
     const revalPreview = await previewCurrencyRevaluation(
       supabase,
-      userId,
+      companyId,
       periodData.period_end
     )
     if (revalPreview.items.length > 0) {
@@ -293,11 +295,12 @@ export async function previewYearEndClosing(
  */
 export async function executeYearEndClosing(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   fiscalPeriodId: string
 ): Promise<YearEndResult> {
   // 1. Validate readiness
-  const validation = await validateYearEndReadiness(supabase, userId, fiscalPeriodId)
+  const validation = await validateYearEndReadiness(supabase, companyId, userId, fiscalPeriodId)
   if (!validation.ready) {
     throw new Error(`Year-end closing not ready: ${validation.errors.join('; ')}`)
   }
@@ -307,7 +310,7 @@ export async function executeYearEndClosing(
     .from('fiscal_periods')
     .select('*')
     .eq('id', fiscalPeriodId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (!period) {
@@ -319,20 +322,21 @@ export async function executeYearEndClosing(
   //    the closing entry then zeros out.
   const revaluationResult = await executeCurrencyRevaluation(
     supabase,
-    userId,
+    companyId,
     period.period_end,
-    fiscalPeriodId
+    fiscalPeriodId,
+    userId
   )
 
   // 3. Get closing preview (now includes revaluation effects in trial balance)
-  const preview = await previewYearEndClosing(supabase, userId, fiscalPeriodId)
+  const preview = await previewYearEndClosing(supabase, companyId, userId, fiscalPeriodId)
 
   if (preview.closingLines.length === 0) {
     throw new Error('No result accounts to close — period has no activity')
   }
 
   // 4. Create closing entry via the journal engine
-  const closingEntry = await createJournalEntry(supabase, userId, {
+  const closingEntry = await createJournalEntry(supabase, companyId, userId, {
     fiscal_period_id: fiscalPeriodId,
     entry_date: period.period_end,
     description: `Årsbokslut ${period.name}`,
@@ -346,24 +350,25 @@ export async function executeYearEndClosing(
     .from('fiscal_periods')
     .update({ closing_entry_id: closingEntry.id })
     .eq('id', fiscalPeriodId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
 
   if (updateError) {
     throw new Error(`Failed to set closing_entry_id: ${updateError.message}`)
   }
 
   // 6. Lock the period
-  await lockPeriod(supabase, userId, fiscalPeriodId)
+  await lockPeriod(supabase, companyId, userId, fiscalPeriodId)
 
   // 7. Close the period
-  await closePeriod(supabase, userId, fiscalPeriodId)
+  await closePeriod(supabase, companyId, userId, fiscalPeriodId)
 
   // 8. Create next period
-  const nextPeriod = await createNextPeriod(supabase, userId, fiscalPeriodId)
+  const nextPeriod = await createNextPeriod(supabase, companyId, userId, fiscalPeriodId)
 
   // 9. Generate opening balances in next period
   const openingBalanceEntry = await generateOpeningBalances(
     supabase,
+    companyId,
     userId,
     fiscalPeriodId,
     nextPeriod.id
@@ -374,13 +379,13 @@ export async function executeYearEndClosing(
     .from('fiscal_periods')
     .select('*')
     .eq('id', fiscalPeriodId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (closedPeriod) {
     await eventBus.emit({
       type: 'period.year_closed',
-      payload: { period: closedPeriod as FiscalPeriod, userId },
+      payload: { period: closedPeriod as FiscalPeriod, companyId, userId },
     })
   }
 
@@ -401,6 +406,7 @@ export async function executeYearEndClosing(
  */
 export async function generateOpeningBalances(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   closedPeriodId: string,
   nextPeriodId: string
@@ -411,7 +417,7 @@ export async function generateOpeningBalances(
     .from('fiscal_periods')
     .select('*')
     .eq('id', nextPeriodId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (!nextPeriod) {
@@ -419,7 +425,7 @@ export async function generateOpeningBalances(
   }
 
   // Get trial balance of closed period (includes the closing entry)
-  const { rows } = await generateTrialBalance(supabase, userId, closedPeriodId)
+  const { rows } = await generateTrialBalance(supabase, companyId, closedPeriodId)
 
   // Filter to balance sheet accounts (class 1-2) with non-zero closing balance
   const balanceSheetAccounts = rows.filter(
@@ -467,7 +473,7 @@ export async function generateOpeningBalances(
   }
 
   // Create opening balance entry in next period
-  const openingEntry = await createJournalEntry(supabase, userId, {
+  const openingEntry = await createJournalEntry(supabase, companyId, userId, {
     fiscal_period_id: nextPeriodId,
     entry_date: nextPeriod.period_start,
     description: `Ingående balans ${nextPeriod.name}`,
@@ -484,7 +490,7 @@ export async function generateOpeningBalances(
       opening_balances_set: true,
     })
     .eq('id', nextPeriodId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
 
   if (updateError) {
     throw new Error(`Failed to set opening_balance_entry_id: ${updateError.message}`)

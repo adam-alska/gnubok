@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { updateDeadlineStatus, isValidTransition } from '@/lib/deadlines/status-engine'
+import { requireCompanyId } from '@/lib/company/context'
 import type { DeadlineStatus } from '@/types'
 
 /**
@@ -18,6 +19,8 @@ export async function PATCH(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   const { id } = await params
 
@@ -41,7 +44,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
   }
 
-  const result = await updateDeadlineStatus(supabase, id, user.id, newStatus)
+  const result = await updateDeadlineStatus(supabase, id, companyId, newStatus)
 
   if (!result.success) {
     return NextResponse.json({ error: result.error }, { status: 400 })
@@ -66,13 +69,15 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { id } = await params
 
   const { data: deadline, error } = await supabase
     .from('deadlines')
     .select('status, is_completed, due_date')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (error || !deadline) {

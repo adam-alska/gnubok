@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireCompanyId } from '@/lib/company/context'
 
 /**
  * GET /api/documents/counts?journal_entry_ids=id1,id2,...
@@ -14,6 +15,8 @@ export async function GET(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   const { searchParams } = new URL(request.url)
   const idsParam = searchParams.get('journal_entry_ids')
@@ -35,7 +38,7 @@ export async function GET(request: Request) {
   const { data, error } = await supabase
     .from('document_attachments')
     .select('journal_entry_id')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .eq('is_current_version', true)
     .in('journal_entry_id', ids)
 

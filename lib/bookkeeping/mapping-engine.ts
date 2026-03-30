@@ -57,7 +57,7 @@ export async function evaluateMappingRules(
     .from('mapping_rules')
     .select('*')
     .eq('is_active', true)
-    .or(`user_id.eq.${userId},user_id.is.null`)
+    .or(`company_id.eq.${userId},company_id.is.null`)
     .order('priority', { ascending: true })
 
   if (error || !rules || rules.length === 0) {
@@ -307,7 +307,7 @@ export async function saveUserMappingRule(
     await supabase
       .from('mapping_rules')
       .delete()
-      .eq('user_id', userId)
+      .eq('company_id', userId)
       .eq('merchant_pattern', escapedMerchant)
       .eq('source', 'user_description')
 

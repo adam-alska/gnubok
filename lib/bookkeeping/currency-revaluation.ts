@@ -23,7 +23,7 @@ export async function getOpenForeignCurrencyReceivables(
   const { data, error } = await supabase
     .from('invoices')
     .select('*')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .in('status', ['sent', 'overdue'])
     .neq('currency', 'SEK')
     .not('exchange_rate', 'is', null)
@@ -47,7 +47,7 @@ export async function getOpenForeignCurrencyPayables(
   const { data, error } = await supabase
     .from('supplier_invoices')
     .select('*')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .in('status', ['registered', 'approved', 'overdue', 'partially_paid'])
     .neq('currency', 'SEK')
     .not('exchange_rate', 'is', null)
@@ -275,15 +275,16 @@ export async function previewCurrencyRevaluation(
  */
 export async function executeCurrencyRevaluation(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   closingDate: string,
-  fiscalPeriodId: string
+  fiscalPeriodId: string,
+  userId?: string
 ): Promise<CurrencyRevaluationResult | null> {
   // Idempotency check: prevent double revaluation
   const { count, error: checkError } = await supabase
     .from('journal_entries')
     .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .eq('fiscal_period_id', fiscalPeriodId)
     .eq('source_type', 'currency_revaluation')
     .eq('status', 'posted')
@@ -296,13 +297,13 @@ export async function executeCurrencyRevaluation(
     throw new Error('Currency revaluation already exists for this period')
   }
 
-  const preview = await previewCurrencyRevaluation(supabase, userId, closingDate)
+  const preview = await previewCurrencyRevaluation(supabase, companyId, closingDate)
 
   if (preview.items.length === 0 || preview.lines.length === 0) {
     return null
   }
 
-  const entry = await createJournalEntry(supabase, userId, {
+  const entry = await createJournalEntry(supabase, companyId, userId ?? companyId, {
     fiscal_period_id: fiscalPeriodId,
     entry_date: closingDate,
     description: `Omvärdering utländsk valuta ${closingDate}`,

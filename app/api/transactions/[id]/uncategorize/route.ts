@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { reverseEntry } from '@/lib/bookkeeping/engine'
 import { ensureInitialized } from '@/lib/init'
+import { requireCompanyId } from '@/lib/company/context'
 
 ensureInitialized()
 
@@ -15,6 +16,8 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { id } = await params
 
   // Fetch transaction
@@ -22,7 +25,7 @@ export async function POST(
     .from('transactions')
     .select('id, journal_entry_id')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (txError || !transaction) {
@@ -38,7 +41,7 @@ export async function POST(
     .from('journal_entries')
     .select('id, status')
     .eq('id', transaction.journal_entry_id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (entryError || !entry) {
@@ -51,7 +54,7 @@ export async function POST(
 
   // Storno reversal (legally compliant — never deletes)
   try {
-    await reverseEntry(supabase, user.id, transaction.journal_entry_id)
+    await reverseEntry(supabase, companyId, user.id, transaction.journal_entry_id)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Reversal failed'
     return NextResponse.json({ error: message }, { status: 500 })
@@ -66,7 +69,7 @@ export async function POST(
       journal_entry_id: null,
     })
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
 
   if (updateError) {
     return NextResponse.json({ error: 'Failed to reset transaction' }, { status: 500 })

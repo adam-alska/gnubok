@@ -17,7 +17,7 @@ export async function getTaxCodes(supabase: SupabaseClient, userId: string): Pro
   const { data, error } = await supabase
     .from('tax_codes')
     .select('*')
-    .or(`user_id.eq.${userId},user_id.is.null`)
+    .or(`company_id.eq.${userId},company_id.is.null`)
     .order('code')
 
   if (error) {
@@ -41,7 +41,7 @@ export async function getTaxCodeByCode(
     .from('tax_codes')
     .select('*')
     .eq('code', code)
-    .or(`user_id.eq.${userId},user_id.is.null`)
+    .or(`company_id.eq.${userId},company_id.is.null`)
     .order('user_id', { ascending: false, nullsFirst: false })
     .limit(1)
     .single()
@@ -93,7 +93,7 @@ export async function calculateMomsFromTaxCodes(
       )
     `)
     .not('tax_code', 'is', null)
-    .eq('journal_entries.user_id', userId)
+    .eq('journal_entries.company_id', userId)
     .eq('journal_entries.status', 'posted')
     .gte('journal_entries.entry_date', periodStart)
     .lte('journal_entries.entry_date', periodEnd)

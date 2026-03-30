@@ -95,7 +95,7 @@ describe('validateYearEndReadiness', () => {
     } as never)
 
     const supabase = makeClient()
-    const result = await validateYearEndReadiness(supabase as never, 'user-1', 'fp-1')
+    const result = await validateYearEndReadiness(supabase as never, 'company-1', 'user-1', 'fp-1')
     expect(result.ready).toBe(false)
     expect(result.errors.some((e: string) => e.includes('draft'))).toBe(true)
   })
@@ -120,7 +120,7 @@ describe('validateYearEndReadiness', () => {
     } as never)
 
     const supabase = makeClient()
-    const result = await validateYearEndReadiness(supabase as never, 'user-1', 'fp-1')
+    const result = await validateYearEndReadiness(supabase as never, 'company-1', 'user-1', 'fp-1')
     expect(result.ready).toBe(false)
     expect(result.trialBalanceBalanced).toBe(false)
     expect(result.errors.some((e: string) => e.includes('Trial balance'))).toBe(true)
@@ -156,7 +156,7 @@ describe('validateYearEndReadiness', () => {
       totalCredit: 10000,
     } as never)
 
-    const result = await validateYearEndReadiness(supabase as never, 'user-1', 'fp-1')
+    const result = await validateYearEndReadiness(supabase as never, 'company-1', 'user-1', 'fp-1')
     expect(result.warnings.some((w: string) => w.includes('gap'))).toBe(true)
     expect(result.voucherGaps).toHaveLength(1)
   })
@@ -187,7 +187,7 @@ describe('previewYearEndClosing', () => {
     } as never)
 
     const supabase = makeClient()
-    const preview = await previewYearEndClosing(supabase as never, 'user-1', 'fp-1')
+    const preview = await previewYearEndClosing(supabase as never, 'company-1', 'user-1', 'fp-1')
 
     expect(preview.netResult).toBe(150000)
     expect(preview.closingAccount).toBe('2099')
@@ -215,7 +215,7 @@ describe('previewYearEndClosing', () => {
     } as never)
 
     const supabase = makeClient()
-    const preview = await previewYearEndClosing(supabase as never, 'user-1', 'fp-1')
+    const preview = await previewYearEndClosing(supabase as never, 'company-1', 'user-1', 'fp-1')
 
     expect(preview.closingAccount).toBe('2010')
     expect(preview.closingAccountName).toBe('Eget kapital')

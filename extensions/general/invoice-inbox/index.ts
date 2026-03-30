@@ -30,7 +30,7 @@ export async function getSettings(userId: string): Promise<InvoiceInboxSettings>
   const { data } = await supabase
     .from('extension_data')
     .select('value')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .eq('extension_id', 'invoice-inbox')
     .eq('key', 'settings')
     .single()
@@ -84,7 +84,7 @@ async function handleDocumentUploaded(
   payload: EventPayload<'document.uploaded'>,
   ctx?: ExtensionContext
 ): Promise<void> {
-  const { document, userId } = payload
+  const { document, userId, companyId } = payload
   const log = ctx?.log ?? console
 
   // Gate: Is it a supported file type?
@@ -103,7 +103,7 @@ async function handleDocumentUploaded(
   const { data: existing } = await supabase
     .from('invoice_inbox_items')
     .select('id')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .eq('document_id', document.id)
     .limit(1)
 
@@ -157,7 +157,7 @@ async function handleDocumentUploaded(
       const { data: suppliers } = await supabase
         .from('suppliers')
         .select('*')
-        .eq('user_id', userId)
+        .eq('company_id', userId)
 
       if (suppliers && suppliers.length > 0) {
         const match = matchSupplier(extraction, suppliers)
@@ -193,6 +193,7 @@ async function handleDocumentUploaded(
           inboxItem: updatedItem,
           confidence: extraction.confidence,
           userId,
+          companyId,
         },
       })
     }

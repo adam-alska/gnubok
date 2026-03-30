@@ -76,7 +76,7 @@ export async function generateTaxDeadlinesForUser(
   const { data: deletedData, error: deleteError } = await supabase
     .from('deadlines')
     .delete()
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .eq('source', 'system')
     .gte('due_date', startDate)
     .lte('due_date', endDate)
@@ -230,10 +230,10 @@ export async function generateNewYearDeadlines(
 ): Promise<{ usersProcessed: number; totalCreated: number }> {
   const newYear = new Date().getFullYear()
 
-  // Fetch all users with company settings
+  // Fetch all companies with company settings
   const { data: allSettings, error } = await supabase
     .from('company_settings')
-    .select('user_id, entity_type, moms_period, f_skatt, vat_registered, pays_salaries, fiscal_year_start_month')
+    .select('company_id, entity_type, moms_period, f_skatt, vat_registered, pays_salaries, fiscal_year_start_month')
 
   if (error) {
     log.error('Error fetching company settings:', error)
@@ -247,7 +247,7 @@ export async function generateNewYearDeadlines(
     try {
       const result = await generateTaxDeadlinesForUser(
         supabase,
-        settings.user_id,
+        settings.company_id,
         {
           entity_type: settings.entity_type,
           moms_period: settings.moms_period,
@@ -261,7 +261,7 @@ export async function generateNewYearDeadlines(
       usersProcessed++
       totalCreated += result.created
     } catch (err) {
-      log.error(`Error generating deadlines for user ${settings.user_id}:`, err)
+      log.error(`Error generating deadlines for company ${settings.company_id}:`, err)
     }
   }
 

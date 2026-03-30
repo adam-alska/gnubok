@@ -54,7 +54,7 @@ describe('generateTrialBalance', () => {
       ],
     }
 
-    const result = await generateTrialBalance(supabase, 'user-1', 'period-1')
+    const result = await generateTrialBalance(supabase, 'company-1', 'period-1')
 
     expect(result.rows).toEqual([])
     expect(result.totalDebit).toBe(0)
@@ -92,7 +92,7 @@ describe('generateTrialBalance', () => {
       ],
     }
 
-    const result = await generateTrialBalance(supabase, 'user-1', 'period-1')
+    const result = await generateTrialBalance(supabase, 'company-1', 'period-1')
 
     expect(result.rows).toHaveLength(2)
     // Sorted by account number
@@ -144,7 +144,7 @@ describe('generateTrialBalance', () => {
       ],
     }
 
-    const result = await generateTrialBalance(supabase, 'user-1', 'period-2')
+    const result = await generateTrialBalance(supabase, 'company-1', 'period-2')
 
     // 1930: opening debit 10000, period credit 500 → closing debit 10000, credit 500
     const acc1930 = result.rows.find((r) => r.account_number === '1930')!
@@ -207,7 +207,7 @@ describe('generateTrialBalance', () => {
       ],
     }
 
-    const result = await generateTrialBalance(supabase, 'user-1', 'period-2')
+    const result = await generateTrialBalance(supabase, 'company-1', 'period-2')
 
     // 1930: opening 8000 debit + period 1000 debit = closing 9000 debit
     const acc1930 = result.rows.find((r) => r.account_number === '1930')!
@@ -245,7 +245,7 @@ describe('generateTrialBalance', () => {
       ],
     }
 
-    const result = await generateTrialBalance(supabase, 'user-1', 'period-1')
+    const result = await generateTrialBalance(supabase, 'company-1', 'period-1')
 
     expect(result.rows[0].account_name).toBe('Konto 9999')
   })
@@ -269,7 +269,7 @@ describe('generateTrialBalance', () => {
       ],
     }
 
-    const result = await generateTrialBalance(supabase, 'user-1', 'period-1')
+    const result = await generateTrialBalance(supabase, 'company-1', 'period-1')
 
     expect(result.rows[0].account_class).toBe(5)
   })
@@ -302,7 +302,7 @@ describe('generateTrialBalance', () => {
       ],
     }
 
-    const result = await generateTrialBalance(supabase, 'user-1', 'period-1')
+    const result = await generateTrialBalance(supabase, 'company-1', 'period-1')
 
     expect(result.rows[0].closing_debit).toBe(100)
     expect(result.totalDebit).toBe(100)
@@ -336,7 +336,7 @@ describe('generateTrialBalance', () => {
       ],
     }
 
-    const result = await generateTrialBalance(supabase, 'user-1', 'period-1')
+    const result = await generateTrialBalance(supabase, 'company-1', 'period-1')
 
     expect(result.totalDebit).toBe(1000)
     expect(result.totalCredit).toBe(999)
@@ -354,7 +354,7 @@ describe('generateTrialBalance', () => {
       ],
     }
 
-    await expect(generateTrialBalance(supabase, 'user-1', 'period-1')).rejects.toThrow('DB error')
+    await expect(generateTrialBalance(supabase, 'company-1', 'period-1')).rejects.toThrow('DB error')
   })
 
   it('handles balanced two-account entry', async () => {
@@ -383,7 +383,7 @@ describe('generateTrialBalance', () => {
       ],
     }
 
-    const result = await generateTrialBalance(supabase, 'user-1', 'period-1')
+    const result = await generateTrialBalance(supabase, 'company-1', 'period-1')
 
     expect(result.rows).toHaveLength(2)
     expect(result.totalDebit).toBe(5000)

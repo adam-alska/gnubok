@@ -15,7 +15,7 @@ import type { TrialBalanceRow } from '@/types'
  */
 export async function generateTrialBalance(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   fiscalPeriodId: string
 ): Promise<{
   rows: TrialBalanceRow[]
@@ -29,12 +29,12 @@ export async function generateTrialBalance(
     .from('fiscal_periods')
     .select('period_start, opening_balance_entry_id')
     .eq('id', fiscalPeriodId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   // ── Opening balances (IB) ──────────────────────────────────────
   const { balances: openingBalances, obEntryId } = await getOpeningBalances(
-    supabase, userId, period
+    supabase, companyId, period
   )
 
   // ── Period lines (excluding opening balance entry) ─────────────
@@ -51,8 +51,8 @@ export async function generateTrialBalance(
   }>(({ from, to }) => {
     let query = supabase
       .from('journal_entry_lines')
-      .select('account_number, debit_amount, credit_amount, journal_entries!inner(user_id, fiscal_period_id, status)')
-      .eq('journal_entries.user_id', userId)
+      .select('account_number, debit_amount, credit_amount, journal_entries!inner(company_id, fiscal_period_id, status)')
+      .eq('journal_entries.company_id', companyId)
       .eq('journal_entries.fiscal_period_id', fiscalPeriodId)
       .in('journal_entries.status', ['posted', 'reversed'])
 
@@ -76,7 +76,7 @@ export async function generateTrialBalance(
     supabase
       .from('chart_of_accounts')
       .select('account_number, account_name, account_class')
-      .eq('user_id', userId)
+      .eq('company_id', companyId)
       .range(from, to)
   )
 

@@ -107,7 +107,7 @@ export const skatteverketExtension: Extension = {
         const { data: settingsData } = await supabase
           .from('extension_data')
           .select('value')
-          .eq('user_id', user.id)
+          .eq('company_id', user.id)
           .eq('extension_id', 'skatteverket')
           .eq('key', 'oauth_state')
           .single()
@@ -122,7 +122,7 @@ export const skatteverketExtension: Extension = {
         const { data: redirectData } = await supabase
           .from('extension_data')
           .select('value')
-          .eq('user_id', user.id)
+          .eq('company_id', user.id)
           .eq('extension_id', 'skatteverket')
           .eq('key', 'oauth_redirect_uri')
           .single()
@@ -138,7 +138,7 @@ export const skatteverketExtension: Extension = {
           await supabase
             .from('extension_data')
             .delete()
-            .eq('user_id', user.id)
+            .eq('company_id', user.id)
             .eq('extension_id', 'skatteverket')
             .eq('key', 'oauth_state')
 
@@ -165,7 +165,7 @@ export const skatteverketExtension: Extension = {
           return NextResponse.json({ error: 'Extension context required' }, { status: 500 })
         }
 
-        const tokens = await getTokens(ctx.supabase, ctx.userId)
+        const tokens = await getTokens(ctx.supabase, ctx.companyId)
         if (!tokens) {
           return NextResponse.json({ connected: false })
         }
@@ -192,7 +192,7 @@ export const skatteverketExtension: Extension = {
           return NextResponse.json({ error: 'Extension context required' }, { status: 500 })
         }
 
-        await deleteTokens(ctx.supabase, ctx.userId)
+        await deleteTokens(ctx.supabase, ctx.companyId)
         return NextResponse.json({ success: true })
       },
     },
@@ -220,7 +220,7 @@ export const skatteverketExtension: Extension = {
 
           const response = await skvRequest(
             ctx.supabase,
-            ctx.userId,
+            ctx.companyId,
             'POST',
             `/kontrollera/${redovisare}/${redovisningsperiod}`,
             momsuppgift
@@ -266,7 +266,7 @@ export const skatteverketExtension: Extension = {
 
           const response = await skvRequest(
             ctx.supabase,
-            ctx.userId,
+            ctx.companyId,
             'POST',
             `/utkast/${redovisare}/${redovisningsperiod}`,
             momsuppgift
@@ -316,7 +316,7 @@ export const skatteverketExtension: Extension = {
 
           const response = await skvRequest(
             ctx.supabase,
-            ctx.userId,
+            ctx.companyId,
             'GET',
             `/utkast/${redovisare}/${redovisningsperiod}`
           )
@@ -355,7 +355,7 @@ export const skatteverketExtension: Extension = {
 
           const response = await skvRequest(
             ctx.supabase,
-            ctx.userId,
+            ctx.companyId,
             'DELETE',
             `/utkast/${redovisare}/${redovisningsperiod}`
           )
@@ -392,7 +392,7 @@ export const skatteverketExtension: Extension = {
 
           const response = await skvRequest(
             ctx.supabase,
-            ctx.userId,
+            ctx.companyId,
             'PUT',
             `/las/${redovisare}/${redovisningsperiod}`
           )
@@ -439,7 +439,7 @@ export const skatteverketExtension: Extension = {
 
           const response = await skvRequest(
             ctx.supabase,
-            ctx.userId,
+            ctx.companyId,
             'DELETE',
             `/las/${redovisare}/${redovisningsperiod}`
           )
@@ -483,7 +483,7 @@ export const skatteverketExtension: Extension = {
 
           const response = await skvRequest(
             ctx.supabase,
-            ctx.userId,
+            ctx.companyId,
             'GET',
             `/inlamnat/${redovisare}/${redovisningsperiod}`
           )
@@ -522,7 +522,7 @@ export const skatteverketExtension: Extension = {
 
           const response = await skvRequest(
             ctx.supabase,
-            ctx.userId,
+            ctx.companyId,
             'GET',
             `/beslutat/${redovisare}/${redovisningsperiod}`
           )
@@ -578,7 +578,7 @@ async function parseDeclarationRequest(
   const { data: settings } = await ctx.supabase
     .from('company_settings')
     .select('org_number, entity_type')
-    .eq('user_id', ctx.userId)
+    .eq('company_id', ctx.companyId)
     .single()
 
   if (!settings?.org_number) {
@@ -591,7 +591,7 @@ async function parseDeclarationRequest(
   // Calculate VAT declaration from the general ledger
   const declaration = await calculateVatDeclaration(
     ctx.supabase,
-    ctx.userId,
+    ctx.companyId,
     periodType,
     year,
     period

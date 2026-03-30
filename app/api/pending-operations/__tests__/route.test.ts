@@ -10,6 +10,11 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: () => Promise.resolve(mockSupabase),
 }))
 
+vi.mock('@/lib/company/context', () => ({
+  requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+  getActiveCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
 import { GET } from '../route'
 
 describe('GET /api/pending-operations', () => {

@@ -11,12 +11,15 @@ import {
   calculateAvgPaymentDays,
 } from '@/lib/reports/kpi'
 import { mergeWithDefaults } from '@/lib/reports/kpi-definitions'
+import { requireCompanyId } from '@/lib/company/context'
 import type { KPIReport, KPIPreferences } from '@/types'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   const { searchParams } = new URL(request.url)
   const periodId = searchParams.get('period_id')
@@ -28,7 +31,7 @@ export async function GET(request: Request) {
     .from('fiscal_periods')
     .select('*')
     .eq('id', periodId)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (periodError || !period) {
@@ -39,7 +42,7 @@ export async function GET(request: Request) {
   const { data: prefsData } = await supabase
     .from('extension_data')
     .select('value')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .eq('extension_id', 'core/kpi')
     .eq('key', 'preferences')
     .single()
@@ -50,14 +53,14 @@ export async function GET(request: Request) {
 
   const [incomeStatement, trialBalanceResult, arLedger, monthlyBreakdown, paidInvoicesResult] =
     await Promise.all([
-      generateIncomeStatement(supabase, user.id, periodId),
-      generateTrialBalance(supabase, user.id, periodId),
-      generateARLedger(supabase, user.id),
-      generateMonthlyBreakdown(supabase, user.id, periodId),
+      generateIncomeStatement(supabase, companyId, periodId),
+      generateTrialBalance(supabase, companyId, periodId),
+      generateARLedger(supabase, companyId),
+      generateMonthlyBreakdown(supabase, companyId, periodId),
       supabase
         .from('invoices')
         .select('invoice_date, paid_at')
-        .eq('user_id', user.id)
+        .eq('company_id', companyId)
         .eq('status', 'paid')
         .not('paid_at', 'is', null),
     ])

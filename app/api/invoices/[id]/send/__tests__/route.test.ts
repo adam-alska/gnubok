@@ -19,6 +19,11 @@ vi.mock('@/lib/init', () => ({
   ensureInitialized: vi.fn(),
 }))
 
+vi.mock('@/lib/company/context', () => ({
+  requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+  getActiveCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
 const mockRenderToBuffer = vi.fn()
 vi.mock('@react-pdf/renderer', () => ({
   renderToBuffer: (...args: unknown[]) => mockRenderToBuffer(...args),
@@ -184,6 +189,7 @@ describe('POST /api/invoices/[id]/send', () => {
     )
     expect(mockCreateInvoiceJournalEntry).toHaveBeenCalledWith(
       expect.anything(),
+      'company-1',
       'user-1',
       expect.objectContaining({ id: 'inv-1' }),
       'enskild_firma'

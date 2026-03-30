@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getBASReference } from '@/lib/bookkeeping/bas-reference'
+import { requireCompanyId } from '@/lib/company/context'
 
 /**
  * POST /api/bookkeeping/accounts/activate
@@ -17,6 +18,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const body = await request.json()
   const accountNumbers: string[] = body.account_numbers
 
@@ -28,7 +31,7 @@ export async function POST(request: Request) {
   const { data: existing } = await supabase
     .from('chart_of_accounts')
     .select('account_number')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .in('account_number', accountNumbers)
 
   const existingNumbers = new Set((existing || []).map((a) => a.account_number))
@@ -42,6 +45,7 @@ export async function POST(request: Request) {
 
       return {
         user_id: user.id,
+        company_id: companyId,
         account_number: ref.account_number,
         account_name: ref.account_name,
         account_class: ref.account_class,

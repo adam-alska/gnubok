@@ -10,7 +10,7 @@ vi.mock('@/lib/currency/riksbanken', () => ({
 // Mock engine
 vi.mock('../engine', () => ({
   createJournalEntry: vi.fn().mockImplementation(
-    async (_supabase: unknown, _userId: string, input: CreateJournalEntryInput) => ({
+    async (_supabase: unknown, _companyId: string, _userId: string, input: CreateJournalEntryInput) => ({
       id: 'entry-1',
       ...input,
       lines: input.lines,
@@ -190,7 +190,7 @@ describe('currency-revaluation', () => {
 
       const supabase = createMockSupabase({ invoices: [eurInvoice, sekInvoice] })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await getOpenForeignCurrencyReceivables(supabase as any, 'user-1')
+      const result = await getOpenForeignCurrencyReceivables(supabase as any, 'company-1')
 
       expect(result).toHaveLength(1)
       expect(result[0].currency).toBe('EUR')
@@ -206,7 +206,7 @@ describe('currency-revaluation', () => {
 
       const supabase = createMockSupabase({ invoices: [paidEurInvoice] })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await getOpenForeignCurrencyReceivables(supabase as any, 'user-1')
+      const result = await getOpenForeignCurrencyReceivables(supabase as any, 'company-1')
 
       expect(result).toHaveLength(0)
     })
@@ -221,7 +221,7 @@ describe('currency-revaluation', () => {
 
       const supabase = createMockSupabase({ invoices: [noRateInvoice] })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await getOpenForeignCurrencyReceivables(supabase as any, 'user-1')
+      const result = await getOpenForeignCurrencyReceivables(supabase as any, 'company-1')
 
       expect(result).toHaveLength(0)
     })
@@ -243,7 +243,7 @@ describe('currency-revaluation', () => {
 
       const supabase = createMockSupabase({ supplierInvoices: [eurSI, sekSI] })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await getOpenForeignCurrencyPayables(supabase as any, 'user-1')
+      const result = await getOpenForeignCurrencyPayables(supabase as any, 'company-1')
 
       expect(result).toHaveLength(1)
       expect(result[0].currency).toBe('EUR')
@@ -259,7 +259,7 @@ describe('currency-revaluation', () => {
 
       const supabase = createMockSupabase({ supplierInvoices: [partialSI] })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await getOpenForeignCurrencyPayables(supabase as any, 'user-1')
+      const result = await getOpenForeignCurrencyPayables(supabase as any, 'company-1')
 
       expect(result).toHaveLength(1)
       expect(result[0].remaining_amount).toBe(2000)
@@ -274,7 +274,7 @@ describe('currency-revaluation', () => {
 
       const supabase = createMockSupabase({ supplierInvoices: [paidSI] })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await getOpenForeignCurrencyPayables(supabase as any, 'user-1')
+      const result = await getOpenForeignCurrencyPayables(supabase as any, 'company-1')
 
       expect(result).toHaveLength(0)
     })
@@ -299,7 +299,7 @@ describe('currency-revaluation', () => {
       })
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const preview = await previewCurrencyRevaluation(supabase as any, 'user-1', '2024-12-31')
+      const preview = await previewCurrencyRevaluation(supabase as any, 'company-1', '2024-12-31')
 
       expect(preview.items).toHaveLength(0)
       expect(preview.lines).toHaveLength(0)
@@ -320,7 +320,7 @@ describe('currency-revaluation', () => {
 
       const supabase = createMockSupabase({ invoices: [eurInvoice] })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const preview = await previewCurrencyRevaluation(supabase as any, 'user-1', '2024-12-31')
+      const preview = await previewCurrencyRevaluation(supabase as any, 'company-1', '2024-12-31')
 
       expect(preview.items).toHaveLength(1)
       expect(preview.items[0].type).toBe('receivable')
@@ -353,7 +353,7 @@ describe('currency-revaluation', () => {
 
       const supabase = createMockSupabase({ invoices: [eurInvoice] })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const preview = await previewCurrencyRevaluation(supabase as any, 'user-1', '2024-12-31')
+      const preview = await previewCurrencyRevaluation(supabase as any, 'company-1', '2024-12-31')
 
       expect(preview.items[0].difference_sek).toBe(-500) // 1000 * (11.5 - 12.0)
 
@@ -384,7 +384,7 @@ describe('currency-revaluation', () => {
 
       const supabase = createMockSupabase({ supplierInvoices: [eurSI] })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const preview = await previewCurrencyRevaluation(supabase as any, 'user-1', '2024-12-31')
+      const preview = await previewCurrencyRevaluation(supabase as any, 'company-1', '2024-12-31')
 
       expect(preview.items[0].type).toBe('payable')
       expect(preview.items[0].difference_sek).toBe(1000) // 2000 * (11.5 - 11.0)
@@ -412,7 +412,7 @@ describe('currency-revaluation', () => {
 
       const supabase = createMockSupabase({ supplierInvoices: [eurSI] })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const preview = await previewCurrencyRevaluation(supabase as any, 'user-1', '2024-12-31')
+      const preview = await previewCurrencyRevaluation(supabase as any, 'company-1', '2024-12-31')
 
       expect(preview.items[0].difference_sek).toBe(-1000) // 2000 * (11.5 - 12.0)
 
@@ -447,7 +447,7 @@ describe('currency-revaluation', () => {
 
       const supabase = createMockSupabase({ invoices: [eurInvoice, usdInvoice] })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const preview = await previewCurrencyRevaluation(supabase as any, 'user-1', '2024-12-31')
+      const preview = await previewCurrencyRevaluation(supabase as any, 'company-1', '2024-12-31')
 
       expect(preview.items).toHaveLength(2)
       // EUR: 1000 * (11.5 - 11.0) = 500
@@ -481,7 +481,7 @@ describe('currency-revaluation', () => {
         supplierInvoices: [lossSI],
       })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const preview = await previewCurrencyRevaluation(supabase as any, 'user-1', '2024-12-31')
+      const preview = await previewCurrencyRevaluation(supabase as any, 'company-1', '2024-12-31')
 
       // Receivable gain: 1000 * 0.5 = 500 → Debit 1510, Credit 3960
       // Payable loss: 2000 * 0.5 = 1000 → Debit 7960, Credit 2440
@@ -510,7 +510,7 @@ describe('currency-revaluation', () => {
 
       const supabase = createMockSupabase({ supplierInvoices: [partialSI] })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const preview = await previewCurrencyRevaluation(supabase as any, 'user-1', '2024-12-31')
+      const preview = await previewCurrencyRevaluation(supabase as any, 'company-1', '2024-12-31')
 
       // Only remaining 5000 EUR is revalued, not full 10000
       expect(preview.items[0].amount_in_currency).toBe(5000)
@@ -532,7 +532,7 @@ describe('currency-revaluation', () => {
 
       const supabase = createMockSupabase({ invoices: [eurInvoice] })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const preview = await previewCurrencyRevaluation(supabase as any, 'user-1', '2024-12-31')
+      const preview = await previewCurrencyRevaluation(supabase as any, 'company-1', '2024-12-31')
 
       expect(preview.items).toHaveLength(0)
       expect(preview.lines).toHaveLength(0)
@@ -563,7 +563,7 @@ describe('currency-revaluation', () => {
         supplierInvoices: [gbpSI],
       })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const preview = await previewCurrencyRevaluation(supabase as any, 'user-1', '2024-12-31')
+      const preview = await previewCurrencyRevaluation(supabase as any, 'company-1', '2024-12-31')
 
       const totalDebit = preview.lines.reduce((sum, l) => sum + l.debit_amount, 0)
       const totalCredit = preview.lines.reduce((sum, l) => sum + l.credit_amount, 0)
@@ -592,7 +592,7 @@ describe('currency-revaluation', () => {
 
       mockRates({} as Record<Currency, number>)
 
-      const result = await executeCurrencyRevaluation(supabase, 'user-1', '2024-12-31', 'period-1')
+      const result = await executeCurrencyRevaluation(supabase, 'company-1', '2024-12-31', 'period-1')
 
       expect(result).toBeNull()
       expect(mockedCreateEntry).not.toHaveBeenCalled()
@@ -614,16 +614,16 @@ describe('currency-revaluation', () => {
         existingRevaluation: false,
       })
 
-      const result = await executeCurrencyRevaluation(supabase, 'user-1', '2024-12-31', 'period-1')
+      const result = await executeCurrencyRevaluation(supabase, 'company-1', '2024-12-31', 'period-1')
 
       expect(result).not.toBeNull()
       expect(mockedCreateEntry).toHaveBeenCalledOnce()
 
       const callArgs = mockedCreateEntry.mock.calls[0]
-      expect(callArgs[2].source_type).toBe('currency_revaluation')
-      expect(callArgs[2].fiscal_period_id).toBe('period-1')
-      expect(callArgs[2].entry_date).toBe('2024-12-31')
-      expect(callArgs[2].description).toContain('Omvärdering utländsk valuta')
+      expect(callArgs[3].source_type).toBe('currency_revaluation')
+      expect(callArgs[3].fiscal_period_id).toBe('period-1')
+      expect(callArgs[3].entry_date).toBe('2024-12-31')
+      expect(callArgs[3].description).toContain('Omvärdering utländsk valuta')
     })
 
     it('throws when revaluation already exists for period (idempotency)', async () => {
@@ -632,7 +632,7 @@ describe('currency-revaluation', () => {
       })
 
       await expect(
-        executeCurrencyRevaluation(supabase, 'user-1', '2024-12-31', 'period-1')
+        executeCurrencyRevaluation(supabase, 'company-1', '2024-12-31', 'period-1')
       ).rejects.toThrow('Currency revaluation already exists for this period')
 
       expect(mockedCreateEntry).not.toHaveBeenCalled()
@@ -654,7 +654,7 @@ describe('currency-revaluation', () => {
         existingRevaluation: false,
       })
 
-      const result = await executeCurrencyRevaluation(supabase, 'user-1', '2024-12-31', 'period-1')
+      const result = await executeCurrencyRevaluation(supabase, 'company-1', '2024-12-31', 'period-1')
 
       expect(result).not.toBeNull()
       expect(result!.entry).toBeDefined()

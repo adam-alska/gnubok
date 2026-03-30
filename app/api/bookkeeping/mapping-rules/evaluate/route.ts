@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { evaluateMappingRules } from '@/lib/bookkeeping/mapping-engine'
 import { validateBody } from '@/lib/api/validate'
 import { EvaluateMappingRulesSchema } from '@/lib/api/schemas'
+import { requireCompanyId } from '@/lib/company/context'
 import type { Transaction } from '@/types'
 
 export async function POST(request: Request) {
@@ -12,6 +13,8 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   const validation = await validateBody(request, EvaluateMappingRulesSchema)
   if (!validation.success) return validation.response
@@ -25,7 +28,7 @@ export async function POST(request: Request) {
       .from('transactions')
       .select('*')
       .eq('id', body.transaction_id)
-      .eq('user_id', user.id)
+      .eq('company_id', companyId)
       .single()
 
     if (error || !data) {
@@ -38,7 +41,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await evaluateMappingRules(supabase, user.id, transaction)
+    const result = await evaluateMappingRules(supabase, companyId, transaction)
     return NextResponse.json({ data: result })
   } catch (err) {
     return NextResponse.json(

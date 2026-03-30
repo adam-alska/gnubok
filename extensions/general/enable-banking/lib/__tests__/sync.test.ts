@@ -78,12 +78,12 @@ describe('syncAccountTransactions', () => {
 
     // Verify filename pattern
     const firstCall = mockUploadDocument.mock.calls[0]
-    expect(firstCall[2].name).toMatch(/^psd2-response_conn-1_acc-uid-1_.*_p1\.json$/)
-    expect(firstCall[2].type).toBe('application/json')
-    expect(firstCall[3]).toEqual({ upload_source: 'api' })
+    expect(firstCall[3].name).toMatch(/^psd2-response_conn-1_acc-uid-1_.*_p1\.json$/)
+    expect(firstCall[3].type).toBe('application/json')
+    expect(firstCall[4]).toEqual({ upload_source: 'api' })
 
     const secondCall = mockUploadDocument.mock.calls[1]
-    expect(secondCall[2].name).toMatch(/^psd2-response_conn-1_acc-uid-1_.*_p2\.json$/)
+    expect(secondCall[3].name).toMatch(/^psd2-response_conn-1_acc-uid-1_.*_p2\.json$/)
   })
 
   it('completes sync even if uploadDocument throws', async () => {

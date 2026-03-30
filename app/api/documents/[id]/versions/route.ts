@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { ensureInitialized } from '@/lib/init'
 import { createNewVersion } from '@/lib/core/documents/document-service'
+import { requireCompanyId } from '@/lib/company/context'
 
 ensureInitialized()
 
@@ -23,6 +24,8 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   const { id } = await params
 
@@ -68,14 +71,16 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { id } = await params
 
-  // First, check if the document belongs to the user
+  // First, check if the document belongs to the company
   const { data: doc, error: docError } = await supabase
     .from('document_attachments')
     .select('id, original_id')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (docError || !doc) {
@@ -89,7 +94,7 @@ export async function GET(
   const { data: versions, error: versionsError } = await supabase
     .from('document_attachments')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .or(`id.eq.${rootId},original_id.eq.${rootId}`)
     .order('version', { ascending: true })
 

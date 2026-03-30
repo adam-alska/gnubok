@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { generateMonthlyBreakdown } from '@/lib/reports/monthly-breakdown'
+import { requireCompanyId } from '@/lib/company/context'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -10,6 +11,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { searchParams } = new URL(request.url)
   const periodId = searchParams.get('period_id')
 
@@ -18,7 +21,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const data = await generateMonthlyBreakdown(supabase, user.id, periodId)
+    const data = await generateMonthlyBreakdown(supabase, companyId, periodId)
     return NextResponse.json({ data })
   } catch {
     return NextResponse.json({ error: 'Failed to generate monthly breakdown' }, { status: 500 })

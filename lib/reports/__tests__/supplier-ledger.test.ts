@@ -41,7 +41,7 @@ describe('generateSupplierLedger', () => {
       { data: [], error: null },
     ]
 
-    const report = await generateSupplierLedger(supabase, 'user-1')
+    const report = await generateSupplierLedger(supabase, 'company-1')
     expect(report.entries).toEqual([])
     expect(report.total_outstanding).toBe(0)
     expect(report.total_current).toBe(0)
@@ -54,7 +54,7 @@ describe('generateSupplierLedger', () => {
       { data: null, error: { message: 'DB error' } },
     ]
 
-    const report = await generateSupplierLedger(supabase, 'user-1')
+    const report = await generateSupplierLedger(supabase, 'company-1')
     expect(report.entries).toEqual([])
     expect(report.total_outstanding).toBe(0)
   })
@@ -106,7 +106,7 @@ describe('generateSupplierLedger', () => {
       },
     ]
 
-    const report = await generateSupplierLedger(supabase, 'user-1', asOfDate)
+    const report = await generateSupplierLedger(supabase, 'company-1', asOfDate)
 
     expect(report.entries).toHaveLength(1)
     const entry = report.entries[0]
@@ -139,7 +139,7 @@ describe('generateSupplierLedger', () => {
       },
     ]
 
-    const report = await generateSupplierLedger(supabase, 'user-1', '2024-06-15')
+    const report = await generateSupplierLedger(supabase, 'company-1', '2024-06-15')
 
     expect(report.entries).toHaveLength(2)
     const names = report.entries.map(e => e.supplier_name)
@@ -174,7 +174,7 @@ describe('generateSupplierLedger', () => {
       },
     ]
 
-    const report = await generateSupplierLedger(supabase, 'user-1', '2024-06-15')
+    const report = await generateSupplierLedger(supabase, 'company-1', '2024-06-15')
 
     expect(report.entries[0].supplier_name).toBe('Large')
     expect(report.entries[1].supplier_name).toBe('Medium')
@@ -204,7 +204,7 @@ describe('generateSupplierLedger', () => {
       },
     ]
 
-    const report = await generateSupplierLedger(supabase, 'user-1', '2024-06-15')
+    const report = await generateSupplierLedger(supabase, 'company-1', '2024-06-15')
 
     expect(report.total_outstanding).toBe(8000)
     expect(report.total_current).toBe(5000)
@@ -239,7 +239,7 @@ describe('generateSupplierLedger', () => {
       },
     ]
 
-    const report = await generateSupplierLedger(supabase, 'user-1', '2024-06-15')
+    const report = await generateSupplierLedger(supabase, 'company-1', '2024-06-15')
 
     expect(report.total_outstanding).toBe(100)
     expect(report.total_current).toBe(100)

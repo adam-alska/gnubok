@@ -152,12 +152,13 @@ function generatePerRateLines(
  */
 export async function createInvoiceJournalEntry(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   invoice: Invoice,
   entityType: EntityType = 'enskild_firma',
   customerName?: string
 ): Promise<JournalEntry | null> {
-  const fiscalPeriodId = await findFiscalPeriod(supabase, userId, invoice.invoice_date)
+  const fiscalPeriodId = await findFiscalPeriod(supabase, companyId, invoice.invoice_date)
   if (!fiscalPeriodId) {
     log.warn('No open fiscal period found for invoice date:', invoice.invoice_date)
     return null
@@ -232,7 +233,7 @@ export async function createInvoiceJournalEntry(
     lines,
   }
 
-  return createJournalEntry(supabase, userId, input)
+  return createJournalEntry(supabase, companyId, userId, input)
 }
 
 /**
@@ -243,6 +244,7 @@ export async function createInvoiceJournalEntry(
  */
 export async function createInvoicePaymentJournalEntry(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   invoice: Invoice,
   paymentDate: string,
@@ -250,7 +252,7 @@ export async function createInvoicePaymentJournalEntry(
   customerName?: string,
   paymentAmount?: number
 ): Promise<JournalEntry | null> {
-  const fiscalPeriodId = await findFiscalPeriod(supabase, userId, paymentDate)
+  const fiscalPeriodId = await findFiscalPeriod(supabase, companyId, paymentDate)
   if (!fiscalPeriodId) {
     log.warn('No open fiscal period found for payment date:', paymentDate)
     return null
@@ -337,7 +339,7 @@ export async function createInvoicePaymentJournalEntry(
     lines,
   }
 
-  return createJournalEntry(supabase, userId, input)
+  return createJournalEntry(supabase, companyId, userId, input)
 }
 
 /**
@@ -350,12 +352,13 @@ export async function createInvoicePaymentJournalEntry(
  */
 export async function createCreditNoteJournalEntry(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   creditNote: Invoice,
   entityType: EntityType = 'enskild_firma',
   customerName?: string
 ): Promise<JournalEntry | null> {
-  const fiscalPeriodId = await findFiscalPeriod(supabase, userId, creditNote.invoice_date)
+  const fiscalPeriodId = await findFiscalPeriod(supabase, companyId, creditNote.invoice_date)
   if (!fiscalPeriodId) {
     log.warn('No open fiscal period found for credit note date:', creditNote.invoice_date)
     return null
@@ -424,7 +427,7 @@ export async function createCreditNoteJournalEntry(
     lines,
   }
 
-  return createJournalEntry(supabase, userId, input)
+  return createJournalEntry(supabase, companyId, userId, input)
 }
 
 /**
@@ -437,13 +440,14 @@ export async function createCreditNoteJournalEntry(
  */
 export async function createInvoiceCashEntry(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   invoice: Invoice,
   paymentDate: string,
   entityType: EntityType = 'enskild_firma',
   customerName?: string
 ): Promise<JournalEntry | null> {
-  const fiscalPeriodId = await findFiscalPeriod(supabase, userId, paymentDate)
+  const fiscalPeriodId = await findFiscalPeriod(supabase, companyId, paymentDate)
   if (!fiscalPeriodId) {
     log.warn('No open fiscal period found for payment date:', paymentDate)
     return null
@@ -504,7 +508,7 @@ export async function createInvoiceCashEntry(
     lines,
   }
 
-  return createJournalEntry(supabase, userId, input)
+  return createJournalEntry(supabase, companyId, userId, input)
 }
 
 /**

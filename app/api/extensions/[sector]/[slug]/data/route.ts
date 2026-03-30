@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireCompanyId } from '@/lib/company/context'
 
 export async function GET(
   request: Request,
@@ -13,6 +14,8 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const extensionId = `${sector}/${slug}`
 
   const { searchParams } = new URL(request.url)
@@ -21,7 +24,7 @@ export async function GET(
   let query = supabase
     .from('extension_data')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .eq('extension_id', extensionId)
 
   const prefix = searchParams.get('prefix')
@@ -53,6 +56,8 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const body = await request.json()
   const { key, value } = body
 
@@ -67,6 +72,7 @@ export async function POST(
     .upsert(
       {
         user_id: user.id,
+        company_id: companyId,
         extension_id: extensionId,
         key,
         value,
@@ -95,6 +101,8 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { searchParams } = new URL(request.url)
   const key = searchParams.get('key')
 
@@ -107,7 +115,7 @@ export async function DELETE(
   const { error } = await supabase
     .from('extension_data')
     .delete()
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .eq('extension_id', extensionId)
     .eq('key', key)
 

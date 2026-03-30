@@ -138,7 +138,7 @@ export async function runReconciliation(
   let query = supabase
     .from('transactions')
     .select('*')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .is('journal_entry_id', null)
     .eq('currency', 'SEK')
 
@@ -172,7 +172,7 @@ export async function runReconciliation(
           is_business: true,
         })
         .eq('id', match.transaction.id)
-        .eq('user_id', userId)
+        .eq('company_id', userId)
 
       if (error) {
         errors++
@@ -186,6 +186,7 @@ export async function runReconciliation(
               journalEntryId: match.glLine.journal_entry_id,
               method: match.method,
               userId,
+              companyId: userId,
             },
           })
         } catch {
@@ -217,7 +218,7 @@ export async function getReconciliationStatus(
   let txQuery = supabase
     .from('transactions')
     .select('amount, journal_entry_id, reconciliation_method')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .eq('currency', 'SEK')
 
   if (dateFrom) txQuery = txQuery.gte('date', dateFrom)
@@ -230,7 +231,7 @@ export async function getReconciliationStatus(
     .from('journal_entry_lines')
     .select('debit_amount, credit_amount, journal_entries!inner(user_id, entry_date, status)')
     .eq('account_number', '1930')
-    .eq('journal_entries.user_id', userId)
+    .eq('journal_entries.company_id', userId)
     .eq('journal_entries.status', 'posted')
 
   if (dateFrom) glQuery = glQuery.gte('journal_entries.entry_date', dateFrom)
@@ -292,7 +293,7 @@ export async function manualLink(
     .from('transactions')
     .select('*')
     .eq('id', transactionId)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .single()
 
   if (txError || !tx) {
@@ -308,7 +309,7 @@ export async function manualLink(
     .from('journal_entries')
     .select('id, user_id, status')
     .eq('id', journalEntryId)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .single()
 
   if (entryError || !entry) {
@@ -335,7 +336,7 @@ export async function manualLink(
     .from('transactions')
     .select('id')
     .eq('journal_entry_id', journalEntryId)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .single()
 
   if (existingLink) {
@@ -351,7 +352,7 @@ export async function manualLink(
       is_business: true,
     })
     .eq('id', transactionId)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
 
   if (updateError) {
     return { success: false, error: 'Failed to link transaction' }
@@ -365,6 +366,7 @@ export async function manualLink(
         journalEntryId,
         method: 'manual' as ReconciliationMethod,
         userId,
+        companyId: userId,
       },
     })
   } catch {
@@ -388,7 +390,7 @@ export async function unlinkReconciliation(
     .from('transactions')
     .select('id, journal_entry_id, reconciliation_method')
     .eq('id', transactionId)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .single()
 
   if (txError || !tx) {
@@ -411,7 +413,7 @@ export async function unlinkReconciliation(
       is_business: null,
     })
     .eq('id', transactionId)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
 
   if (updateError) {
     return { success: false, error: 'Failed to unlink transaction' }

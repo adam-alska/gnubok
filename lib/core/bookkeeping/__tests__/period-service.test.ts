@@ -53,7 +53,7 @@ describe('lockPeriod', () => {
     eventBus.on('period.locked', handler)
 
     const supabase = makeClient()
-    const result = await lockPeriod(supabase as never, 'user-1', 'fp-1')
+    const result = await lockPeriod(supabase as never, 'company-1', 'user-1', 'fp-1')
 
     expect(result.locked_at).toBeTruthy()
     expect(handler).toHaveBeenCalledOnce()
@@ -69,7 +69,7 @@ describe('lockPeriod', () => {
     results = [{ data: period, error: null }]
 
     const supabase = makeClient()
-    await expect(lockPeriod(supabase as never, 'user-1', 'fp-1')).rejects.toThrow('already locked')
+    await expect(lockPeriod(supabase as never, 'company-1', 'user-1', 'fp-1')).rejects.toThrow('already locked')
   })
 })
 
@@ -89,7 +89,7 @@ describe('closePeriod', () => {
     ]
 
     const supabase = makeClient()
-    const result = await closePeriod(supabase as never, 'user-1', 'fp-1')
+    const result = await closePeriod(supabase as never, 'company-1', 'user-1', 'fp-1')
     expect(result.is_closed).toBe(true)
   })
 
@@ -104,7 +104,7 @@ describe('closePeriod', () => {
     results = [{ data: period, error: null }]
 
     const supabase = makeClient()
-    await expect(closePeriod(supabase as never, 'user-1', 'fp-1')).rejects.toThrow('must be locked')
+    await expect(closePeriod(supabase as never, 'company-1', 'user-1', 'fp-1')).rejects.toThrow('must be locked')
   })
 
   it('rejects if no closing_entry_id', async () => {
@@ -118,7 +118,7 @@ describe('closePeriod', () => {
     results = [{ data: period, error: null }]
 
     const supabase = makeClient()
-    await expect(closePeriod(supabase as never, 'user-1', 'fp-1')).rejects.toThrow(
+    await expect(closePeriod(supabase as never, 'company-1', 'user-1', 'fp-1')).rejects.toThrow(
       'Year-end closing must be executed'
     )
   })
@@ -147,7 +147,7 @@ describe('createNextPeriod', () => {
     ]
 
     const supabase = makeClient()
-    const result = await createNextPeriod(supabase as never, 'user-1', 'fp-2024')
+    const result = await createNextPeriod(supabase as never, 'company-1', 'user-1', 'fp-2024')
     expect(result.period_start).toBe('2025-01-01')
     expect(result.period_end).toBe('2025-12-31')
     expect(result.previous_period_id).toBe('fp-2024')
@@ -175,7 +175,7 @@ describe('createNextPeriod', () => {
     ]
 
     const supabase = makeClient()
-    const result = await createNextPeriod(supabase as never, 'user-1', 'fp-2024')
+    const result = await createNextPeriod(supabase as never, 'company-1', 'user-1', 'fp-2024')
     expect(result.period_start).toBe('2024-07-01')
     expect(result.period_end).toBe('2025-06-30')
   })

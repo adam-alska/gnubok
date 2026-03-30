@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireCompanyId } from '@/lib/company/context'
 
 /**
  * POST /api/deadlines/[id]/complete
@@ -20,12 +21,14 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // First, get current deadline state
   const { data: existing, error: fetchError } = await supabase
     .from('deadlines')
     .select('is_completed')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (fetchError) {
@@ -44,7 +47,7 @@ export async function POST(
       completed_at: newCompletedState ? new Date().toISOString() : null,
     })
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .select('*, customer:customers(id, name)')
     .single()
 

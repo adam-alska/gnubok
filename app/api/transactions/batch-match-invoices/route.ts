@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getBestInvoiceMatch } from '@/lib/invoices/invoice-matching'
+import { requireCompanyId } from '@/lib/company/context'
 import type { Transaction } from '@/types'
 
 /**
@@ -16,11 +17,13 @@ export async function POST() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Fetch uncategorized income transactions without a potential match
   const { data: transactions, error: txError } = await supabase
     .from('transactions')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .is('is_business', null)
     .gt('amount', 0)
     .is('potential_invoice_id', null)

@@ -106,7 +106,7 @@ async function fetchCandidateTransactions(
   const { data, error } = await supabase
     .from('transactions')
     .select('*')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .is('journal_entry_id', null)
     .is('is_business', null)
     .lt('amount', 0)

@@ -5,6 +5,7 @@ import { ensureInitialized } from '@/lib/init'
 import { validateBody } from '@/lib/api/validate'
 import { CreateCustomerSchema } from '@/lib/api/schemas'
 import { validateVatNumber } from '@/lib/vat/vies-client'
+import { requireCompanyId } from '@/lib/company/context'
 import { createLogger } from '@/lib/logger'
 import type { Customer } from '@/types'
 
@@ -21,10 +22,12 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { data, error } = await supabase
     .from('customers')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .order('name', { ascending: true })
 
   if (error) {
@@ -43,6 +46,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const result = await validateBody(request, CreateCustomerSchema)
   if (!result.success) return result.response
   const body = result.data
@@ -51,6 +56,7 @@ export async function POST(request: Request) {
     .from('customers')
     .insert({
       user_id: user.id,
+      company_id: companyId,
       name: body.name,
       customer_type: body.customer_type,
       email: body.email,
@@ -84,7 +90,7 @@ export async function POST(request: Request) {
             vat_number_validated_at: new Date().toISOString(),
           })
           .eq('id', data.id)
-          .eq('user_id', user.id)
+          .eq('company_id', companyId)
 
         data.vat_number_validated = true
         data.vat_number_validated_at = new Date().toISOString()
@@ -96,7 +102,7 @@ export async function POST(request: Request) {
 
   await eventBus.emit({
     type: 'customer.created',
-    payload: { customer: data as Customer, userId: user.id },
+    payload: { customer: data as Customer, companyId, userId: user.id },
   })
 
   return NextResponse.json({ data })

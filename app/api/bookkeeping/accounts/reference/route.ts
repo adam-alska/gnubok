@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import { NextResponse } from 'next/server'
 import { BAS_REFERENCE } from '@/lib/bookkeeping/bas-reference'
+import { requireCompanyId } from '@/lib/company/context'
 
 /**
  * GET /api/bookkeeping/accounts/reference
@@ -17,13 +18,15 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Fetch user's chart of accounts (paginated to avoid 1000-row limit)
   try {
     const userAccounts = await fetchAllRows<{ account_number: string; is_active: boolean; is_system_account: boolean }>(({ from, to }) =>
       supabase
         .from('chart_of_accounts')
         .select('account_number, is_active, is_system_account')
-        .eq('user_id', user.id)
+        .eq('company_id', companyId)
         .range(from, to)
     )
 

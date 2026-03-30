@@ -11,6 +11,11 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: () => Promise.resolve(mockSupabase),
 }))
 
+vi.mock('@/lib/company/context', () => ({
+  requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+  getActiveCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
 import { POST } from '../../reject/route'
 
 describe('POST /api/pending-operations/:id/reject', () => {

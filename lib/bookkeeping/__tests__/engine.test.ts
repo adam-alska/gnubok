@@ -141,7 +141,7 @@ describe('createDraftEntry — cancelled status on line-insert failure', () => {
     }
 
     await expect(
-      createDraftEntry(supabase as never, 'user-1', {
+      createDraftEntry(supabase as never, 'company-1', 'user-1', {
         fiscal_period_id: 'period-1',
         entry_date: '2024-01-01',
         description: 'Test',

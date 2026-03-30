@@ -16,6 +16,11 @@ vi.mock('@/lib/init', () => ({
   ensureInitialized: vi.fn(),
 }))
 
+vi.mock('@/lib/company/context', () => ({
+  requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+  getActiveCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
 import { eventBus } from '@/lib/events'
 
 import { POST } from '../route'

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { validateBody } from '@/lib/api/validate'
 import { UpdateCustomerSchema } from '@/lib/api/schemas'
 import { validateVatNumber } from '@/lib/vat/vies-client'
+import { requireCompanyId } from '@/lib/company/context'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('api/customers/[id]')
@@ -22,11 +23,13 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { data, error } = await supabase
     .from('customers')
     .select('*')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (error) {
@@ -41,7 +44,7 @@ export async function GET(
     .from('invoices')
     .select('id, invoice_number, invoice_date, due_date, status, total, currency')
     .eq('customer_id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .order('invoice_date', { ascending: false })
 
   return NextResponse.json({
@@ -67,6 +70,8 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const result = await validateBody(request, UpdateCustomerSchema)
   if (!result.success) return result.response
   const body = result.data
@@ -91,7 +96,7 @@ export async function PATCH(
     .from('customers')
     .update(updateData)
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .select()
     .single()
 
@@ -113,7 +118,7 @@ export async function PATCH(
               vat_number_validated_at: new Date().toISOString(),
             })
             .eq('id', id)
-            .eq('user_id', user.id)
+            .eq('company_id', companyId)
 
           data.vat_number_validated = true
           data.vat_number_validated_at = new Date().toISOString()
@@ -125,7 +130,7 @@ export async function PATCH(
               vat_number_validated_at: null,
             })
             .eq('id', id)
-            .eq('user_id', user.id)
+            .eq('company_id', companyId)
 
           data.vat_number_validated = false
           data.vat_number_validated_at = null
@@ -139,7 +144,7 @@ export async function PATCH(
             vat_number_validated_at: null,
           })
           .eq('id', id)
-          .eq('user_id', user.id)
+          .eq('company_id', companyId)
 
         data.vat_number_validated = false
         data.vat_number_validated_at = null
@@ -167,11 +172,13 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { error } = await supabase
     .from('customers')
     .delete()
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

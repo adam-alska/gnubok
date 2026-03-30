@@ -1,15 +1,18 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireCompanyId } from '@/lib/company/context'
 
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { data, error } = await supabase
     .from('categorization_templates')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .eq('is_active', true)
     .order('occurrence_count', { ascending: false })
 
@@ -22,6 +25,8 @@ export async function DELETE(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   let id: string | undefined
   try {
@@ -36,7 +41,7 @@ export async function DELETE(request: Request) {
     .from('categorization_templates')
     .update({ is_active: false })
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

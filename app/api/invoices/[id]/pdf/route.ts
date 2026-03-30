@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { InvoicePDF } from '@/lib/invoices/pdf-template'
+import { requireCompanyId } from '@/lib/company/context'
 import type { Invoice, InvoiceItem, Customer, CompanySettings } from '@/types'
 
 export async function GET(
@@ -17,6 +18,8 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Fetch invoice with customer and items
   const { data: invoice, error: invoiceError } = await supabase
     .from('invoices')
@@ -26,7 +29,7 @@ export async function GET(
       items:invoice_items(*)
     `)
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (invoiceError || !invoice) {
@@ -37,7 +40,7 @@ export async function GET(
   const { data: company, error: companyError } = await supabase
     .from('company_settings')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (companyError || !company) {

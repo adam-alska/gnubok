@@ -5,6 +5,7 @@ import {
   previewYearEndClosing,
   executeYearEndClosing,
 } from '@/lib/core/bookkeeping/year-end-service'
+import { requireCompanyId } from '@/lib/company/context'
 
 /**
  * GET: Validate readiness and preview year-end closing
@@ -21,10 +22,12 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   try {
     const [validation, preview] = await Promise.all([
-      validateYearEndReadiness(supabase, user.id, id),
-      previewYearEndClosing(supabase, user.id, id),
+      validateYearEndReadiness(supabase, companyId, user.id, id),
+      previewYearEndClosing(supabase, companyId, user.id, id),
     ])
 
     return NextResponse.json({ data: { validation, preview } })
@@ -51,8 +54,10 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   try {
-    const result = await executeYearEndClosing(supabase, user.id, id)
+    const result = await executeYearEndClosing(supabase, companyId, user.id, id)
     return NextResponse.json({ data: result })
   } catch (err) {
     return NextResponse.json(

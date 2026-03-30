@@ -11,6 +11,11 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: () => mockCreateClient(),
 }))
 
+vi.mock('@/lib/company/context', () => ({
+  requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+  getActiveCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
 import { GET } from '../route'
 
 function buildMockSupabase({

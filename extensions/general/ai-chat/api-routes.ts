@@ -19,7 +19,7 @@ async function checkRateLimitDB(supabase: SupabaseClient, userId: string): Promi
   const { data } = await supabase
     .from('extension_data')
     .select('value')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .eq('extension_id', 'ai-chat')
     .eq('key', 'rate_limit')
     .single()
@@ -116,7 +116,7 @@ async function handlePostChat(
         .from('chat_sessions')
         .select('id')
         .eq('id', sessionId)
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .single()
 
       if (!existingSession) {
@@ -252,7 +252,7 @@ async function handlePostStream(
         .from('chat_sessions')
         .select('id')
         .eq('id', sessionId)
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .single()
 
       if (!existingSession) {
@@ -393,7 +393,7 @@ async function handleGetSessions(
   const { data, error, count } = await supabase
     .from('chat_sessions')
     .select('*', { count: 'exact' })
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
@@ -474,7 +474,7 @@ async function handleGetSession(
     .from('chat_sessions')
     .select('*')
     .eq('id', id)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .single()
 
   if (sessionError || !session) {
@@ -529,7 +529,7 @@ async function handlePatchSession(
       .from('chat_sessions')
       .update({ title })
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('company_id', userId)
       .select()
       .single()
 
@@ -578,7 +578,7 @@ async function handleDeleteSession(
     .from('chat_sessions')
     .delete()
     .eq('id', id)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
 
   if (error) {
     console.error('Error deleting session:', error)

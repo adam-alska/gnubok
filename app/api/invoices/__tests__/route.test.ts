@@ -17,6 +17,11 @@ vi.mock('@/lib/init', () => ({
   ensureInitialized: vi.fn(),
 }))
 
+vi.mock('@/lib/company/context', () => ({
+  requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+  getActiveCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
 const mockGetVatRules = vi.fn()
 const mockCalculateVat = vi.fn()
 const mockGetAvailableVatRates = vi.fn()

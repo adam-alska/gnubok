@@ -79,12 +79,14 @@ export async function POST(request: Request) {
   const supabase = createServiceClient()
 
   // Resolve user from recipient email
-  const userId = await resolveUserFromEmail(payload.to, supabase)
+  const resolved = await resolveUserFromEmail(payload.to, supabase)
 
-  if (!userId) {
+  if (!resolved) {
     console.warn(`[document-inbox] No user found for email: ${payload.to}`)
     return NextResponse.json({ error: 'User not found' }, { status: 404 })
   }
+
+  const { userId, companyId } = resolved
 
   // Build raw email payload for BFL 7:2 archiving (no binary attachment content)
   const rawEmailPayload = buildRawEmailPayload(body, payload)
@@ -222,7 +224,7 @@ export async function POST(request: Request) {
             // Use pre-extracted receipt data from unified call
             const { data: urlData } = supabase.storage.from('documents').getPublicUrl(storagePath)
 
-            const result = await processReceiptFromDocument(supabase, userId, attachment.content, attachment.content_type, {
+            const result = await processReceiptFromDocument(supabase, userId, companyId, attachment.content, attachment.content_type, {
               documentId: document.id,
               source: 'email',
               emailFrom: payload.from,

@@ -134,7 +134,7 @@ export async function findMatchingInvoices(
       *,
       customer:customers(*)
     `)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .in('status', ['sent', 'overdue', 'partially_paid'])
     .order('due_date', { ascending: true })
 

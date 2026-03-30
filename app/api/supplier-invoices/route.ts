@@ -5,6 +5,7 @@ import { createSupplierInvoiceRegistrationEntry } from '@/lib/bookkeeping/suppli
 import { ensureInitialized } from '@/lib/init'
 import { validateBody } from '@/lib/api/validate'
 import { CreateSupplierInvoiceSchema } from '@/lib/api/schemas'
+import { requireCompanyId } from '@/lib/company/context'
 import type { SupplierInvoice, SupplierInvoiceItem } from '@/types'
 
 ensureInitialized()
@@ -18,13 +19,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status')
 
   let query = supabase
     .from('supplier_invoices')
     .select('*, supplier:suppliers(id, name)')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
 
   if (status && status !== 'all') {
     if (status === 'to_pay') {
@@ -52,6 +55,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const validation = await validateBody(request, CreateSupplierInvoiceSchema)
   if (!validation.success) return validation.response
   const body = validation.data
@@ -61,7 +66,7 @@ export async function POST(request: Request) {
     .from('suppliers')
     .select('*')
     .eq('id', body.supplier_id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (supplierError || !supplier) {
@@ -111,6 +116,7 @@ export async function POST(request: Request) {
     .from('supplier_invoices')
     .insert({
       user_id: user.id,
+      company_id: companyId,
       supplier_id: body.supplier_id,
       arrival_number: arrivalNum,
       supplier_invoice_number: body.supplier_invoice_number,
@@ -159,7 +165,7 @@ export async function POST(request: Request) {
   const { data: settings } = await supabase
     .from('company_settings')
     .select('accounting_method')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   const accountingMethod = settings?.accounting_method || 'accrual'
@@ -169,6 +175,7 @@ export async function POST(request: Request) {
     try {
       const journalEntry = await createSupplierInvoiceRegistrationEntry(
         supabase,
+        companyId,
         user.id,
         invoice as SupplierInvoice,
         items as SupplierInvoiceItem[],
@@ -190,7 +197,7 @@ export async function POST(request: Request) {
   try {
     await eventBus.emit({
       type: 'supplier_invoice.registered',
-      payload: { supplierInvoice: invoice as SupplierInvoice, userId: user.id },
+      payload: { supplierInvoice: invoice as SupplierInvoice, companyId, userId: user.id },
     })
   } catch {
     // Non-blocking — event emission failure should not affect the response

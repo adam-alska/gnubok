@@ -9,6 +9,7 @@ import { MatchSupplierInvoiceSchema } from '@/lib/api/schemas'
 import { logMatchEvent } from '@/lib/invoices/match-log'
 import { eventBus } from '@/lib/events/bus'
 import { ensureInitialized } from '@/lib/init'
+import { requireCompanyId } from '@/lib/company/context'
 import type { SupplierInvoice, SupplierInvoiceItem, Transaction } from '@/types'
 
 ensureInitialized()
@@ -31,6 +32,8 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const validation = await validateBody(request, MatchSupplierInvoiceSchema)
   if (!validation.success) return validation.response
   const { supplier_invoice_id } = validation.data
@@ -40,7 +43,7 @@ export async function POST(
     .from('transactions')
     .select('*')
     .eq('id', transactionId)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (fetchTxError || !transaction) {
@@ -67,7 +70,7 @@ export async function POST(
     .from('supplier_invoices')
     .select('*, supplier:suppliers(*), items:supplier_invoice_items(*)')
     .eq('id', supplier_invoice_id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (fetchInvError || !invoice) {
@@ -88,7 +91,7 @@ export async function POST(
   const { data: settings } = await supabase
     .from('company_settings')
     .select('accounting_method')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   const accountingMethod = settings?.accounting_method || 'accrual'
@@ -100,6 +103,7 @@ export async function POST(
     if (accountingMethod === 'cash') {
       const journalEntry = await createSupplierInvoiceCashEntry(
         supabase,
+        companyId,
         user.id,
         invoice as SupplierInvoice,
         (invoice.items || []) as SupplierInvoiceItem[],
@@ -110,6 +114,7 @@ export async function POST(
     } else {
       const journalEntry = await createSupplierInvoicePaymentEntry(
         supabase,
+        companyId,
         user.id,
         invoice as SupplierInvoice,
         paymentAmount,
@@ -157,6 +162,7 @@ export async function POST(
     .from('supplier_invoice_payments')
     .insert({
       user_id: user.id,
+      company_id: companyId,
       supplier_invoice_id,
       payment_date: transaction.date,
       amount: paymentAmount,
@@ -205,6 +211,7 @@ export async function POST(
         supplierInvoice: invoice as SupplierInvoice,
         transaction: transaction as Transaction,
         userId: user.id,
+        companyId,
       },
     })
   } catch {

@@ -65,6 +65,11 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: (...args: unknown[]) => mockCreateClient(...args),
 }))
 
+vi.mock('@/lib/company/context', () => ({
+  requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+  getActiveCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
 describe('POST /api/transactions/batch-describe', () => {
   let POST: typeof import('../route').POST
 

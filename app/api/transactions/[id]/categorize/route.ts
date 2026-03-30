@@ -7,6 +7,7 @@ import { getTemplateById, buildMappingResultFromTemplate, validateTemplateForEnt
 import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-entries'
 import { saveUserMappingRule } from '@/lib/bookkeeping/mapping-engine'
 import { upsertCounterpartyTemplate, buildMappingResultFromCounterpartyTemplate } from '@/lib/bookkeeping/counterparty-templates'
+import { requireCompanyId } from '@/lib/company/context'
 import type { CategorizationTemplate } from '@/types'
 import { validateBody } from '@/lib/api/validate'
 import { CategorizeTransactionSchema } from '@/lib/api/schemas'
@@ -20,6 +21,7 @@ ensureInitialized()
 async function ensureFiscalPeriod(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
+  companyId: string,
   date: string,
   fiscalYearStartMonth: number = 1
 ): Promise<boolean> {
@@ -27,7 +29,7 @@ async function ensureFiscalPeriod(
   const { data: existing } = await supabase
     .from('fiscal_periods')
     .select('id')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .lte('period_start', date)
     .gte('period_end', date)
     .eq('is_closed', false)
@@ -68,11 +70,12 @@ async function ensureFiscalPeriod(
     .from('fiscal_periods')
     .upsert({
       user_id: userId,
+      company_id: companyId,
       name: periodName,
       period_start: periodStart,
       period_end: periodEnd,
     }, {
-      onConflict: 'user_id,period_start,period_end',
+      onConflict: 'company_id,period_start,period_end',
     })
 
   if (error) {
@@ -96,6 +99,8 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Parse and validate request body
   const validation = await validateBody(request, CategorizeTransactionSchema)
   if (!validation.success) return validation.response
@@ -107,7 +112,7 @@ export async function POST(
     .from('transactions')
     .select('*')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (fetchError || !transaction) {
@@ -149,7 +154,7 @@ export async function POST(
   const { data: settings } = await supabase
     .from('company_settings')
     .select('entity_type, fiscal_year_start_month')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   const entityType: EntityType = (settings?.entity_type as EntityType) || 'enskild_firma'
@@ -188,7 +193,7 @@ export async function POST(
       .from('categorization_templates')
       .select('*')
       .eq('id', body.counterparty_template_id)
-      .eq('user_id', user.id)
+      .eq('company_id', companyId)
       .eq('is_active', true)
       .maybeSingle()
 
@@ -233,7 +238,7 @@ export async function POST(
     const { data: accountExists } = await supabase
       .from('chart_of_accounts')
       .select('account_number, account_class')
-      .eq('user_id', user.id)
+      .eq('company_id', companyId)
       .eq('account_number', body.account_override)
       .single()
 
@@ -266,7 +271,7 @@ export async function POST(
   }
 
   // Ensure fiscal period exists for the transaction date
-  await ensureFiscalPeriod(supabase, user.id, transaction.date, fiscalYearStartMonth)
+  await ensureFiscalPeriod(supabase, user.id, companyId, transaction.date, fiscalYearStartMonth)
 
   // Try to create journal entry
   let journalEntryCreated = false
@@ -276,6 +281,7 @@ export async function POST(
   try {
     const journalEntry = await createTransactionJournalEntry(
       supabase,
+      companyId,
       user.id,
       transaction as Transaction,
       mappingResult
@@ -333,7 +339,7 @@ export async function POST(
           .from('document_attachments')
           .update({ journal_entry_id: journalEntryId })
           .eq('id', receipt.document_id)
-          .eq('user_id', user.id)
+          .eq('company_id', companyId)
       }
     } catch (linkErr) {
       console.error('[categorize] Failed to link receipt document:', linkErr)
@@ -347,7 +353,7 @@ export async function POST(
         .from('invoice_inbox_items')
         .update({ status: 'confirmed' })
         .eq('id', body.inbox_item_id)
-        .eq('user_id', user.id)
+        .eq('company_id', companyId)
 
       // Link inbox item's document to the journal entry
       if (journalEntryId) {
@@ -362,7 +368,7 @@ export async function POST(
             .from('document_attachments')
             .update({ journal_entry_id: journalEntryId })
             .eq('id', inboxItem.document_id)
-            .eq('user_id', user.id)
+            .eq('company_id', companyId)
         }
       }
     } catch (inboxErr) {
@@ -395,6 +401,7 @@ export async function POST(
       account: mappingResult.debit_account,
       taxCode: mappingResult.vat_lines[0]?.account_number || '',
       userId: user.id,
+      companyId,
     },
   })
 

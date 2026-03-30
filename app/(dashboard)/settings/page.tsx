@@ -32,6 +32,7 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
+import { useCompany } from '@/contexts/CompanyContext'
 import type { CompanySettings } from '@/types'
 import { validateBankgiroNumber, formatBankgiroNumber } from '@/lib/bankgiro/luhn'
 import { BankNameCombobox } from '@/components/settings/BankNameCombobox'
@@ -50,6 +51,7 @@ export default function SettingsPage() {
   const searchParams = useSearchParams()
   const { toast } = useToast()
   const supabase = createClient()
+  const { company } = useCompany()
 
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -91,7 +93,7 @@ export default function SettingsPage() {
       return
     }
 
-    const settingsRes = await supabase.from('company_settings').select('*').eq('user_id', user.id).single()
+    const settingsRes = await supabase.from('company_settings').select('*').eq('company_id', company.id).single()
 
     setSettings(settingsRes.data)
 

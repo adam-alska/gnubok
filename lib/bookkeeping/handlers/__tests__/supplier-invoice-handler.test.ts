@@ -56,11 +56,13 @@ describe('Supplier Invoice Core Handler', () => {
         inboxItem: { id: 'inbox-1' } as never,
         supplierInvoice: invoice,
         userId: 'user-1',
+        companyId: 'company-1',
       },
     })
 
     expect(mockCreateEntry).toHaveBeenCalledWith(
       expect.anything(),
+      'company-1',
       'user-1',
       invoice,
       expect.any(Array),
@@ -84,6 +86,7 @@ describe('Supplier Invoice Core Handler', () => {
         inboxItem: { id: 'inbox-2' } as never,
         supplierInvoice: invoice,
         userId: 'user-1',
+        companyId: 'company-1',
       },
     })
 
@@ -111,6 +114,7 @@ describe('Supplier Invoice Core Handler', () => {
         inboxItem: { id: 'inbox-3' } as never,
         supplierInvoice: invoice,
         userId: 'user-1',
+        companyId: 'company-1',
       },
     })
 

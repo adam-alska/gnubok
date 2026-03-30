@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { validateBody } from '@/lib/api/validate'
 import { CreateMappingRuleSchema } from '@/lib/api/schemas'
+import { requireCompanyId } from '@/lib/company/context'
 
 export async function GET() {
   const supabase = await createClient()
@@ -11,10 +12,12 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { data, error } = await supabase
     .from('mapping_rules')
     .select('*')
-    .or(`user_id.eq.${user.id},user_id.is.null`)
+    .or(`company_id.eq.${companyId},company_id.is.null`)
     .eq('is_active', true)
     .order('priority')
 
@@ -33,6 +36,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const result = await validateBody(request, CreateMappingRuleSchema)
   if (!result.success) return result.response
   const body = result.data
@@ -41,6 +46,7 @@ export async function POST(request: Request) {
     .from('mapping_rules')
     .insert({
       user_id: user.id,
+      company_id: companyId,
       rule_name: body.rule_name,
       rule_type: body.rule_type,
       priority: body.priority || 10,

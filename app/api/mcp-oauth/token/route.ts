@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { decryptAuthCode, verifyPkce, hashAuthCode } from '@/lib/auth/oauth-codes'
 import { generateApiKey, createServiceClientNoCookies, ALL_SCOPES } from '@/lib/auth/api-keys'
+import { requireCompanyId } from '@/lib/company/context'
 
 /**
  * OAuth 2.0 Token Endpoint.
@@ -100,6 +101,9 @@ export async function POST(request: Request) {
     .lt('created_at', new Date(Date.now() - 10 * 60 * 1000).toISOString())
     .then(() => {})
 
+  // Resolve company context for the user
+  const companyId = await requireCompanyId(supabase, payload.userId)
+
   // Create the API key now (after PKCE verification — prevents orphaned keys)
   const { key, hash, prefix } = generateApiKey()
 
@@ -107,6 +111,7 @@ export async function POST(request: Request) {
     .from('api_keys')
     .insert({
       user_id: payload.userId,
+      company_id: companyId,
       key_hash: hash,
       key_prefix: prefix,
       name: 'MCP-klient (OAuth)',

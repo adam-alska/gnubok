@@ -38,7 +38,7 @@ export interface ARLedgerReport {
  */
 export async function generateARLedger(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   asOfDate?: string
 ): Promise<ARLedgerReport> {
   const refDate = asOfDate ? new Date(asOfDate) : new Date()
@@ -47,7 +47,7 @@ export async function generateARLedger(
   const { data: invoices, error } = await supabase
     .from('invoices')
     .select('*, customer:customers(id, name)')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .in('status', ['sent', 'overdue'])
 
   if (error || !invoices) {

@@ -32,6 +32,7 @@ async function handleGetInbox(
   ctx?: ExtensionContext
 ): Promise<Response> {
   const userId = ctx!.userId
+  const companyId = ctx!.companyId
   const supabase = await getSupabase()
 
   const { searchParams } = new URL(request.url)
@@ -41,7 +42,7 @@ async function handleGetInbox(
   let query = supabase
     .from('invoice_inbox_items')
     .select('*, document:document_attachments(id, file_name, mime_type, storage_path), supplier:suppliers(id, name), receipt:receipts(id, merchant_name, total_amount, receipt_date, status, matched_transaction_id)')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
 
   if (status && status !== 'all') {
     query = query.eq('status', status)
@@ -69,6 +70,7 @@ async function handlePostInbox(
   ctx?: ExtensionContext
 ): Promise<Response> {
   const userId = ctx!.userId
+  const companyId = ctx!.companyId
   const supabase = await getSupabase()
 
   const formData = await request.formData()
@@ -100,11 +102,11 @@ async function handlePostInbox(
     }
 
     try {
-      const result = await uploadAndCreateInboxItem(supabase, userId, file)
+      const result = await uploadAndCreateInboxItem(supabase, userId, companyId, file)
       items.push(result.inboxItem)
 
       // Process asynchronously
-      processInboxItem(result.inboxItem.id as string, userId, result.base64, file.type).catch((err) =>
+      processInboxItem(result.inboxItem.id as string, userId, companyId, result.base64, file.type).catch((err) =>
         console.error('[invoice-inbox] Background processing failed:', err)
       )
     } catch (error) {
@@ -124,6 +126,7 @@ async function handlePostInbox(
 async function uploadAndCreateInboxItem(
   supabase: Awaited<ReturnType<typeof getSupabase>>,
   userId: string,
+  companyId: string,
   file: File
 ): Promise<{ inboxItem: Record<string, unknown>; base64: string }> {
   const arrayBuffer = await file.arrayBuffer()
@@ -144,6 +147,7 @@ async function uploadAndCreateInboxItem(
     .from('document_attachments')
     .insert({
       user_id: userId,
+      company_id: companyId,
       storage_path: storagePath,
       file_name: file.name,
       file_size_bytes: buffer.length,
@@ -175,7 +179,7 @@ async function uploadAndCreateInboxItem(
 
   await eventBus.emit({
     type: 'supplier_invoice.received',
-    payload: { inboxItem, userId },
+    payload: { inboxItem, userId, companyId },
   })
 
   return { inboxItem, base64 }
@@ -184,6 +188,7 @@ async function uploadAndCreateInboxItem(
 async function processInboxItem(
   itemId: string,
   userId: string,
+  companyId: string,
   base64: string,
   mimeType: string
 ): Promise<void> {
@@ -198,9 +203,9 @@ async function processInboxItem(
 
     // Handle based on document type
     if (classification.type === 'receipt' && result.receipt) {
-      await processAsReceipt(supabase, itemId, userId, result.receipt)
+      await processAsReceipt(supabase, itemId, userId, companyId, result.receipt)
     } else if (classification.type === 'supplier_invoice' && result.invoice) {
-      await processAsInvoice(supabase, itemId, userId, result.invoice)
+      await processAsInvoice(supabase, itemId, userId, companyId, result.invoice)
     } else if (classification.type === 'government_letter' || classification.type === 'unknown') {
       // Store classification but no extraction — user must review manually
       await supabase
@@ -216,7 +221,7 @@ async function processInboxItem(
       console.warn(`[invoice-inbox] item=${itemId}: classified as ${classification.type} but no extraction data, falling back`)
       const { extractInvoice } = await import('@/lib/ai/document-analyzer')
       const fallbackExtraction = await extractInvoice(base64, mimeType)
-      await processAsInvoice(supabase, itemId, userId, fallbackExtraction)
+      await processAsInvoice(supabase, itemId, userId, companyId, fallbackExtraction)
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
@@ -231,6 +236,7 @@ async function processAsReceipt(
   supabase: Awaited<ReturnType<typeof getSupabase>>,
   itemId: string,
   userId: string,
+  companyId: string,
   extraction: import('@/types').ReceiptExtractionResult
 ): Promise<void> {
   console.log(`[invoice-inbox] item=${itemId} processing as receipt: merchant=${extraction.merchant?.name}, total=${extraction.totals?.total}`)
@@ -332,6 +338,7 @@ async function processAsReceipt(
         documentId: inboxItem?.document_id || null,
         confidence: extraction.confidence,
         userId,
+        companyId,
       },
     })
   } catch {
@@ -372,6 +379,7 @@ async function processAsInvoice(
   supabase: Awaited<ReturnType<typeof getSupabase>>,
   itemId: string,
   userId: string,
+  companyId: string,
   extraction: InvoiceExtractionResult
 ): Promise<void> {
   console.log(`[invoice-inbox] item=${itemId} processing as supplier_invoice: supplier=${extraction.supplier?.name}, total=${extraction.totals?.total}`)
@@ -384,7 +392,7 @@ async function processAsInvoice(
     const { data: suppliers } = await supabase
       .from('suppliers')
       .select('*')
-      .eq('user_id', userId)
+      .eq('company_id', userId)
 
     if (suppliers && suppliers.length > 0) {
       const match = matchSupplier(extraction, suppliers)
@@ -429,6 +437,7 @@ async function processAsInvoice(
         inboxItem: updatedItem,
         confidence: extraction.confidence,
         userId,
+        companyId,
       },
     })
 
@@ -465,6 +474,7 @@ async function handleGetInboxItem(
   ctx?: ExtensionContext
 ): Promise<Response> {
   const userId = ctx!.userId
+  const companyId = ctx!.companyId
   const supabase = await getSupabase()
   const id = getIdParam(request)
 
@@ -476,7 +486,7 @@ async function handleGetInboxItem(
     .from('invoice_inbox_items')
     .select('*, document:document_attachments(id, file_name, mime_type, storage_path), supplier:suppliers(id, name)')
     .eq('id', id)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .single()
 
   if (error || !data) {
@@ -495,6 +505,7 @@ async function handlePatchInboxItem(
   ctx?: ExtensionContext
 ): Promise<Response> {
   const userId = ctx!.userId
+  const companyId = ctx!.companyId
   const supabase = await getSupabase()
   const id = getIdParam(request)
 
@@ -509,7 +520,7 @@ async function handlePatchInboxItem(
     .from('invoice_inbox_items')
     .select('id, status')
     .eq('id', id)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .single()
 
   if (findError || !existing) {
@@ -552,6 +563,7 @@ async function handleDeleteInboxItem(
   ctx?: ExtensionContext
 ): Promise<Response> {
   const userId = ctx!.userId
+  const companyId = ctx!.companyId
   const supabase = await getSupabase()
   const id = getIdParam(request)
 
@@ -564,7 +576,7 @@ async function handleDeleteInboxItem(
     .from('invoice_inbox_items')
     .update({ status: 'rejected' })
     .eq('id', id)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .select()
     .single()
 
@@ -584,6 +596,7 @@ async function handleProcessInboxItem(
   ctx?: ExtensionContext
 ): Promise<Response> {
   const userId = ctx!.userId
+  const companyId = ctx!.companyId
   const supabase = await getSupabase()
   const id = getIdParam(request)
 
@@ -596,7 +609,7 @@ async function handleProcessInboxItem(
     .from('invoice_inbox_items')
     .select('*, document:document_attachments(id, storage_path, mime_type)')
     .eq('id', id)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .single()
 
   if (findError || !inboxItem) {
@@ -654,9 +667,9 @@ async function handleProcessInboxItem(
     console.log(`[invoice-inbox] Re-process item=${id} classified as: ${classification.type} (confidence=${classification.confidence})`)
 
     if (classification.type === 'receipt' && result.receipt) {
-      await processAsReceipt(supabase, id, userId, result.receipt)
+      await processAsReceipt(supabase, id, userId, companyId, result.receipt)
     } else if (classification.type === 'supplier_invoice' && result.invoice) {
-      await processAsInvoice(supabase, id, userId, result.invoice)
+      await processAsInvoice(supabase, id, userId, companyId, result.invoice)
     } else if (classification.type === 'government_letter' || classification.type === 'unknown') {
       await supabase
         .from('invoice_inbox_items')
@@ -671,7 +684,7 @@ async function handleProcessInboxItem(
       // Fallback: extract as invoice
       const { extractInvoice } = await import('@/lib/ai/document-analyzer')
       const fallbackExtraction = await extractInvoice(base64, document.mime_type)
-      await processAsInvoice(supabase, id, userId, fallbackExtraction)
+      await processAsInvoice(supabase, id, userId, companyId, fallbackExtraction)
     }
 
     // Fetch final state
@@ -705,6 +718,7 @@ async function handleConfirmInboxItem(
   ctx?: ExtensionContext
 ): Promise<Response> {
   const userId = ctx!.userId
+  const companyId = ctx!.companyId
   const supabase = await getSupabase()
   const id = getIdParam(request)
 
@@ -717,7 +731,7 @@ async function handleConfirmInboxItem(
     .from('invoice_inbox_items')
     .select('*')
     .eq('id', id)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .single()
 
   if (findError || !inboxItem) {
@@ -794,7 +808,7 @@ async function handleConfirmInboxItem(
       .from('suppliers')
       .select('*')
       .eq('id', supplierId)
-      .eq('user_id', userId)
+      .eq('company_id', userId)
       .single()
 
     if (supplierCheckError || !supplier) {
@@ -981,6 +995,7 @@ async function handleConfirmInboxItem(
           inboxItem: { ...inboxItem, status: 'confirmed' },
           supplierInvoice: invoice as SupplierInvoice,
           userId,
+          companyId,
         },
       })
     } catch {
@@ -1010,6 +1025,7 @@ async function handleConfirmReceipt(
   ctx?: ExtensionContext
 ): Promise<Response> {
   const userId = ctx!.userId
+  const companyId = ctx!.companyId
   const supabase = await getSupabase()
   const id = getIdParam(request)
 
@@ -1022,7 +1038,7 @@ async function handleConfirmReceipt(
     .from('invoice_inbox_items')
     .select('*')
     .eq('id', id)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .single()
 
   if (findError || !inboxItem) {
@@ -1111,7 +1127,7 @@ async function handleConfirmReceipt(
       .from('transactions')
       .update({ receipt_id: inboxItem.linked_receipt_id })
       .eq('id', matched_transaction_id)
-      .eq('user_id', userId)
+      .eq('company_id', userId)
   }
 
   // Update inbox item status
@@ -1136,6 +1152,7 @@ async function handleConfirmReceipt(
           businessTotal,
           privateTotal,
           userId,
+          companyId,
         },
       })
     }
@@ -1155,6 +1172,7 @@ async function handleGetSettings(
   ctx?: ExtensionContext
 ): Promise<Response> {
   const userId = ctx!.userId
+  const companyId = ctx!.companyId
   const settings = await getSettings(userId)
   return NextResponse.json({ data: settings })
 }
@@ -1168,6 +1186,7 @@ async function handlePutSettings(
   ctx?: ExtensionContext
 ): Promise<Response> {
   const userId = ctx!.userId
+  const companyId = ctx!.companyId
   const body = await request.json()
   const settings = await saveSettings(userId, body)
   return NextResponse.json({ data: settings })

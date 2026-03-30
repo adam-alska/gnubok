@@ -8,6 +8,7 @@ import {
 } from '@/lib/bookkeeping/supplier-invoice-entries'
 import { validateBody } from '@/lib/api/validate'
 import { MarkSupplierInvoicePaidSchema } from '@/lib/api/schemas'
+import { requireCompanyId } from '@/lib/company/context'
 import type { SupplierInvoice, SupplierInvoiceItem } from '@/types'
 
 ensureInitialized()
@@ -25,6 +26,8 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const validation = await validateBody(request, MarkSupplierInvoicePaidSchema)
   if (!validation.success) return validation.response
   const body = validation.data
@@ -34,7 +37,7 @@ export async function POST(
     .from('supplier_invoices')
     .select('*, supplier:suppliers(*), items:supplier_invoice_items(*)')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (fetchError || !invoice) {
@@ -56,7 +59,7 @@ export async function POST(
   const { data: settings } = await supabase
     .from('company_settings')
     .select('accounting_method')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   const accountingMethod = settings?.accounting_method || 'accrual'
@@ -68,6 +71,7 @@ export async function POST(
     if (accountingMethod === 'cash') {
       const journalEntry = await createSupplierInvoiceCashEntry(
         supabase,
+        companyId,
         user.id,
         invoice as SupplierInvoice,
         (invoice.items || []) as SupplierInvoiceItem[],
@@ -79,6 +83,7 @@ export async function POST(
     } else {
       const journalEntry = await createSupplierInvoicePaymentEntry(
         supabase,
+        companyId,
         user.id,
         invoice as SupplierInvoice,
         paymentAmount,
@@ -134,7 +139,7 @@ export async function POST(
   try {
     await eventBus.emit({
       type: 'supplier_invoice.paid',
-      payload: { supplierInvoice: invoice as SupplierInvoice, paymentAmount, userId: user.id },
+      payload: { supplierInvoice: invoice as SupplierInvoice, paymentAmount, companyId, userId: user.id },
     })
   } catch {
     // Non-blocking

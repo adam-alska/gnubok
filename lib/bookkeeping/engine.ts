@@ -30,18 +30,18 @@ export function validateBalance(lines: CreateJournalEntryLineInput[]): {
 }
 
 /**
- * Get the next voucher number for a user/period/series
+ * Get the next voucher number for a company/period/series
  * Uses the concurrent-safe INSERT ON CONFLICT implementation in the database
  */
 export async function getNextVoucherNumber(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   fiscalPeriodId: string,
   series: string = 'A'
 ): Promise<number> {
 
   const { data, error } = await supabase.rpc('next_voucher_number', {
-    p_user_id: userId,
+    p_company_id: companyId,
     p_fiscal_period_id: fiscalPeriodId,
     p_series: series,
   })
@@ -54,11 +54,11 @@ export async function getNextVoucherNumber(
 }
 
 /**
- * Resolve account IDs from account numbers for a user
+ * Resolve account IDs from account numbers for a company
  */
 async function resolveAccountIds(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   lines: CreateJournalEntryLineInput[]
 ): Promise<Map<string, string>> {
   const accountNumbers = [...new Set(lines.map((l) => l.account_number))]
@@ -66,7 +66,7 @@ async function resolveAccountIds(
   const { data: accounts, error } = await supabase
     .from('chart_of_accounts')
     .select('id, account_number')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .in('account_number', accountNumbers)
 
   if (error) {
@@ -86,7 +86,7 @@ async function resolveAccountIds(
  */
 export async function findFiscalPeriod(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   date: string
 ): Promise<string | null> {
 
@@ -95,7 +95,7 @@ export async function findFiscalPeriod(
   const { data, error } = await supabase
     .from('fiscal_periods')
     .select('id')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .lte('period_start', date)
     .gte('period_end', date)
     .eq('is_closed', false)
@@ -141,6 +141,7 @@ function buildLineInserts(
  */
 export async function createDraftEntry(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   input: CreateJournalEntryInput
 ): Promise<JournalEntry> {
@@ -153,12 +154,13 @@ export async function createDraftEntry(
   }
 
   // Resolve account IDs
-  const accountIdMap = await resolveAccountIds(supabase, userId, input.lines)
+  const accountIdMap = await resolveAccountIds(supabase, companyId, input.lines)
 
   // Insert journal entry header as draft (voucher_number = 0, will be assigned on commit)
   const { data: entry, error: entryError } = await supabase
     .from('journal_entries')
     .insert({
+      company_id: companyId,
       user_id: userId,
       fiscal_period_id: input.fiscal_period_id,
       voucher_number: 0,
@@ -199,7 +201,7 @@ export async function createDraftEntry(
 
   await eventBus.emit({
     type: 'journal_entry.drafted',
-    payload: { entry: result, userId },
+    payload: { entry: result, userId, companyId },
   })
 
   return result
@@ -211,6 +213,7 @@ export async function createDraftEntry(
  */
 export async function commitEntry(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   entryId: string
 ): Promise<JournalEntry> {
@@ -220,7 +223,7 @@ export async function commitEntry(
     .from('journal_entries')
     .select('*')
     .eq('id', entryId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .eq('status', 'draft')
     .single()
 
@@ -231,7 +234,7 @@ export async function commitEntry(
   // Assign voucher number
   const voucherNumber = await getNextVoucherNumber(
     supabase,
-    userId,
+    companyId,
     entry.fiscal_period_id,
     entry.voucher_series || 'A'
   )
@@ -261,7 +264,7 @@ export async function commitEntry(
 
   await eventBus.emit({
     type: 'journal_entry.committed',
-    payload: { entry: result, userId },
+    payload: { entry: result, userId, companyId },
   })
 
   return result
@@ -275,11 +278,12 @@ export async function commitEntry(
  */
 export async function createJournalEntry(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   input: CreateJournalEntryInput
 ): Promise<JournalEntry> {
-  const draft = await createDraftEntry(supabase, userId, input)
-  return commitEntry(supabase, userId, draft.id)
+  const draft = await createDraftEntry(supabase, companyId, userId, input)
+  return commitEntry(supabase, companyId, userId, draft.id)
 }
 
 /**
@@ -296,6 +300,7 @@ export function getSwedishLocalDate(): string {
  */
 export async function reverseEntry(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   entryId: string,
   reversalDate?: string
@@ -306,7 +311,7 @@ export async function reverseEntry(
     .from('journal_entries')
     .select('*, lines:journal_entry_lines(*)')
     .eq('id', entryId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (error || !original) {
@@ -340,18 +345,19 @@ export async function reverseEntry(
   // Get voucher number for the reversal
   const voucherNumber = await getNextVoucherNumber(
     supabase,
-    userId,
+    companyId,
     original.fiscal_period_id,
     original.voucher_series || 'A'
   )
 
   // Resolve account IDs
-  const accountIdMap = await resolveAccountIds(supabase, userId, reversedLines)
+  const accountIdMap = await resolveAccountIds(supabase, companyId, reversedLines)
 
   // Create reversal entry with reverses_id link
   const { data: reversalEntry, error: reversalError } = await supabase
     .from('journal_entries')
     .insert({
+      company_id: companyId,
       user_id: userId,
       fiscal_period_id: original.fiscal_period_id,
       voucher_number: voucherNumber,
@@ -425,7 +431,7 @@ export async function reverseEntry(
 
   await eventBus.emit({
     type: 'journal_entry.committed',
-    payload: { entry: result, userId },
+    payload: { entry: result, userId, companyId },
   })
 
   return result

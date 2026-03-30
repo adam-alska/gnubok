@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { regenerateTaxDeadlinesForUser } from '@/lib/tax/deadline-generator'
+import { requireCompanyId } from '@/lib/company/context'
 
 /**
  * POST /api/tax-deadlines/generate
@@ -15,11 +16,13 @@ export async function POST() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Fetch company settings
   const { data: settings, error: settingsError } = await supabase
     .from('company_settings')
     .select('entity_type, moms_period, f_skatt, vat_registered, pays_salaries, fiscal_year_start_month')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (settingsError || !settings) {

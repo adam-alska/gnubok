@@ -4,6 +4,7 @@ import { ensureInitialized } from '@/lib/init'
 import { manualLink } from '@/lib/reconciliation/bank-reconciliation'
 import { validateBody } from '@/lib/api/validate'
 import { BankLinkSchema } from '@/lib/api/schemas'
+import { requireCompanyId } from '@/lib/company/context'
 
 ensureInitialized()
 
@@ -15,11 +16,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const validation = await validateBody(request, BankLinkSchema)
   if (!validation.success) return validation.response
   const { transaction_id, journal_entry_id } = validation.data
 
-  const result = await manualLink(supabase, user.id, transaction_id, journal_entry_id)
+  const result = await manualLink(supabase, companyId, transaction_id, journal_entry_id)
 
   if (!result.success) {
     return NextResponse.json({ error: result.error }, { status: 400 })

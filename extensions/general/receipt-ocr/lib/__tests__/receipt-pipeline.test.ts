@@ -106,7 +106,7 @@ describe('processReceiptFromDocument', () => {
     setResult(receipt)
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result = await processReceiptFromDocument(supabase as any, 'user-1', 'base64data', 'image/jpeg', {
+    const result = await processReceiptFromDocument(supabase as any, 'user-1', 'company-1', 'base64data', 'image/jpeg', {
       documentId: 'doc-1',
       source: 'email',
       emailFrom: 'sender@example.com',
@@ -133,7 +133,7 @@ describe('processReceiptFromDocument', () => {
     setResult(receipt)
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await processReceiptFromDocument(supabase as any, 'user-1', 'base64data', 'image/jpeg', {
+    await processReceiptFromDocument(supabase as any, 'user-1', 'company-1', 'base64data', 'image/jpeg', {
       documentId: 'doc-1',
       source: 'upload',
       storageUrl: 'https://storage.example.com/file.jpg',
@@ -146,6 +146,7 @@ describe('processReceiptFromDocument', () => {
         documentId: 'doc-1',
         confidence: 0.92,
         userId: 'user-1',
+        companyId: 'company-1',
       }),
     })
   })
@@ -155,7 +156,7 @@ describe('processReceiptFromDocument', () => {
     setResult(null, { message: 'insert failed' })
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await expect(processReceiptFromDocument(supabase as any, 'user-1', 'base64data', 'image/jpeg', {
+    await expect(processReceiptFromDocument(supabase as any, 'user-1', 'company-1', 'base64data', 'image/jpeg', {
       documentId: null,
       source: 'upload',
       storageUrl: 'https://storage.example.com/file.jpg',
@@ -167,7 +168,7 @@ describe('processReceiptFromDocument', () => {
     setResult({ id: 'receipt-1', user_id: 'user-1' })
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await processReceiptFromDocument(supabase as any, 'user-1', 'base64data', 'image/jpeg', {
+    await processReceiptFromDocument(supabase as any, 'user-1', 'company-1', 'base64data', 'image/jpeg', {
       documentId: null,
       source: 'upload',
       storageUrl: 'https://storage.example.com/file.jpg',

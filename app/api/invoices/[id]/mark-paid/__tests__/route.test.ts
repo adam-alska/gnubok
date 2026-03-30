@@ -17,6 +17,10 @@ vi.mock('@/lib/init', () => ({
   ensureInitialized: vi.fn(),
 }))
 
+vi.mock('@/lib/company/context', () => ({
+  requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
 const mockCreateInvoicePaymentJournalEntry = vi.fn()
 const mockCreateInvoiceCashEntry = vi.fn()
 vi.mock('@/lib/bookkeeping/invoice-entries', () => ({
@@ -137,6 +141,7 @@ describe('POST /api/invoices/[id]/mark-paid', () => {
     expect(body.journal_entry_id).toBe('je-1')
     expect(mockCreateInvoicePaymentJournalEntry).toHaveBeenCalledWith(
       expect.anything(),
+      'company-1',
       'user-1',
       expect.objectContaining({ id: 'inv-1' }),
       expect.any(String),
@@ -172,6 +177,7 @@ describe('POST /api/invoices/[id]/mark-paid', () => {
     expect(body.journal_entry_id).toBe('je-2')
     expect(mockCreateInvoiceCashEntry).toHaveBeenCalledWith(
       expect.anything(),
+      'company-1',
       'user-1',
       expect.objectContaining({ id: 'inv-1' }),
       expect.any(String),
@@ -235,6 +241,7 @@ describe('POST /api/invoices/[id]/mark-paid', () => {
     // Should call createJournalEntry directly with custom lines
     expect(mockCreateJournalEntry).toHaveBeenCalledWith(
       expect.anything(),
+      'company-1',
       'user-1',
       expect.objectContaining({
         entry_date: '2025-03-17',

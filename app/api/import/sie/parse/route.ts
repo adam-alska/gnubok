@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireCompanyId } from '@/lib/company/context'
 import {
   parseSIEFile,
   validateSIEFile,
@@ -26,6 +27,8 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   try {
     // Get form data with file
@@ -91,7 +94,7 @@ export async function POST(request: Request) {
     const { data: storedMappings } = await supabase
       .from('sie_account_mappings')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('company_id', companyId)
 
     // Match against the full BAS reference (1,276 accounts) instead of only
     // the user's active chart (~40 accounts). Accounts that match will be

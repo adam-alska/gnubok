@@ -72,6 +72,7 @@ function OnboardingPageContent() {
   const [isSaving, setIsSaving] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
   const [settings, setSettings] = useState<Partial<CompanySettings>>({})
+  const [companyId, setCompanyId] = useState<string | null>(null)
   const ticEnabled = ENABLED_EXTENSION_IDS.has('tic')
   const [ticLookup, setTicLookup] = useState<CompanyLookupResult | null>(null)
 
@@ -102,26 +103,39 @@ function OnboardingPageContent() {
         return
       }
 
-      const { data, error } = await supabase
-        .from('company_settings')
-        .select('*')
+      // Check if user already has a company via company_members
+      const { data: membership } = await supabase
+        .from('company_members')
+        .select('company_id')
         .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(1)
         .single()
 
-      if (error && error.code !== 'PGRST116') {
-        logError('failed to load settings', { message: error.message, code: error.code })
-      }
+      if (membership?.company_id) {
+        setCompanyId(membership.company_id)
 
-      if (data) {
-        const step = data.onboarding_step || 1
-        const clampedStep = step > totalSteps ? totalSteps : step
-        if (step > totalSteps) {
-          logError('onboarding_step exceeds totalSteps — clamped', { step, totalSteps })
+        const { data, error } = await supabase
+          .from('company_settings')
+          .select('*')
+          .eq('company_id', membership.company_id)
+          .single()
+
+        if (error && error.code !== 'PGRST116') {
+          logError('failed to load settings', { message: error.message, code: error.code })
         }
-        // Important milestone: where we resume
-        console.log(LOG, 'resuming at step', clampedStep, { entity_type: data.entity_type })
-        setSettings(data)
-        setCurrentStep(clampedStep)
+
+        if (data) {
+          const step = data.onboarding_step || 1
+          const clampedStep = step > totalSteps ? totalSteps : step
+          if (step > totalSteps) {
+            logError('onboarding_step exceeds totalSteps — clamped', { step, totalSteps })
+          }
+          // Important milestone: where we resume
+          console.log(LOG, 'resuming at step', clampedStep, { entity_type: data.entity_type })
+          setSettings(data)
+          setCurrentStep(clampedStep)
+        }
       }
 
       setIsLoading(false)
@@ -153,16 +167,21 @@ function OnboardingPageContent() {
         onboarding_step: targetStep,
       }
 
+      if (!companyId) {
+        logError('save aborted: no companyId', { step: targetStep })
+        return false
+      }
+
       // Remove read-only and transient fields before updating
       const {
-        id: _id, user_id: _uid, created_at: _ca, updated_at: _ua,
+        id: _id, user_id: _uid, company_id: _cid, created_at: _ca, updated_at: _ua,
         is_first_fiscal_year: _ify, first_year_start: _fys, first_year_end: _fye,
         ...settingsToSave
       } = updatedSettings as Record<string, unknown>
 
       const { error } = await supabase
         .from('company_settings')
-        .upsert({ ...settingsToSave, user_id: user.id }, { onConflict: 'user_id' })
+        .upsert({ ...settingsToSave, company_id: companyId }, { onConflict: 'company_id' })
 
       if (error) {
         logError('save failed', { message: error.message, step: targetStep, code: error.code, details: error.details })
@@ -199,8 +218,112 @@ function OnboardingPageContent() {
       setTicLookup(null)
     }
 
+    // Step 1: Create company + membership + user_preferences if no companyId yet
+    let activeCompanyId = companyId
+
+    if (currentStep === 1 && !activeCompanyId) {
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (authError) {
+          logError('auth.getUser() failed before company creation', { message: authError.message })
+        }
+        if (!user) {
+          logError('company creation skipped: no user')
+          router.push('/login')
+          return
+        }
+
+        // Create the company
+        const { data: newCompany, error: companyError } = await supabase
+          .from('companies')
+          .insert({
+            name: 'Mitt företag',
+            entity_type: stepData.entity_type,
+            created_by: user.id,
+          })
+          .select('id')
+          .single()
+
+        if (companyError || !newCompany) {
+          logError('company creation failed', { message: companyError?.message, code: companyError?.code })
+          toast({ title: 'Fel', description: 'Kunde inte skapa företag. Försök igen.', variant: 'destructive' })
+          return
+        }
+
+        activeCompanyId = newCompany.id
+
+        // Create membership + user_preferences in parallel
+        const [{ error: memberError }, { error: prefError }] = await Promise.all([
+          supabase.from('company_members').insert({
+            company_id: activeCompanyId,
+            user_id: user.id,
+            role: 'owner',
+          }),
+          supabase.from('user_preferences').upsert({
+            user_id: user.id,
+            active_company_id: activeCompanyId,
+          }, { onConflict: 'user_id' }),
+        ])
+
+        if (memberError) {
+          logError('company_members insert failed', { message: memberError.message })
+        }
+        if (prefError) {
+          logError('user_preferences upsert failed', { message: prefError.message })
+        }
+
+        setCompanyId(activeCompanyId)
+        console.log(LOG, 'created company', activeCompanyId)
+      } catch (err) {
+        logError('company creation threw', { error: String(err) })
+        Sentry.captureException(err)
+        toast({ title: 'Fel', description: 'Kunde inte skapa företag. Försök igen.', variant: 'destructive' })
+        return
+      }
+    }
+
+    if (!activeCompanyId) {
+      logError('handleNext aborted: no companyId', { step: currentStep })
+      return
+    }
+
     const nextStep = currentStep + 1
-    const success = await saveSettings(stepData, nextStep)
+
+    // For step 1, companyId state may not be updated yet (React batching).
+    // Save settings directly with activeCompanyId to avoid the race condition.
+    const needsDirectSave = currentStep === 1 && !companyId
+    const success = needsDirectSave
+      ? await (async () => {
+          setIsSaving(true)
+          try {
+            const updatedSettings = { ...settings, ...stepData, onboarding_step: nextStep }
+            const {
+              id: _id, user_id: _uid, company_id: _cid, created_at: _ca, updated_at: _ua,
+              is_first_fiscal_year: _ify, first_year_start: _fys, first_year_end: _fye,
+              ...settingsToSave
+            } = updatedSettings as Record<string, unknown>
+
+            const { error } = await supabase
+              .from('company_settings')
+              .upsert({ ...settingsToSave, company_id: activeCompanyId }, { onConflict: 'company_id' })
+
+            if (error) {
+              logError('save failed', { message: error.message, step: nextStep, code: error.code })
+              toast({ title: 'Fel', description: error.message || 'Kunde inte spara. Försök igen.', variant: 'destructive' })
+              return false
+            }
+
+            setSettings(updatedSettings)
+            return true
+          } catch (err) {
+            logError('saveSettings threw', { message: String(err), step: nextStep })
+            Sentry.captureException(err)
+            return false
+          } finally {
+            setIsSaving(false)
+          }
+        })()
+      : await saveSettings(stepData, nextStep)
 
     if (!success) {
       logError('handleNext aborted: saveSettings failed', { step: currentStep })
@@ -210,25 +333,17 @@ function OnboardingPageContent() {
     // After step 1 (entity type selection): seed chart of accounts
     if (currentStep === 1 && stepData.entity_type) {
       try {
-        const { data: { user }, error: authError } = await supabase.auth.getUser()
-        if (authError) {
-          logError('auth.getUser() failed before seeding chart of accounts', { message: authError.message })
-        }
-        if (user) {
-          const { error: rpcError } = await supabase.rpc('seed_chart_of_accounts', {
-            p_user_id: user.id,
-            p_entity_type: stepData.entity_type,
+        const { error: rpcError } = await supabase.rpc('seed_chart_of_accounts', {
+          p_company_id: activeCompanyId,
+          p_entity_type: stepData.entity_type,
+        })
+        if (rpcError) {
+          logError('chart of accounts seeding failed', {
+            entity_type: stepData.entity_type,
+            message: rpcError.message,
+            code: rpcError.code,
+            details: rpcError.details,
           })
-          if (rpcError) {
-            logError('chart of accounts seeding failed', {
-              entity_type: stepData.entity_type,
-              message: rpcError.message,
-              code: rpcError.code,
-              details: rpcError.details,
-            })
-          }
-        } else {
-          logError('chart of accounts seeding skipped: no user')
         }
       } catch (err) {
         logError('chart of accounts seeding threw', { error: String(err) })
@@ -237,15 +352,8 @@ function OnboardingPageContent() {
     }
 
     // After step 3 (tax registration): create initial fiscal period
-    if (currentStep === 3) {
+    if (currentStep === 3 && companyId) {
       try {
-        const { data: { user }, error: authError } = await supabase.auth.getUser()
-        if (authError) {
-          logError('auth.getUser() failed before fiscal period creation', { message: authError.message })
-        }
-        if (!user) {
-          logError('fiscal period creation skipped: no user')
-        } else {
           const isFirstYear = stepData.is_first_fiscal_year as boolean | undefined
           const firstYearStart = stepData.first_year_start as string | undefined
           const firstYearEnd = stepData.first_year_end as string | undefined
@@ -314,7 +422,7 @@ function OnboardingPageContent() {
           const { data: existingPeriods, error: fetchPeriodsError } = await supabase
             .from('fiscal_periods')
             .select('id')
-            .eq('user_id', user.id)
+            .eq('company_id', companyId)
 
           if (fetchPeriodsError) {
             logError('failed to fetch existing fiscal periods', {
@@ -348,12 +456,12 @@ function OnboardingPageContent() {
           }
 
           const { error: upsertError } = await supabase.from('fiscal_periods').upsert({
-            user_id: user.id,
+            company_id: companyId,
             name: periodName,
             period_start: startStr,
             period_end: endStr,
           }, {
-            onConflict: 'user_id,period_start,period_end',
+            onConflict: 'company_id,period_start,period_end',
           })
 
           if (upsertError) {
@@ -361,7 +469,6 @@ function OnboardingPageContent() {
               message: upsertError.message, startStr, endStr, code: upsertError.code, details: upsertError.details,
             })
           }
-        }
       } catch (err) {
         logError('fiscal period creation threw', { error: String(err) })
         Sentry.captureException(err)

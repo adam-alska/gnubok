@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { runDocumentMatchingSweep } from '@/lib/documents/batch-match'
+import { requireCompanyId } from '@/lib/company/context'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -9,6 +10,8 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   // Optional: pass specific inbox item IDs to match
   let inboxItemIds: string[] | undefined

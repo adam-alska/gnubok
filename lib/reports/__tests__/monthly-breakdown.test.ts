@@ -13,7 +13,7 @@ describe('generateMonthlyBreakdown', () => {
   it('returns empty months when no fiscal period found', async () => {
     mockResult({ data: null, error: { message: 'not found' } })
 
-    const result = await generateMonthlyBreakdown(supabase, 'user-1', 'period-1')
+    const result = await generateMonthlyBreakdown(supabase, 'company-1', 'period-1')
     expect(result.months).toEqual([])
   })
 
@@ -65,7 +65,7 @@ describe('generateMonthlyBreakdown', () => {
       }
     })
 
-    const result = await generateMonthlyBreakdown(supabase, 'user-1', 'period-1')
+    const result = await generateMonthlyBreakdown(supabase, 'company-1', 'period-1')
     expect(result.months.length).toBe(12)
     expect(result.months[0].label).toBe('Jan')
     expect(result.months[0].income).toBe(0)
@@ -132,7 +132,7 @@ describe('generateMonthlyBreakdown', () => {
       }
     })
 
-    const result = await generateMonthlyBreakdown(supabase, 'user-1', 'period-1')
+    const result = await generateMonthlyBreakdown(supabase, 'company-1', 'period-1')
 
     // January
     const jan = result.months.find((m) => m.label === 'Jan')!
@@ -211,7 +211,7 @@ describe('generateMonthlyBreakdown', () => {
       }
     })
 
-    const result = await generateMonthlyBreakdown(supabase, 'user-1', 'period-1')
+    const result = await generateMonthlyBreakdown(supabase, 'company-1', 'period-1')
     const jan = result.months.find((m) => m.label === 'Jan')!
     // Class 1 and 2 are ignored
     // Class 8 debit (8400 interest expense) → expense

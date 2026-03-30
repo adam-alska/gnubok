@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { ensureInitialized } from '@/lib/init'
 import { uploadDocument } from '@/lib/core/documents/document-service'
+import { requireCompanyId } from '@/lib/company/context'
 
 ensureInitialized()
 
@@ -24,6 +25,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   try {
     const formData = await request.formData()
     const file = formData.get('file') as File | null
@@ -38,7 +41,7 @@ export async function POST(request: Request) {
 
     const buffer = await file.arrayBuffer()
 
-    const document = await uploadDocument(supabase, user.id, {
+    const document = await uploadDocument(supabase, user.id, companyId, {
       name: file.name,
       buffer,
       type: file.type,
@@ -77,6 +80,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { searchParams } = new URL(request.url)
   const journalEntryId = searchParams.get('journal_entry_id')
   const currentOnly = searchParams.get('current_only') !== 'false'
@@ -86,7 +91,7 @@ export async function GET(request: Request) {
   let query = supabase
     .from('document_attachments')
     .select('*', { count: 'exact' })
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 

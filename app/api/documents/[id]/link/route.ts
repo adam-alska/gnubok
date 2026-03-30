@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { ensureInitialized } from '@/lib/init'
 import { linkToJournalEntry } from '@/lib/core/documents/document-service'
+import { requireCompanyId } from '@/lib/company/context'
 
 ensureInitialized()
 
@@ -24,6 +25,8 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   const { id } = await params
 

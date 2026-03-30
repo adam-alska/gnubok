@@ -125,8 +125,8 @@ describe('Email Handler', () => {
             eq: vi.fn().mockReturnValue({
               eq: vi.fn().mockResolvedValue({
                 data: [
-                  { user_id: 'user-1', value: { inboxEmail: 'test@inbox.com' } },
-                  { user_id: 'user-2', value: { inboxEmail: 'other@inbox.com' } },
+                  { user_id: 'user-1', company_id: 'company-1', value: { inboxEmail: 'test@inbox.com' } },
+                  { user_id: 'user-2', company_id: 'company-2', value: { inboxEmail: 'other@inbox.com' } },
                 ],
                 error: null,
               }),
@@ -136,7 +136,7 @@ describe('Email Handler', () => {
       }
 
       const result = await resolveUserFromEmail('test@inbox.com', mockClient)
-      expect(result).toBe('user-1')
+      expect(result).toEqual({ userId: 'user-1', companyId: 'company-1' })
     })
 
     it('handles case-insensitive email matching', async () => {
@@ -146,7 +146,7 @@ describe('Email Handler', () => {
             eq: vi.fn().mockReturnValue({
               eq: vi.fn().mockResolvedValue({
                 data: [
-                  { user_id: 'user-1', value: { inboxEmail: 'Test@Inbox.Com' } },
+                  { user_id: 'user-1', company_id: 'company-1', value: { inboxEmail: 'Test@Inbox.Com' } },
                 ],
                 error: null,
               }),
@@ -156,7 +156,7 @@ describe('Email Handler', () => {
       }
 
       const result = await resolveUserFromEmail('test@inbox.com', mockClient)
-      expect(result).toBe('user-1')
+      expect(result).toEqual({ userId: 'user-1', companyId: 'company-1' })
     })
 
     it('returns null when no matching email', async () => {

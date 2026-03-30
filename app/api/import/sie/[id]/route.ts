@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireCompanyId } from '@/lib/company/context'
 
 /**
  * GET /api/import/sie/[id]
@@ -20,11 +21,13 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { data, error } = await supabase
     .from('sie_imports')
     .select('*')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (error) {
@@ -62,12 +65,14 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Check current status before deleting
   const { data: importRecord } = await supabase
     .from('sie_imports')
     .select('status')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (!importRecord) {
@@ -84,7 +89,7 @@ export async function DELETE(
     .from('sie_imports')
     .delete()
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

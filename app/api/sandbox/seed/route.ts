@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireCompanyId } from '@/lib/company/context'
 
 /**
  * POST /api/sandbox/seed
@@ -18,11 +19,13 @@ export async function POST() {
     return NextResponse.json({ error: 'Sandbox is only available for anonymous users' }, { status: 403 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Idempotency: if already seeded, return early
   const { data: existing } = await supabase
     .from('company_settings')
     .select('id')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .maybeSingle()
 
   if (existing) {
@@ -43,6 +46,7 @@ export async function POST() {
       .from('company_settings')
       .insert({
         user_id: userId,
+        company_id: companyId,
         entity_type: 'enskild_firma',
         company_name: 'Sandlådan Konsult',
         org_number: '199001011234',
@@ -80,6 +84,7 @@ export async function POST() {
       .from('fiscal_periods')
       .insert({
         user_id: userId,
+        company_id: companyId,
         name: `Räkenskapsår ${currentYear}`,
         period_start: `${currentYear}-01-01`,
         period_end: `${currentYear}-12-31`,
@@ -95,6 +100,7 @@ export async function POST() {
       .insert([
         {
           user_id: userId,
+          company_id: companyId,
           name: 'Björk & Partner AB',
           customer_type: 'swedish_business',
           email: 'faktura@bjorkpartner.se',
@@ -109,6 +115,7 @@ export async function POST() {
         },
         {
           user_id: userId,
+          company_id: companyId,
           name: 'Schmidt GmbH',
           customer_type: 'eu_business',
           email: 'billing@schmidt.de',
@@ -123,6 +130,7 @@ export async function POST() {
         },
         {
           user_id: userId,
+          company_id: companyId,
           name: 'Anna Lindström',
           customer_type: 'individual',
           email: 'anna.lindstrom@example.com',
@@ -158,6 +166,7 @@ export async function POST() {
       .insert([
         {
           user_id: userId,
+          company_id: companyId,
           customer_id: customerMap['Björk & Partner AB'],
           invoice_number: 'F-2026001',
           invoice_date: toDateStr(thirtyDaysAgo),
@@ -175,6 +184,7 @@ export async function POST() {
         },
         {
           user_id: userId,
+          company_id: companyId,
           customer_id: customerMap['Schmidt GmbH'],
           invoice_number: 'F-2026002',
           invoice_date: toDateStr(fifteenDaysAgo),
@@ -190,6 +200,7 @@ export async function POST() {
         },
         {
           user_id: userId,
+          company_id: companyId,
           customer_id: customerMap['Anna Lindström'],
           invoice_number: 'F-2026003',
           invoice_date: toDateStr(thirtyDaysAgo),
@@ -205,6 +216,7 @@ export async function POST() {
         },
         {
           user_id: userId,
+          company_id: companyId,
           customer_id: customerMap['Björk & Partner AB'],
           invoice_number: 'F-2026004',
           invoice_date: toDateStr(today),
@@ -273,7 +285,7 @@ export async function POST() {
     const { data: accounts } = await supabase
       .from('chart_of_accounts')
       .select('id, account_number')
-      .eq('user_id', userId)
+      .eq('company_id', companyId)
       .in('account_number', ['1510', '1930', '2611', '3001'])
 
     const accountMap = Object.fromEntries(
@@ -291,6 +303,7 @@ export async function POST() {
       .from('journal_entries')
       .insert({
         user_id: userId,
+        company_id: companyId,
         fiscal_period_id: fiscalPeriod.id,
         voucher_number: voucherNum1 ?? 1,
         voucher_series: 'A',
@@ -316,6 +329,7 @@ export async function POST() {
       .from('journal_entries')
       .insert({
         user_id: userId,
+        company_id: companyId,
         fiscal_period_id: fiscalPeriod.id,
         voucher_number: voucherNum2 ?? 2,
         voucher_series: 'A',
@@ -388,6 +402,7 @@ export async function POST() {
         // Categorized expenses
         {
           user_id: userId,
+          company_id: companyId,
           date: toDateStr(thirtyDaysAgo),
           description: 'CLAS OHLSON STOCKHOLM',
           amount: -450,
@@ -397,6 +412,7 @@ export async function POST() {
         },
         {
           user_id: userId,
+          company_id: companyId,
           date: toDateStr(fifteenDaysAgo),
           description: 'GITHUB INC',
           amount: -999,
@@ -406,6 +422,7 @@ export async function POST() {
         },
         {
           user_id: userId,
+          company_id: companyId,
           date: toDateStr(fiveDaysAgo),
           description: 'SJ BILJETT',
           amount: -2500,
@@ -416,6 +433,7 @@ export async function POST() {
         // Income matched to paid invoice
         {
           user_id: userId,
+          company_id: companyId,
           date: toDateStr(fifteenDaysAgo),
           description: 'BJÖRK & PARTNER AB BETALNING F-2026001',
           amount: 18750,
@@ -428,6 +446,7 @@ export async function POST() {
         // Private transaction
         {
           user_id: userId,
+          company_id: companyId,
           date: toDateStr(fiveDaysAgo),
           description: 'PRIVAT INSÄTTNING',
           amount: 5000,
@@ -437,6 +456,7 @@ export async function POST() {
         // Uncategorized transactions
         {
           user_id: userId,
+          company_id: companyId,
           date: toDateStr(fiveDaysAgo),
           description: 'SWISH BETALNING 0701234567',
           amount: -350,
@@ -445,6 +465,7 @@ export async function POST() {
         },
         {
           user_id: userId,
+          company_id: companyId,
           date: toDateStr(today),
           description: 'INSÄTTNING BANKGIRO',
           amount: 1200,
@@ -453,6 +474,7 @@ export async function POST() {
         },
         {
           user_id: userId,
+          company_id: companyId,
           date: toDateStr(today),
           description: 'KORTBETALNING RESTAURANG',
           amount: -680,
@@ -473,6 +495,7 @@ export async function POST() {
       .insert([
         {
           user_id: userId,
+          company_id: companyId,
           title: 'Momsdeklaration Q1 2026',
           due_date: toDateStr(momsDeadline),
           deadline_type: 'tax',
@@ -485,6 +508,7 @@ export async function POST() {
         },
         {
           user_id: userId,
+          company_id: companyId,
           title: 'Inkomstdeklaration 2025',
           due_date: `${currentYear}-05-02`,
           deadline_type: 'tax',

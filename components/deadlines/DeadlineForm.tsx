@@ -25,7 +25,7 @@ import { formatDateISO, DEADLINE_TYPE_LABELS, PRIORITY_LABELS } from '@/lib/cale
 interface DeadlineFormProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (data: Omit<Deadline, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>
+  onSubmit: (data: Omit<Deadline, 'id' | 'user_id' | 'company_id' | 'created_at' | 'updated_at'>) => Promise<void>
   onDelete?: (deadline: Partial<Deadline>) => void
   initialData?: Partial<Deadline>
   initialDate?: Date | null

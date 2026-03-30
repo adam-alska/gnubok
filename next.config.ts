@@ -17,7 +17,7 @@ const cspDirectives = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
+  output: process.env.VERCEL ? 'standalone' : undefined,
   async redirects() {
     return [
       {

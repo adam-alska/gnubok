@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { eventBus } from '@/lib/events'
 import { ensureInitialized } from '@/lib/init'
+import { requireCompanyId } from '@/lib/company/context'
 import type { SupplierInvoice } from '@/types'
 
 ensureInitialized()
@@ -19,11 +20,13 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { data: invoice } = await supabase
     .from('supplier_invoices')
     .select('*')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (!invoice) {
@@ -41,7 +44,7 @@ export async function POST(
     .from('supplier_invoices')
     .update({ status: 'approved' })
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .select()
     .single()
 
@@ -52,7 +55,7 @@ export async function POST(
   try {
     await eventBus.emit({
       type: 'supplier_invoice.approved',
-      payload: { supplierInvoice: data as SupplierInvoice, userId: user.id },
+      payload: { supplierInvoice: data as SupplierInvoice, companyId, userId: user.id },
     })
   } catch {
     // Non-blocking

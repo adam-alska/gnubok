@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import DashboardContent from '@/components/dashboard/DashboardContent'
+import { getActiveCompanyId } from '@/lib/company/context'
 import type { Deadline, ReceiptQueueSummary, OnboardingProgress } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -12,6 +14,14 @@ export default async function DashboardPage() {
 
   if (!user) {
     redirect('/login')
+  }
+
+  const cookieStore = await cookies()
+  const companyId = cookieStore.get('gnubok-company-id')?.value
+    ?? await getActiveCompanyId(supabase, user.id)
+
+  if (!companyId) {
+    redirect('/onboarding')
   }
 
   // Fetch current year date boundaries
@@ -54,28 +64,29 @@ export default async function DashboardPage() {
     { count: staleUncategorizedCount },
   ] = await Promise.all([
     supabase.from('profiles').select('full_name').eq('id', user.id).single(),
-    supabase.from('company_settings').select('*').eq('user_id', user.id).single(),
-    supabase.from('customers').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-    supabase.from('invoices').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-    supabase.from('receipts').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-    supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+    supabase.from('company_settings').select('*').eq('company_id', companyId).single(),
+    supabase.from('customers').select('*', { count: 'exact', head: true }).eq('company_id', companyId),
+    supabase.from('invoices').select('*', { count: 'exact', head: true }).eq('company_id', companyId),
+    supabase.from('receipts').select('*', { count: 'exact', head: true }).eq('company_id', companyId),
+    supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('company_id', companyId),
     supabase.from('journal_entry_lines')
-      .select('account_number, debit_amount, credit_amount, journal_entry:journal_entries!inner(entry_date, status)')
+      .select('account_number, debit_amount, credit_amount, journal_entry:journal_entries!inner(entry_date, status, company_id)')
       .eq('journal_entry.status', 'posted')
+      .eq('journal_entry.company_id', companyId)
       .gte('journal_entry.entry_date', startOfYearStr),
-    supabase.from('transactions').select('amount, amount_sek, is_business').eq('user_id', user.id).gte('date', startOfYearStr),
-    supabase.from('invoices').select('total, total_sek, vat_amount, vat_amount_sek, status').eq('user_id', user.id).in('status', ['sent', 'overdue']),
-    supabase.from('bank_connections').select('id, accounts_data, status, consent_expires, bank_name').eq('user_id', user.id).eq('status', 'active'),
-    supabase.from('deadlines').select('*, customer:customers(id, name)').eq('user_id', user.id).eq('is_completed', false)
+    supabase.from('transactions').select('amount, amount_sek, is_business').eq('company_id', companyId).gte('date', startOfYearStr),
+    supabase.from('invoices').select('total, total_sek, vat_amount, vat_amount_sek, status').eq('company_id', companyId).in('status', ['sent', 'overdue']),
+    supabase.from('bank_connections').select('id, accounts_data, status, consent_expires, bank_name').eq('company_id', companyId).eq('status', 'active'),
+    supabase.from('deadlines').select('*, customer:customers(id, name)').eq('company_id', companyId).eq('is_completed', false)
       .or(`due_date.lt.${today},due_date.lte.${nextWeek}`).order('due_date', { ascending: true }),
-    supabase.from('receipts').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'extracted'),
-    supabase.from('receipts').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'confirmed').is('matched_transaction_id', null),
-    supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('user_id', user.id).lt('amount', 0).is('receipt_id', null),
-    supabase.from('journal_entries').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'posted').in('source_type', needsDocSourceTypes),
-    supabase.from('document_attachments').select('journal_entry_id').eq('user_id', user.id).eq('is_current_version', true).not('journal_entry_id', 'is', null),
-    supabase.from('receipts').select('created_at').eq('user_id', user.id).eq('status', 'confirmed').order('created_at', { ascending: false }).limit(30),
-    supabase.from('sie_imports').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'completed'),
-    supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('user_id', user.id).is('journal_entry_id', null).not('is_business', 'eq', false).lt('date', new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
+    supabase.from('receipts').select('*', { count: 'exact', head: true }).eq('company_id', companyId).eq('status', 'extracted'),
+    supabase.from('receipts').select('*', { count: 'exact', head: true }).eq('company_id', companyId).eq('status', 'confirmed').is('matched_transaction_id', null),
+    supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('company_id', companyId).lt('amount', 0).is('receipt_id', null),
+    supabase.from('journal_entries').select('*', { count: 'exact', head: true }).eq('company_id', companyId).eq('status', 'posted').in('source_type', needsDocSourceTypes),
+    supabase.from('document_attachments').select('journal_entry_id').eq('company_id', companyId).eq('is_current_version', true).not('journal_entry_id', 'is', null),
+    supabase.from('receipts').select('created_at').eq('company_id', companyId).eq('status', 'confirmed').order('created_at', { ascending: false }).limit(30),
+    supabase.from('sie_imports').select('*', { count: 'exact', head: true }).eq('company_id', companyId).eq('status', 'completed'),
+    supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('company_id', companyId).is('journal_entry_id', null).not('is_business', 'eq', false).lt('date', new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
   ])
 
   const firstName = profile?.full_name?.split(' ')[0] || null

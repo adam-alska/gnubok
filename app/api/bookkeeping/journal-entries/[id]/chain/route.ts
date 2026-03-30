@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireCompanyId } from '@/lib/company/context'
 
 export async function GET(
   request: Request,
@@ -13,12 +14,14 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Fetch the requested entry with lines
   const { data: entry, error } = await supabase
     .from('journal_entries')
     .select('*, lines:journal_entry_lines(*)')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (error || !entry) {
@@ -38,7 +41,7 @@ export async function GET(
   const { data: referencing } = await supabase
     .from('journal_entries')
     .select('id')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .or(`reverses_id.eq.${id},reversed_by_id.eq.${id},correction_of_id.eq.${id}`)
 
   if (referencing) {
@@ -57,7 +60,7 @@ export async function GET(
     const { data: batchEntries } = await supabase
       .from('journal_entries')
       .select('id, reverses_id, reversed_by_id, correction_of_id')
-      .eq('user_id', user.id)
+      .eq('company_id', companyId)
       .in('id', batch)
 
     if (!batchEntries) continue
@@ -81,7 +84,7 @@ export async function GET(
     const { data: refs } = await supabase
       .from('journal_entries')
       .select('id')
-      .eq('user_id', user.id)
+      .eq('company_id', companyId)
       .or(batchOr)
 
     if (refs) {
@@ -99,7 +102,7 @@ export async function GET(
     const { data: chainEntries } = await supabase
       .from('journal_entries')
       .select('*, lines:journal_entry_lines(*)')
-      .eq('user_id', user.id)
+      .eq('company_id', companyId)
       .in('id', chainIds)
       .order('created_at', { ascending: true })
 

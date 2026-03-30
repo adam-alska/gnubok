@@ -17,7 +17,7 @@ const log = createLogger('supplier-invoice-handler')
 async function handleSupplierInvoiceConfirmed(
   payload: EventPayload<'supplier_invoice.confirmed'>
 ): Promise<void> {
-  const { supplierInvoice, userId } = payload
+  const { supplierInvoice, userId, companyId } = payload
 
   const supabase = await createClient()
 
@@ -25,7 +25,7 @@ async function handleSupplierInvoiceConfirmed(
   const { data: settings } = await supabase
     .from('company_settings')
     .select('accounting_method')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .single()
 
   const accountingMethod = settings?.accounting_method || 'accrual'
@@ -55,6 +55,7 @@ async function handleSupplierInvoiceConfirmed(
   try {
     const journalEntry = await createSupplierInvoiceRegistrationEntry(
       supabase,
+      companyId,
       userId,
       supplierInvoice,
       items as SupplierInvoiceItem[],

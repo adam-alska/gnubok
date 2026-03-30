@@ -3,6 +3,7 @@ import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import { NextResponse } from 'next/server'
 import { validateBody } from '@/lib/api/validate'
 import { CreateAccountSchema } from '@/lib/api/schemas'
+import { requireCompanyId } from '@/lib/company/context'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -11,6 +12,8 @@ export async function GET(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   const { searchParams } = new URL(request.url)
   const accountClass = searchParams.get('class')
@@ -21,7 +24,7 @@ export async function GET(request: Request) {
       let query = supabase
         .from('chart_of_accounts')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('company_id', companyId)
         .order('sort_order')
 
       if (activeOnly) {
@@ -53,10 +56,13 @@ export async function POST(request: Request) {
   if (!validation.success) return validation.response
   const body = validation.data
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { data, error } = await supabase
     .from('chart_of_accounts')
     .insert({
       user_id: user.id,
+      company_id: companyId,
       account_number: body.account_number,
       account_name: body.account_name,
       account_class: parseInt(body.account_number[0]),

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { ensureInitialized } from '@/lib/init'
+import { requireCompanyId } from '@/lib/company/context'
 
 ensureInitialized()
 
@@ -20,6 +21,8 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { id } = await params
 
   // Fetch document record
@@ -27,7 +30,7 @@ export async function GET(
     .from('document_attachments')
     .select('*')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (docError || !doc) {

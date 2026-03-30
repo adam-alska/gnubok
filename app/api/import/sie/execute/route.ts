@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import { NextResponse } from 'next/server'
+import { requireCompanyId } from '@/lib/company/context'
 import { parseSIEFile, detectEncoding, decodeBuffer } from '@/lib/import/sie-parser'
 import { suggestMappings } from '@/lib/import/account-mapper'
 import { executeSIEImport } from '@/lib/import/sie-import'
@@ -25,6 +26,8 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   try {
     // Get form data with file and options
@@ -63,7 +66,7 @@ export async function POST(request: Request) {
       const { data: storedMappings } = await supabase
         .from('sie_account_mappings')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('company_id', companyId)
 
       mappings = suggestMappings(
         parsed.accounts,
@@ -94,7 +97,7 @@ export async function POST(request: Request) {
       supabase
         .from('chart_of_accounts')
         .select('account_number')
-        .eq('user_id', user.id)
+        .eq('company_id', companyId)
         .in('account_number', mappedAccountNumbers)
         .range(from, to)
     )
@@ -116,6 +119,7 @@ export async function POST(request: Request) {
           // Account exists in BAS reference — use full metadata
           return {
             user_id: user.id,
+            company_id: companyId,
             account_number: ref.account_number,
             account_name: ref.account_name,
             account_class: ref.account_class,
@@ -146,6 +150,7 @@ export async function POST(request: Request) {
 
         return {
           user_id: user.id,
+          company_id: companyId,
           account_number: num,
           account_name: accountName,
           account_class: accountClass,

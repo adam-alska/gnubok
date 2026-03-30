@@ -101,7 +101,7 @@ const VALID_VAT_TREATMENTS = [
 
 async function stagePendingOperation(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   operationType: string,
   title: string,
   params: Record<string, unknown>,
@@ -110,7 +110,7 @@ async function stagePendingOperation(
   const { data, error } = await supabase
     .from('pending_operations')
     .insert({
-      user_id: userId,
+      company_id: companyId,
       operation_type: operationType,
       title,
       params,
@@ -136,6 +136,7 @@ async function categorizeTransactionCore(
   category: TransactionCategory,
   vatTreatment: VatTreatment | undefined,
   userId: string,
+  companyId: string,
   supabase: SupabaseClient,
   confirm: boolean = false
 ): Promise<{
@@ -173,7 +174,7 @@ async function categorizeTransactionCore(
     .from('transactions')
     .select('*')
     .eq('id', txId)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .single()
 
   if (fetchError || !transaction) {
@@ -199,7 +200,7 @@ async function categorizeTransactionCore(
   const { data: settings } = await supabase
     .from('company_settings')
     .select('entity_type, fiscal_year_start_month')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .single()
 
   const entityType: EntityType = (settings?.entity_type as EntityType) || 'enskild_firma'
@@ -280,6 +281,7 @@ async function categorizeTransactionCore(
   try {
     const journalEntry = await createTransactionJournalEntry(
       supabase,
+      companyId,
       userId,
       transaction as Transaction,
       mappingResult
@@ -309,6 +311,7 @@ async function categorizeTransactionCore(
       account: mappingResult.debit_account,
       taxCode: mappingResult.vat_lines[0]?.account_number || '',
       userId,
+      companyId,
     },
   })
 
@@ -381,7 +384,7 @@ const tools: McpTool[] = [
       const { count: totalCount, error: countError } = await supabase
         .from('transactions')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .is('journal_entry_id', null)
 
       if (countError) throw new Error(`Database error: ${countError.message}`)
@@ -391,7 +394,7 @@ const tools: McpTool[] = [
         .select(
           'id, date, description, amount, currency, merchant_name, reference, is_business, category'
         )
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .is('journal_entry_id', null)
         .order('date', { ascending: false })
         .range(offset, offset + limit - 1)
@@ -465,6 +468,7 @@ const tools: McpTool[] = [
         args.category as TransactionCategory,
         args.vat_treatment as VatTreatment | undefined,
         userId,
+        userId,
         supabase,
         false // preview mode — execution happens via web UI commit
       )
@@ -480,7 +484,7 @@ const tools: McpTool[] = [
         .from('transactions')
         .select('description, merchant_name, amount, currency')
         .eq('id', args.transaction_id as string)
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .single()
 
       const txDesc = tx
@@ -545,7 +549,7 @@ const tools: McpTool[] = [
         .select(
           'id, date, description, amount, currency, merchant_name, reference, is_business, category'
         )
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .is('journal_entry_id', null)
         .order('date', { ascending: false })
         .limit(limit)
@@ -581,7 +585,7 @@ const tools: McpTool[] = [
       const { data, error } = await supabase
         .from('customers')
         .select('id, name, customer_type, email, org_number, vat_number, default_payment_terms, city, country')
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .order('name')
 
       if (error) throw new Error(`Database error: ${error.message}`)
@@ -706,7 +710,7 @@ const tools: McpTool[] = [
       let query = supabase
         .from('invoices')
         .select('id, invoice_number, status, customer_id, total, currency, invoice_date, due_date, document_type, customers(name)', { count: 'exact' })
-        .eq('user_id', userId)
+        .eq('company_id', userId)
 
       if (status) {
         query = query.eq('status', status)
@@ -825,7 +829,7 @@ const tools: McpTool[] = [
         .from('customers')
         .select('*')
         .eq('id', customerId)
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .single()
 
       if (custError || !customer) {
@@ -928,7 +932,7 @@ const tools: McpTool[] = [
         const { data: periods } = await supabase
           .from('fiscal_periods')
           .select('id, name')
-          .eq('user_id', userId)
+          .eq('company_id', userId)
           .order('period_start', { ascending: false })
           .limit(1)
           .single()
@@ -944,7 +948,7 @@ const tools: McpTool[] = [
         .from('fiscal_periods')
         .select('id, name, period_start, period_end')
         .eq('id', periodId)
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .single()
 
       if (!period) throw new Error('Fiscal period not found.')
@@ -953,7 +957,7 @@ const tools: McpTool[] = [
       const { data: lines, error } = await supabase
         .from('journal_entry_lines')
         .select('account_number, debit_amount, credit_amount, journal_entries!inner(status, user_id, fiscal_period_id)')
-        .eq('journal_entries.user_id', userId)
+        .eq('journal_entries.company_id', userId)
         .eq('journal_entries.fiscal_period_id', periodId)
         .in('journal_entries.status', ['posted', 'reversed'])
 
@@ -963,7 +967,7 @@ const tools: McpTool[] = [
       const { data: accounts } = await supabase
         .from('chart_of_accounts')
         .select('account_number, account_name')
-        .eq('user_id', userId)
+        .eq('company_id', userId)
 
       const accountMap = new Map((accounts ?? []).map((a: { account_number: string; account_name: string }) => [a.account_number, a.account_name]))
 
@@ -1074,7 +1078,7 @@ const tools: McpTool[] = [
       const { data: lines, error } = await supabase
         .from('journal_entry_lines')
         .select('account_number, debit_amount, credit_amount, journal_entries!inner(entry_date, status, user_id)')
-        .eq('journal_entries.user_id', userId)
+        .eq('journal_entries.company_id', userId)
         .in('journal_entries.status', ['posted', 'reversed'])
         .gte('journal_entries.entry_date', startDate)
         .lte('journal_entries.entry_date', endDate)
@@ -1178,7 +1182,7 @@ const tools: McpTool[] = [
         const { data: periods } = await supabase
           .from('fiscal_periods')
           .select('id')
-          .eq('user_id', userId)
+          .eq('company_id', userId)
           .order('period_start', { ascending: false })
           .limit(1)
           .single()
@@ -1194,7 +1198,7 @@ const tools: McpTool[] = [
         .from('fiscal_periods')
         .select('id, name, period_start, period_end')
         .eq('id', periodId)
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .single()
 
       if (!period) throw new Error('Fiscal period not found.')
@@ -1209,7 +1213,7 @@ const tools: McpTool[] = [
           supabase
             .from('invoices')
             .select('invoice_date, paid_at')
-            .eq('user_id', userId)
+            .eq('company_id', userId)
             .eq('status', 'paid')
             .not('paid_at', 'is', null),
         ])
@@ -1288,7 +1292,7 @@ const tools: McpTool[] = [
         const { data: periods } = await supabase
           .from('fiscal_periods')
           .select('id')
-          .eq('user_id', userId)
+          .eq('company_id', userId)
           .order('period_start', { ascending: false })
           .limit(1)
           .single()
@@ -1303,7 +1307,7 @@ const tools: McpTool[] = [
         .from('fiscal_periods')
         .select('id, name, period_start, period_end')
         .eq('id', periodId)
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .single()
 
       if (!period) throw new Error('Fiscal period not found.')
@@ -1357,7 +1361,7 @@ const tools: McpTool[] = [
         .from('invoices')
         .select('*, customer:customers(*)')
         .eq('id', invoiceId)
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .single()
 
       if (invoiceError || !invoice) throw new Error('Invoice not found')
@@ -1424,7 +1428,7 @@ const tools: McpTool[] = [
         .from('invoices')
         .select('*, customer:customers(*)')
         .eq('id', invoiceId)
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .single()
 
       if (invoiceError || !invoice) throw new Error('Invoice not found')
@@ -1480,7 +1484,7 @@ const tools: McpTool[] = [
         .from('invoices')
         .select('*, customer:customers(*)')
         .eq('id', invoiceId)
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .single()
 
       if (invoiceError || !invoice) throw new Error('Invoice not found')
@@ -1520,7 +1524,7 @@ const tools: McpTool[] = [
       const { data, error } = await supabase
         .from('suppliers')
         .select('id, name, supplier_type, email, phone, org_number, vat_number, default_expense_account, default_payment_terms, default_currency, city, country')
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .order('name', { ascending: true })
 
       if (error) throw new Error(`Database error: ${error.message}`)
@@ -1565,7 +1569,7 @@ const tools: McpTool[] = [
       let query = supabase
         .from('supplier_invoices')
         .select('id, supplier_invoice_number, invoice_date, due_date, status, total, total_sek, currency, vat_treatment, remaining_amount, supplier:suppliers(id, name)')
-        .eq('user_id', userId)
+        .eq('company_id', userId)
 
       if (status !== 'all') {
         if (status === 'to_pay') {
@@ -1614,7 +1618,7 @@ const tools: McpTool[] = [
       const { data, error } = await supabase
         .from('categorization_templates')
         .select('id, counterparty_name, counterparty_aliases, debit_account, credit_account, vat_treatment, vat_account, category, line_pattern, occurrence_count, confidence, last_seen_date, source')
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .eq('is_active', true)
         .order('occurrence_count', { ascending: false })
         .limit(limit)
@@ -1669,7 +1673,7 @@ const tools: McpTool[] = [
       const { data: transactions, error: txError } = await supabase
         .from('transactions')
         .select('*')
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .in('id', limitedIds)
 
       if (txError) throw new Error(`Database error: ${txError.message}`)
@@ -1679,7 +1683,7 @@ const tools: McpTool[] = [
       const { data: mappingRules } = await supabase
         .from('mapping_rules')
         .select('*')
-        .or(`user_id.eq.${userId},user_id.is.null`)
+        .or(`company_id.eq.${userId},company_id.is.null`)
         .eq('is_active', true)
         .order('priority', { ascending: false })
 
@@ -1687,7 +1691,7 @@ const tools: McpTool[] = [
       const { data: historicalTxns } = await supabase
         .from('transactions')
         .select('category')
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .not('is_business', 'is', null)
         .neq('category', 'uncategorized')
         .neq('category', 'private')
@@ -1763,7 +1767,7 @@ const tools: McpTool[] = [
       let query = supabase
         .from('chart_of_accounts')
         .select('account_number, account_name, account_class, account_group, account_type, normal_balance, is_active, description')
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .order('sort_order')
 
       if (activeOnly) query = query.eq('is_active', true)
@@ -1807,7 +1811,7 @@ const tools: McpTool[] = [
         const { data: periods } = await supabase
           .from('fiscal_periods')
           .select('id')
-          .eq('user_id', userId)
+          .eq('company_id', userId)
           .order('period_start', { ascending: false })
           .limit(1)
           .single()
@@ -1820,7 +1824,7 @@ const tools: McpTool[] = [
         .from('fiscal_periods')
         .select('id, name, period_start, period_end')
         .eq('id', periodId)
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .single()
 
       if (!period) throw new Error('Fiscal period not found.')
@@ -1868,7 +1872,7 @@ const tools: McpTool[] = [
         const { data: periods } = await supabase
           .from('fiscal_periods')
           .select('id')
-          .eq('user_id', userId)
+          .eq('company_id', userId)
           .order('period_start', { ascending: false })
           .limit(1)
           .single()
@@ -1984,7 +1988,7 @@ const tools: McpTool[] = [
         .from('transactions')
         .select('id, description, merchant_name, amount, currency, invoice_id')
         .eq('id', transactionId)
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .single()
 
       if (txError || !transaction) throw new Error('Transaction not found')
@@ -1995,7 +1999,7 @@ const tools: McpTool[] = [
         .from('invoices')
         .select('*, customer:customers(*)')
         .eq('id', invoiceId)
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .single()
 
       if (invError || !invoice) throw new Error('Invoice not found')
@@ -2042,7 +2046,7 @@ const tools: McpTool[] = [
       const { data, error } = await supabase
         .from('fiscal_periods')
         .select('id, name, period_start, period_end, status')
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .order('period_start', { ascending: false })
 
       if (error) throw new Error(`Database error: ${error.message}`)
@@ -2152,7 +2156,7 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
     })
   }
 
-  const { userId, scopes: keyScopes } = authResult
+  const { userId, companyId, scopes: keyScopes } = authResult
   const supabase = createServiceClientNoCookies()
 
   // ── Parse JSON-RPC ──
@@ -2244,7 +2248,7 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
       }
 
       try {
-        const result = await tool.execute(toolArgs, userId, supabase)
+        const result = await tool.execute(toolArgs, companyId, supabase)
         const response: Record<string, unknown> = {
           content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         }

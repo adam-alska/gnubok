@@ -40,6 +40,7 @@ export interface ProcessedReceipt {
 export async function processReceiptFromDocument(
   supabase: SupabaseClient,
   userId: string,
+  companyId: string,
   base64: string,
   mimeType: string,
   opts: ReceiptPipelineOptions
@@ -123,7 +124,7 @@ export async function processReceiptFromDocument(
     const { data: transactions } = await supabase
       .from('transactions')
       .select('*')
-      .eq('user_id', userId)
+      .eq('company_id', userId)
       .is('receipt_id', null)
       .lt('amount', 0)
       .gte('date', dateFrom.toISOString().split('T')[0])
@@ -163,6 +164,7 @@ export async function processReceiptFromDocument(
       documentId: opts.documentId,
       confidence: extraction.confidence,
       userId,
+      companyId,
     },
   })
 

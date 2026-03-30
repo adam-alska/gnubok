@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/use-toast'
 import { createClient } from '@/lib/supabase/client'
+import { useCompany } from '@/contexts/CompanyContext'
 import { Bell, BellOff, Loader2, Moon } from 'lucide-react'
 import type { NotificationSettings as NotificationSettingsType } from '@/types'
 
@@ -18,6 +19,7 @@ interface NotificationSettingsProps {
 export function NotificationSettings({ onSettingsChange }: NotificationSettingsProps) {
   const { toast } = useToast()
   const supabase = createClient()
+  const { company } = useCompany()
 
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -53,7 +55,7 @@ export function NotificationSettings({ onSettingsChange }: NotificationSettingsP
     const { data, error } = await supabase
       .from('notification_settings')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('company_id', company.id)
       .single()
 
     if (!error && data) {
@@ -64,6 +66,7 @@ export function NotificationSettings({ onSettingsChange }: NotificationSettingsP
         .from('notification_settings')
         .insert({
           user_id: user.id,
+          company_id: company.id,
           tax_deadlines_enabled: true,
           invoice_reminders_enabled: true,
           push_enabled: true,

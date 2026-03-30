@@ -105,7 +105,7 @@ describe('generateFullArchive', () => {
   it('generates a ZIP with expected file structure', async () => {
     enqueueStandardResponses()
 
-    const buffer = await generateFullArchive(supabase as any, 'user-1', {
+    const buffer = await generateFullArchive(supabase as any, 'company-1', {
       period_id: 'period-1',
     })
 
@@ -170,7 +170,7 @@ describe('generateFullArchive', () => {
       }),
     })
 
-    const buffer = await generateFullArchive(supabase as any, 'user-1', {
+    const buffer = await generateFullArchive(supabase as any, 'company-1', {
       period_id: 'period-1',
     })
 
@@ -209,7 +209,7 @@ describe('generateFullArchive', () => {
       },
     ])
 
-    const buffer = await generateFullArchive(supabase as any, 'user-1', {
+    const buffer = await generateFullArchive(supabase as any, 'company-1', {
       period_id: 'period-1',
       include_documents: false,
     })
@@ -231,7 +231,7 @@ describe('generateFullArchive', () => {
     enqueueMany([{ data: null }])
 
     await expect(
-      generateFullArchive(supabase as any, 'user-1', { period_id: 'nonexistent' })
+      generateFullArchive(supabase as any, 'company-1', { period_id: 'nonexistent' })
     ).rejects.toThrow('Fiscal period not found')
   })
 })

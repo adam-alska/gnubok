@@ -24,7 +24,7 @@ export interface SupplierLedgerReport {
  */
 export async function generateSupplierLedger(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   asOfDate?: string
 ): Promise<SupplierLedgerReport> {
   const refDate = asOfDate ? new Date(asOfDate) : new Date()
@@ -33,7 +33,7 @@ export async function generateSupplierLedger(
   const { data: invoices, error } = await supabase
     .from('supplier_invoices')
     .select('*, supplier:suppliers(id, name)')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .in('status', ['registered', 'approved', 'partially_paid', 'overdue'])
 
   if (error || !invoices) {

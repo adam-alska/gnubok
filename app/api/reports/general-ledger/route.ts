@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { generateGeneralLedger } from '@/lib/reports/general-ledger'
+import { requireCompanyId } from '@/lib/company/context'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -11,6 +12,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { searchParams } = new URL(request.url)
   const periodId = searchParams.get('period_id')
   const accountFrom = searchParams.get('account_from') || undefined
@@ -20,7 +23,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'period_id is required' }, { status: 400 })
   }
 
-  const data = await generateGeneralLedger(supabase, user.id, periodId, accountFrom, accountTo)
+  const data = await generateGeneralLedger(supabase, companyId, periodId, accountFrom, accountTo)
 
   return NextResponse.json({ data })
 }

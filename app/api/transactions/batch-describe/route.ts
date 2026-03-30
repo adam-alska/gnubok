@@ -7,6 +7,7 @@ import { BatchDescribeSchema } from '@/lib/api/schemas'
 import { getTemplateById, buildMappingResultFromTemplate } from '@/lib/bookkeeping/booking-templates'
 import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-entries'
 import { saveUserMappingRule } from '@/lib/bookkeeping/mapping-engine'
+import { requireCompanyId } from '@/lib/company/context'
 import type { Transaction, EntityType, TransactionCategory } from '@/types'
 
 ensureInitialized()
@@ -19,6 +20,8 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   const validation = await validateBody(request, BatchDescribeSchema)
   if (!validation.success) return validation.response
@@ -34,7 +37,7 @@ export async function POST(request: Request) {
   const { data: settings } = await supabase
     .from('company_settings')
     .select('entity_type, fiscal_year_start_month')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   const entityType: EntityType = (settings?.entity_type as EntityType) || 'enskild_firma'
@@ -44,7 +47,7 @@ export async function POST(request: Request) {
   const { data: transactions, error: fetchError } = await supabase
     .from('transactions')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .eq('merchant_name', merchant_name)
     .is('journal_entry_id', null)
     .order('date', { ascending: true })
@@ -99,16 +102,18 @@ export async function POST(request: Request) {
         .from('fiscal_periods')
         .upsert({
           user_id: user.id,
+          company_id: companyId,
           name: periodName,
           period_start: periodStart,
           period_end: periodEnd,
-        }, { onConflict: 'user_id,period_start,period_end' })
+        }, { onConflict: 'company_id,period_start,period_end' })
 
       // Create journal entry
       let journalEntryId: string | null = null
       try {
         const journalEntry = await createTransactionJournalEntry(
           supabase,
+          companyId,
           user.id,
           tx as Transaction,
           mappingResult
@@ -137,6 +142,7 @@ export async function POST(request: Request) {
           account: mappingResult.debit_account,
           taxCode: mappingResult.vat_lines[0]?.account_number || '',
           userId: user.id,
+          companyId,
         },
       })
 

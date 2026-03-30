@@ -197,7 +197,7 @@ describe('calculateVatDeclaration', () => {
       { data: [], error: null },  // entry counts
     ]
 
-    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'company-1', 'monthly', 2024, 1)
 
     expect(result.rutor.ruta05).toBe(0)
     expect(result.rutor.ruta10).toBe(0)
@@ -229,7 +229,7 @@ describe('calculateVatDeclaration', () => {
       { data: [{ source_type: 'invoice_created' }, { source_type: 'invoice_created' }], error: null },
     ]
 
-    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'company-1', 'monthly', 2024, 1)
 
     // Output VAT in ruta 10/11/12
     expect(result.rutor.ruta10).toBe(2500)
@@ -257,7 +257,7 @@ describe('calculateVatDeclaration', () => {
       { data: [{ source_type: 'bank_transaction' }, { source_type: 'bank_transaction' }], error: null },
     ]
 
-    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'company-1', 'monthly', 2024, 1)
 
     expect(result.rutor.ruta48).toBe(370)
     expect(result.transactionCount).toBe(2)
@@ -276,7 +276,7 @@ describe('calculateVatDeclaration', () => {
       { data: [], error: null },
     ]
 
-    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'company-1', 'monthly', 2024, 1)
 
     // Both 2641 and 2645 debit balances sum into ruta48
     expect(result.rutor.ruta48).toBe(700)
@@ -295,7 +295,7 @@ describe('calculateVatDeclaration', () => {
       { data: [], error: null },
     ]
 
-    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'company-1', 'monthly', 2024, 1)
 
     expect(result.rutor.ruta39).toBe(8000)
     expect(result.rutor.ruta40).toBe(12000)
@@ -318,7 +318,7 @@ describe('calculateVatDeclaration', () => {
       { data: [{ source_type: 'invoice_created' }, { source_type: 'credit_note' }], error: null },
     ]
 
-    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'company-1', 'monthly', 2024, 1)
 
     // Net: 2500 - 625 = 1875 output VAT in ruta10, 10000 - 2500 = 7500 revenue in ruta05
     expect(result.rutor.ruta10).toBe(1875)
@@ -340,7 +340,7 @@ describe('calculateVatDeclaration', () => {
       { data: [], error: null },
     ]
 
-    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'company-1', 'monthly', 2024, 1)
 
     expect(result.rutor.ruta10).toBe(2500)
     expect(result.rutor.ruta05).toBe(10000)
@@ -361,7 +361,7 @@ describe('calculateVatDeclaration', () => {
       { data: [], error: null },
     ]
 
-    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'company-1', 'monthly', 2024, 1)
 
     expect(result.rutor.ruta49).toBe(-2500) // 500 - 3000
   })
@@ -374,7 +374,7 @@ describe('calculateVatDeclaration', () => {
     ]
 
     // Should not throw — parameter accepted but not used
-    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1, 'cash')
+    const result = await calculateVatDeclaration(supabase, 'company-1', 'monthly', 2024, 1, 'cash')
     expect(result.rutor.ruta49).toBe(0)
   })
 
@@ -400,7 +400,7 @@ describe('calculateVatDeclaration', () => {
       { data: [], error: null },
     ]
 
-    const result = await calculateVatDeclaration(supabase, 'user-1', 'quarterly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'company-1', 'quarterly', 2024, 1)
 
     // Output VAT in ruta 10/11/12
     expect(result.rutor.ruta10).toBe(2500)
@@ -436,7 +436,7 @@ describe('calculateVatDeclaration — reverse charge', () => {
       { data: [], error: null },  // entry counts
     ]
 
-    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'company-1', 'monthly', 2024, 1)
 
     expect(result.rutor.ruta30).toBe(1250)
     expect(result.rutor.ruta31).toBe(120)
@@ -465,7 +465,7 @@ describe('calculateVatDeclaration — reverse charge', () => {
       { data: [], error: null },  // entry counts
     ]
 
-    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'company-1', 'monthly', 2024, 1)
 
     expect(result.rutor.ruta10).toBe(2500)
     expect(result.rutor.ruta30).toBe(500)
@@ -510,7 +510,7 @@ describe('calculateVatDeclaration — reverse charge', () => {
       { data: [], error: null },  // entry counts
     ]
 
-    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'company-1', 'monthly', 2024, 1)
 
     expect(result.rutor.ruta21).toBe(5000)
     expect(result.rutor.ruta20).toBe(0)
@@ -554,7 +554,7 @@ describe('calculateVatDeclaration — reverse charge', () => {
       { data: [], error: null },
     ]
 
-    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'company-1', 'monthly', 2024, 1)
 
     // Uses subtotal_sek when available
     expect(result.rutor.ruta22).toBe(3000)
@@ -595,7 +595,7 @@ describe('calculateVatDeclaration — reverse charge', () => {
       { data: [], error: null },
     ]
 
-    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'company-1', 'monthly', 2024, 1)
 
     expect(result.rutor.ruta24).toBe(2000)
     expect(result.rutor.ruta21).toBe(0)
@@ -615,7 +615,7 @@ describe('calculateVatDeclaration — reverse charge', () => {
       { data: [], error: null },
     ]
 
-    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'company-1', 'monthly', 2024, 1)
 
     expect(result.rutor.ruta20).toBe(0)
     expect(result.rutor.ruta21).toBe(0)
@@ -674,7 +674,7 @@ describe('calculateVatDeclaration — reverse charge', () => {
       { data: [], error: null },
     ]
 
-    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'company-1', 'monthly', 2024, 1)
 
     // 5000 - 1000 = 4000 net base for EU services
     expect(result.rutor.ruta21).toBe(4000)
@@ -718,7 +718,7 @@ describe('calculateVatDeclaration — reverse charge', () => {
       { data: [], error: null },
     ]
 
-    const result = await calculateVatDeclaration(supabase, 'user-1', 'monthly', 2024, 1)
+    const result = await calculateVatDeclaration(supabase, 'company-1', 'monthly', 2024, 1)
 
     // Only the posted entry's invoice (5000) should count
     expect(result.rutor.ruta21).toBe(5000)

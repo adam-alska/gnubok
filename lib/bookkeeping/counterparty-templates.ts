@@ -148,7 +148,7 @@ export async function findCounterpartyTemplatesBatch(
   const { data: allTemplates } = await supabase
     .from('categorization_templates')
     .select('*')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .eq('is_active', true)
 
   if (!allTemplates || allTemplates.length === 0) return result
@@ -407,7 +407,7 @@ export async function insertOrUpdateTemplate(
     const { data } = await supabase
       .from('categorization_templates')
       .select('*')
-      .eq('user_id', userId)
+      .eq('company_id', userId)
       .eq('counterparty_name', params.counterpartyName)
       .maybeSingle()
     existing = data as CategorizationTemplate | null
@@ -883,7 +883,7 @@ export async function populateTemplatesFromSieVouchers(
   const { data: existingTemplates } = await supabase
     .from('categorization_templates')
     .select('*')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .eq('is_active', true)
 
   const templateMap = new Map<string, CategorizationTemplate>()
