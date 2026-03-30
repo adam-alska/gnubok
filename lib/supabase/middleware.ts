@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { isMfaRequired } from '@/lib/auth/mfa'
+import { shouldEnforceMfa } from '@/lib/auth/mfa'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -87,7 +87,8 @@ export async function updateSession(request: NextRequest) {
   }
 
   // MFA enforcement (application-side only, not RLS)
-  if (isMfaRequired()) {
+  // BankID-linked users skip TOTP — BankID is inherently 2FA
+  if (shouldEnforceMfa(user)) {
     const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
 
     // User has MFA enrolled but hasn't verified this session → redirect to verify

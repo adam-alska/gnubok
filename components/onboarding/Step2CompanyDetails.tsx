@@ -8,9 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2, ArrowRight, ArrowLeft, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { Loader2, ArrowRight, ArrowLeft, CheckCircle2, AlertTriangle, Building2 } from 'lucide-react'
 import type { EntityType } from '@/types'
 import type { CompanyLookupResult } from '@/lib/company-lookup/types'
+import type { CompanyRole } from '@/extensions/general/tic/lib/bankid-types'
 
 const schema = z.object({
   company_name: z.string().min(1, 'Företagsnamn krävs'),
@@ -30,6 +31,7 @@ interface Step2Props {
   initialData: Partial<FormData>
   entityType?: EntityType
   ticEnabled?: boolean
+  enrichmentCompanies?: CompanyRole[]
   onTicLookup?: (result: CompanyLookupResult | null) => void
   onNext: (data: FormData) => void
   onBack: () => void
@@ -40,6 +42,7 @@ export default function Step2CompanyDetails({
   initialData,
   entityType,
   ticEnabled,
+  enrichmentCompanies,
   onTicLookup,
   onNext,
   onBack,
@@ -67,6 +70,19 @@ export default function Step2CompanyDetails({
   const [lookupError, setLookupError] = useState<string | null>(null)
   const [lookupDone, setLookupDone] = useState<CompanyLookupResult | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const [pickerDismissed, setPickerDismissed] = useState(false)
+
+  const showCompanyPicker = !pickerDismissed
+    && enrichmentCompanies
+    && enrichmentCompanies.length > 0
+    && !initialData.org_number // Don't show if already pre-filled from a previous visit
+
+  const handleSelectCompany = (company: CompanyRole) => {
+    setValue('org_number', company.companyRegistrationNumber)
+    setValue('company_name', company.legalName)
+    setPickerDismissed(true)
+    // The org_number change will trigger the TIC lookup via the watch effect
+  }
 
   const orgNumber = watch('org_number')
 
@@ -142,6 +158,46 @@ export default function Step2CompanyDetails({
 
   return (
     <div className="space-y-6">
+      {showCompanyPicker && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Vi hittade dina företag</CardTitle>
+            <CardDescription>
+              Välj det företag du vill bokföra för, eller fyll i manuellt nedan.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {enrichmentCompanies!.map((company) => (
+              <button
+                key={company.companyRegistrationNumber}
+                type="button"
+                onClick={() => handleSelectCompany(company)}
+                className="flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-muted/50"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/8">
+                  <Building2 className="h-4 w-4 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{company.legalName}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {company.companyRegistrationNumber} · {company.legalEntityType}
+                    {company.positionDescriptions?.[0] && ` · ${company.positionDescriptions[0]}`}
+                  </p>
+                </div>
+                <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setPickerDismissed(true)}
+              className="mt-1 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors"
+            >
+              Fyll i manuellt istället
+            </button>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Grunduppgifter</CardTitle>

@@ -5,7 +5,7 @@
   "entryPoint": "@/extensions/general/tic",
   "workspace": "@/components/extensions/general/TicWorkspace",
   "requiredEnvVars": ["TIC_API_PROXY_URL"],
-  "optionalEnvVars": [],
+  "optionalEnvVars": ["TIC_IDENTITY_API_KEY", "BANKID_ENCRYPTION_KEY"],
   "npmDependencies": [],
   "definition": {
     "name": "Bolagsuppgifter",

@@ -11,6 +11,8 @@ import { useToast } from '@/components/ui/use-toast'
 import { Loader2, Mail, ArrowLeft, KeyRound } from 'lucide-react'
 import Image from 'next/image'
 import { getErrorMessage } from '@/lib/errors/get-error-message'
+import { isBankIdEnabled } from '@/lib/auth/bankid'
+import { BankIdAuth } from '@/components/auth/BankIdAuth'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -20,9 +22,60 @@ export default function LoginPage() {
   const [showResetPassword, setShowResetPassword] = useState(false)
   const [resetCooldownUntil, setResetCooldownUntil] = useState<number | null>(null)
   const [resetCooldownRemaining, setResetCooldownRemaining] = useState(0)
+  const [bankIdNoAccount, setBankIdNoAccount] = useState<{ givenName?: string; surname?: string } | null>(null)
   const { toast } = useToast()
   const router = useRouter()
   const supabase = createClient()
+  const bankIdEnabled = isBankIdEnabled()
+
+  const handleBankIdComplete = async (result: {
+    tokenHash?: string
+    type?: string
+    isNewUser?: boolean
+    error?: string
+    givenName?: string
+    surname?: string
+  }) => {
+    if (result.error === 'no_account') {
+      setBankIdNoAccount({ givenName: result.givenName, surname: result.surname })
+      return
+    }
+
+    // BankID auth completed on the TIC side — now call /complete to get a Supabase session
+    try {
+      // The BankIdAuth component gives us the poll result with user data.
+      // We need to call /bankid/complete to exchange it for a Supabase magic link.
+      // But the sessionId is managed inside BankIdAuth. We need to call complete from there.
+      // Actually, let's restructure: BankIdAuth calls /complete and returns the tokenHash.
+
+      if (result.tokenHash && result.type) {
+        const { error } = await supabase.auth.verifyOtp({
+          token_hash: result.tokenHash,
+          type: result.type as 'magiclink',
+        })
+
+        if (error) {
+          console.error('[login] BankID verifyOtp failed', error)
+          toast({
+            title: 'Inloggning misslyckades',
+            description: 'Kunde inte slutföra BankID-inloggningen.',
+            variant: 'destructive',
+          })
+          return
+        }
+
+        router.push('/')
+        router.refresh()
+      }
+    } catch (error) {
+      console.error('[login] BankID complete error', error)
+      toast({
+        title: 'Inloggning misslyckades',
+        description: getErrorMessage(error, { context: 'auth' }),
+        variant: 'destructive',
+      })
+    }
+  }
 
   // Reset cooldown timer
   useEffect(() => {
@@ -244,6 +297,39 @@ export default function LoginPage() {
         </div>
 
         <div className="rounded-xl border bg-card p-6" style={{ boxShadow: 'var(--shadow-md)' }}>
+          {bankIdEnabled && !bankIdNoAccount && (
+            <>
+              <div className="mb-5">
+                <BankIdAuth mode="login" onComplete={handleBankIdComplete} />
+              </div>
+              <div className="relative mb-5">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">eller logga in med e-post</span>
+                </div>
+              </div>
+            </>
+          )}
+
+          {bankIdNoAccount && (
+            <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
+              <p className="text-sm">
+                Inget konto kopplat till detta BankID
+                {bankIdNoAccount.givenName && ` (${bankIdNoAccount.givenName} ${bankIdNoAccount.surname})`}.
+              </p>
+              <div className="mt-2 flex gap-2">
+                <Button size="sm" asChild>
+                  <Link href="/register">Skapa konto</Link>
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setBankIdNoAccount(null)}>
+                  Tillbaka
+                </Button>
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handlePasswordLogin} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="email">E-postadress</Label>

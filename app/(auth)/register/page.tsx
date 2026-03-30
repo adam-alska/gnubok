@@ -9,7 +9,10 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { Loader2, Mail, ArrowLeft } from 'lucide-react'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import { getErrorMessage } from '@/lib/errors/get-error-message'
+import { isBankIdEnabled } from '@/lib/auth/bankid'
+import { BankIdAuth } from '@/components/auth/BankIdAuth'
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('')
@@ -17,8 +20,98 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isRegistered, setIsRegistered] = useState(false)
+  const [bankIdUser, setBankIdUser] = useState<{ givenName?: string; surname?: string } | null>(null)
+  const [bankIdSessionId, setBankIdSessionId] = useState<string | null>(null)
   const { toast } = useToast()
+  const router = useRouter()
   const supabase = createClient()
+  const bankIdEnabled = isBankIdEnabled()
+
+  const handleBankIdComplete = (result: {
+    givenName?: string
+    surname?: string
+    sessionId?: string
+    error?: string
+  }) => {
+    if (result.error) {
+      toast({
+        title: 'BankID misslyckades',
+        description: 'Kunde inte verifiera din identitet.',
+        variant: 'destructive',
+      })
+      return
+    }
+    // BankID verified — store sessionId and show email form
+    setBankIdUser({ givenName: result.givenName, surname: result.surname })
+    if (result.sessionId) setBankIdSessionId(result.sessionId)
+  }
+
+  const handleBankIdSignup = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setIsLoading(true)
+
+    const formData = new FormData(e.currentTarget)
+    const emailValue = (formData.get('bankid_email') as string) || email
+
+    try {
+      const res = await fetch('/api/extensions/ext/tic/bankid/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: bankIdSessionId,
+          mode: 'signup',
+          email: emailValue,
+        }),
+      })
+
+      const json = await res.json()
+
+      if (!res.ok) {
+        if (json.error === 'already_linked') {
+          toast({
+            title: 'BankID redan kopplat',
+            description: 'Detta BankID är redan kopplat till ett konto. Försök logga in istället.',
+            variant: 'destructive',
+          })
+        } else {
+          toast({
+            title: 'Registrering misslyckades',
+            description: json.message || json.error || 'Ett oväntat fel uppstod.',
+            variant: 'destructive',
+          })
+        }
+        return
+      }
+
+      const { tokenHash, type } = json.data
+      const { error } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: type as 'magiclink',
+      })
+
+      if (error) {
+        console.error('[register] BankID verifyOtp failed', error)
+        toast({
+          title: 'Registrering misslyckades',
+          description: 'Kunde inte slutföra registreringen.',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      router.push('/onboarding')
+      router.refresh()
+    } catch (error) {
+      console.error('[register] BankID signup error', error)
+      toast({
+        title: 'Registrering misslyckades',
+        description: getErrorMessage(error, { context: 'auth' }),
+        variant: 'destructive',
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   function isStrongPassword(pw: string): boolean {
     return pw.length >= 8
@@ -176,6 +269,71 @@ export default function RegisterPage() {
         </div>
 
         <div className="rounded-xl border bg-card p-6" style={{ boxShadow: 'var(--shadow-md)' }}>
+          {bankIdEnabled && !bankIdUser && (
+            <>
+              <div className="mb-5">
+                <BankIdAuth mode="signup" onComplete={handleBankIdComplete} />
+              </div>
+              <div className="relative mb-5">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">eller skapa konto med e-post</span>
+                </div>
+              </div>
+            </>
+          )}
+
+          {bankIdUser && (
+            <form onSubmit={handleBankIdSignup} className="space-y-5 mb-5">
+              <div className="rounded-lg border bg-muted/50 p-3">
+                <p className="text-sm font-medium">
+                  {bankIdUser.givenName} {bankIdUser.surname}
+                </p>
+                <p className="text-xs text-muted-foreground">Verifierad med BankID</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bankid_email">E-postadress</Label>
+                <Input
+                  id="bankid_email"
+                  name="bankid_email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="namn@exempel.se"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  className="h-11"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Används för aviseringar och kontoåterställning
+                </p>
+              </div>
+              <Button type="submit" className="w-full h-11" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Skapar konto...
+                  </>
+                ) : (
+                  'Skapa konto'
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full text-muted-foreground"
+                onClick={() => setBankIdUser(null)}
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Tillbaka
+              </Button>
+            </form>
+          )}
+
+          {!bankIdUser && (
           <form onSubmit={handleRegister} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="email">E-postadress</Label>
@@ -235,6 +393,7 @@ export default function RegisterPage() {
               )}
             </Button>
           </form>
+          )}
         </div>
 
         <p className="mt-6 text-center text-sm text-muted-foreground">

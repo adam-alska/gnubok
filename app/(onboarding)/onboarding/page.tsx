@@ -12,6 +12,7 @@ import { validatePeriodDuration } from '@/lib/bookkeeping/validate-period-durati
 import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
 import type { CompanyLookupResult } from '@/lib/company-lookup/types'
 import type { CompanySettings, EntityType, MomsPeriod } from '@/types'
+import type { EnrichmentData } from '@/extensions/general/tic/lib/bankid-types'
 
 import Step1EntityType from '@/components/onboarding/Step1EntityType'
 import Step2CompanyDetails from '@/components/onboarding/Step2CompanyDetails'
@@ -74,6 +75,7 @@ function OnboardingPageContent() {
   const [settings, setSettings] = useState<Partial<CompanySettings>>({})
   const ticEnabled = ENABLED_EXTENSION_IDS.has('tic')
   const [ticLookup, setTicLookup] = useState<CompanyLookupResult | null>(null)
+  const [enrichment, setEnrichment] = useState<EnrichmentData | null>(null)
 
   const totalSteps = 4
 
@@ -122,6 +124,59 @@ function OnboardingPageContent() {
         console.log(LOG, 'resuming at step', clampedStep, { entity_type: data.entity_type })
         setSettings(data)
         setCurrentStep(clampedStep)
+      }
+
+      // Load BankID enrichment data (if signup was via BankID)
+      if (user) {
+        try {
+          const { data: enrichmentRow } = await supabase
+            .from('extension_data')
+            .select('value')
+            .eq('user_id', user.id)
+            .eq('extension_id', 'tic')
+            .eq('key', 'bankid_enrichment')
+            .single()
+
+          if (enrichmentRow?.value) {
+            const enrichmentData = enrichmentRow.value as EnrichmentData
+            console.log(LOG, 'loaded BankID enrichment', {
+              hasSpar: !!enrichmentData.spar,
+              companyCount: enrichmentData.companyRoles?.length ?? 0,
+            })
+            setEnrichment(enrichmentData)
+
+            // SPAR address pre-fill (always applies — it's the user's own address)
+            if (!data?.address_line1 && enrichmentData.spar) {
+              const spar = enrichmentData.spar
+              const sparPrefill: Partial<CompanySettings> = {}
+              if (spar.Folkbokforingsadress_SvenskAdress_Utdelningsadress1) {
+                sparPrefill.address_line1 = spar.Folkbokforingsadress_SvenskAdress_Utdelningsadress1
+              }
+              if (spar.Folkbokforingsadress_SvenskAdress_PostNr) {
+                sparPrefill.postal_code = spar.Folkbokforingsadress_SvenskAdress_PostNr
+              }
+              if (spar.Folkbokforingsadress_SvenskAdress_Postort) {
+                sparPrefill.city = spar.Folkbokforingsadress_SvenskAdress_Postort
+              }
+              if (Object.keys(sparPrefill).length > 0) {
+                console.log(LOG, 'pre-filling SPAR address', Object.keys(sparPrefill))
+                setSettings((prev) => ({ ...prev, ...sparPrefill }))
+              }
+            }
+            // Company roles are NOT auto-filled — user picks in Step 2 via the company picker
+
+            // Delete enrichment data after loading (one-time use)
+            supabase
+              .from('extension_data')
+              .delete()
+              .eq('user_id', user.id)
+              .eq('extension_id', 'tic')
+              .eq('key', 'bankid_enrichment')
+              .then(() => {})
+          }
+        } catch {
+          // Enrichment is optional — ignore errors
+        }
       }
 
       setIsLoading(false)
@@ -440,6 +495,7 @@ function OnboardingPageContent() {
           }}
           entityType={settings.entity_type as EntityType}
           ticEnabled={ticEnabled}
+          enrichmentCompanies={enrichment?.companyRoles?.filter((c) => c.companyStatus === 'Aktivt')}
           onTicLookup={setTicLookup}
           onNext={(data) => handleNext(data)}
           onBack={handleBack}
