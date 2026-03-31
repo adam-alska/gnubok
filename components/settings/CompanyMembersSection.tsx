@@ -167,7 +167,7 @@ export function CompanyMembersSection() {
             </Badge>
           </div>
           <CardHeader>
-            <CardTitle className="text-base">Bjud in till {company.name}</CardTitle>
+            <CardTitle className="text-base">Bjud in till {company?.name}</CardTitle>
             <CardDescription>
               Personen får tillgång till enbart detta företag.
             </CardDescription>
