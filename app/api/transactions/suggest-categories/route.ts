@@ -98,7 +98,7 @@ export async function POST(request: Request) {
   const entityType = (settings?.entity_type as EntityType) || undefined
 
   // Batch counterparty template matching (1 DB query, in-memory matching)
-  const counterpartyMatches = await findCounterpartyTemplatesBatch(supabase, user.id, transactions as Transaction[])
+  const counterpartyMatches = await findCounterpartyTemplatesBatch(supabase, companyId, transactions as Transaction[])
 
   // Generate initial suggestions for each transaction
   const suggestions: Record<string, SuggestedCategory[]> = {}

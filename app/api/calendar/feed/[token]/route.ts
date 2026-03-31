@@ -101,7 +101,7 @@ export async function GET(
       ? supabase
           .from('deadlines')
           .select('*')
-          .eq('user_id', feed.user_id)
+          .eq('company_id', feed.company_id)
           .gte('due_date', startStr)
           .lte('due_date', endStr)
           .order('due_date')
@@ -112,7 +112,7 @@ export async function GET(
       ? supabase
           .from('invoices')
           .select('*, customer:customers(*)')
-          .eq('user_id', feed.user_id)
+          .eq('company_id', feed.company_id)
           .gte('due_date', startStr)
           .lte('due_date', endStr)
           .order('due_date')

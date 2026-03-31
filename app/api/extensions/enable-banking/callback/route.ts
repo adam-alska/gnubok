@@ -81,7 +81,7 @@ export async function GET(request: Request) {
     // Look up pending connection by oauth_state (CSRF-safe)
     const { data: pendingConnection, error: findError } = await supabase
       .from('bank_connections')
-      .select('id, user_id')
+      .select('id, user_id, company_id')
       .eq('oauth_state', state)
       .eq('status', 'pending')
       .single()
@@ -98,6 +98,7 @@ export async function GET(request: Request) {
     }
 
     const userId = pendingConnection.user_id
+    const companyId = pendingConnection.company_id
 
     console.log('[enable-banking] Exchanging code for session', {
       connectionId: pendingConnection.id,
@@ -166,7 +167,7 @@ export async function GET(request: Request) {
     const { data: userSettings } = await supabase
       .from('company_settings')
       .select('onboarding_complete')
-      .eq('user_id', userId)
+      .eq('company_id', companyId)
       .single()
 
     const redirectTarget = userSettings?.onboarding_complete

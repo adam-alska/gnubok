@@ -42,7 +42,7 @@ export async function POST(
 
     const document = await linkToJournalEntry(
       supabase,
-      user.id,
+      companyId,
       id,
       body.journal_entry_id,
       body.journal_entry_line_id

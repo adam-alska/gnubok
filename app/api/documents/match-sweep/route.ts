@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await runDocumentMatchingSweep(supabase, user.id, inboxItemIds)
+    const result = await runDocumentMatchingSweep(supabase, companyId, inboxItemIds)
     return NextResponse.json({ data: result })
   } catch (error) {
     console.error('[match-sweep] Failed:', error)

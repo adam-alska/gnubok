@@ -143,7 +143,7 @@ export async function GET(request: Request) {
       const { data: sieOverlap } = await supabase
         .from('sie_imports')
         .select('id')
-        .eq('user_id', connection.user_id)
+        .eq('company_id', connection.company_id)
         .eq('status', 'completed')
         .gte('fiscal_year_end', fromDate)
         .limit(1)
@@ -156,6 +156,7 @@ export async function GET(request: Request) {
       const syncResults = await Promise.all(
         accounts.map(account => syncAccountTransactions(
           supabase,
+          connection.company_id,
           connection.user_id,
           connection.id,
           account,
@@ -284,7 +285,7 @@ async function sendConsentExpiryNotification(
     const { data: companySettings } = await supabase
       .from('company_settings')
       .select('company_name')
-      .eq('user_id', userId)
+      .eq('company_id', connection.company_id)
       .single()
 
     const emailData = {

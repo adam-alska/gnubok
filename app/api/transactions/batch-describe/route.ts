@@ -160,7 +160,7 @@ export async function POST(request: Request) {
       const sampleResult = buildMappingResultFromTemplate(template, sampleTx, entityType)
       await saveUserMappingRule(
         supabase,
-        user.id,
+        companyId,
         merchant_name,
         sampleResult.debit_account,
         sampleResult.credit_account,

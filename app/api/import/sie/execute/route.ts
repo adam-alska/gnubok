@@ -93,14 +93,15 @@ export async function POST(request: Request) {
       ...new Set(mappings.filter((m) => m.targetAccount).map((m) => m.targetAccount)),
     ]
 
-    const existingAccounts = await fetchAllRows(({ from, to }) =>
+    const allCompanyAccounts = await fetchAllRows(({ from, to }) =>
       supabase
         .from('chart_of_accounts')
         .select('account_number')
         .eq('company_id', companyId)
-        .in('account_number', mappedAccountNumbers)
         .range(from, to)
     )
+    const mappedSet = new Set(mappedAccountNumbers)
+    const existingAccounts = allCompanyAccounts.filter((a) => mappedSet.has(a.account_number))
 
     // Build a lookup from SIE mappings for account names (used for bas_range accounts)
     const mappingNameLookup = new Map<string, string>()
@@ -181,6 +182,7 @@ export async function POST(request: Request) {
     // Execute the import
     const result = await executeSIEImport(
       supabase,
+      companyId,
       user.id,
       parsed,
       mappings,

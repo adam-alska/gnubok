@@ -401,7 +401,7 @@ export const arcimMigrationExtension: Extension = {
             .map(a => ({ number: a.number, name: a.name }))
 
           // Load existing user mappings
-          const existingMappings = await loadMappings(supabase, user.id)
+          const existingMappings = await loadMappings(supabase, ctx?.companyId ?? user.id)
           const existingRecords = [...existingMappings.values()].map(m => ({
             id: '',
             user_id: user.id,

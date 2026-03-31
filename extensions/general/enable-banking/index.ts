@@ -157,6 +157,7 @@ export const enableBankingExtension: Extension = {
           const { data: connection, error } = await supabase
             .from('bank_connections')
             .insert({
+              company_id: ctx?.companyId ?? user.id,
               user_id: user.id,
               provider: `${aspsp_name.toLowerCase().replace(/\s+/g, '-')}-${aspsp_country.toLowerCase()}`,
               bank_name: aspsp_name,
@@ -264,9 +265,11 @@ export const enableBankingExtension: Extension = {
             })
           }
 
+          const companyId = ctx?.companyId ?? user.id
           const results = await Promise.all(
             accounts.map(account => syncAccountTransactions(
               supabase,
+              companyId,
               user.id,
               connection.id,
               account,

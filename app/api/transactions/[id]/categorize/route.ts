@@ -302,7 +302,7 @@ export async function POST(
     try {
       await saveUserMappingRule(
         supabase,
-        user.id,
+        companyId,
         transaction.merchant_name,
         mappingResult.debit_account,
         mappingResult.credit_account,

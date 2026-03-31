@@ -98,6 +98,7 @@ export async function POST(request: Request) {
     await supabase
       .from('invoice_inbox_items')
       .insert({
+        company_id: companyId,
         user_id: userId,
         status: 'error',
         source: 'email',
@@ -133,6 +134,7 @@ export async function POST(request: Request) {
       const { data: document, error: docError } = await supabase
         .from('document_attachments')
         .insert({
+          company_id: companyId,
           user_id: userId,
           storage_path: storagePath,
           file_name: attachment.filename,
@@ -161,6 +163,7 @@ export async function POST(request: Request) {
       const { data: inboxItem, error: itemError } = await supabase
         .from('invoice_inbox_items')
         .insert({
+          company_id: companyId,
           user_id: userId,
           status: 'processing',
           source: 'email',
@@ -199,7 +202,7 @@ export async function POST(request: Request) {
             const { data: suppliers } = await supabase
               .from('suppliers')
               .select('*')
-              .eq('user_id', userId)
+              .eq('company_id', companyId)
 
             if (suppliers && suppliers.length > 0) {
               const match = matchSupplier(extraction, suppliers)

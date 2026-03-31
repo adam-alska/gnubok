@@ -1,4 +1,4 @@
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -31,9 +31,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Delete the auth user via service role — all data cascades via ON DELETE CASCADE
-    const serviceClient = await createServiceClient()
-    const { error } = await serviceClient.auth.admin.deleteUser(user.id)
+    // RPC disables protective triggers, deletes from auth.users (CASCADE
+    // cleans up all public tables), then re-enables triggers — all in one tx.
+    const { error } = await supabase.rpc('delete_user_account', {
+      target_user_id: user.id,
+    })
 
     if (error) {
       console.error('Failed to delete user:', error)

@@ -33,7 +33,7 @@ export async function POST() {
   }
 
   try {
-    const result = await regenerateTaxDeadlinesForUser(supabase, user.id, {
+    const result = await regenerateTaxDeadlinesForUser(supabase, companyId, {
       entity_type: settings.entity_type,
       moms_period: settings.moms_period,
       f_skatt: settings.f_skatt,

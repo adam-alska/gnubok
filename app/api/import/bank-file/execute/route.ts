@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     }))
 
     // Run ingestion pipeline
-    const ingestResult = await ingestTransactions(supabase, user.id, rawTransactions)
+    const ingestResult = await ingestTransactions(supabase, companyId, user.id, rawTransactions)
 
     // Update import record with results
     await supabase
