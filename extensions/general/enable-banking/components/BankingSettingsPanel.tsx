@@ -40,6 +40,7 @@ export default function BankingSettingsPanel() {
     setIsLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+    if (!company) return
 
     const { data: connections } = await supabase
       .from('bank_connections')

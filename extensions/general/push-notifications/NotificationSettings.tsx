@@ -51,6 +51,7 @@ export function NotificationSettings({ onSettingsChange }: NotificationSettingsP
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+    if (!company) return
 
     const { data, error } = await supabase
       .from('notification_settings')
