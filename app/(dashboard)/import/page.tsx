@@ -584,6 +584,8 @@ function PSD2ConnectWizard() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
+    if (!company) return
+
     const { data: connections } = await supabase
       .from('bank_connections')
       .select('*')
@@ -763,6 +765,7 @@ export default function ImportPage() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
       setUserId(user.id)
+      if (!company) return
       supabase
         .from('company_settings')
         .select('is_sandbox')
