@@ -55,7 +55,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith('/register') ||
     pathname.startsWith('/auth') ||
     pathname.startsWith('/reset-password') ||
-    pathname.startsWith('/sandbox')
+    pathname.startsWith('/sandbox') ||
+    pathname.startsWith('/invite')
   ) {
     // If user is logged in and trying to access auth pages, redirect to dashboard or onboarding
     if (user) {
@@ -115,8 +116,27 @@ export async function updateSession(request: NextRequest) {
   // Company context resolution
   const companyId = await resolveCompanyForMiddleware(supabase, user.id, request)
 
-  // No companies at all → redirect to onboarding (creates first company)
+  // No companies at all
   if (!companyId) {
+    // Check if user is in a team (consultant without companies yet).
+    // Team members should reach the dashboard (which shows an empty state)
+    // rather than being forced through company onboarding.
+    const { data: teamMember } = await supabase
+      .from('team_members')
+      .select('id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .maybeSingle()
+
+    if (teamMember) {
+      // Consultant with a team but no companies — allow dashboard access
+      if (pathname.startsWith('/onboarding')) {
+        return NextResponse.redirect(new URL('/', request.url))
+      }
+      return supabaseResponse
+    }
+
+    // No team, no companies → redirect to onboarding
     if (pathname.startsWith('/onboarding')) {
       return supabaseResponse
     }

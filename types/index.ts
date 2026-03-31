@@ -4,6 +4,19 @@ export type EntityType = 'enskild_firma' | 'aktiebolag'
 // Company role for multi-tenant access
 export type CompanyRole = 'owner' | 'admin' | 'member' | 'viewer'
 
+// Team (consulting firm) roles and source tracking
+export type TeamRole = 'owner' | 'admin' | 'member'
+export type MemberSource = 'direct' | 'team'
+
+// Team (consulting firm grouping)
+export interface Team {
+  id: string
+  name: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
 // Company (multi-tenant identity)
 export interface Company {
   id: string
@@ -11,6 +24,7 @@ export interface Company {
   org_number: string | null
   entity_type: EntityType
   created_by: string
+  team_id: string | null
   archived_at: string | null
   created_at: string
   updated_at: string

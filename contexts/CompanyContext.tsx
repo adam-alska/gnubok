@@ -1,12 +1,14 @@
 'use client'
 
 import { createContext, useContext } from 'react'
-import type { Company, CompanyRole } from '@/types'
+import type { Company, CompanyRole, Team } from '@/types'
 
 interface CompanyContextValue {
-  company: Company
-  role: CompanyRole
+  company: Company | null
+  role: CompanyRole | null
   companies: { company: Company; role: CompanyRole }[]
+  isTeamMember: boolean
+  team: Team | null
 }
 
 const CompanyContext = createContext<CompanyContextValue | null>(null)
