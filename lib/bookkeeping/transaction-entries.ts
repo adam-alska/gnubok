@@ -41,6 +41,7 @@ const log = createLogger('transaction-entries')
  */
 export async function createTransactionJournalEntry(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   transaction: Transaction,
   mappingResult: MappingResult
@@ -51,7 +52,7 @@ export async function createTransactionJournalEntry(
     )
   }
 
-  const fiscalPeriodId = await findFiscalPeriod(supabase, userId, transaction.date)
+  const fiscalPeriodId = await findFiscalPeriod(supabase, companyId, transaction.date)
   if (!fiscalPeriodId) {
     log.warn('No open fiscal period found for transaction date:', transaction.date)
     return null
@@ -240,7 +241,7 @@ export async function createTransactionJournalEntry(
     lines,
   }
 
-  return createJournalEntry(supabase, userId, input)
+  return createJournalEntry(supabase, companyId, userId, input)
 }
 
 /**

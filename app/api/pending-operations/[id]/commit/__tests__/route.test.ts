@@ -15,6 +15,11 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 vi.mock('@/lib/init', () => ({ ensureInitialized: vi.fn() }))
 
+vi.mock('@/lib/company/context', () => ({
+  requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+  getActiveCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
 // Mock the counterparty templates (non-critical side effect)
 vi.mock('@/lib/bookkeeping/counterparty-templates', () => ({
   upsertCounterpartyTemplate: vi.fn().mockResolvedValue(undefined),

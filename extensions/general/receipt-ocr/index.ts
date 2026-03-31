@@ -38,7 +38,7 @@ export async function getSettings(userId: string): Promise<ReceiptOcrSettings> {
   const { data } = await supabase
     .from('extension_data')
     .select('value')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .eq('extension_id', 'receipt-ocr')
     .eq('key', 'settings')
     .single()
@@ -87,7 +87,7 @@ async function handleDocumentUploaded(
   payload: EventPayload<'document.uploaded'>,
   ctx?: ExtensionContext
 ): Promise<void> {
-  const { document, userId } = payload
+  const { document, userId, companyId } = payload
   const log = ctx?.log ?? console
 
   // Gate: Is it an image?
@@ -208,6 +208,7 @@ async function handleDocumentUploaded(
         documentId: document.id,
         confidence: extraction.confidence,
         userId,
+        companyId,
       },
     })
 
@@ -224,7 +225,7 @@ async function handleTransactionSynced(
   payload: EventPayload<'transaction.synced'>,
   ctx?: ExtensionContext
 ): Promise<void> {
-  const { transactions: syncedTransactions, userId } = payload
+  const { transactions: syncedTransactions, userId, companyId } = payload
   const log = ctx?.log ?? console
 
   // Gate: Is autoMatchEnabled?
@@ -248,7 +249,7 @@ async function handleTransactionSynced(
     const { data: unmatchedReceipts, error: fetchError } = await supabase
       .from('receipts')
       .select('*, line_items:receipt_line_items(*)')
-      .eq('user_id', userId)
+      .eq('company_id', userId)
       .in('status', ['extracted', 'confirmed'])
       .is('matched_transaction_id', null)
 
@@ -291,6 +292,7 @@ async function handleTransactionSynced(
           confidence: match.confidence,
           autoMatched: true,
           userId,
+          companyId,
         },
       })
 

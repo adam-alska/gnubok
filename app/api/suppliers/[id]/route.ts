@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { validateBody } from '@/lib/api/validate'
 import { UpdateSupplierSchema } from '@/lib/api/schemas'
+import { requireCompanyId } from '@/lib/company/context'
 
 export async function GET(
   _request: Request,
@@ -16,12 +17,14 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Fetch supplier
   const { data: supplier, error } = await supabase
     .from('suppliers')
     .select('*')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (error || !supplier) {
@@ -33,7 +36,7 @@ export async function GET(
     .from('supplier_invoices')
     .select('status, total, remaining_amount, paid_amount')
     .eq('supplier_id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
 
   const stats = {
     total_outstanding: 0,
@@ -67,6 +70,8 @@ export async function PUT(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const result = await validateBody(request, UpdateSupplierSchema)
   if (!result.success) return result.response
   const body = result.data
@@ -96,7 +101,7 @@ export async function PUT(
       notes: body.notes,
     })
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .select()
     .single()
 
@@ -120,12 +125,14 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Check for linked invoices
   const { count } = await supabase
     .from('supplier_invoices')
     .select('id', { count: 'exact', head: true })
     .eq('supplier_id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
 
   if (count && count > 0) {
     return NextResponse.json(
@@ -138,7 +145,7 @@ export async function DELETE(
     .from('suppliers')
     .delete()
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

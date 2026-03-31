@@ -150,6 +150,7 @@ describe('handleDocumentUploaded gates', () => {
           storage_path: 'docs/file.pdf',
         } as never,
         userId: 'user-1',
+        companyId: 'company-1',
       },
     })
 
@@ -173,6 +174,7 @@ describe('handleDocumentUploaded gates', () => {
           storage_path: 'docs/receipt.jpg',
         } as never,
         userId: 'user-1',
+        companyId: 'company-1',
       },
     })
 
@@ -205,6 +207,7 @@ describe('handleDocumentUploaded gates', () => {
           storage_path: 'docs/receipt.jpg',
         } as never,
         userId: 'user-1',
+        companyId: 'company-1',
       },
     })
 
@@ -230,6 +233,7 @@ describe('handleTransactionSynced gates', () => {
       payload: {
         transactions: [{ id: 'tx1', amount: -100 }] as never,
         userId: 'user-1',
+        companyId: 'company-1',
       },
     })
 
@@ -248,6 +252,7 @@ describe('handleTransactionSynced gates', () => {
       payload: {
         transactions: [{ id: 'tx1', amount: 500 }] as never, // income
         userId: 'user-1',
+        companyId: 'company-1',
       },
     })
 

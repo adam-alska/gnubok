@@ -7,6 +7,7 @@ import {
 import { createJournalEntry, findFiscalPeriod } from '@/lib/bookkeeping/engine'
 import { MarkInvoicePaidSchema } from '@/lib/api/schemas'
 import { ensureInitialized } from '@/lib/init'
+import { requireCompanyId } from '@/lib/company/context'
 import type { CreateJournalEntryInput, EntityType, Invoice } from '@/types'
 
 ensureInitialized()
@@ -35,12 +36,14 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Fetch invoice
   const { data: invoice, error: invoiceError } = await supabase
     .from('invoices')
     .select('*, customer:customers(*), items:invoice_items(*)')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (invoiceError || !invoice) {
@@ -83,7 +86,7 @@ export async function POST(
   const { data: settings } = await supabase
     .from('company_settings')
     .select('accounting_method, entity_type')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   const accountingMethod = settings?.accounting_method || 'accrual'
@@ -107,7 +110,7 @@ export async function POST(
         }
 
         // User-provided lines from PaymentBookingDialog
-        const fiscalPeriodId = await findFiscalPeriod(supabase, user.id, paymentDate)
+        const fiscalPeriodId = await findFiscalPeriod(supabase, companyId, paymentDate)
         if (!fiscalPeriodId) {
           return NextResponse.json(
             { error: 'Ingen öppen räkenskapsperiod för betalningsdatumet' },
@@ -125,12 +128,13 @@ export async function POST(
           source_id: invoice.id,
           lines: customLines,
         }
-        const journalEntry = await createJournalEntry(supabase, user.id, input)
+        const journalEntry = await createJournalEntry(supabase, companyId, user.id, input)
         journalEntryId = journalEntry?.id ?? null
       } else if (accountingMethod === 'accrual') {
         // Faktureringsmetoden: clear receivable (Debit 1930, Credit 1510)
         const journalEntry = await createInvoicePaymentJournalEntry(
           supabase,
+          companyId,
           user.id,
           invoice as Invoice,
           paymentDate,
@@ -142,6 +146,7 @@ export async function POST(
         // Kontantmetoden: combined revenue entry (Debit 1930, Credit 30xx, Credit 26xx)
         const journalEntry = await createInvoiceCashEntry(
           supabase,
+          companyId,
           user.id,
           invoice as Invoice,
           paymentDate,
@@ -168,7 +173,7 @@ export async function POST(
       paid_amount: invoice.total,
     })
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
 
   if (updateError) {
     return NextResponse.json({ error: 'Kunde inte uppdatera status' }, { status: 500 })

@@ -36,14 +36,14 @@ describe('ai-consent', () => {
 
   describe('hasAiConsent', () => {
     it('returns true for non-AI extensions without checking DB', async () => {
-      const result = await hasAiConsent(supabase as any, 'user-1', 'enable-banking')
+      const result = await hasAiConsent(supabase as any, 'company-1', 'enable-banking')
       expect(result).toBe(true)
       expect(supabase.from).not.toHaveBeenCalled()
     })
 
     it('returns false when no consent record exists', async () => {
       mockResult({ data: null })
-      const result = await hasAiConsent(supabase as any, 'user-1', 'receipt-ocr')
+      const result = await hasAiConsent(supabase as any, 'company-1', 'receipt-ocr')
       expect(result).toBe(false)
     })
 
@@ -57,7 +57,7 @@ describe('ai-consent', () => {
           },
         },
       })
-      const result = await hasAiConsent(supabase as any, 'user-1', 'receipt-ocr')
+      const result = await hasAiConsent(supabase as any, 'company-1', 'receipt-ocr')
       expect(result).toBe(true)
     })
 
@@ -71,7 +71,7 @@ describe('ai-consent', () => {
           },
         },
       })
-      const result = await hasAiConsent(supabase as any, 'user-1', 'receipt-ocr')
+      const result = await hasAiConsent(supabase as any, 'company-1', 'receipt-ocr')
       expect(result).toBe(false)
     })
 
@@ -85,7 +85,7 @@ describe('ai-consent', () => {
           },
         },
       })
-      const result = await hasAiConsent(supabase as any, 'user-1', 'receipt-ocr')
+      const result = await hasAiConsent(supabase as any, 'company-1', 'receipt-ocr')
       expect(result).toBe(false)
     })
   })
@@ -93,13 +93,13 @@ describe('ai-consent', () => {
   describe('grantAiConsent', () => {
     it('upserts consent record to extension_data', async () => {
       mockResult({ data: null, error: null })
-      await grantAiConsent(supabase as any, 'user-1', 'receipt-ocr')
+      await grantAiConsent(supabase as any, 'user-1', 'company-1', 'receipt-ocr')
 
       expect(supabase.from).toHaveBeenCalledWith('extension_data')
     })
 
     it('does nothing for non-AI extensions', async () => {
-      await grantAiConsent(supabase as any, 'user-1', 'enable-banking')
+      await grantAiConsent(supabase as any, 'user-1', 'company-1', 'enable-banking')
       expect(supabase.from).not.toHaveBeenCalled()
     })
   })
@@ -107,13 +107,13 @@ describe('ai-consent', () => {
   describe('revokeAiConsent', () => {
     it('upserts revoked consent to extension_data', async () => {
       mockResult({ data: null, error: null })
-      await revokeAiConsent(supabase as any, 'user-1', 'ai-chat')
+      await revokeAiConsent(supabase as any, 'user-1', 'company-1', 'ai-chat')
 
       expect(supabase.from).toHaveBeenCalledWith('extension_data')
     })
 
     it('does nothing for non-AI extensions', async () => {
-      await revokeAiConsent(supabase as any, 'user-1', 'email')
+      await revokeAiConsent(supabase as any, 'user-1', 'company-1', 'email')
       expect(supabase.from).not.toHaveBeenCalled()
     })
   })

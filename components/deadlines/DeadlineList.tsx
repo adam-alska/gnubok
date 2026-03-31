@@ -12,7 +12,7 @@ import { Plus } from 'lucide-react'
 interface DeadlineListProps {
   deadlines: Deadline[]
   customers: { id: string; name: string }[]
-  onDeadlineCreate: (data: Omit<Deadline, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>
+  onDeadlineCreate: (data: Omit<Deadline, 'id' | 'user_id' | 'company_id' | 'created_at' | 'updated_at'>) => Promise<void>
   onDeadlineToggle: (deadline: Deadline) => Promise<void>
   onDeadlineEdit: (deadline: Deadline) => Promise<void>
   onDeadlineDelete: (deadline: Deadline) => Promise<void>
@@ -67,7 +67,7 @@ export function DeadlineList({
     setTypeFilter('all')
   }
 
-  const handleFormSubmit = async (data: Omit<Deadline, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+  const handleFormSubmit = async (data: Omit<Deadline, 'id' | 'user_id' | 'company_id' | 'created_at' | 'updated_at'>) => {
     if (editingDeadline) {
       await onDeadlineEdit({ ...editingDeadline, ...data })
     } else {

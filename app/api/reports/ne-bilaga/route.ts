@@ -6,6 +6,7 @@ import {
   sruFileToString,
   getSRUFilename,
 } from '@/lib/reports/ne-bilaga/sru-generator'
+import { requireCompanyId } from '@/lib/company/context'
 
 /**
  * GET /api/reports/ne-bilaga
@@ -28,6 +29,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { searchParams } = new URL(request.url)
   const periodId = searchParams.get('period_id')
   const format = searchParams.get('format') || 'json'
@@ -40,7 +43,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const declaration = await generateNEDeclaration(supabase, user.id, periodId)
+    const declaration = await generateNEDeclaration(supabase, companyId, periodId)
 
     if (format === 'sru') {
       // Generate and return SRU file

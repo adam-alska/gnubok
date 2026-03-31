@@ -60,7 +60,7 @@ export default function DeadlinesPage() {
   }, [fetchData])
 
   const handleDeadlineCreate = async (
-    data: Omit<Deadline, 'id' | 'user_id' | 'created_at' | 'updated_at'>
+    data: Omit<Deadline, 'id' | 'user_id' | 'company_id' | 'created_at' | 'updated_at'>
   ) => {
     try {
       const response = await fetch('/api/deadlines', {

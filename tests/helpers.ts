@@ -18,6 +18,8 @@ import type {
   CompanySettings,
   InvoiceInboxItem,
   CategorizationTemplate,
+  Company,
+  CompanyMember,
 } from '@/types'
 import type { SIEVoucher, SIETransactionLine } from '@/lib/import/types'
 
@@ -99,10 +101,41 @@ export function createMockSupabase() {
 let _counter = 0
 const nextId = () => `test-${++_counter}`
 
+export function makeCompany(overrides: Partial<Company> = {}): Company {
+  const { team_id = null, ...rest } = overrides
+  return {
+    id: 'company-1',
+    name: 'Test Company',
+    org_number: null,
+    entity_type: 'enskild_firma',
+    created_by: 'user-1',
+    team_id,
+    archived_at: null,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+    ...rest,
+  }
+}
+
+export function makeCompanyMember(overrides: Partial<CompanyMember> = {}): CompanyMember {
+  return {
+    id: 'member-1',
+    company_id: 'company-1',
+    user_id: 'user-1',
+    role: 'owner',
+    invited_by: null,
+    joined_at: '2024-01-01T00:00:00Z',
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
 export function makeReceipt(overrides: Partial<Receipt> = {}): Receipt {
   return {
     id: nextId(),
     user_id: 'user-1',
+    company_id: 'company-1',
     image_url: 'https://example.com/receipt.jpg',
     image_thumbnail_url: null,
     status: 'confirmed',
@@ -136,6 +169,7 @@ export function makeTransaction(overrides: Partial<Transaction> = {}): Transacti
   return {
     id: nextId(),
     user_id: 'user-1',
+    company_id: 'company-1',
     bank_connection_id: null,
     external_id: null,
     date: '2024-06-15',
@@ -169,6 +203,7 @@ export function makeFiscalPeriod(overrides: Partial<FiscalPeriod> = {}): FiscalP
   return {
     id: nextId(),
     user_id: 'user-1',
+    company_id: 'company-1',
     name: 'FY 2024',
     period_start: '2024-01-01',
     period_end: '2024-12-31',
@@ -190,6 +225,7 @@ export function makeJournalEntry(overrides: Partial<JournalEntry> = {}): Journal
   return {
     id: nextId(),
     user_id: 'user-1',
+    company_id: 'company-1',
     fiscal_period_id: 'period-1',
     voucher_number: 1,
     voucher_series: 'A',
@@ -238,6 +274,7 @@ export function makeDocumentAttachment(
   return {
     id: nextId(),
     user_id: 'user-1',
+    company_id: 'company-1',
     storage_path: 'documents/user-1/file.pdf',
     file_name: 'file.pdf',
     file_size_bytes: 1024,
@@ -286,6 +323,7 @@ export function makeInvoice(overrides: Partial<Invoice> = {}): Invoice {
   return {
     id: nextId(),
     user_id: 'user-1',
+    company_id: 'company-1',
     customer_id: 'customer-1',
     invoice_number: 'F-2024001',
     invoice_date: '2024-06-15',
@@ -325,6 +363,7 @@ export function makeInvoicePayment(
   return {
     id: nextId(),
     user_id: 'user-1',
+    company_id: 'company-1',
     invoice_id: 'invoice-1',
     payment_date: '2024-07-01',
     amount: 12500,
@@ -343,6 +382,7 @@ export function makeCustomer(overrides: Partial<Customer> = {}): Customer {
   return {
     id: nextId(),
     user_id: 'user-1',
+    company_id: 'company-1',
     name: 'Test AB',
     customer_type: 'swedish_business',
     email: 'kontakt@test.se',
@@ -368,6 +408,7 @@ export function makeSupplier(overrides: Partial<Supplier> = {}): Supplier {
   return {
     id: nextId(),
     user_id: 'user-1',
+    company_id: 'company-1',
     name: 'Leverantör AB',
     supplier_type: 'swedish_business',
     email: 'info@leverantor.se',
@@ -400,6 +441,7 @@ export function makeSupplierInvoice(
   return {
     id: nextId(),
     user_id: 'user-1',
+    company_id: 'company-1',
     supplier_id: 'supplier-1',
     arrival_number: 1,
     supplier_invoice_number: 'LF-001',
@@ -442,6 +484,7 @@ export function makeCompanySettings(
   return {
     id: nextId(),
     user_id: 'user-1',
+    company_id: 'company-1',
     entity_type: 'enskild_firma',
     company_name: 'Test Firma',
     org_number: '199001011234',
@@ -486,6 +529,7 @@ export function makeInvoiceInboxItem(
   return {
     id: nextId(),
     user_id: 'user-1',
+    company_id: 'company-1',
     status: 'pending',
     source: 'upload',
     email_from: null,
@@ -654,6 +698,7 @@ export function makeCategorizationTemplate(
   return {
     id: nextId(),
     user_id: 'user-1',
+    company_id: 'company-1',
     counterparty_name: 'telia',
     counterparty_aliases: ['telia sverige ab'],
     debit_account: '6200',

@@ -9,6 +9,7 @@ import { fetchExchangeRate, convertToSEK } from '@/lib/currency/riksbanken'
 import {
   createCreditNoteJournalEntry,
 } from '@/lib/bookkeeping/invoice-entries'
+import { requireCompanyId } from '@/lib/company/context'
 
 ensureInitialized()
 
@@ -21,6 +22,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status')
   const limit = parseInt(searchParams.get('limit') || '50')
@@ -29,7 +32,7 @@ export async function GET(request: Request) {
   let query = supabase
     .from('invoices')
     .select('*, customer:customers(*)', { count: 'exact' })
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .order('invoice_date', { ascending: false })
     .range(offset, offset + limit - 1)
 
@@ -55,6 +58,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   let rawBody: unknown
   try {
     rawBody = await request.json()
@@ -78,7 +83,7 @@ export async function POST(request: Request) {
         { status: 400 },
       )
     }
-    return createCreditNote(supabase, user.id, parsed.data)
+    return createCreditNote(supabase, companyId, user.id, parsed.data)
   }
 
   const parsed = CreateInvoiceSchema.safeParse(rawBody)
@@ -100,7 +105,7 @@ export async function POST(request: Request) {
     .from('customers')
     .select('*')
     .eq('id', invoiceInput.customer_id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (customerError || !customer) {
@@ -178,6 +183,7 @@ export async function POST(request: Request) {
     .from('invoices')
     .insert({
       user_id: user.id,
+      company_id: companyId,
       customer_id: invoiceInput.customer_id,
       invoice_number: invoiceNumber,
       invoice_date: invoiceInput.invoice_date,
@@ -246,7 +252,7 @@ export async function POST(request: Request) {
   if (completeInvoice && documentType === 'invoice') {
     await eventBus.emit({
       type: 'invoice.created',
-      payload: { invoice: completeInvoice as Invoice, userId: user.id },
+      payload: { invoice: completeInvoice as Invoice, companyId, userId: user.id },
     })
   }
 
@@ -256,6 +262,7 @@ export async function POST(request: Request) {
 // Create a credit note for an existing invoice
 async function createCreditNote(
   supabase: Awaited<ReturnType<typeof createClient>>,
+  companyId: string,
   userId: string,
   input: { credited_invoice_id: string; reason?: string }
 ) {
@@ -264,7 +271,7 @@ async function createCreditNote(
     .from('invoices')
     .select('*, items:invoice_items(*)')
     .eq('id', input.credited_invoice_id)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (originalError || !originalInvoice) {
@@ -300,6 +307,7 @@ async function createCreditNote(
     .from('invoices')
     .insert({
       user_id: userId,
+      company_id: companyId,
       customer_id: originalInvoice.customer_id,
       invoice_number: creditNoteNumber,
       invoice_date: new Date().toISOString().split('T')[0],
@@ -373,7 +381,7 @@ async function createCreditNote(
   const { data: creditNoteSettings } = await supabase
     .from('company_settings')
     .select('entity_type, accounting_method')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   const entityType = (creditNoteSettings?.entity_type as EntityType) || 'enskild_firma'
@@ -385,6 +393,7 @@ async function createCreditNote(
     try {
       const journalEntry = await createCreditNoteJournalEntry(
         supabase,
+        companyId,
         userId,
         completeCreditNote as Invoice,
         entityType,
@@ -402,7 +411,7 @@ async function createCreditNote(
 
     await eventBus.emit({
       type: 'credit_note.created',
-      payload: { creditNote: completeCreditNote as CreditNote, userId },
+      payload: { creditNote: completeCreditNote as CreditNote, companyId, userId },
     })
   }
 

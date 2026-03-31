@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { parseBankFile, generateFileHash, detectFileFormat } from '@/lib/import/bank-file/parser'
 import { decodeFileContent } from '@/lib/import/bank-file/encoding'
+import { requireCompanyId } from '@/lib/company/context'
 import type { BankFileFormatId } from '@/lib/import/bank-file/types'
 
 /**
@@ -17,6 +18,8 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   const formData = await request.formData()
   const file = formData.get('file') as File | null
@@ -41,7 +44,7 @@ export async function POST(request: Request) {
     const { data: existingImport } = await supabase
       .from('bank_file_imports')
       .select('id, status, imported_count, created_at')
-      .eq('user_id', user.id)
+      .eq('company_id', companyId)
       .eq('file_hash', fileHash)
       .single()
 
@@ -67,7 +70,7 @@ export async function POST(request: Request) {
       const { count } = await supabase
         .from('transactions')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
+        .eq('company_id', companyId)
         .gte('date', parseResult.date_from || '1970-01-01')
         .lte('date', parseResult.date_to || '2099-12-31')
 

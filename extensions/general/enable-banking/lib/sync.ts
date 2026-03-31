@@ -8,6 +8,7 @@ import type { StoredAccount } from '../types'
 /** Ingest function signature — matches lib/transactions/ingest */
 export type IngestFn = (
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   raw: RawTransaction[],
   options?: IngestOptions
@@ -37,6 +38,7 @@ export interface SyncResult {
  */
 export async function syncAccountTransactions(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   connectionId: string,
   account: StoredAccount,
@@ -85,7 +87,7 @@ export async function syncAccountTransactions(
   const ingestOptions: IngestOptions | undefined = syncOptions?.skipAutoCategorization
     ? { skipAutoCategorization: true }
     : undefined
-  const ingestResult = await ingest(supabase, userId, rawTransactions, ingestOptions)
+  const ingestResult = await ingest(supabase, companyId, userId, rawTransactions, ingestOptions)
 
   console.log('[enable-banking] Ingest result', {
     connectionId,
@@ -100,7 +102,7 @@ export async function syncAccountTransactions(
     try {
       const fileName = `psd2-response_${connectionId}_${account.uid}_${new Date().toISOString().replace(/[:.]/g, '-')}_p${i + 1}.json`
       const buffer = new TextEncoder().encode(rawPages[i]).buffer as ArrayBuffer
-      await uploadDocument(supabase, userId,
+      await uploadDocument(supabase, companyId, userId,
         { name: fileName, buffer, type: 'application/json' },
         { upload_source: 'api' }
       )

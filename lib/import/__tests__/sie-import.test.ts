@@ -17,6 +17,7 @@ function makeParsedFile(overrides?: Partial<ParsedSIEFile>): ParsedSIEFile {
       address: null,
       fiscalYears: [{ yearIndex: 0, start: new Date(2024, 0, 1), end: new Date(2024, 11, 31) }],
       currency: 'SEK',
+      kontoPlanType: null,
     },
     accounts: [
       { number: '1510', name: 'Kundfordringar' },

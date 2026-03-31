@@ -1,11 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import DashboardNav from '@/components/dashboard/DashboardNav'
 import { RecaptIdentify } from '@/components/RecaptIdentify'
 import { SentryIdentify } from '@/components/SentryIdentify'
 import { SandboxBanner } from '@/components/dashboard/SandboxBanner'
 import { getExtensionNavItems } from '@/lib/extensions/sectors'
-import type { EntityType } from '@/types'
+import { CompanyProvider } from '@/contexts/CompanyContext'
+import { getActiveCompanyId } from '@/lib/company/context'
+import type { EntityType, CompanyRole, Team } from '@/types'
 
 export default async function DashboardLayout({
   children,
@@ -20,21 +23,138 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
+  const cookieStore = await cookies()
+  const companyId = cookieStore.get('gnubok-company-id')?.value
+    ?? await getActiveCompanyId(supabase, user.id)
+
+  // Fetch team membership + team info
+  const { data: teamMembership } = await supabase
+    .from('team_members')
+    .select('team_id, role')
+    .eq('user_id', user.id)
+    .limit(1)
+    .maybeSingle()
+
+  let team: Team | null = null
+  if (teamMembership?.team_id) {
+    const { data: teamRow } = await supabase
+      .from('teams')
+      .select('*')
+      .eq('id', teamMembership.team_id)
+      .single()
+    team = teamRow
+  }
+
+  const isTeamMember = !!teamMembership
+
+  // Consultant with team but no companies — show dashboard with empty state
+  if (!companyId) {
+    if (isTeamMember) {
+      const companyContextValue = {
+        company: null,
+        role: null,
+        companies: [],
+        isTeamMember: true,
+        team,
+      }
+
+      return (
+        <CompanyProvider value={companyContextValue}>
+          <div className="min-h-screen bg-background">
+            <a
+              href="#main-content"
+              className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg focus:text-sm focus:font-medium"
+            >
+              Hoppa till innehåll
+            </a>
+            <DashboardNav
+              companyName={team?.name || 'Mitt team'}
+              entityType="enskild_firma"
+              uncategorizedTransactionCount={0}
+              pendingOperationsCount={0}
+              isSandbox={false}
+              extensionNavItems={getExtensionNavItems()}
+            />
+            <main id="main-content" className="safe-area-main-padding md:!pb-0 md:pl-[232px]" role="main">
+              <div className="max-w-5xl mx-auto px-5 py-8 md:px-8 md:py-10">
+                {children}
+              </div>
+            </main>
+            <SentryIdentify userId={user.id} email={user.email} />
+          </div>
+        </CompanyProvider>
+      )
+    }
+
+    redirect('/onboarding')
+  }
+
+  // Fetch company + membership for context provider
+  const [
+    { data: companyRow },
+    { data: memberRow },
+    { data: allMemberships },
+  ] = await Promise.all([
+    supabase.from('companies').select('*').eq('id', companyId).single(),
+    supabase.from('company_members').select('role').eq('company_id', companyId).eq('user_id', user.id).single(),
+    supabase.from('company_members').select('company_id, role, companies:company_id(id, name, org_number, entity_type, created_by, team_id, archived_at, created_at, updated_at)').eq('user_id', user.id),
+  ])
+
+  if (!companyRow || !memberRow) {
+    // Stale cookie pointing to a deleted/inaccessible company.
+    // If the user is a team member, render the empty-state dashboard
+    // instead of redirecting to onboarding (which would cause a loop).
+    if (isTeamMember) {
+      const companyContextValue = {
+        company: null,
+        role: null,
+        companies: (allMemberships || []).filter(m => m.companies).map((m) => ({
+          company: m.companies as unknown as import('@/types').Company,
+          role: m.role as CompanyRole,
+        })),
+        isTeamMember: true,
+        team,
+      }
+
+      return (
+        <CompanyProvider value={companyContextValue}>
+          <div className="min-h-screen bg-background">
+            <DashboardNav
+              companyName={team?.name || 'Mitt team'}
+              entityType="enskild_firma"
+              uncategorizedTransactionCount={0}
+              pendingOperationsCount={0}
+              isSandbox={false}
+              extensionNavItems={getExtensionNavItems()}
+            />
+            <main id="main-content" className="safe-area-main-padding md:!pb-0 md:pl-[232px]" role="main">
+              <div className="max-w-5xl mx-auto px-5 py-8 md:px-8 md:py-10">
+                {children}
+              </div>
+            </main>
+            <SentryIdentify userId={user.id} email={user.email} />
+          </div>
+        </CompanyProvider>
+      )
+    }
+    redirect('/onboarding')
+  }
+
   const [{ data: settings }, { count: uncategorizedCount }, { count: pendingOpsCount }] = await Promise.all([
     supabase
       .from('company_settings')
       .select('company_name, onboarding_complete, entity_type, is_sandbox')
-      .eq('user_id', user.id)
+      .eq('company_id', companyId)
       .single(),
     supabase
       .from('transactions')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
+      .eq('company_id', companyId)
       .is('is_business', null),
     supabase
       .from('pending_operations')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
+      .eq('company_id', companyId)
       .eq('status', 'pending'),
   ])
 
@@ -42,41 +162,62 @@ export default async function DashboardLayout({
     redirect('/onboarding')
   }
 
+  // Use company_name from settings as the display name (companies.name may be stale)
+  const displayName = settings.company_name || companyRow.name
+  const companyWithName = { ...companyRow, name: displayName }
+
+  const companyContextValue = {
+    company: companyWithName,
+    role: memberRow.role as CompanyRole,
+    companies: (allMemberships || []).map((m) => {
+      const c = m.companies as unknown as import('@/types').Company
+      // Override active company's name with settings name
+      if (c.id === companyId) {
+        return { company: { ...c, name: displayName }, role: m.role as CompanyRole }
+      }
+      return { company: c, role: m.role as CompanyRole }
+    }),
+    isTeamMember,
+    team,
+  }
+
   const entityType = (settings.entity_type as EntityType) || 'enskild_firma'
 
   const isSandbox = settings.is_sandbox === true
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Skip to content link for keyboard/screen reader users */}
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg focus:text-sm focus:font-medium"
-      >
-        Hoppa till innehåll
-      </a>
-      {isSandbox && <SandboxBanner />}
-      <DashboardNav
-        companyName={settings.company_name || 'Min verksamhet'}
-        entityType={entityType}
-        uncategorizedTransactionCount={uncategorizedCount ?? 0}
-        pendingOperationsCount={pendingOpsCount ?? 0}
-        isSandbox={isSandbox}
-        extensionNavItems={getExtensionNavItems()}
-      />
-      <main id="main-content" className="safe-area-main-padding md:!pb-0 md:pl-[232px]" role="main">
-        <div className="max-w-5xl mx-auto px-5 py-8 md:px-8 md:py-10">
-          {children}
-        </div>
-      </main>
-      <SentryIdentify userId={user.id} email={user.email} />
-      {!isSandbox && (
-        <RecaptIdentify
-          userId={user.id}
-          email={user.email}
-          displayName={settings.company_name || undefined}
+    <CompanyProvider value={companyContextValue}>
+      <div className="min-h-screen bg-background">
+        {/* Skip to content link for keyboard/screen reader users */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg focus:text-sm focus:font-medium"
+        >
+          Hoppa till innehåll
+        </a>
+        {isSandbox && <SandboxBanner />}
+        <DashboardNav
+          companyName={settings.company_name || 'Min verksamhet'}
+          entityType={entityType}
+          uncategorizedTransactionCount={uncategorizedCount ?? 0}
+          pendingOperationsCount={pendingOpsCount ?? 0}
+          isSandbox={isSandbox}
+          extensionNavItems={getExtensionNavItems()}
         />
-      )}
-    </div>
+        <main id="main-content" className="safe-area-main-padding md:!pb-0 md:pl-[232px]" role="main">
+          <div key={companyId} className="max-w-5xl mx-auto px-5 py-8 md:px-8 md:py-10">
+            {children}
+          </div>
+        </main>
+        <SentryIdentify userId={user.id} email={user.email} />
+        {!isSandbox && (
+          <RecaptIdentify
+            userId={user.id}
+            email={user.email}
+            displayName={settings.company_name || undefined}
+          />
+        )}
+      </div>
+    </CompanyProvider>
   )
 }

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { InvoicePDF } from '@/lib/invoices/pdf-template'
 import { getVatRules } from '@/lib/invoices/vat-rules'
+import { requireCompanyId } from '@/lib/company/context'
 import type { Invoice, InvoiceItem, Customer, CompanySettings, InvoiceDocumentType } from '@/types'
 
 /**
@@ -20,6 +21,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const body = await request.json()
   const { customer_id, invoice_date, due_date, currency, items, your_reference, our_reference, notes, document_type } = body
 
@@ -32,7 +35,7 @@ export async function POST(request: Request) {
     .from('customers')
     .select('*')
     .eq('id', customer_id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (customerError || !customer) {
@@ -43,7 +46,7 @@ export async function POST(request: Request) {
   const { data: company, error: companyError } = await supabase
     .from('company_settings')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (companyError || !company) {

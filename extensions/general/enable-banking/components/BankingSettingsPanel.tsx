@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { DestructiveConfirmDialog, useDestructiveConfirm } from '@/components/ui/destructive-confirm-dialog'
 import { Loader2, Upload } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useCompany } from '@/contexts/CompanyContext'
 import { BankSelector, type Bank } from './BankSelector'
 import { BankConnectionStatus } from './BankConnectionStatus'
 import type { BankConnection } from '@/types'
@@ -21,6 +22,7 @@ export default function BankingSettingsPanel() {
   const supabase = createClient()
 
   const { dialogProps, confirm } = useDestructiveConfirm()
+  const { company } = useCompany()
 
   const [bankConnections, setBankConnections] = useState<BankConnection[]>([])
   const [syncingConnectionId, setSyncingConnectionId] = useState<string | null>(null)
@@ -38,11 +40,12 @@ export default function BankingSettingsPanel() {
     setIsLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+    if (!company) return
 
     const { data: connections } = await supabase
       .from('bank_connections')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('company_id', company.id)
       .order('created_at', { ascending: false })
 
     setBankConnections(connections || [])

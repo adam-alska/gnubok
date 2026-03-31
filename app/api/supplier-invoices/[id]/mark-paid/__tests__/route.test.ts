@@ -17,6 +17,11 @@ vi.mock('@/lib/init', () => ({
   ensureInitialized: vi.fn(),
 }))
 
+vi.mock('@/lib/company/context', () => ({
+  requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+  getActiveCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
 const mockCreateSupplierInvoicePaymentEntry = vi.fn()
 const mockCreateSupplierInvoiceCashEntry = vi.fn()
 vi.mock('@/lib/bookkeeping/supplier-invoice-entries', () => ({

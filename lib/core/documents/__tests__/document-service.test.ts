@@ -74,7 +74,7 @@ describe('uploadDocument', () => {
 
     const supabase = makeClient()
     const buffer = new TextEncoder().encode('test content').buffer
-    const result = await uploadDocument(supabase as never, 'user-1', {
+    const result = await uploadDocument(supabase as never, 'user-1', 'company-1', {
       name: 'test.pdf',
       buffer: buffer as ArrayBuffer,
       type: 'application/pdf',
@@ -87,6 +87,7 @@ describe('uploadDocument', () => {
       expect.objectContaining({
         document: expect.objectContaining({ id: 'doc-1' }),
         userId: 'user-1',
+        companyId: 'company-1',
       })
     )
   })

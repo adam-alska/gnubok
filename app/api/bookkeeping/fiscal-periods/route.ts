@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { validatePeriodDuration } from '@/lib/bookkeeping/validate-period-duration'
 import { validateBody } from '@/lib/api/validate'
 import { CreateFiscalPeriodSchema } from '@/lib/api/schemas'
+import { requireCompanyId } from '@/lib/company/context'
 
 export async function GET() {
   const supabase = await createClient()
@@ -12,10 +13,12 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { data, error } = await supabase
     .from('fiscal_periods')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .order('period_start', { ascending: false })
 
   if (error) {
@@ -33,6 +36,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const validation = await validateBody(request, CreateFiscalPeriodSchema)
   if (!validation.success) return validation.response
   const body = validation.data
@@ -47,7 +52,7 @@ export async function POST(request: Request) {
   const { data: overlapping } = await supabase
     .from('fiscal_periods')
     .select('id, name')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .lte('period_start', body.period_end)
     .gte('period_end', body.period_start)
     .limit(1)
@@ -63,6 +68,7 @@ export async function POST(request: Request) {
     .from('fiscal_periods')
     .insert({
       user_id: user.id,
+      company_id: companyId,
       name: body.name,
       period_start: body.period_start,
       period_end: body.period_end,

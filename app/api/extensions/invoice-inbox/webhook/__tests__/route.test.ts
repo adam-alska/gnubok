@@ -142,7 +142,7 @@ describe('Invoice Inbox Webhook Route', () => {
       created_at: '2024-06-15T10:00:00Z',
     })
     mockExtractAttachments.mockReturnValue([])
-    mockResolveUserFromEmail.mockResolvedValue('user-1')
+    mockResolveUserFromEmail.mockResolvedValue({ userId: 'user-1', companyId: 'company-1' })
 
     // Insert inbox item with error status
     enqueueMany([

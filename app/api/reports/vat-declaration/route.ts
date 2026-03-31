@@ -4,6 +4,7 @@ import {
   calculateVatDeclaration,
   formatPeriodLabel,
 } from '@/lib/reports/vat-declaration'
+import { requireCompanyId } from '@/lib/company/context'
 import type { VatPeriodType, AccountingMethod } from '@/types'
 
 /**
@@ -28,6 +29,8 @@ export async function GET(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   const { searchParams } = new URL(request.url)
   const periodType = searchParams.get('periodType') as VatPeriodType | null
@@ -94,7 +97,7 @@ export async function GET(request: Request) {
   const { data: settings } = await supabase
     .from('company_settings')
     .select('accounting_method')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   const accountingMethod = (settings?.accounting_method as AccountingMethod) || 'accrual'
@@ -102,7 +105,7 @@ export async function GET(request: Request) {
   try {
     const declaration = await calculateVatDeclaration(
       supabase,
-      user.id,
+      companyId,
       periodType,
       year,
       period,

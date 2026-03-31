@@ -401,7 +401,7 @@ export const arcimMigrationExtension: Extension = {
             .map(a => ({ number: a.number, name: a.name }))
 
           // Load existing user mappings
-          const existingMappings = await loadMappings(supabase, user.id)
+          const existingMappings = await loadMappings(supabase, ctx?.companyId ?? user.id)
           const existingRecords = [...existingMappings.values()].map(m => ({
             id: '',
             user_id: user.id,
@@ -485,7 +485,7 @@ export const arcimMigrationExtension: Extension = {
           await saveMappings(supabase, user.id, mappings)
 
           // Execute the import via core engine
-          const result = await executeSIEImport(supabase, user.id, parsed, mappings, {
+          const result = await executeSIEImport(supabase, ctx?.companyId ?? user.id, user.id, parsed, mappings, {
             filename: `migration-sie-${Date.now()}.se`,
             fileContent: rawContent,
             createFiscalPeriod: options.createFiscalPeriod,

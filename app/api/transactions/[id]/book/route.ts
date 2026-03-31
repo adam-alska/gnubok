@@ -5,6 +5,7 @@ import { ensureInitialized } from '@/lib/init'
 import { createJournalEntry } from '@/lib/bookkeeping/engine'
 import { validateBody } from '@/lib/api/validate'
 import { BookTransactionSchema } from '@/lib/api/schemas'
+import { requireCompanyId } from '@/lib/company/context'
 import type { Transaction } from '@/types'
 
 ensureInitialized()
@@ -22,6 +23,8 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const validation = await validateBody(request, BookTransactionSchema)
   if (!validation.success) return validation.response
   const { fiscal_period_id, entry_date, description, lines } = validation.data
@@ -31,7 +34,7 @@ export async function POST(
     .from('transactions')
     .select('*')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (fetchError || !transaction) {
@@ -49,7 +52,7 @@ export async function POST(
   // Create journal entry via the engine
   let journalEntry
   try {
-    journalEntry = await createJournalEntry(supabase, user.id, {
+    journalEntry = await createJournalEntry(supabase, companyId, user.id, {
       fiscal_period_id,
       entry_date,
       description,
@@ -90,6 +93,7 @@ export async function POST(
         account: lines[0]?.account_number || '',
         taxCode: '',
         userId: user.id,
+        companyId,
       },
     })
   } catch {

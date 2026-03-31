@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { extractBearerToken, validateApiKey, createServiceClientNoCookies } from '@/lib/auth/api-keys'
 import { validateQuery } from '@/lib/api/validate'
 import { EventsQuerySchema } from '@/lib/api/schemas'
+import { requireCompanyId } from '@/lib/company/context'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
@@ -40,6 +41,8 @@ export async function GET(request: Request) {
     userId = user.id
   }
 
+  const companyId = await requireCompanyId(supabase, userId)
+
   // Validate query params
   const result = validateQuery(request, EventsQuerySchema)
   if (!result.success) return result.response
@@ -49,7 +52,7 @@ export async function GET(request: Request) {
   let query = supabase
     .from('event_log')
     .select('sequence, event_type, entity_id, data, created_at')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .order('sequence', { ascending: true })
     .limit(limit)
 

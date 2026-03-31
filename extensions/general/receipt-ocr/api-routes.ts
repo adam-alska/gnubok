@@ -29,7 +29,7 @@ async function handleListReceipts(
       *,
       line_items:receipt_line_items(*)
     `, { count: 'exact' })
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
@@ -61,6 +61,7 @@ async function handleUpload(
   ctx?: ExtensionContext
 ): Promise<Response> {
   const userId = ctx!.userId
+  const companyId = ctx!.companyId
   const { createClient } = await import('@/lib/supabase/server')
   const supabase = await createClient()
 
@@ -106,7 +107,7 @@ async function handleUpload(
     let wormDocumentId: string | null = null
     try {
       const { uploadDocument } = await import('@/lib/core/documents/document-service')
-      const wormDoc = await uploadDocument(supabase, userId, {
+      const wormDoc = await uploadDocument(supabase, userId, companyId, {
         name: imageFile.name,
         buffer: arrayBuffer,
         type: imageFile.type,
@@ -231,6 +232,7 @@ async function handleUpload(
           documentId: wormDocumentId,
           confidence: extraction.confidence,
           userId,
+          companyId,
         },
       })
 
@@ -290,7 +292,7 @@ async function handleGetQueue(
       *,
       line_items:receipt_line_items(*)
     `)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .order('created_at', { ascending: false })
 
   if (status) {
@@ -312,20 +314,20 @@ async function handleGetQueue(
   const { count: unmatchedReceiptsCount } = await supabase
     .from('receipts')
     .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .eq('status', 'confirmed')
     .is('matched_transaction_id', null)
 
   const { count: pendingReviewCount } = await supabase
     .from('receipts')
     .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .eq('status', 'extracted')
 
   const { count: unmatchedTransactionsCount } = await supabase
     .from('transactions')
     .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .lt('amount', 0)
     .is('receipt_id', null)
 
@@ -333,7 +335,7 @@ async function handleGetQueue(
   const { data: recentActivity } = await supabase
     .from('receipts')
     .select('created_at')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .eq('status', 'confirmed')
     .order('created_at', { ascending: false })
     .limit(30)
@@ -394,7 +396,7 @@ async function handleGetReceipt(
       matched_transaction:transactions(*)
     `)
     .eq('id', id)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .single()
 
   if (error) {
@@ -431,7 +433,7 @@ async function handleDeleteReceipt(
     .from('receipts')
     .select('image_url, matched_transaction_id')
     .eq('id', id)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .single()
 
   if (!receipt) {
@@ -451,7 +453,7 @@ async function handleDeleteReceipt(
     .from('receipts')
     .delete()
     .eq('id', id)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -481,6 +483,7 @@ async function handleConfirm(
   ctx?: ExtensionContext
 ): Promise<Response> {
   const userId = ctx!.userId
+  const companyId = ctx!.companyId
   const { createClient } = await import('@/lib/supabase/server')
   const supabase = await createClient()
 
@@ -496,7 +499,7 @@ async function handleConfirm(
     .from('receipts')
     .select('*')
     .eq('id', id)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .single()
 
   if (fetchError || !receipt) {
@@ -544,7 +547,7 @@ async function handleConfirm(
       .from('transactions')
       .select('id')
       .eq('id', body.matched_transaction_id)
-      .eq('user_id', userId)
+      .eq('company_id', userId)
       .single()
 
     if (!txError && transaction) {
@@ -595,6 +598,7 @@ async function handleConfirm(
       businessTotal: Math.round(businessTotal * 100) / 100,
       privateTotal: Math.round(privateTotal * 100) / 100,
       userId,
+      companyId,
     },
   })
 
@@ -625,7 +629,7 @@ async function handleFindMatches(
     .from('receipts')
     .select('*')
     .eq('id', id)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .single()
 
   if (receiptError || !receipt) {
@@ -643,7 +647,7 @@ async function handleFindMatches(
   const { data: transactions, error: txError } = await supabase
     .from('transactions')
     .select('*')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .is('receipt_id', null)
     .lt('amount', 0) // Only expenses
     .gte('date', startDate.toISOString().split('T')[0])
@@ -678,6 +682,7 @@ async function handleLinkMatch(
   ctx?: ExtensionContext
 ): Promise<Response> {
   const userId = ctx!.userId
+  const companyId = ctx!.companyId
   const { createClient } = await import('@/lib/supabase/server')
   const supabase = await createClient()
 
@@ -700,7 +705,7 @@ async function handleLinkMatch(
     .from('receipts')
     .select('*, line_items:receipt_line_items(*)')
     .eq('id', id)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .single()
 
   if (receiptError || !receipt) {
@@ -712,7 +717,7 @@ async function handleLinkMatch(
     .from('transactions')
     .select('*')
     .eq('id', transaction_id)
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .single()
 
   if (txError || !transaction) {
@@ -753,6 +758,7 @@ async function handleLinkMatch(
       confidence: match_confidence || 0,
       autoMatched: false,
       userId,
+      companyId,
     },
   })
 

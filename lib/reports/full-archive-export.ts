@@ -30,7 +30,7 @@ interface DocumentManifestEntry {
  */
 export async function generateFullArchive(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   options: FullArchiveOptions
 ): Promise<ArrayBuffer> {
   const { period_id, include_documents = true } = options
@@ -40,7 +40,7 @@ export async function generateFullArchive(
     .from('fiscal_periods')
     .select('*')
     .eq('id', period_id)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (!period) {
@@ -51,7 +51,7 @@ export async function generateFullArchive(
   const { data: company } = await supabase
     .from('company_settings')
     .select('company_name, org_number, moms_period')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (!company) {
@@ -61,7 +61,7 @@ export async function generateFullArchive(
   const zip = new JSZip()
 
   // 1. SIE4 export
-  const sieContent = await generateSIEExport(supabase, userId, {
+  const sieContent = await generateSIEExport(supabase, companyId, {
     fiscal_period_id: period_id,
     company_name: company.company_name || 'Unknown',
     org_number: company.org_number,
@@ -74,11 +74,11 @@ export async function generateFullArchive(
 
   const [trialBalance, incomeStatement, balanceSheet, generalLedger, journalRegister] =
     await Promise.all([
-      generateTrialBalance(supabase, userId, period_id),
-      generateIncomeStatement(supabase, userId, period_id),
-      generateBalanceSheet(supabase, userId, period_id),
-      generateGeneralLedger(supabase, userId, period_id),
-      generateJournalRegister(supabase, userId, period_id),
+      generateTrialBalance(supabase, companyId, period_id),
+      generateIncomeStatement(supabase, companyId, period_id),
+      generateBalanceSheet(supabase, companyId, period_id),
+      generateGeneralLedger(supabase, companyId, period_id),
+      generateJournalRegister(supabase, companyId, period_id),
     ])
 
   rapporter.file('saldobalans.json', JSON.stringify(trialBalance, null, 2))
@@ -92,7 +92,7 @@ export async function generateFullArchive(
     const startDate = new Date(period.period_start)
     const vatDeclaration = await calculateVatDeclaration(
       supabase,
-      userId,
+      companyId,
       'yearly',
       startDate.getFullYear(),
       1
@@ -111,7 +111,7 @@ export async function generateFullArchive(
     const { data: documents } = await supabase
       .from('document_attachments')
       .select('id, file_name, storage_path, journal_entry_id')
-      .eq('user_id', userId)
+      .eq('company_id', companyId)
       .not('journal_entry_id', 'is', null)
 
     if (documents && documents.length > 0) {
@@ -119,7 +119,7 @@ export async function generateFullArchive(
       const { data: periodEntryIds } = await supabase
         .from('journal_entries')
         .select('id')
-        .eq('user_id', userId)
+        .eq('company_id', companyId)
         .eq('fiscal_period_id', period_id)
         .in('status', ['posted', 'reversed'])
 
@@ -172,7 +172,7 @@ export async function generateFullArchive(
   const pageSize = 500
 
   while (true) {
-    const result = await getAuditLog(supabase, userId, {
+    const result = await getAuditLog(supabase, companyId, {
       from_date: period.period_start,
       to_date: period.period_end,
       page,

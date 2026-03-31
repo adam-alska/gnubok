@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getEmailService } from '@/lib/email/service'
 import { SUPPORT_RECIPIENT_EMAIL } from '@/lib/support'
+import { requireCompanyId } from '@/lib/company/context'
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -11,6 +12,8 @@ export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  await requireCompanyId(supabase, user.id)
 
   let body: { subject?: string; message?: string }
   try {

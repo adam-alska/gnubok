@@ -6,7 +6,7 @@ import type { CreateJournalEntryInput, MappingResult, VatJournalLine } from '@/t
 vi.mock('../engine', () => ({
   findFiscalPeriod: vi.fn().mockResolvedValue('period-1'),
   createJournalEntry: vi.fn().mockImplementation(
-    async (_supabase: unknown, _userId: string, input: CreateJournalEntryInput) => ({
+    async (_supabase: unknown, _companyId: string, _userId: string, input: CreateJournalEntryInput) => ({
       id: 'entry-1',
       ...input,
       lines: input.lines,
@@ -90,7 +90,7 @@ function makeMappingResult(overrides: Partial<MappingResult> = {}): MappingResul
     rule: null,
     debit_account: '5410',
     credit_account: '1930',
-    risk_level: 'low',
+    risk_level: 'LOW',
     confidence: 0.95,
     requires_review: false,
     default_private: false,
@@ -121,7 +121,7 @@ describe('createTransactionJournalEntry', () => {
     const mapping = makeMappingResult({ debit_account: '' })
 
     await expect(
-      createTransactionJournalEntry(null as never, 'user-1', tx, mapping)
+      createTransactionJournalEntry(null as never, 'company-1', 'user-1', tx, mapping)
     ).rejects.toThrow('Invalid mapping result')
   })
 
@@ -130,7 +130,7 @@ describe('createTransactionJournalEntry', () => {
     const mapping = makeMappingResult({ credit_account: '' })
 
     await expect(
-      createTransactionJournalEntry(null as never, 'user-1', tx, mapping)
+      createTransactionJournalEntry(null as never, 'company-1', 'user-1', tx, mapping)
     ).rejects.toThrow('Invalid mapping result')
   })
 
@@ -141,7 +141,7 @@ describe('createTransactionJournalEntry', () => {
     const tx = makeTransaction()
     const mapping = makeMappingResult()
 
-    const result = await createTransactionJournalEntry(null as never, 'user-1', tx, mapping)
+    const result = await createTransactionJournalEntry(null as never, 'company-1', 'user-1', tx, mapping)
 
     expect(result).toBeNull()
     expect(mockedCreateEntry).not.toHaveBeenCalled()
@@ -157,10 +157,10 @@ describe('createTransactionJournalEntry', () => {
       default_private: true,
     })
 
-    await createTransactionJournalEntry(null as never, 'user-1', tx, mapping)
+    await createTransactionJournalEntry(null as never, 'company-1', 'user-1', tx, mapping)
 
     expect(mockedCreateEntry).toHaveBeenCalledOnce()
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     expect(input.lines).toHaveLength(2)
 
@@ -184,9 +184,9 @@ describe('createTransactionJournalEntry', () => {
       default_private: true,
     })
 
-    await createTransactionJournalEntry(null as never, 'user-1', tx, mapping)
+    await createTransactionJournalEntry(null as never, 'company-1', 'user-1', tx, mapping)
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.lines).toHaveLength(2)
 
     const debit2893 = input.lines.find(l => l.account_number === '2893')
@@ -208,9 +208,9 @@ describe('createTransactionJournalEntry', () => {
       vat_lines: [],
     })
 
-    await createTransactionJournalEntry(null as never, 'user-1', tx, mapping)
+    await createTransactionJournalEntry(null as never, 'company-1', 'user-1', tx, mapping)
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.lines).toHaveLength(2)
 
     const debit5410 = input.lines.find(l => l.account_number === '5410')
@@ -233,9 +233,9 @@ describe('createTransactionJournalEntry', () => {
       vat_lines: vatLines,
     })
 
-    await createTransactionJournalEntry(null as never, 'user-1', tx, mapping)
+    await createTransactionJournalEntry(null as never, 'company-1', 'user-1', tx, mapping)
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.lines).toHaveLength(3)
 
     const debit2641 = input.lines.find(l => l.account_number === '2641')
@@ -261,9 +261,9 @@ describe('createTransactionJournalEntry', () => {
       vat_lines: vatLines,
     })
 
-    await createTransactionJournalEntry(null as never, 'user-1', tx, mapping)
+    await createTransactionJournalEntry(null as never, 'company-1', 'user-1', tx, mapping)
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     const debit5410 = input.lines.find(l => l.account_number === '5410')
     // net = Math.round((997.50 - 199.50) * 100) / 100 = 798
     expect(debit5410?.debit_amount).toBe(Math.round((997.50 - 199.50) * 100) / 100)
@@ -283,9 +283,9 @@ describe('createTransactionJournalEntry', () => {
       vat_lines: vatLines,
     })
 
-    await createTransactionJournalEntry(null as never, 'user-1', tx, mapping)
+    await createTransactionJournalEntry(null as never, 'company-1', 'user-1', tx, mapping)
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     const debit2645 = input.lines.find(l => l.account_number === '2645')
     expect(debit2645?.debit_amount).toBe(1250)
@@ -313,9 +313,9 @@ describe('createTransactionJournalEntry', () => {
       vat_lines: [],
     })
 
-    await createTransactionJournalEntry(null as never, 'user-1', tx, mapping)
+    await createTransactionJournalEntry(null as never, 'company-1', 'user-1', tx, mapping)
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.lines).toHaveLength(2)
 
     const debit1930 = input.lines.find(l => l.account_number === '1930')
@@ -338,9 +338,9 @@ describe('createTransactionJournalEntry', () => {
       vat_lines: vatLines,
     })
 
-    await createTransactionJournalEntry(null as never, 'user-1', tx, mapping)
+    await createTransactionJournalEntry(null as never, 'company-1', 'user-1', tx, mapping)
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     const debit1930 = input.lines.find(l => l.account_number === '1930')
     expect(debit1930?.debit_amount).toBe(12500)
@@ -365,9 +365,9 @@ describe('createTransactionJournalEntry', () => {
       vat_lines: vatLines,
     })
 
-    await createTransactionJournalEntry(null as never, 'user-1', tx, mapping)
+    await createTransactionJournalEntry(null as never, 'company-1', 'user-1', tx, mapping)
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     const credit3001 = input.lines.find(l => l.account_number === '3001')
     // net = Math.round((333.33 - 66.67) * 100) / 100 = 266.66
     expect(credit3001?.credit_amount).toBe(Math.round((333.33 - 66.67) * 100) / 100)
@@ -391,9 +391,9 @@ describe('createTransactionJournalEntry', () => {
       vat_lines: [],
     })
 
-    await createTransactionJournalEntry(null as never, 'user-1', tx, mapping)
+    await createTransactionJournalEntry(null as never, 'company-1', 'user-1', tx, mapping)
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     const credit1930 = input.lines.find(l => l.account_number === '1930')
 
     expect(credit1930?.currency).toBe('EUR')
@@ -412,9 +412,9 @@ describe('createTransactionJournalEntry', () => {
     const tx = makeTransaction({ amount: -500, currency: 'SEK' })
     const mapping = makeMappingResult()
 
-    await createTransactionJournalEntry(null as never, 'user-1', tx, mapping)
+    await createTransactionJournalEntry(null as never, 'company-1', 'user-1', tx, mapping)
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     for (const line of input.lines) {
       expect(line.currency).toBeUndefined()
       expect(line.amount_in_currency).toBeUndefined()
@@ -428,9 +428,9 @@ describe('createTransactionJournalEntry', () => {
     const tx = makeTransaction({ id: 'tx-abc-123', amount: -100 })
     const mapping = makeMappingResult()
 
-    await createTransactionJournalEntry(null as never, 'user-1', tx, mapping)
+    await createTransactionJournalEntry(null as never, 'company-1', 'user-1', tx, mapping)
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.source_type).toBe('bank_transaction')
     expect(input.source_id).toBe('tx-abc-123')
   })
@@ -439,9 +439,9 @@ describe('createTransactionJournalEntry', () => {
     const tx = makeTransaction({ date: '2024-09-15', amount: -100 })
     const mapping = makeMappingResult()
 
-    await createTransactionJournalEntry(null as never, 'user-1', tx, mapping)
+    await createTransactionJournalEntry(null as never, 'company-1', 'user-1', tx, mapping)
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.entry_date).toBe('2024-09-15')
   })
 })

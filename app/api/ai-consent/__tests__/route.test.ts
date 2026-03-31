@@ -15,6 +15,11 @@ vi.mock('@/lib/extensions/ai-consent', () => ({
   ),
 }))
 
+vi.mock('@/lib/company/context', () => ({
+  requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+  getActiveCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
 import { createClient } from '@/lib/supabase/server'
 import { hasAiConsent, grantAiConsent, revokeAiConsent } from '@/lib/extensions/ai-consent'
 import { GET, POST, DELETE } from '../route'
@@ -91,7 +96,7 @@ describe('POST /api/ai-consent', () => {
 
     expect(status).toBe(200)
     expect(body.data.consented).toBe(true)
-    expect(mockGrantAiConsent).toHaveBeenCalledWith(expect.anything(), 'user-1', 'receipt-ocr')
+    expect(mockGrantAiConsent).toHaveBeenCalledWith(expect.anything(), 'user-1', 'company-1', 'receipt-ocr')
   })
 
   it('returns 400 for non-AI extension', async () => {
@@ -131,6 +136,6 @@ describe('DELETE /api/ai-consent', () => {
 
     expect(status).toBe(200)
     expect(body.data.consented).toBe(false)
-    expect(mockRevokeAiConsent).toHaveBeenCalledWith(expect.anything(), 'user-1', 'ai-chat')
+    expect(mockRevokeAiConsent).toHaveBeenCalledWith(expect.anything(), 'user-1', 'company-1', 'ai-chat')
   })
 })

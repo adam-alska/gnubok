@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { validateBody } from '@/lib/api/validate'
 import { CreateDeadlineSchema } from '@/lib/api/schemas'
+import { requireCompanyId } from '@/lib/company/context'
 
 /**
  * GET /api/deadlines
@@ -23,6 +24,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Parse query params
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status') || 'all'
@@ -34,7 +37,7 @@ export async function GET(request: Request) {
   let query = supabase
     .from('deadlines')
     .select('*, customer:customers(id, name)')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
 
   // Apply filters
   if (status === 'pending') {
@@ -79,6 +82,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const validation = await validateBody(request, CreateDeadlineSchema)
   if (!validation.success) return validation.response
   const body = validation.data
@@ -88,6 +93,7 @@ export async function POST(request: Request) {
     .from('deadlines')
     .insert({
       user_id: user.id,
+      company_id: companyId,
       title: body.title,
       due_date: body.due_date,
       due_time: body.due_time || null,

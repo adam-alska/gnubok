@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { ArrowLeftRight, ArrowRightLeft, FileText, ArrowLeft, Landmark, Loader2, Info, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { useCompany } from '@/contexts/CompanyContext'
 import { BankSelector, type Bank } from '@/extensions/general/enable-banking/components/BankSelector'
 import { BankConnectionStatus } from '@/extensions/general/enable-banking/components/BankConnectionStatus'
 import { DestructiveConfirmDialog, useDestructiveConfirm } from '@/components/ui/destructive-confirm-dialog'
@@ -566,6 +567,7 @@ function PSD2ConnectWizard() {
   const { toast } = useToast()
   const supabase = createClient()
   const { dialogProps, confirm } = useDestructiveConfirm()
+  const { company } = useCompany()
 
   const [bankConnections, setBankConnections] = useState<BankConnection[]>([])
   const [syncingConnectionId, setSyncingConnectionId] = useState<string | null>(null)
@@ -582,10 +584,12 @@ function PSD2ConnectWizard() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
+    if (!company) return
+
     const { data: connections } = await supabase
       .from('bank_connections')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('company_id', company.id)
       .order('created_at', { ascending: false })
 
     setBankConnections(connections || [])
@@ -750,6 +754,7 @@ function PSD2ConnectWizard() {
 type ImportMode = null | 'psd2' | 'bank' | 'sie' | 'migration'
 
 export default function ImportPage() {
+  const { company } = useCompany()
   const [mode, setMode] = useState<ImportMode>(null)
   const [userId, setUserId] = useState('')
   const [isSandbox, setIsSandbox] = useState(false)
@@ -760,10 +765,11 @@ export default function ImportPage() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
       setUserId(user.id)
+      if (!company) return
       supabase
         .from('company_settings')
         .select('is_sandbox')
-        .eq('user_id', user.id)
+        .eq('company_id', company.id)
         .single()
         .then(({ data }) => {
           if (data?.is_sandbox) setIsSandbox(true)

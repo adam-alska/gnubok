@@ -1,6 +1,56 @@
 // Entity types
 export type EntityType = 'enskild_firma' | 'aktiebolag'
 
+// Company role for multi-tenant access
+export type CompanyRole = 'owner' | 'admin' | 'member' | 'viewer'
+
+// Team (consulting firm) roles and source tracking
+export type TeamRole = 'owner' | 'admin' | 'member'
+export type MemberSource = 'direct' | 'team'
+
+// Team (consulting firm grouping)
+export interface Team {
+  id: string
+  name: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+// Company (multi-tenant identity)
+export interface Company {
+  id: string
+  name: string
+  org_number: string | null
+  entity_type: EntityType
+  created_by: string
+  team_id: string | null
+  archived_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+// Company membership
+export interface CompanyMember {
+  id: string
+  company_id: string
+  user_id: string
+  role: CompanyRole
+  invited_by: string | null
+  joined_at: string
+  created_at: string
+  updated_at: string
+}
+
+// User preferences (cross-company)
+export interface UserPreferences {
+  id: string
+  user_id: string
+  active_company_id: string | null
+  created_at: string
+  updated_at: string
+}
+
 // Transaction categories
 export type TransactionCategory =
   | 'income_services'
@@ -81,6 +131,7 @@ export interface Profile {
 export interface CompanySettings {
   id: string
   user_id: string
+  company_id: string
 
   // Entity info
   entity_type: EntityType
@@ -151,6 +202,7 @@ export interface CompanySettings {
 export interface BankConnection {
   id: string
   user_id: string
+  company_id: string
 
   bank_name: string
   provider: string
@@ -198,6 +250,7 @@ export type ImportSource =
 export interface Transaction {
   id: string
   user_id: string
+  company_id: string
 
   // Source
   bank_connection_id: string | null
@@ -258,6 +311,7 @@ export type BankFileImportStatus = 'pending' | 'processing' | 'completed' | 'fai
 export interface BankFileImport {
   id: string
   user_id: string
+  company_id: string
   filename: string
   file_hash: string
   file_format: string
@@ -277,6 +331,7 @@ export interface BankFileImport {
 export interface Customer {
   id: string
   user_id: string
+  company_id: string
 
   // Basic info
   name: string
@@ -313,6 +368,7 @@ export interface Customer {
 export interface Supplier {
   id: string
   user_id: string
+  company_id: string
 
   name: string
   supplier_type: SupplierType
@@ -349,6 +405,7 @@ export interface Supplier {
 export interface SupplierInvoice {
   id: string
   user_id: string
+  company_id: string
   supplier_id: string
 
   arrival_number: number
@@ -442,6 +499,7 @@ export interface SupplierInvoicePayment {
 export interface InvoicePayment {
   id: string
   user_id: string
+  company_id: string
   invoice_id: string
 
   payment_date: string
@@ -461,6 +519,7 @@ export interface InvoicePayment {
 export interface Invoice {
   id: string
   user_id: string
+  company_id: string
   customer_id: string
 
   // Invoice number (auto-generated)
@@ -799,6 +858,7 @@ export type MappingRuleType =
 export interface BASAccount {
   id: string
   user_id: string
+  company_id: string
   account_number: string
   account_name: string
   account_class: number
@@ -821,6 +881,7 @@ export interface BASAccount {
 export interface FiscalPeriod {
   id: string
   user_id: string
+  company_id: string
   name: string
   period_start: string
   period_end: string
@@ -840,6 +901,7 @@ export interface FiscalPeriod {
 export interface JournalEntry {
   id: string
   user_id: string
+  company_id: string
   fiscal_period_id: string
   voucher_number: number
   voucher_series: string
@@ -882,6 +944,7 @@ export interface JournalEntryLine {
 export interface MappingRule {
   id: string
   user_id: string | null
+  company_id: string | null
   rule_name: string
   rule_type: MappingRuleType
   priority: number
@@ -954,6 +1017,7 @@ export interface LinePatternEntry {
 export interface CategorizationTemplate {
   id: string
   user_id: string
+  company_id: string
   counterparty_name: string
   counterparty_aliases: string[]
   debit_account: string
@@ -975,6 +1039,7 @@ export interface CategorizationTemplate {
 export interface AccountBalance {
   id: string
   user_id: string
+  company_id: string
   fiscal_period_id: string
   account_number: string
   account_id: string | null
@@ -1077,6 +1142,7 @@ export type PendingOperationStatus = 'pending' | 'committed' | 'rejected'
 export interface PendingOperation {
   id: string
   user_id: string
+  company_id: string
   operation_type: PendingOperationType
   status: PendingOperationStatus
   title: string
@@ -1182,6 +1248,7 @@ export type DeadlinePriority = 'critical' | 'important' | 'normal'
 export interface Deadline {
   id: string
   user_id: string
+  company_id: string
   title: string
   due_date: string
   due_time: string | null
@@ -1278,6 +1345,7 @@ export type NotificationType =
 export interface NotificationLog {
   id: string
   user_id: string
+  company_id: string | null
   notification_type: NotificationType
   reference_id: string
   days_before: number
@@ -1293,6 +1361,7 @@ export interface NotificationLog {
 export interface CalendarFeed {
   id: string
   user_id: string
+  company_id: string
   feed_token: string
   is_active: boolean
   include_tax_deadlines: boolean
@@ -1344,6 +1413,7 @@ export type SIEImportStatus = 'pending' | 'mapped' | 'completed' | 'failed'
 export interface SIEImport {
   id: string
   user_id: string
+  company_id: string
   filename: string
   file_hash: string
   org_number: string | null
@@ -1367,6 +1437,7 @@ export interface SIEImport {
 export interface SIEAccountMapping {
   id: string
   user_id: string
+  company_id: string
   source_account: string
   source_name: string | null
   target_account: string
@@ -1389,6 +1460,7 @@ export type DocumentClassificationType = 'supplier_invoice' | 'receipt' | 'gover
 export interface InvoiceInboxItem {
   id: string
   user_id: string
+  company_id: string
   status: InboxItemStatus
   source: InboxItemSource
   email_from: string | null
@@ -1436,6 +1508,7 @@ export type ReceiptStatus = 'pending' | 'processing' | 'extracted' | 'confirmed'
 export interface Receipt {
   id: string
   user_id: string
+  company_id: string
 
   // Image storage
   image_url: string
@@ -1763,6 +1836,7 @@ export interface CreditNote extends Invoice {
 export interface ExtensionDataRecord {
   id: string
   user_id: string
+  company_id: string
   extension_id: string
   key: string
   value: Record<string, unknown>
@@ -1820,6 +1894,7 @@ export type DocumentUploadSource =
 export interface DocumentAttachment {
   id: string
   user_id: string
+  company_id: string
   storage_path: string
   file_name: string
   file_size_bytes: number | null
@@ -1872,6 +1947,7 @@ export type AuditAction =
 export interface AuditLogEntry {
   id: string
   user_id: string
+  company_id: string | null
   action: AuditAction
   table_name: string | null
   record_id: string | null
@@ -1889,6 +1965,7 @@ export interface AuditLogEntry {
 export interface CostCenter {
   id: string
   user_id: string
+  company_id: string
   code: string
   name: string
   is_active: boolean
@@ -1899,6 +1976,7 @@ export interface CostCenter {
 export interface Project {
   id: string
   user_id: string
+  company_id: string
   code: string
   name: string
   is_active: boolean
@@ -1998,6 +2076,7 @@ export interface InvoiceReminder {
   id: string
   invoice_id: string
   user_id: string
+  company_id: string
   reminder_level: 1 | 2 | 3
   sent_at: string
   email_to: string

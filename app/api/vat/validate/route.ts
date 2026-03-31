@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { validateBody } from '@/lib/api/validate'
 import { ValidateVatNumberSchema } from '@/lib/api/schemas'
 import { validateVatNumber } from '@/lib/vat/vies-client'
+import { requireCompanyId } from '@/lib/company/context'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -12,6 +13,8 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   const result = await validateBody(request, ValidateVatNumberSchema)
   if (!result.success) return result.response
@@ -29,7 +32,7 @@ export async function POST(request: Request) {
         vat_number_validated_at: new Date().toISOString(),
       })
       .eq('id', customer_id)
-      .eq('user_id', user.id)
+      .eq('company_id', companyId)
   }
 
   return NextResponse.json(validation)

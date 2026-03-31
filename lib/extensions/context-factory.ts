@@ -29,6 +29,7 @@ function createExtLogger(extensionId: string): ExtensionLogger {
 function createSettings(
   supabase: SupabaseClient,
   userId: string,
+  companyId: string,
   extensionId: string
 ): ExtensionSettings {
   return {
@@ -37,7 +38,7 @@ function createSettings(
       const { data } = await supabase
         .from('extension_data')
         .select('value')
-        .eq('user_id', userId)
+        .eq('company_id', companyId)
         .eq('extension_id', extensionId)
         .eq('key', lookupKey)
         .single()
@@ -51,11 +52,12 @@ function createSettings(
         .upsert(
           {
             user_id: userId,
+            company_id: companyId,
             extension_id: extensionId,
             key,
             value,
           },
-          { onConflict: 'user_id,extension_id,key' }
+          { onConflict: 'company_id,extension_id,key' }
         )
     },
   }
@@ -108,14 +110,16 @@ function createServices(): ExtensionServices {
 export function createExtensionContext(
   supabase: SupabaseClient,
   userId: string,
+  companyId: string,
   extensionId: string
 ): ExtensionContext {
   return {
     userId,
+    companyId,
     extensionId,
     supabase,
     emit: (event: CoreEvent) => eventBus.emit(event),
-    settings: createSettings(supabase, userId, extensionId),
+    settings: createSettings(supabase, userId, companyId, extensionId),
     storage: createStorage(supabase),
     log: createExtLogger(extensionId),
     services: createServices(),

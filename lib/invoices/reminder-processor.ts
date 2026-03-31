@@ -188,7 +188,7 @@ export async function processOverdueReminders(): Promise<ProcessRemindersResult>
     const { data: company, error: companyError } = await supabase
       .from('company_settings')
       .select('*')
-      .eq('user_id', invoice.user_id)
+      .eq('company_id', invoice.company_id)
       .single()
 
     if (companyError || !company) {

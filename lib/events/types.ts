@@ -18,30 +18,31 @@ import type {
 
 export type CoreEvent =
   // Bookkeeping
-  | { type: 'journal_entry.drafted'; payload: { entry: JournalEntry; userId: string } }
-  | { type: 'journal_entry.committed'; payload: { entry: JournalEntry; userId: string } }
-  | { type: 'journal_entry.corrected'; payload: { original: JournalEntry; storno: JournalEntry; corrected: JournalEntry; userId: string } }
+  | { type: 'journal_entry.drafted'; payload: { entry: JournalEntry; userId: string; companyId: string } }
+  | { type: 'journal_entry.committed'; payload: { entry: JournalEntry; userId: string; companyId: string } }
+  | { type: 'journal_entry.corrected'; payload: { original: JournalEntry; storno: JournalEntry; corrected: JournalEntry; userId: string; companyId: string } }
   // Documents
-  | { type: 'document.uploaded'; payload: { document: DocumentAttachment; userId: string } }
+  | { type: 'document.uploaded'; payload: { document: DocumentAttachment; userId: string; companyId: string } }
   // Invoicing
-  | { type: 'invoice.created'; payload: { invoice: Invoice; userId: string } }
-  | { type: 'invoice.sent'; payload: { invoice: Invoice; userId: string } }
-  | { type: 'credit_note.created'; payload: { creditNote: CreditNote; userId: string } }
+  | { type: 'invoice.created'; payload: { invoice: Invoice; userId: string; companyId: string } }
+  | { type: 'invoice.sent'; payload: { invoice: Invoice; userId: string; companyId: string } }
+  | { type: 'credit_note.created'; payload: { creditNote: CreditNote; userId: string; companyId: string } }
   // Banking
-  | { type: 'transaction.synced'; payload: { transactions: Transaction[]; userId: string } }
-  | { type: 'transaction.categorized'; payload: { transaction: Transaction; account: string; taxCode: string; userId: string } }
-  | { type: 'transaction.reconciled'; payload: { transaction: Transaction; journalEntryId: string; method: ReconciliationMethod; userId: string } }
+  | { type: 'transaction.synced'; payload: { transactions: Transaction[]; userId: string; companyId: string } }
+  | { type: 'transaction.categorized'; payload: { transaction: Transaction; account: string; taxCode: string; userId: string; companyId: string } }
+  | { type: 'transaction.reconciled'; payload: { transaction: Transaction; journalEntryId: string; method: ReconciliationMethod; userId: string; companyId: string } }
   // Periods
-  | { type: 'period.locked'; payload: { period: FiscalPeriod; userId: string } }
-  | { type: 'period.year_closed'; payload: { period: FiscalPeriod; userId: string } }
+  | { type: 'period.locked'; payload: { period: FiscalPeriod; userId: string; companyId: string } }
+  | { type: 'period.year_closed'; payload: { period: FiscalPeriod; userId: string; companyId: string } }
   // Customers
-  | { type: 'customer.created'; payload: { customer: Customer; userId: string } }
+  | { type: 'customer.created'; payload: { customer: Customer; userId: string; companyId: string } }
   // Receipts
   | { type: 'receipt.extracted'; payload: {
       receipt: Receipt;
       documentId: string | null;
       confidence: number;
       userId: string;
+      companyId: string;
     }}
   | { type: 'receipt.matched'; payload: {
       receipt: Receipt;
@@ -49,25 +50,27 @@ export type CoreEvent =
       confidence: number;
       autoMatched: boolean;
       userId: string;
+      companyId: string;
     }}
   | { type: 'receipt.confirmed'; payload: {
       receipt: Receipt;
       businessTotal: number;
       privateTotal: number;
       userId: string;
+      companyId: string;
     }}
   // Supplier Invoice Lifecycle
-  | { type: 'supplier_invoice.registered'; payload: { supplierInvoice: SupplierInvoice; userId: string } }
-  | { type: 'supplier_invoice.approved'; payload: { supplierInvoice: SupplierInvoice; userId: string } }
-  | { type: 'supplier_invoice.paid'; payload: { supplierInvoice: SupplierInvoice; paymentAmount: number; userId: string } }
-  | { type: 'supplier_invoice.credited'; payload: { supplierInvoice: SupplierInvoice; creditNote: SupplierInvoice; userId: string } }
+  | { type: 'supplier_invoice.registered'; payload: { supplierInvoice: SupplierInvoice; userId: string; companyId: string } }
+  | { type: 'supplier_invoice.approved'; payload: { supplierInvoice: SupplierInvoice; userId: string; companyId: string } }
+  | { type: 'supplier_invoice.paid'; payload: { supplierInvoice: SupplierInvoice; paymentAmount: number; userId: string; companyId: string } }
+  | { type: 'supplier_invoice.credited'; payload: { supplierInvoice: SupplierInvoice; creditNote: SupplierInvoice; userId: string; companyId: string } }
   // Payment Matching
-  | { type: 'invoice.match_confirmed'; payload: { invoice: Invoice; transaction: Transaction; userId: string } }
-  | { type: 'supplier_invoice.match_confirmed'; payload: { supplierInvoice: SupplierInvoice; transaction: Transaction; userId: string } }
+  | { type: 'invoice.match_confirmed'; payload: { invoice: Invoice; transaction: Transaction; userId: string; companyId: string } }
+  | { type: 'supplier_invoice.match_confirmed'; payload: { supplierInvoice: SupplierInvoice; transaction: Transaction; userId: string; companyId: string } }
   // Supplier Invoice Inbox
-  | { type: 'supplier_invoice.received'; payload: { inboxItem: InvoiceInboxItem; userId: string } }
-  | { type: 'supplier_invoice.extracted'; payload: { inboxItem: InvoiceInboxItem; confidence: number; userId: string } }
-  | { type: 'supplier_invoice.confirmed'; payload: { inboxItem: InvoiceInboxItem; supplierInvoice: SupplierInvoice; userId: string } }
+  | { type: 'supplier_invoice.received'; payload: { inboxItem: InvoiceInboxItem; userId: string; companyId: string } }
+  | { type: 'supplier_invoice.extracted'; payload: { inboxItem: InvoiceInboxItem; confidence: number; userId: string; companyId: string } }
+  | { type: 'supplier_invoice.confirmed'; payload: { inboxItem: InvoiceInboxItem; supplierInvoice: SupplierInvoice; userId: string; companyId: string } }
 
 // ============================================================
 // Helper Types

@@ -78,6 +78,7 @@ function createQueueMockSupabase() {
 // ---------------------------------------------------------------------------
 
 const USER_ID = 'user-1'
+const COMPANY_ID = 'company-1'
 
 function makeRaw(overrides: Partial<RawTransaction> = {}): RawTransaction {
   return {
@@ -147,7 +148,7 @@ describe('ingestTransactions', () => {
     // evaluateMappingRules will be called but we want low confidence
     mockEvaluateMappingRules.mockResolvedValue(makeMappingResult({ confidence: 0.5 }))
 
-    const result = await ingestTransactions(supabase as never, USER_ID, [raw])
+    const result = await ingestTransactions(supabase as never, COMPANY_ID, USER_ID, [raw])
 
     expect(result.imported).toBe(1)
     expect(result.duplicates).toBe(0)
@@ -169,7 +170,7 @@ describe('ingestTransactions', () => {
     // Batch external_id dedup query — returns matching external_id
     enqueue({ data: [{ external_id: raw.external_id }], error: null })
 
-    const result = await ingestTransactions(supabase as never, USER_ID, [raw])
+    const result = await ingestTransactions(supabase as never, COMPANY_ID, USER_ID, [raw])
 
     expect(result.duplicates).toBe(1)
     expect(result.imported).toBe(0)
@@ -192,7 +193,7 @@ describe('ingestTransactions', () => {
     // Insert fails
     enqueue({ data: null, error: { message: 'DB constraint violation' } })
 
-    const result = await ingestTransactions(supabase as never, USER_ID, [raw])
+    const result = await ingestTransactions(supabase as never, COMPANY_ID, USER_ID, [raw])
 
     expect(result.errors).toBe(1)
     expect(result.imported).toBe(0)
@@ -231,12 +232,12 @@ describe('ingestTransactions', () => {
     })
     mockEvaluateMappingRules.mockResolvedValue(makeMappingResult({ confidence: 0.5 }))
 
-    const result = await ingestTransactions(supabase as never, USER_ID, [raw])
+    const result = await ingestTransactions(supabase as never, COMPANY_ID, USER_ID, [raw])
 
     expect(result.auto_matched_invoices).toBe(1)
     expect(mockGetBestInvoiceMatch).toHaveBeenCalledWith(
       expect.anything(), // supabase client
-      USER_ID,
+      COMPANY_ID,
       expect.objectContaining({ id: 'tx-income' }),
       0.50
     )
@@ -265,7 +266,7 @@ describe('ingestTransactions', () => {
 
     mockEvaluateMappingRules.mockResolvedValue(makeMappingResult({ confidence: 0.5 }))
 
-    const result = await ingestTransactions(supabase as never, USER_ID, [raw])
+    const result = await ingestTransactions(supabase as never, COMPANY_ID, USER_ID, [raw])
 
     expect(result.imported).toBe(1)
     expect(result.auto_matched_invoices).toBe(0)
@@ -301,11 +302,12 @@ describe('ingestTransactions', () => {
     )
     mockCreateTransactionJournalEntry.mockResolvedValue(journalEntry)
 
-    const result = await ingestTransactions(supabase as never, USER_ID, [raw])
+    const result = await ingestTransactions(supabase as never, COMPANY_ID, USER_ID, [raw])
 
     expect(result.auto_categorized).toBe(1)
     expect(mockCreateTransactionJournalEntry).toHaveBeenCalledWith(
       expect.anything(),
+      COMPANY_ID,
       USER_ID,
       expect.objectContaining({ id: 'tx-cat' }),
       expect.objectContaining({ confidence: 0.85 })
@@ -337,7 +339,7 @@ describe('ingestTransactions', () => {
       makeMappingResult({ confidence: 0.6 })
     )
 
-    const result = await ingestTransactions(supabase as never, USER_ID, [raw])
+    const result = await ingestTransactions(supabase as never, COMPANY_ID, USER_ID, [raw])
 
     expect(result.auto_categorized).toBe(0)
     expect(mockCreateTransactionJournalEntry).not.toHaveBeenCalled()
@@ -368,7 +370,7 @@ describe('ingestTransactions', () => {
       makeMappingResult({ confidence: 0.95, requires_review: true })
     )
 
-    const result = await ingestTransactions(supabase as never, USER_ID, [raw])
+    const result = await ingestTransactions(supabase as never, COMPANY_ID, USER_ID, [raw])
 
     expect(result.auto_categorized).toBe(0)
     expect(mockCreateTransactionJournalEntry).not.toHaveBeenCalled()
@@ -398,7 +400,7 @@ describe('ingestTransactions', () => {
 
     mockEvaluateMappingRules.mockResolvedValue(makeMappingResult({ confidence: 0.5 }))
 
-    const result = await ingestTransactions(supabase as never, USER_ID, [raw1, raw2])
+    const result = await ingestTransactions(supabase as never, COMPANY_ID, USER_ID, [raw1, raw2])
 
     expect(result.imported).toBe(2)
     expect(result.duplicates).toBe(0)
@@ -457,6 +459,7 @@ describe('ingestTransactions', () => {
 
     const result = await ingestTransactions(
       supabase as never,
+      COMPANY_ID,
       USER_ID,
       [rawNew, rawDup, rawErr]
     )
@@ -475,7 +478,7 @@ describe('ingestTransactions', () => {
   it('returns zero totals for an empty input array', async () => {
     const { supabase } = createQueueMockSupabase()
 
-    const result = await ingestTransactions(supabase as never, USER_ID, [])
+    const result = await ingestTransactions(supabase as never, COMPANY_ID, USER_ID, [])
 
     expect(result).toEqual({
       imported: 0,
@@ -507,7 +510,7 @@ describe('ingestTransactions', () => {
     mockGetBestInvoiceMatch.mockRejectedValue(new Error('Network error'))
     mockEvaluateMappingRules.mockResolvedValue(makeMappingResult({ confidence: 0.5 }))
 
-    const result = await ingestTransactions(supabase as never, USER_ID, [raw])
+    const result = await ingestTransactions(supabase as never, COMPANY_ID, USER_ID, [raw])
 
     // Should still count as imported even though invoice matching failed
     expect(result.imported).toBe(1)
@@ -533,7 +536,7 @@ describe('ingestTransactions', () => {
 
     mockEvaluateMappingRules.mockRejectedValue(new Error('Mapping error'))
 
-    const result = await ingestTransactions(supabase as never, USER_ID, [raw])
+    const result = await ingestTransactions(supabase as never, COMPANY_ID, USER_ID, [raw])
 
     expect(result.imported).toBe(1)
     expect(result.auto_categorized).toBe(0)
@@ -587,7 +590,7 @@ describe('ingestTransactions', () => {
     // Reconciliation update
     enqueue({ data: null, error: null })
 
-    const result = await ingestTransactions(supabase as never, USER_ID, [raw])
+    const result = await ingestTransactions(supabase as never, COMPANY_ID, USER_ID, [raw])
 
     expect(result.imported).toBe(1)
     expect(result.reconciled).toBe(1)
@@ -631,7 +634,7 @@ describe('ingestTransactions', () => {
 
     mockEvaluateMappingRules.mockResolvedValue(makeMappingResult({ confidence: 0.5 }))
 
-    const result = await ingestTransactions(supabase as never, USER_ID, [raw])
+    const result = await ingestTransactions(supabase as never, COMPANY_ID, USER_ID, [raw])
 
     expect(result.imported).toBe(1)
     expect(result.reconciled).toBe(0)
@@ -660,7 +663,7 @@ describe('ingestTransactions', () => {
 
     mockEvaluateMappingRules.mockResolvedValue(makeMappingResult({ confidence: 0.5 }))
 
-    const result = await ingestTransactions(supabase as never, USER_ID, [raw])
+    const result = await ingestTransactions(supabase as never, COMPANY_ID, USER_ID, [raw])
 
     expect(result.imported).toBe(1)
     expect(result.reconciled).toBe(0)
@@ -688,7 +691,7 @@ describe('ingestTransactions', () => {
     // Batch external_id dedup query (no match by external_id)
     enqueue({ data: [], error: null })
 
-    const result = await ingestTransactions(supabase as never, USER_ID, [raw])
+    const result = await ingestTransactions(supabase as never, COMPANY_ID, USER_ID, [raw])
 
     expect(result.duplicates).toBe(1)
     expect(result.imported).toBe(0)
@@ -717,7 +720,7 @@ describe('ingestTransactions', () => {
 
     mockEvaluateMappingRules.mockResolvedValue(makeMappingResult({ confidence: 0.5 }))
 
-    const result = await ingestTransactions(supabase as never, USER_ID, [raw])
+    const result = await ingestTransactions(supabase as never, COMPANY_ID, USER_ID, [raw])
 
     expect(result.imported).toBe(1)
     expect(result.duplicates).toBe(0)
@@ -754,7 +757,7 @@ describe('ingestTransactions', () => {
 
     mockEvaluateMappingRules.mockResolvedValue(makeMappingResult({ confidence: 0.5 }))
 
-    const result = await ingestTransactions(supabase as never, USER_ID, [raw1, raw2, raw3])
+    const result = await ingestTransactions(supabase as never, COMPANY_ID, USER_ID, [raw1, raw2, raw3])
 
     expect(result.duplicates).toBe(2)
     expect(result.imported).toBe(1)
@@ -776,7 +779,7 @@ describe('ingestTransactions', () => {
 
     mockEvaluateMappingRules.mockResolvedValue(makeMappingResult({ confidence: 0.5 }))
 
-    const result = await ingestTransactions(supabase as never, USER_ID, [raw])
+    const result = await ingestTransactions(supabase as never, COMPANY_ID, USER_ID, [raw])
 
     expect(result.imported).toBe(1)
     expect(result.duplicates).toBe(0)

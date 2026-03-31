@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { eventBus } from '@/lib/events'
 import { ensureInitialized } from '@/lib/init'
 import { createSupplierCreditNoteEntry } from '@/lib/bookkeeping/supplier-invoice-entries'
+import { requireCompanyId } from '@/lib/company/context'
 import type { SupplierInvoice, SupplierInvoiceItem, AccountingMethod } from '@/types'
 
 ensureInitialized()
@@ -20,12 +21,14 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Fetch original invoice with supplier and items
   const { data: original, error: fetchError } = await supabase
     .from('supplier_invoices')
     .select('*, supplier:suppliers(*), items:supplier_invoice_items(*)')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (fetchError || !original) {
@@ -48,6 +51,7 @@ export async function POST(
     .from('supplier_invoices')
     .insert({
       user_id: user.id,
+      company_id: companyId,
       supplier_id: original.supplier_id,
       arrival_number: arrivalNum,
       supplier_invoice_number: `KREDIT-${original.supplier_invoice_number}`,
@@ -96,7 +100,7 @@ export async function POST(
   const { data: settings } = await supabase
     .from('company_settings')
     .select('accounting_method')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   const accountingMethod = (settings?.accounting_method as AccountingMethod) || 'accrual'
@@ -108,6 +112,7 @@ export async function POST(
     try {
       const journalEntry = await createSupplierCreditNoteEntry(
         supabase,
+        companyId,
         user.id,
         creditNote as SupplierInvoice,
         creditItems as SupplierInvoiceItem[],
@@ -144,6 +149,7 @@ export async function POST(
       payload: {
         supplierInvoice: original as SupplierInvoice,
         creditNote: creditNote as SupplierInvoice,
+        companyId,
         userId: user.id,
       },
     })

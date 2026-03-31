@@ -57,14 +57,14 @@ export async function resolveUserFromEmail(
   recipientEmail: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   serviceClient: any
-): Promise<string | null> {
+): Promise<{ userId: string; companyId: string } | null> {
   // Extract the local part (before @) to handle address variants
   const normalizedEmail = recipientEmail.toLowerCase().trim()
 
   // Look up in extension_data where invoice-inbox settings store the inbox email
   const { data, error } = await serviceClient
     .from('extension_data')
-    .select('user_id, value')
+    .select('user_id, company_id, value')
     .eq('extension_id', 'invoice-inbox')
     .eq('key', 'settings')
 
@@ -75,7 +75,7 @@ export async function resolveUserFromEmail(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const settings = row.value as any
     if (settings?.inboxEmail && settings.inboxEmail.toLowerCase().trim() === normalizedEmail) {
-      return row.user_id
+      return { userId: row.user_id, companyId: row.company_id }
     }
   }
 

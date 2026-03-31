@@ -55,14 +55,20 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith('/register') ||
     pathname.startsWith('/auth') ||
     pathname.startsWith('/reset-password') ||
-    pathname.startsWith('/sandbox')
+    pathname.startsWith('/sandbox') ||
+    pathname.startsWith('/invite')
   ) {
     // If user is logged in and trying to access auth pages, redirect to dashboard or onboarding
     if (user) {
+      const companyId = await resolveCompanyForMiddleware(supabase, user.id, request)
+      if (!companyId) {
+        return NextResponse.redirect(new URL('/onboarding', request.url))
+      }
+
       const { data: settings } = await supabase
         .from('company_settings')
         .select('onboarding_complete')
-        .eq('user_id', user.id)
+        .eq('company_id', companyId)
         .single()
 
       if (!settings?.onboarding_complete) {
@@ -107,15 +113,58 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
+  // Company context resolution
+  const companyId = await resolveCompanyForMiddleware(supabase, user.id, request)
+
+  // No companies at all
+  if (!companyId) {
+    // Check if user is in a team (consultant without companies yet).
+    // Team members should reach the dashboard (which shows an empty state)
+    // rather than being forced through company onboarding.
+    const { data: teamMember } = await supabase
+      .from('team_members')
+      .select('id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .maybeSingle()
+
+    if (teamMember) {
+      // Consultant with a team but no companies — allow dashboard access
+      if (pathname.startsWith('/onboarding')) {
+        return NextResponse.redirect(new URL('/', request.url))
+      }
+      return supabaseResponse
+    }
+
+    // No team, no companies → redirect to onboarding
+    if (pathname.startsWith('/onboarding')) {
+      return supabaseResponse
+    }
+    return NextResponse.redirect(new URL('/onboarding', request.url))
+  }
+
+  // Set company cookie on the response so downstream requests have it
+  supabaseResponse.cookies.set('gnubok-company-id', companyId, {
+    path: '/',
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * 365,
+  })
+
+  // Select-company page — allow access (for switching companies)
+  if (pathname.startsWith('/select-company') || pathname.startsWith('/companies/new')) {
+    return supabaseResponse
+  }
+
   // Onboarding route - only accessible if not complete
   if (pathname.startsWith('/onboarding')) {
     const { data: settings } = await supabase
       .from('company_settings')
       .select('onboarding_complete')
-      .eq('user_id', user.id)
+      .eq('company_id', companyId)
       .single()
 
-    // If onboarding is complete, redirect to dashboard
     if (settings?.onboarding_complete) {
       return NextResponse.redirect(new URL('/', request.url))
     }
@@ -123,17 +172,69 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse
   }
 
-  // Dashboard routes - require completed onboarding
+  // Dashboard routes - require completed onboarding for active company
   const { data: settings } = await supabase
     .from('company_settings')
     .select('onboarding_complete')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
-  // If no settings or onboarding not complete, redirect to onboarding
   if (!settings?.onboarding_complete) {
     return NextResponse.redirect(new URL('/onboarding', request.url))
   }
 
   return supabaseResponse
+}
+
+/**
+ * Resolve the active company for the authenticated user.
+ * Uses cookie → user_preferences → first membership as fallback.
+ * Cannot use lib/company/context.ts because middleware runs on Edge.
+ */
+async function resolveCompanyForMiddleware(
+  supabase: ReturnType<typeof createServerClient>,
+  userId: string,
+  request: NextRequest
+): Promise<string | null> {
+  // 1. Try cookie
+  const cookieCompanyId = request.cookies.get('gnubok-company-id')?.value
+  if (cookieCompanyId) {
+    const { data: membership } = await supabase
+      .from('company_members')
+      .select('company_id')
+      .eq('company_id', cookieCompanyId)
+      .eq('user_id', userId)
+      .single()
+
+    if (membership) return membership.company_id
+  }
+
+  // 2. Try user_preferences
+  const { data: prefs } = await supabase
+    .from('user_preferences')
+    .select('active_company_id')
+    .eq('user_id', userId)
+    .single()
+
+  if (prefs?.active_company_id) {
+    const { data: membership } = await supabase
+      .from('company_members')
+      .select('company_id')
+      .eq('company_id', prefs.active_company_id)
+      .eq('user_id', userId)
+      .single()
+
+    if (membership) return membership.company_id
+  }
+
+  // 3. Fallback: first company membership
+  const { data: firstCompany } = await supabase
+    .from('company_members')
+    .select('company_id')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .single()
+
+  return firstCompany?.company_id ?? null
 }

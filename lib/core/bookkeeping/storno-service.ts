@@ -24,6 +24,7 @@ import { validateBalance, getNextVoucherNumber, getSwedishLocalDate } from '@/li
  */
 export async function correctEntry(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   originalEntryId: string,
   correctedLines: CreateJournalEntryLineInput[]
@@ -41,7 +42,7 @@ export async function correctEntry(
     .from('journal_entries')
     .select('*, lines:journal_entry_lines(*)')
     .eq('id', originalEntryId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (fetchError || !original) {
@@ -57,7 +58,7 @@ export async function correctEntry(
   // ===== Step 1: Create storno (reversal) entry =====
   const reversalVoucherNumber = await getNextVoucherNumber(
     supabase,
-    userId,
+    companyId,
     original.fiscal_period_id,
     original.voucher_series || 'A'
   )
@@ -65,6 +66,7 @@ export async function correctEntry(
   const { data: reversalEntry, error: reversalError } = await supabase
     .from('journal_entries')
     .insert({
+      company_id: companyId,
       user_id: userId,
       fiscal_period_id: original.fiscal_period_id,
       voucher_number: reversalVoucherNumber,
@@ -147,7 +149,7 @@ export async function correctEntry(
   try {
     const correctedVoucherNumber = await getNextVoucherNumber(
       supabase,
-      userId,
+      companyId,
       original.fiscal_period_id,
       original.voucher_series || 'A'
     )
@@ -157,7 +159,7 @@ export async function correctEntry(
     const { data: accounts } = await supabase
       .from('chart_of_accounts')
       .select('id, account_number')
-      .eq('user_id', userId)
+      .eq('company_id', companyId)
       .in('account_number', accountNumbers)
 
     const accountIdMap = new Map<string, string>()
@@ -168,6 +170,7 @@ export async function correctEntry(
     const { data: newEntry, error: correctedError } = await supabase
       .from('journal_entries')
       .insert({
+        company_id: companyId,
         user_id: userId,
         fiscal_period_id: original.fiscal_period_id,
         voucher_number: correctedVoucherNumber,
@@ -254,6 +257,7 @@ export async function correctEntry(
       original: original as JournalEntry,
       storno: result.reversal,
       corrected: result.corrected,
+      companyId,
       userId,
     },
   })

@@ -123,7 +123,7 @@ function round(value: number): number {
  */
 export async function calculateVatDeclaration(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   periodType: VatPeriodType,
   year: number,
   period: number,
@@ -143,10 +143,10 @@ export async function calculateVatDeclaration(
         account_number,
         debit_amount,
         credit_amount,
-        journal_entries!inner (user_id, entry_date, status)
+        journal_entries!inner (company_id, entry_date, status)
       `)
       .in('account_number', VAT_ACCOUNTS)
-      .eq('journal_entries.user_id', userId)
+      .eq('journal_entries.company_id', companyId)
       .in('journal_entries.status', ['posted', 'reversed'])
       .gte('journal_entries.entry_date', start)
       .lte('journal_entries.entry_date', end)
@@ -203,7 +203,7 @@ export async function calculateVatDeclaration(
   }
 
   // Calculate reverse charge purchase bases (ruta 20-24) from supplier invoices
-  const rcBases = await calculateReverseChargeBases(supabase, userId, start, end)
+  const rcBases = await calculateReverseChargeBases(supabase, companyId, start, end)
   rutor.ruta20 = rcBases.ruta20
   rutor.ruta21 = rcBases.ruta21
   rutor.ruta22 = rcBases.ruta22
@@ -214,7 +214,7 @@ export async function calculateVatDeclaration(
   const { data: entryCounts } = await supabase
     .from('journal_entries')
     .select('source_type')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .in('status', ['posted', 'reversed'])
     .gte('entry_date', start)
     .lte('entry_date', end)
@@ -279,7 +279,7 @@ export async function calculateVatDeclaration(
  */
 async function calculateReverseChargeBases(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   start: string,
   end: string,
 ): Promise<{ ruta20: number; ruta21: number; ruta22: number; ruta23: number; ruta24: number }> {
@@ -298,7 +298,7 @@ async function calculateReverseChargeBases(
     supabase
       .from('journal_entries')
       .select('id, source_id')
-      .eq('user_id', userId)
+      .eq('company_id', companyId)
       .in('source_type', supplierSourceTypes)
       .eq('status', 'posted')
       .gte('entry_date', start)
@@ -319,7 +319,7 @@ async function calculateReverseChargeBases(
       .select('id, supplier_id, reverse_charge, is_credit_note, subtotal_sek, subtotal, currency, exchange_rate, suppliers!inner(supplier_type)')
       .in('id', sourceIds)
       .eq('reverse_charge', true)
-      .eq('user_id', userId)
+      .eq('company_id', companyId)
       .range(from, to)
   )
 

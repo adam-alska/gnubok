@@ -32,6 +32,7 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
+import { useCompany } from '@/contexts/CompanyContext'
 import type { CompanySettings } from '@/types'
 import { validateBankgiroNumber, formatBankgiroNumber } from '@/lib/bankgiro/luhn'
 import { BankNameCombobox } from '@/components/settings/BankNameCombobox'
@@ -41,6 +42,8 @@ import { getSettingsPanel } from '@/lib/extensions/settings-panel-registry'
 import { SecuritySettings } from '@/components/settings/SecuritySettings'
 import { ApiKeysPanel } from '@/components/settings/ApiKeysPanel'
 import { CounterpartyTemplatesPanel } from '@/components/settings/CounterpartyTemplatesPanel'
+import { TeamPanel } from '@/components/settings/TeamPanel'
+import { CompanyMembersSection } from '@/components/settings/CompanyMembersSection'
 import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
 
 const BankingPanel = getSettingsPanel('enable-banking')
@@ -50,6 +53,7 @@ export default function SettingsPage() {
   const searchParams = useSearchParams()
   const { toast } = useToast()
   const supabase = createClient()
+  const { company, isTeamMember } = useCompany()
 
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -67,15 +71,18 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
-  const initialTab = searchParams.get('tab') || 'company'
+  const hasCompany = !!company
+  const defaultTab = hasCompany ? 'company' : (isTeamMember ? 'team' : 'account')
+  const initialTab = searchParams.get('tab') || defaultTab
   const [activeTab, setActiveTab] = useState(initialTab)
 
   const settingsTabs = [
-    { value: 'company', label: 'Företag', show: true },
-    { value: 'banking', label: 'Bank (PSD2)', show: !settings?.is_sandbox && hasBankingExtension },
-    { value: 'templates', label: 'Mallar', show: true },
+    { value: 'company', label: 'Företag', show: hasCompany },
+    { value: 'team', label: 'Lag', show: isTeamMember },
+    { value: 'banking', label: 'Bank (PSD2)', show: hasCompany && !settings?.is_sandbox && hasBankingExtension },
+    { value: 'templates', label: 'Mallar', show: hasCompany },
     { value: 'account', label: 'Konto', show: true },
-    { value: 'api', label: 'API', show: hasMcpExtension },
+    { value: 'api', label: 'API', show: hasCompany && hasMcpExtension },
   ].filter(t => t.show)
 
   useEffect(() => {
@@ -91,9 +98,10 @@ export default function SettingsPage() {
       return
     }
 
-    const settingsRes = await supabase.from('company_settings').select('*').eq('user_id', user.id).single()
-
-    setSettings(settingsRes.data)
+    if (company?.id) {
+      const settingsRes = await supabase.from('company_settings').select('*').eq('company_id', company.id).single()
+      setSettings(settingsRes.data)
+    }
 
     setIsLoading(false)
   }
@@ -625,6 +633,15 @@ export default function SettingsPage() {
               </Button>
             </div>
           </form>
+
+          <Separator className="my-8" />
+
+          <CompanyMembersSection />
+        </TabsContent>
+
+        {/* Team management */}
+        <TabsContent value="team">
+          <TeamPanel />
         </TabsContent>
 
         {/* Banking settings — loaded dynamically from extension, hidden for sandbox */}

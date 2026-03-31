@@ -41,7 +41,7 @@ describe('generateBalanceSheet', () => {
       isBalanced: true,
     })
 
-    const report = await generateBalanceSheet(supabase, 'user-1', 'period-1')
+    const report = await generateBalanceSheet(supabase, 'company-1', 'period-1')
 
     expect(report.asset_sections).toEqual([])
     expect(report.equity_liability_sections).toEqual([])
@@ -60,7 +60,7 @@ describe('generateBalanceSheet', () => {
       isBalanced: false,
     })
 
-    const report = await generateBalanceSheet(supabase, 'user-1', 'period-1')
+    const report = await generateBalanceSheet(supabase, 'company-1', 'period-1')
 
     expect(report.asset_sections).toHaveLength(2)
     expect(report.asset_sections[0].title).toBe('Kundfordringar')
@@ -81,7 +81,7 @@ describe('generateBalanceSheet', () => {
       isBalanced: false,
     })
 
-    const report = await generateBalanceSheet(supabase, 'user-1', 'period-1')
+    const report = await generateBalanceSheet(supabase, 'company-1', 'period-1')
 
     expect(report.equity_liability_sections).toHaveLength(2)
     expect(report.equity_liability_sections[0].title).toBe('Eget kapital')
@@ -102,7 +102,7 @@ describe('generateBalanceSheet', () => {
       isBalanced: false,
     })
 
-    const report = await generateBalanceSheet(supabase, 'user-1', 'period-1')
+    const report = await generateBalanceSheet(supabase, 'company-1', 'period-1')
 
     const bankSection = report.asset_sections.find(s => s.title === 'Kassa och bank')!
     expect(bankSection.rows).toHaveLength(1)
@@ -121,7 +121,7 @@ describe('generateBalanceSheet', () => {
       isBalanced: false,
     })
 
-    const report = await generateBalanceSheet(supabase, 'user-1', 'period-1')
+    const report = await generateBalanceSheet(supabase, 'company-1', 'period-1')
 
     expect(report.asset_sections).toHaveLength(1)
     expect(report.asset_sections[0].title).toBe('Kassa och bank')
@@ -138,7 +138,7 @@ describe('generateBalanceSheet', () => {
       isBalanced: false,
     })
 
-    const report = await generateBalanceSheet(supabase, 'user-1', 'period-1')
+    const report = await generateBalanceSheet(supabase, 'company-1', 'period-1')
 
     expect(report.asset_sections).toHaveLength(1)
     expect(report.asset_sections[0].title).toBe('Kundfordringar')
@@ -159,7 +159,7 @@ describe('generateBalanceSheet', () => {
       isBalanced: false,
     })
 
-    const report = await generateBalanceSheet(supabase, 'user-1', 'period-1')
+    const report = await generateBalanceSheet(supabase, 'company-1', 'period-1')
 
     expect(report.asset_sections).toHaveLength(1) // Only 1930
     // Class 3-8 accounts are not included as balance sheet rows, but their
@@ -184,7 +184,7 @@ describe('generateBalanceSheet', () => {
       isBalanced: false,
     })
 
-    const report = await generateBalanceSheet(supabase, 'user-1', 'period-1')
+    const report = await generateBalanceSheet(supabase, 'company-1', 'period-1')
 
     // All three are in group '19' (Kassa och bank)
     const section = report.asset_sections.find(s => s.title === 'Kassa och bank')!

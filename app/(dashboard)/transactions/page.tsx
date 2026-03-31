@@ -27,6 +27,7 @@ import { getDefaultAccountForCategory, getDefaultVatTreatmentForCategory } from 
 import { getTemplateById, type BookingTemplate } from '@/lib/bookkeeping/booking-templates'
 import { isCounterpartyTemplateId, extractCounterpartyId } from '@/lib/bookkeeping/counterparty-templates'
 import type { TransactionWithInvoice, ViewMode, CategorizeHandler } from '@/components/transactions/transaction-types'
+import { useCompany } from '@/contexts/CompanyContext'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { TransactionCategory, CreateTransactionInput, Invoice, Customer, VatTreatment, InvoiceInboxItem, EntityType, LinePatternEntry } from '@/types'
 import type { SuggestedCategory, SuggestedTemplate } from '@/lib/transactions/category-suggestions'
@@ -42,6 +43,7 @@ interface QuickReviewState {
 }
 
 export default function TransactionsPage() {
+  const { company } = useCompany()
   const [transactions, setTransactions] = useState<TransactionWithInvoice[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [mode, setMode] = useState<ViewMode>('inbox')
@@ -484,6 +486,7 @@ export default function TransactionsPage() {
     const { data: transaction, error } = await supabase
       .from('transactions')
       .insert({
+        company_id: company!.id,
         user_id: user.id,
         date: data.date,
         description: data.description,

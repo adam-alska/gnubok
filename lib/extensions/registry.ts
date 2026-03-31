@@ -7,6 +7,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 export type ContextFactory = (
   supabase: SupabaseClient,
   userId: string,
+  companyId: string,
   extensionId: string
 ) => ExtensionContext
 
@@ -52,14 +53,15 @@ class ExtensionRegistry {
     if (extension.eventHandlers) {
       for (const { eventType, handler } of extension.eventHandlers) {
         // Wrap handler to inject ExtensionContext as second argument
-        const wrappedHandler = async (payload: { userId: string; [key: string]: unknown }) => {
+        const wrappedHandler = async (payload: { userId: string; companyId?: string; [key: string]: unknown }) => {
           let ctx: ExtensionContext | undefined
           if (contextFactory && payload.userId) {
             try {
               // Dynamic import to avoid circular deps at module load time
               const { createClient } = await import('@/lib/supabase/server')
               const supabase = await createClient()
-              ctx = contextFactory(supabase, payload.userId, extension.id)
+              const companyId = payload.companyId ?? payload.userId // fallback for legacy events
+              ctx = contextFactory(supabase, payload.userId, companyId, extension.id)
             } catch {
               // Context creation failed (e.g. no request cookies in cron jobs).
               // Handler still gets called — ctx will be undefined.

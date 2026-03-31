@@ -4,6 +4,7 @@ import {
   previewCurrencyRevaluation,
   executeCurrencyRevaluation,
 } from '@/lib/bookkeeping/currency-revaluation'
+import { requireCompanyId } from '@/lib/company/context'
 
 /**
  * GET: Preview currency revaluation for a fiscal period
@@ -20,20 +21,22 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   try {
     // Fetch period to get closing date
     const { data: period, error: periodError } = await supabase
       .from('fiscal_periods')
       .select('*')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq('company_id', companyId)
       .single()
 
     if (periodError || !period) {
       return NextResponse.json({ error: 'Fiscal period not found' }, { status: 404 })
     }
 
-    const preview = await previewCurrencyRevaluation(supabase, user.id, period.period_end)
+    const preview = await previewCurrencyRevaluation(supabase, companyId, period.period_end)
     return NextResponse.json({ data: preview })
   } catch (err) {
     return NextResponse.json(
@@ -58,13 +61,15 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   try {
     // Fetch period to get closing date
     const { data: period, error: periodError } = await supabase
       .from('fiscal_periods')
       .select('*')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq('company_id', companyId)
       .single()
 
     if (periodError || !period) {
@@ -75,7 +80,7 @@ export async function POST(
       return NextResponse.json({ error: 'Period is already closed' }, { status: 400 })
     }
 
-    const result = await executeCurrencyRevaluation(supabase, user.id, period.period_end, id)
+    const result = await executeCurrencyRevaluation(supabase, companyId, period.period_end, id, user.id)
 
     if (!result) {
       return NextResponse.json({ data: null, message: 'No foreign currency items to revalue' })

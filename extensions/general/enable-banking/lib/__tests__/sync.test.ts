@@ -23,6 +23,7 @@ import { syncAccountTransactions } from '../sync'
 import type { StoredAccount } from '../../types'
 
 const USER_ID = 'user-1'
+const COMPANY_ID = 'company-1'
 const CONNECTION_ID = 'conn-1'
 
 function makeAccount(overrides: Partial<StoredAccount> = {}): StoredAccount {
@@ -66,6 +67,7 @@ describe('syncAccountTransactions', () => {
     const account = makeAccount()
     await syncAccountTransactions(
       {} as never,
+      COMPANY_ID,
       USER_ID,
       CONNECTION_ID,
       account,
@@ -78,12 +80,12 @@ describe('syncAccountTransactions', () => {
 
     // Verify filename pattern
     const firstCall = mockUploadDocument.mock.calls[0]
-    expect(firstCall[2].name).toMatch(/^psd2-response_conn-1_acc-uid-1_.*_p1\.json$/)
-    expect(firstCall[2].type).toBe('application/json')
-    expect(firstCall[3]).toEqual({ upload_source: 'api' })
+    expect(firstCall[3].name).toMatch(/^psd2-response_conn-1_acc-uid-1_.*_p1\.json$/)
+    expect(firstCall[3].type).toBe('application/json')
+    expect(firstCall[4]).toEqual({ upload_source: 'api' })
 
     const secondCall = mockUploadDocument.mock.calls[1]
-    expect(secondCall[2].name).toMatch(/^psd2-response_conn-1_acc-uid-1_.*_p2\.json$/)
+    expect(secondCall[3].name).toMatch(/^psd2-response_conn-1_acc-uid-1_.*_p2\.json$/)
   })
 
   it('completes sync even if uploadDocument throws', async () => {
@@ -108,6 +110,7 @@ describe('syncAccountTransactions', () => {
     const account = makeAccount()
     const result = await syncAccountTransactions(
       {} as never,
+      COMPANY_ID,
       USER_ID,
       CONNECTION_ID,
       account,
@@ -148,6 +151,7 @@ describe('syncAccountTransactions', () => {
     const account = makeAccount()
     await syncAccountTransactions(
       {} as never,
+      COMPANY_ID,
       USER_ID,
       CONNECTION_ID,
       account,
@@ -157,7 +161,7 @@ describe('syncAccountTransactions', () => {
     )
 
     expect(mockIngest).toHaveBeenCalledTimes(1)
-    const rawTxns = mockIngest.mock.calls[0][2]
+    const rawTxns = mockIngest.mock.calls[0][3]
     expect(rawTxns).toHaveLength(1)
     expect(rawTxns[0].external_id).toBe('conn-1_tx-500')
     expect(rawTxns[0].import_source).toBe('enable_banking')

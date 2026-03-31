@@ -142,12 +142,13 @@ export interface ExtensionStorage {
 
 /** Core services exposed to extensions */
 export interface ExtensionServices {
-  ingestTransactions(supabase: SupabaseClient, userId: string, raw: RawTransaction[], options?: IngestOptions): Promise<IngestResult>
+  ingestTransactions(supabase: SupabaseClient, companyId: string, userId: string, raw: RawTransaction[], options?: IngestOptions): Promise<IngestResult>
 }
 
 /** Context passed to extension lifecycle hooks and event handlers */
 export interface ExtensionContext {
   userId: string
+  companyId: string
   extensionId: string
   supabase: SupabaseClient
   emit(event: CoreEvent): Promise<void>

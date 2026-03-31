@@ -26,6 +26,7 @@ function makeBASAccount(number: string, name: string): BASAccount {
   return {
     id: `bas-${number}`,
     user_id: 'user-1',
+    company_id: 'company-1',
     account_number: number,
     account_name: name,
     account_class: classNum,

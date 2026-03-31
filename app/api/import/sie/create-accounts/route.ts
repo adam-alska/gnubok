@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireCompanyId } from '@/lib/company/context'
 import type { SIEAccount } from '@/lib/import/types'
 
 /**
@@ -63,6 +64,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   try {
     const body = await request.json()
     const accounts: SIEAccount[] = body.accounts
@@ -80,6 +83,7 @@ export async function POST(request: Request) {
 
       return {
         user_id: user.id,
+        company_id: companyId,
         account_number: account.number,
         account_name: account.name,
         account_class: accountClass,

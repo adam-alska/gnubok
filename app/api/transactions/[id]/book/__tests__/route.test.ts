@@ -18,6 +18,10 @@ vi.mock('@/lib/init', () => ({
   ensureInitialized: vi.fn(),
 }))
 
+vi.mock('@/lib/company/context', () => ({
+  requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
 const mockCreateJournalEntry = vi.fn()
 vi.mock('@/lib/bookkeeping/engine', () => ({
   createJournalEntry: (...args: unknown[]) => mockCreateJournalEntry(...args),
@@ -155,7 +159,7 @@ describe('POST /api/transactions/[id]/book', () => {
     expect(body.journal_entry_id).toBe('je-new')
     expect(body.data.id).toBe('je-new')
 
-    expect(mockCreateJournalEntry).toHaveBeenCalledWith(expect.anything(), 'user-1', {
+    expect(mockCreateJournalEntry).toHaveBeenCalledWith(expect.anything(), 'company-1', 'user-1', {
       fiscal_period_id: VALID_UUID,
       entry_date: '2025-01-15',
       description: 'Test booking',

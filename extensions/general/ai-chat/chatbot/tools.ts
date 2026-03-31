@@ -29,7 +29,7 @@ async function resolveCurrentPeriod(
       .from('fiscal_periods')
       .select('id, period_start, period_end')
       .eq('id', fiscalPeriodId)
-      .eq('user_id', userId)
+      .eq('company_id', userId)
       .single()
     if (data) return { id: data.id, start: data.period_start, end: data.period_end }
   }
@@ -38,7 +38,7 @@ async function resolveCurrentPeriod(
   const { data } = await supabase
     .from('fiscal_periods')
     .select('id, period_start, period_end, is_closed')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .order('period_start', { ascending: false })
     .limit(1)
     .single()
@@ -56,7 +56,7 @@ export function createAccountingTools(supabase: SupabaseClient, userId: string) 
       let query = supabase
         .from('invoices')
         .select('id, invoice_number, invoice_date, due_date, status, total, paid_amount, currency, vat_amount, customer:customers(name)')
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .order('invoice_date', { ascending: false })
         .limit(limit)
 
@@ -68,7 +68,7 @@ export function createAccountingTools(supabase: SupabaseClient, userId: string) 
       const { data: _data, error: _countError, count } = await supabase
         .from('invoices')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId)
+        .eq('company_id', userId)
 
       const { data: invoices, error: fetchError } = await query
 
@@ -111,7 +111,7 @@ export function createAccountingTools(supabase: SupabaseClient, userId: string) 
       let query = supabase
         .from('supplier_invoices')
         .select('id, supplier_invoice_number, invoice_date, due_date, status, total, remaining_amount, currency, vat_amount, supplier:suppliers(name)')
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .order('invoice_date', { ascending: false })
         .limit(limit)
 
@@ -198,7 +198,7 @@ export function createAccountingTools(supabase: SupabaseClient, userId: string) 
       let query = supabase
         .from('transactions')
         .select('id, date, description, amount, currency, category, is_business, merchant_name, journal_entry_id')
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .order('date', { ascending: false })
         .limit(limit)
 
@@ -245,7 +245,7 @@ export function createAccountingTools(supabase: SupabaseClient, userId: string) 
       let query = supabase
         .from('journal_entries')
         .select('id, voucher_number, entry_date, description, status, source_type')
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .eq('status', 'posted')
         .order('voucher_number', { ascending: false })
         .limit(limit)
@@ -404,7 +404,7 @@ export function createAccountingTools(supabase: SupabaseClient, userId: string) 
       const { data: settings } = await supabase
         .from('company_settings')
         .select('moms_period')
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .single()
 
       const periodType = settings?.moms_period || 'quarterly'
@@ -452,7 +452,7 @@ export function createAccountingTools(supabase: SupabaseClient, userId: string) 
       const { data: settings } = await supabase
         .from('company_settings')
         .select('*')
-        .eq('user_id', userId)
+        .eq('company_id', userId)
         .single()
 
       if (!settings) return 'Inga företagsinställningar hittades.'
@@ -466,10 +466,10 @@ export function createAccountingTools(supabase: SupabaseClient, userId: string) 
         { count: txCount },
         { count: unbookedCount },
       ] = await Promise.all([
-        supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('user_id', userId),
-        supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('user_id', userId).in('status', ['sent', 'overdue']),
-        supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('user_id', userId),
-        supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('user_id', userId).is('journal_entry_id', null),
+        supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('company_id', userId),
+        supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('company_id', userId).in('status', ['sent', 'overdue']),
+        supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('company_id', userId),
+        supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('company_id', userId).is('journal_entry_id', null),
       ])
 
       let netResult: number | null = null

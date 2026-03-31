@@ -34,7 +34,7 @@ describe('event-log-handler', () => {
 
     await eventBus.emit({
       type: 'invoice.created',
-      payload: { invoice, userId: 'user-1' },
+      payload: { invoice, userId: 'user-1', companyId: 'company-1' },
     })
 
     expect(mockInsert).toHaveBeenCalledTimes(1)
@@ -57,7 +57,7 @@ describe('event-log-handler', () => {
 
     await eventBus.emit({
       type: 'customer.created',
-      payload: { customer, userId: 'user-1' },
+      payload: { customer, userId: 'user-1', companyId: 'company-1' },
     })
 
     expect(mockInsert).toHaveBeenCalledTimes(1)
@@ -77,7 +77,7 @@ describe('event-log-handler', () => {
 
     await eventBus.emit({
       type: 'transaction.synced',
-      payload: { transactions: [tx1, tx2, tx3], userId: 'user-1' },
+      payload: { transactions: [tx1, tx2, tx3], userId: 'user-1', companyId: 'company-1' },
     })
 
     expect(mockInsert).toHaveBeenCalledTimes(1)
@@ -91,7 +91,7 @@ describe('event-log-handler', () => {
   it('does NOT persist journal_entry.drafted (excluded noise event)', async () => {
     await eventBus.emit({
       type: 'journal_entry.drafted',
-      payload: { entry: {} as unknown, userId: 'user-1' },
+      payload: { entry: {} as never, userId: 'user-1', companyId: 'company-1' },
     })
 
     expect(mockInsert).not.toHaveBeenCalled()
@@ -100,7 +100,7 @@ describe('event-log-handler', () => {
   it('does NOT persist receipt.extracted (excluded noise event)', async () => {
     await eventBus.emit({
       type: 'receipt.extracted',
-      payload: { receipt: {} as unknown, documentId: null, confidence: 0.9, userId: 'user-1' },
+      payload: { receipt: {} as never, documentId: null, confidence: 0.9, userId: 'user-1', companyId: 'company-1' },
     })
 
     expect(mockInsert).not.toHaveBeenCalled()
@@ -109,7 +109,7 @@ describe('event-log-handler', () => {
   it('does NOT persist supplier_invoice.received (excluded noise event)', async () => {
     await eventBus.emit({
       type: 'supplier_invoice.received',
-      payload: { inboxItem: {} as unknown, userId: 'user-1' },
+      payload: { inboxItem: {} as never, userId: 'user-1', companyId: 'company-1' },
     })
 
     expect(mockInsert).not.toHaveBeenCalled()
@@ -118,7 +118,7 @@ describe('event-log-handler', () => {
   it('does NOT persist supplier_invoice.extracted (excluded noise event)', async () => {
     await eventBus.emit({
       type: 'supplier_invoice.extracted',
-      payload: { inboxItem: {} as unknown, confidence: 0.9, userId: 'user-1' },
+      payload: { inboxItem: {} as never, confidence: 0.9, userId: 'user-1', companyId: 'company-1' },
     })
 
     expect(mockInsert).not.toHaveBeenCalled()
@@ -130,7 +130,7 @@ describe('event-log-handler', () => {
     // Should not throw
     await eventBus.emit({
       type: 'customer.created',
-      payload: { customer: makeCustomer(), userId: 'user-1' },
+      payload: { customer: makeCustomer(), userId: 'user-1', companyId: 'company-1' },
     })
 
     expect(mockInsert).toHaveBeenCalledTimes(1)
@@ -141,7 +141,7 @@ describe('event-log-handler', () => {
 
     await eventBus.emit({
       type: 'period.locked',
-      payload: { period, userId: 'user-1' },
+      payload: { period, userId: 'user-1', companyId: 'company-1' },
     })
 
     expect(mockInsert).toHaveBeenCalledWith(

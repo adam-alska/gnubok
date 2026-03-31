@@ -154,7 +154,7 @@ export async function updateDeadlineStatuses(
 export async function updateDeadlineStatus(
   supabase: SupabaseClient,
   deadlineId: string,
-  userId: string,
+  companyId: string,
   newStatus: DeadlineStatus
 ): Promise<{ success: boolean; error?: string }> {
   // Fetch current deadline
@@ -162,7 +162,7 @@ export async function updateDeadlineStatus(
     .from('deadlines')
     .select('status, is_completed')
     .eq('id', deadlineId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (fetchError || !deadline) {
@@ -193,7 +193,7 @@ export async function updateDeadlineStatus(
     .from('deadlines')
     .update(updates)
     .eq('id', deadlineId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
 
   if (updateError) {
     return { success: false, error: updateError.message }
@@ -207,7 +207,7 @@ export async function updateDeadlineStatus(
  */
 export async function getDeadlinesNeedingAttention(
   supabase: SupabaseClient,
-  userId: string
+  companyId: string
 ): Promise<{
   actionNeeded: Array<{ id: string; title: string; due_date: string; tax_deadline_type: string | null }>
   overdue: Array<{ id: string; title: string; due_date: string; tax_deadline_type: string | null }>
@@ -215,7 +215,7 @@ export async function getDeadlinesNeedingAttention(
   const { data: deadlines, error } = await supabase
     .from('deadlines')
     .select('id, title, due_date, tax_deadline_type, status')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .eq('is_completed', false)
     .in('status', ['action_needed', 'overdue'])
     .order('due_date', { ascending: true })

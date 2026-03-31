@@ -15,6 +15,10 @@ vi.mock('@/lib/init', () => ({
   ensureInitialized: vi.fn(),
 }))
 
+vi.mock('@/lib/company/context', () => ({
+  requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
 const mockCorrectEntry = vi.fn()
 vi.mock('@/lib/core/bookkeeping/storno-service', () => ({
   correctEntry: (...args: unknown[]) => mockCorrectEntry(...args),
@@ -100,7 +104,7 @@ describe('POST /api/bookkeeping/journal-entries/[id]/correct', () => {
     expect(status).toBe(200)
     expect(body.data.reversal).toEqual(reversal)
     expect(body.data.corrected).toEqual(corrected)
-    expect(mockCorrectEntry).toHaveBeenCalledWith(expect.anything(), 'user-1', 'entry-1', lines)
+    expect(mockCorrectEntry).toHaveBeenCalledWith(expect.anything(), 'company-1', 'user-1', 'entry-1', lines)
   })
 
   it('returns 400 when correctEntry throws for unbalanced lines', async () => {

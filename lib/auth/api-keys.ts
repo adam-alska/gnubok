@@ -117,7 +117,7 @@ export function extractBearerToken(request: Request): string | null {
  */
 export async function validateApiKey(
   key: string
-): Promise<{ userId: string; scopes: ApiKeyScope[] } | { error: string; status: number }> {
+): Promise<{ userId: string; companyId: string; scopes: ApiKeyScope[] } | { error: string; status: number }> {
   if (!key.startsWith(KEY_PREFIX)) {
     return { error: 'Invalid API key format', status: 401 }
   }
@@ -141,6 +141,7 @@ export async function validateApiKey(
 
   return {
     userId: row.user_id,
+    companyId: row.company_id,
     scopes: validateScopes(row.scopes) ?? DEFAULT_SCOPES,
   }
 }

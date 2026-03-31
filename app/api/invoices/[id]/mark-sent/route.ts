@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { createInvoiceJournalEntry } from '@/lib/bookkeeping/invoice-entries'
 import { ensureInitialized } from '@/lib/init'
+import { requireCompanyId } from '@/lib/company/context'
 import type { EntityType, Invoice } from '@/types'
 
 ensureInitialized()
@@ -26,12 +27,14 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Fetch invoice
   const { data: invoice, error: invoiceError } = await supabase
     .from('invoices')
     .select('*, customer:customers(*), items:invoice_items(*)')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (invoiceError || !invoice) {
@@ -50,7 +53,7 @@ export async function POST(
     .from('invoices')
     .update({ status: 'sent' })
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
 
   if (updateError) {
     return NextResponse.json({ error: 'Kunde inte uppdatera status' }, { status: 500 })
@@ -60,7 +63,7 @@ export async function POST(
   const { data: settings } = await supabase
     .from('company_settings')
     .select('accounting_method, entity_type')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   const accountingMethod = settings?.accounting_method || 'accrual'
@@ -72,6 +75,7 @@ export async function POST(
     try {
       const journalEntry = await createInvoiceJournalEntry(
         supabase,
+        companyId,
         user.id,
         invoice as Invoice,
         (settings?.entity_type as EntityType) || 'enskild_firma',

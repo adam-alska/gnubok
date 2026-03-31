@@ -16,7 +16,7 @@ interface PaymentCalendarProps {
   invoices: Invoice[]
   deadlines: Deadline[]
   customers: { id: string; name: string }[]
-  onDeadlineCreate: (data: Omit<Deadline, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>
+  onDeadlineCreate: (data: Omit<Deadline, 'id' | 'user_id' | 'company_id' | 'created_at' | 'updated_at'>) => Promise<void>
   onDeadlineToggle: (deadline: Deadline) => Promise<void>
 }
 
@@ -125,7 +125,7 @@ export function PaymentCalendar({
     setDeadlineFormDate(null)
   }, [])
 
-  const handleDeadlineSubmit = useCallback(async (data: Omit<Deadline, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+  const handleDeadlineSubmit = useCallback(async (data: Omit<Deadline, 'id' | 'user_id' | 'company_id' | 'created_at' | 'updated_at'>) => {
     await onDeadlineCreate(data)
     handleDeadlineFormClose()
   }, [onDeadlineCreate])

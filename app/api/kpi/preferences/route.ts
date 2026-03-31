@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { mergeWithDefaults } from '@/lib/reports/kpi-definitions'
+import { requireCompanyId } from '@/lib/company/context'
 import type { KPIPreferences } from '@/types'
 
 const EXTENSION_ID = 'core/kpi'
@@ -11,10 +12,12 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { data } = await supabase
     .from('extension_data')
     .select('value')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .eq('extension_id', EXTENSION_ID)
     .eq('key', KEY)
     .single()
@@ -27,6 +30,8 @@ export async function PUT(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   let body: unknown
   try {
@@ -64,6 +69,7 @@ export async function PUT(request: Request) {
     .upsert(
       {
         user_id: user.id,
+        company_id: companyId,
         extension_id: EXTENSION_ID,
         key: KEY,
         value: merged,

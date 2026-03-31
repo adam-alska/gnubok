@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { closePeriod } from '@/lib/core/bookkeeping/period-service'
+import { requireCompanyId } from '@/lib/company/context'
 
 export async function POST(
   request: Request,
@@ -14,8 +15,10 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   try {
-    const period = await closePeriod(supabase, user.id, id)
+    const period = await closePeriod(supabase, companyId, user.id, id)
     return NextResponse.json({ data: period })
   } catch (err) {
     return NextResponse.json(

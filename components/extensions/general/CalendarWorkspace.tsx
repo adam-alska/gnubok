@@ -59,7 +59,7 @@ export default function CalendarWorkspace({ userId }: WorkspaceComponentProps) {
   }, [fetchData])
 
   const handleDeadlineCreate = async (
-    data: Omit<Deadline, 'id' | 'user_id' | 'created_at' | 'updated_at'>
+    data: Omit<Deadline, 'id' | 'user_id' | 'company_id' | 'created_at' | 'updated_at'>
   ) => {
     try {
       const { error } = await supabase.from('deadlines').insert([data])

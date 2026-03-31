@@ -6,6 +6,7 @@ import { DescribeTransactionSchema } from '@/lib/api/schemas'
 import { extensionRegistry } from '@/lib/extensions/registry'
 import { findMatchingTemplates, type TemplateMatch } from '@/lib/bookkeeping/booking-templates'
 import { findCounterpartyTemplate, buildMappingResultFromCounterpartyTemplate, formatCounterpartyName } from '@/lib/bookkeeping/counterparty-templates'
+import { requireCompanyId } from '@/lib/company/context'
 import type { Transaction, EntityType, VatTreatment } from '@/types'
 import type { Extension } from '@/lib/extensions/types'
 
@@ -82,6 +83,8 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const validation = await validateBody(request, DescribeTransactionSchema)
   if (!validation.success) return validation.response
   const { description } = validation.data
@@ -91,7 +94,7 @@ export async function POST(
     .from('transactions')
     .select('*')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (fetchError || !transaction) {
@@ -102,7 +105,7 @@ export async function POST(
   const { data: settings } = await supabase
     .from('company_settings')
     .select('entity_type')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   const entityType: EntityType = (settings?.entity_type as EntityType) || 'enskild_firma'
@@ -155,7 +158,7 @@ export async function POST(
     const { count } = await supabase
       .from('transactions')
       .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
+      .eq('company_id', companyId)
       .eq('merchant_name', transaction.merchant_name)
       .is('journal_entry_id', null)
       .neq('id', id)

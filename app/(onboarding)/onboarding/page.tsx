@@ -6,22 +6,36 @@ import Image from 'next/image'
 import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/use-toast'
-import { Loader2 } from 'lucide-react'
+import { Loader2, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { validatePeriodDuration } from '@/lib/bookkeeping/validate-period-duration'
 import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
 import type { CompanyLookupResult } from '@/lib/company-lookup/types'
 import type { CompanySettings, EntityType, MomsPeriod } from '@/types'
 
+import Step0RoleChoice from '@/components/onboarding/Step0RoleChoice'
 import Step1EntityType from '@/components/onboarding/Step1EntityType'
 import Step2CompanyDetails from '@/components/onboarding/Step2CompanyDetails'
 import Step3TaxRegistration from '@/components/onboarding/Step3TaxRegistration'
 import Step4VatAccounting from '@/components/onboarding/Step4VatAccounting'
+
+type OnboardingMode = 'choice' | 'self' | 'consultant'
+
 const STEP_INFO = [
   { title: 'Välkommen', subtitle: 'Välj din företagsform för att komma igång.', label: 'Företagsform' },
   { title: 'Ditt företag', subtitle: 'Uppgifterna visas på fakturor och dokument.', label: 'Uppgifter' },
   { title: 'F-skatt & räkenskapsår', subtitle: 'Ange din skatteregistrering och räkenskapsår.', label: 'Skatt' },
   { title: 'Moms & bokföring', subtitle: 'Momsregistrering och bokföringsmetod.', label: 'Moms' },
+]
+
+const STEP_INFO_CONSULTANT = [
+  { title: 'Kundföretag', subtitle: 'Välj din kunds företagsform.', label: 'Företagsform' },
+  { title: 'Kundföretag', subtitle: 'Uppgifterna visas på fakturor och dokument.', label: 'Uppgifter' },
+  { title: 'F-skatt & räkenskapsår', subtitle: 'Din kunds skatteregistrering och räkenskapsår.', label: 'Skatt' },
+  { title: 'Moms & bokföring', subtitle: 'Din kunds momsregistrering och bokföringsmetod.', label: 'Moms' },
 ]
 
 function translatePeriodError(msg: string): string {
@@ -72,8 +86,12 @@ function OnboardingPageContent() {
   const [isSaving, setIsSaving] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
   const [settings, setSettings] = useState<Partial<CompanySettings>>({})
+  const [companyId, setCompanyId] = useState<string | null>(null)
   const ticEnabled = ENABLED_EXTENSION_IDS.has('tic')
   const [ticLookup, setTicLookup] = useState<CompanyLookupResult | null>(null)
+  const [mode, setMode] = useState<OnboardingMode>('choice')
+  const [consultantLanding, setConsultantLanding] = useState(false)
+  const [teamName, setTeamName] = useState('')
 
   const totalSteps = 4
 
@@ -102,26 +120,95 @@ function OnboardingPageContent() {
         return
       }
 
-      const { data, error } = await supabase
-        .from('company_settings')
-        .select('*')
-        .eq('user_id', user.id)
-        .single()
+      // Check for unprocessed invite token (fallback if auth callback didn't process it)
+      const cookieMatch = document.cookie.match(/gnubok-invite-token=([^;]+)/)
+      const inviteToken = cookieMatch?.[1]
 
-      if (error && error.code !== 'PGRST116') {
-        logError('failed to load settings', { message: error.message, code: error.code })
+      if (inviteToken) {
+        try {
+          const res = await fetch('/api/team/accept', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: inviteToken }),
+          })
+
+          if (res.ok) {
+            // Clear the cookie
+            document.cookie = 'gnubok-invite-token=; path=/; max-age=0'
+            console.log(LOG, 'invite accepted via fallback — redirecting to dashboard')
+            router.push('/')
+            return
+          }
+
+          // Log the failure to help diagnose
+          const errBody = await res.json().catch(() => ({}))
+          console.error(LOG, 'fallback invite acceptance returned non-ok', {
+            status: res.status,
+            error: errBody.error,
+          })
+        } catch (err) {
+          console.error(LOG, 'fallback invite acceptance failed:', err)
+        }
+        // Clear cookie regardless to avoid retry loops
+        document.cookie = 'gnubok-invite-token=; path=/; max-age=0'
       }
 
-      if (data) {
-        const step = data.onboarding_step || 1
-        const clampedStep = step > totalSteps ? totalSteps : step
-        if (step > totalSteps) {
-          logError('onboarding_step exceeds totalSteps — clamped', { step, totalSteps })
+      // Check if user is already in a team (consultant) — skip onboarding
+      const { data: teamMember } = await supabase
+        .from('team_members')
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle()
+
+      if (teamMember) {
+        console.log(LOG, 'user already in a team — redirecting to dashboard')
+        window.location.href = '/'
+        return
+      }
+
+      // Check if user already has a company via company_members
+      const { data: membership } = await supabase
+        .from('company_members')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single()
+
+      if (membership?.company_id) {
+        const { data, error } = await supabase
+          .from('company_settings')
+          .select('*')
+          .eq('company_id', membership.company_id)
+          .single()
+
+        if (error && error.code !== 'PGRST116') {
+          logError('failed to load settings', { message: error.message, code: error.code })
         }
-        // Important milestone: where we resume
-        console.log(LOG, 'resuming at step', clampedStep, { entity_type: data.entity_type })
-        setSettings(data)
-        setCurrentStep(clampedStep)
+
+        // If this company is already onboarded (invited user joining existing company),
+        // skip onboarding entirely and go to dashboard
+        if (data?.onboarding_complete) {
+          console.log(LOG, 'company already onboarded — redirecting to dashboard')
+          router.push('/')
+          return
+        }
+
+        setCompanyId(membership.company_id)
+        setMode('self') // Resuming — skip role choice
+
+        if (data) {
+          const step = data.onboarding_step || 1
+          const clampedStep = step > totalSteps ? totalSteps : step
+          if (step > totalSteps) {
+            logError('onboarding_step exceeds totalSteps — clamped', { step, totalSteps })
+          }
+          // Important milestone: where we resume
+          console.log(LOG, 'resuming at step', clampedStep, { entity_type: data.entity_type })
+          setSettings(data)
+          setCurrentStep(clampedStep)
+        }
       }
 
       setIsLoading(false)
@@ -153,16 +240,21 @@ function OnboardingPageContent() {
         onboarding_step: targetStep,
       }
 
+      if (!companyId) {
+        logError('save aborted: no companyId', { step: targetStep })
+        return false
+      }
+
       // Remove read-only and transient fields before updating
       const {
-        id: _id, user_id: _uid, created_at: _ca, updated_at: _ua,
+        id: _id, user_id: _uid, company_id: _cid, created_at: _ca, updated_at: _ua,
         is_first_fiscal_year: _ify, first_year_start: _fys, first_year_end: _fye,
         ...settingsToSave
       } = updatedSettings as Record<string, unknown>
 
       const { error } = await supabase
         .from('company_settings')
-        .upsert({ ...settingsToSave, user_id: user.id }, { onConflict: 'user_id' })
+        .upsert({ ...settingsToSave, company_id: companyId }, { onConflict: 'company_id' })
 
       if (error) {
         logError('save failed', { message: error.message, step: targetStep, code: error.code, details: error.details })
@@ -199,36 +291,121 @@ function OnboardingPageContent() {
       setTicLookup(null)
     }
 
+    // Step 1: Create company + membership + user_preferences if no companyId yet
+    let activeCompanyId = companyId
+
+    if (currentStep === 1 && !activeCompanyId) {
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (authError) {
+          logError('auth.getUser() failed before company creation', { message: authError.message })
+        }
+        if (!user) {
+          logError('company creation skipped: no user')
+          router.push('/login')
+          return
+        }
+
+        // Atomically create company + owner membership + set active
+        const { data: newCompanyId, error: rpcError } = await supabase.rpc('create_company_with_owner', {
+          p_name: 'Mitt företag',
+          p_entity_type: stepData.entity_type,
+        })
+
+        if (rpcError || !newCompanyId) {
+          logError('company creation failed', { message: rpcError?.message, code: rpcError?.code })
+          toast({ title: 'Fel', description: 'Kunde inte skapa företag. Försök igen.', variant: 'destructive' })
+          return
+        }
+
+        activeCompanyId = newCompanyId
+        setCompanyId(activeCompanyId)
+        console.log(LOG, 'created company', activeCompanyId)
+      } catch (err) {
+        logError('company creation threw', { error: String(err) })
+        Sentry.captureException(err)
+        toast({ title: 'Fel', description: 'Kunde inte skapa företag. Försök igen.', variant: 'destructive' })
+        return
+      }
+    }
+
+    if (!activeCompanyId) {
+      logError('handleNext aborted: no companyId', { step: currentStep })
+      return
+    }
+
     const nextStep = currentStep + 1
-    const success = await saveSettings(stepData, nextStep)
+
+    // For step 1, companyId state may not be updated yet (React batching).
+    // Save settings directly with activeCompanyId to avoid the race condition.
+    const needsDirectSave = currentStep === 1 && !companyId
+    const success = needsDirectSave
+      ? await (async () => {
+          setIsSaving(true)
+          try {
+            const updatedSettings = { ...settings, ...stepData, onboarding_step: nextStep }
+            const {
+              id: _id, user_id: _uid, company_id: _cid, created_at: _ca, updated_at: _ua,
+              is_first_fiscal_year: _ify, first_year_start: _fys, first_year_end: _fye,
+              ...settingsToSave
+            } = updatedSettings as Record<string, unknown>
+
+            const { error } = await supabase
+              .from('company_settings')
+              .upsert({ ...settingsToSave, company_id: activeCompanyId }, { onConflict: 'company_id' })
+
+            if (error) {
+              logError('save failed', { message: error.message, step: nextStep, code: error.code })
+              toast({ title: 'Fel', description: error.message || 'Kunde inte spara. Försök igen.', variant: 'destructive' })
+              return false
+            }
+
+            setSettings(updatedSettings)
+            return true
+          } catch (err) {
+            logError('saveSettings threw', { message: String(err), step: nextStep })
+            Sentry.captureException(err)
+            return false
+          } finally {
+            setIsSaving(false)
+          }
+        })()
+      : await saveSettings(stepData, nextStep)
 
     if (!success) {
       logError('handleNext aborted: saveSettings failed', { step: currentStep })
       return
     }
 
+    // After step 2 (company details): sync company name to companies table
+    if (currentStep === 2 && stepData.company_name && activeCompanyId) {
+      const { error: nameError } = await supabase
+        .from('companies')
+        .update({ name: stepData.company_name })
+        .eq('id', activeCompanyId)
+
+      if (nameError) {
+        logError('failed to sync company name to companies table', {
+          message: nameError.message,
+          code: nameError.code,
+        })
+      }
+    }
+
     // After step 1 (entity type selection): seed chart of accounts
     if (currentStep === 1 && stepData.entity_type) {
       try {
-        const { data: { user }, error: authError } = await supabase.auth.getUser()
-        if (authError) {
-          logError('auth.getUser() failed before seeding chart of accounts', { message: authError.message })
-        }
-        if (user) {
-          const { error: rpcError } = await supabase.rpc('seed_chart_of_accounts', {
-            p_user_id: user.id,
-            p_entity_type: stepData.entity_type,
+        const { error: rpcError } = await supabase.rpc('seed_chart_of_accounts', {
+          p_company_id: activeCompanyId,
+          p_entity_type: stepData.entity_type,
+        })
+        if (rpcError) {
+          logError('chart of accounts seeding failed', {
+            entity_type: stepData.entity_type,
+            message: rpcError.message,
+            code: rpcError.code,
+            details: rpcError.details,
           })
-          if (rpcError) {
-            logError('chart of accounts seeding failed', {
-              entity_type: stepData.entity_type,
-              message: rpcError.message,
-              code: rpcError.code,
-              details: rpcError.details,
-            })
-          }
-        } else {
-          logError('chart of accounts seeding skipped: no user')
         }
       } catch (err) {
         logError('chart of accounts seeding threw', { error: String(err) })
@@ -237,15 +414,8 @@ function OnboardingPageContent() {
     }
 
     // After step 3 (tax registration): create initial fiscal period
-    if (currentStep === 3) {
+    if (currentStep === 3 && companyId) {
       try {
-        const { data: { user }, error: authError } = await supabase.auth.getUser()
-        if (authError) {
-          logError('auth.getUser() failed before fiscal period creation', { message: authError.message })
-        }
-        if (!user) {
-          logError('fiscal period creation skipped: no user')
-        } else {
           const isFirstYear = stepData.is_first_fiscal_year as boolean | undefined
           const firstYearStart = stepData.first_year_start as string | undefined
           const firstYearEnd = stepData.first_year_end as string | undefined
@@ -314,7 +484,7 @@ function OnboardingPageContent() {
           const { data: existingPeriods, error: fetchPeriodsError } = await supabase
             .from('fiscal_periods')
             .select('id')
-            .eq('user_id', user.id)
+            .eq('company_id', companyId)
 
           if (fetchPeriodsError) {
             logError('failed to fetch existing fiscal periods', {
@@ -348,12 +518,12 @@ function OnboardingPageContent() {
           }
 
           const { error: upsertError } = await supabase.from('fiscal_periods').upsert({
-            user_id: user.id,
+            company_id: companyId,
             name: periodName,
             period_start: startStr,
             period_end: endStr,
           }, {
-            onConflict: 'user_id,period_start,period_end',
+            onConflict: 'company_id,period_start,period_end',
           })
 
           if (upsertError) {
@@ -361,7 +531,6 @@ function OnboardingPageContent() {
               message: upsertError.message, startStr, endStr, code: upsertError.code, details: upsertError.details,
             })
           }
-        }
       } catch (err) {
         logError('fiscal period creation threw', { error: String(err) })
         Sentry.captureException(err)
@@ -394,6 +563,8 @@ function OnboardingPageContent() {
   const handleBack = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1)
+    } else if (isConsultant) {
+      setConsultantLanding(true)
     }
   }
 
@@ -408,6 +579,46 @@ function OnboardingPageContent() {
     setCurrentStep(nextStep)
   }
 
+  const handleConsultantCreateTeam = async () => {
+    if (!teamName.trim()) {
+      toast({ title: 'Ange ett namn', description: 'Ditt team behöver ett namn.', variant: 'destructive' })
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
+      }
+
+      const { data: newTeamId, error: teamError } = await supabase.rpc('create_team_with_owner', {
+        p_name: teamName.trim(),
+      })
+
+      if (teamError || !newTeamId) {
+        logError('consultant team creation failed', { message: teamError?.message })
+        toast({ title: 'Fel', description: 'Kunde inte skapa team. Försök igen.', variant: 'destructive' })
+        return
+      }
+
+      console.log(LOG, 'created team', newTeamId)
+      toast({
+        title: 'Välkommen!',
+        description: 'Lägg till ditt första kundföretag för att komma igång.',
+      })
+      // Hard navigation to exit the (onboarding) route group and trigger middleware
+      window.location.href = '/'
+    } catch (err) {
+      logError('consultant team creation threw', { error: String(err) })
+      Sentry.captureException(err)
+      toast({ title: 'Fel', description: 'Ett oväntat fel uppstod. Försök igen.', variant: 'destructive' })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -416,7 +627,11 @@ function OnboardingPageContent() {
     )
   }
 
-  const stepInfo = STEP_INFO[currentStep - 1]
+  const isConsultant = mode === 'consultant'
+  const stepInfoArr = isConsultant ? STEP_INFO_CONSULTANT : STEP_INFO
+  const stepInfo = stepInfoArr[currentStep - 1]
+  const showRoleChoice = mode === 'choice'
+  const showConsultantLanding = isConsultant && consultantLanding
 
   const renderSteps = () => (
     <>
@@ -475,10 +690,150 @@ function OnboardingPageContent() {
           isSaving={isSaving}
         />
       )}
-
     </>
   )
 
+  // ── Role Choice Screen (Step 0) ──
+  if (showRoleChoice) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <header className="relative bg-[#141414] text-white overflow-hidden">
+          <div className="absolute inset-0 pointer-events-none" aria-hidden>
+            <div
+              className="absolute inset-0"
+              style={{
+                background: 'radial-gradient(ellipse at 30% -20%, rgba(255,255,255,0.04) 0%, transparent 50%)',
+              }}
+            />
+          </div>
+          <div className="relative z-10 max-w-2xl mx-auto w-full px-6 md:px-10 pt-5 pb-6 md:pt-6 md:pb-8">
+            <div className="flex items-center gap-2.5 mb-5 md:mb-6">
+              <Image
+                src="/gnubokiceon-removebg-preview.png"
+                alt="Gnubok"
+                width={30}
+                height={30}
+                className="invert opacity-90"
+              />
+              <span className="font-display text-base tracking-tight">gnubok</span>
+            </div>
+            <div className="animate-fade-in">
+              <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight leading-[1.1]">
+                Välkommen till gnubok
+              </h1>
+              <p className="text-white/40 mt-1.5 text-sm max-w-sm leading-relaxed">
+                Hur vill du använda gnubok?
+              </p>
+            </div>
+          </div>
+        </header>
+        <main className="flex-1">
+          <div className="max-w-lg mx-auto px-6 md:px-10 py-6 md:py-8">
+            <div className="animate-slide-up">
+              <Step0RoleChoice
+                onChooseSelf={() => setMode('self')}
+                onChooseConsultant={() => {
+                  setMode('consultant')
+                  setConsultantLanding(true)
+                }}
+              />
+            </div>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  // ── Consultant Landing Screen ──
+  if (showConsultantLanding) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <header className="relative bg-[#141414] text-white overflow-hidden">
+          <div className="absolute inset-0 pointer-events-none" aria-hidden>
+            <div
+              className="absolute inset-0"
+              style={{
+                background: 'radial-gradient(ellipse at 30% -20%, rgba(255,255,255,0.04) 0%, transparent 50%)',
+              }}
+            />
+          </div>
+          <div className="relative z-10 max-w-2xl mx-auto w-full px-6 md:px-10 pt-5 pb-6 md:pt-6 md:pb-8">
+            <div className="flex items-center gap-2.5 mb-5 md:mb-6">
+              <Image
+                src="/gnubokiceon-removebg-preview.png"
+                alt="Gnubok"
+                width={30}
+                height={30}
+                className="invert opacity-90"
+              />
+              <span className="font-display text-base tracking-tight">gnubok</span>
+            </div>
+            <div className="animate-fade-in">
+              <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight leading-[1.1]">
+                Namnge ditt team
+              </h1>
+              <p className="text-white/40 mt-1.5 text-sm max-w-sm leading-relaxed">
+                Skapa ett team som samlar dig och dina kollegor.
+              </p>
+            </div>
+          </div>
+        </header>
+        <main className="flex-1">
+          <div className="max-w-lg mx-auto px-6 md:px-10 py-6 md:py-8">
+            <div className="animate-slide-up space-y-5">
+              <div className="rounded-xl border bg-card p-6 space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="team-name">Teamnamn</Label>
+                  <Input
+                    id="team-name"
+                    placeholder="T.ex. Redovisningsbyrån AB"
+                    value={teamName}
+                    onChange={(e) => setTeamName(e.target.value)}
+                    disabled={isSaving}
+                    className="h-11"
+                    autoFocus
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Du kan ändra namnet senare i inställningar.
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                size="lg"
+                className="w-full"
+                onClick={handleConsultantCreateTeam}
+                disabled={isSaving || !teamName.trim()}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Skapar team...
+                  </>
+                ) : (
+                  <>
+                    Skapa team
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+              <button
+                onClick={() => {
+                  setMode('choice')
+                  setConsultantLanding(false)
+                }}
+                className="block mx-auto text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+              >
+                Tillbaka
+              </button>
+            </div>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  // ── Steps 1–4 (self or consultant adding company) ──
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* ── Branded Header ── */}
@@ -511,7 +866,7 @@ function OnboardingPageContent() {
             </div>
             {/* Step indicator — inline with logo row */}
             <div className="flex items-center gap-1.5">
-              {STEP_INFO.map((_, i) => {
+              {stepInfoArr.map((_, i) => {
                 const num = i + 1
                 return (
                   <div

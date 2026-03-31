@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { validateQuery } from '@/lib/api/validate'
 import { PendingOperationsQuerySchema } from '@/lib/api/schemas'
+import { requireCompanyId } from '@/lib/company/context'
 
 /**
  * GET /api/pending-operations
@@ -16,6 +17,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const result = validateQuery(request, PendingOperationsQuerySchema)
   if (!result.success) return result.response
   const { status, limit, offset } = result.data
@@ -23,7 +26,7 @@ export async function GET(request: Request) {
   const { data, error, count } = await supabase
     .from('pending_operations')
     .select('*', { count: 'exact' })
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .eq('status', status)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { generateBalanceSheet } from '@/lib/reports/balance-sheet'
+import { requireCompanyId } from '@/lib/company/context'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -9,6 +10,8 @@ export async function GET(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   const { searchParams } = new URL(request.url)
   const periodId = searchParams.get('period_id')
@@ -21,11 +24,11 @@ export async function GET(request: Request) {
     .from('fiscal_periods')
     .select('period_start, period_end')
     .eq('id', periodId)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   try {
-    const result = await generateBalanceSheet(supabase, user.id, periodId)
+    const result = await generateBalanceSheet(supabase, companyId, periodId)
 
     if (period) {
       result.period = {

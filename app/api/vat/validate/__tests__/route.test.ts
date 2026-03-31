@@ -6,6 +6,11 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
 }))
 
+vi.mock('@/lib/company/context', () => ({
+  requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+  getActiveCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
 // Mock VIES client
 const mockValidateVatNumber = vi.fn()
 vi.mock('@/lib/vat/vies-client', () => ({

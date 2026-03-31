@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireCompanyId } from '@/lib/company/context'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -8,6 +9,8 @@ export async function GET(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   const { searchParams } = new URL(request.url)
   const from = searchParams.get('from')
@@ -27,7 +30,7 @@ export async function GET(request: Request) {
   let entriesQuery = supabase
     .from('journal_entries')
     .select('id, entry_date')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .eq('status', 'posted')
 
   if (dateFrom) {

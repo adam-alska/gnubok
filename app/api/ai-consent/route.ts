@@ -7,6 +7,7 @@ import {
   revokeAiConsent,
   isAiExtension,
 } from '@/lib/extensions/ai-consent'
+import { requireCompanyId } from '@/lib/company/context'
 
 export async function GET() {
   const supabase = await createClient()
@@ -16,9 +17,11 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const statuses: Record<string, boolean> = {}
   for (const ext of AI_EXTENSIONS) {
-    statuses[ext] = await hasAiConsent(supabase, user.id, ext)
+    statuses[ext] = await hasAiConsent(supabase, companyId, ext)
   }
 
   return NextResponse.json({ data: statuses })
@@ -32,6 +35,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const body = await request.json()
   const { extension_id } = body
 
@@ -42,7 +47,7 @@ export async function POST(request: Request) {
     )
   }
 
-  await grantAiConsent(supabase, user.id, extension_id)
+  await grantAiConsent(supabase, user.id, companyId, extension_id)
   return NextResponse.json({ data: { consented: true } })
 }
 
@@ -54,6 +59,8 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const body = await request.json()
   const { extension_id } = body
 
@@ -64,6 +71,6 @@ export async function DELETE(request: Request) {
     )
   }
 
-  await revokeAiConsent(supabase, user.id, extension_id)
+  await revokeAiConsent(supabase, user.id, companyId, extension_id)
   return NextResponse.json({ data: { consented: false } })
 }

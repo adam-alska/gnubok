@@ -127,10 +127,10 @@ export interface CounterpartyTemplateMatch {
  */
 export async function findCounterpartyTemplate(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   transaction: Transaction
 ): Promise<CounterpartyTemplateMatch | null> {
-  const results = await findCounterpartyTemplatesBatch(supabase, userId, [transaction])
+  const results = await findCounterpartyTemplatesBatch(supabase, companyId, [transaction])
   return results.get(transaction.id) ?? null
 }
 
@@ -140,7 +140,7 @@ export async function findCounterpartyTemplate(
  */
 export async function findCounterpartyTemplatesBatch(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   transactions: Transaction[]
 ): Promise<Map<string, CounterpartyTemplateMatch>> {
   const result = new Map<string, CounterpartyTemplateMatch>()
@@ -148,7 +148,7 @@ export async function findCounterpartyTemplatesBatch(
   const { data: allTemplates } = await supabase
     .from('categorization_templates')
     .select('*')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .eq('is_active', true)
 
   if (!allTemplates || allTemplates.length === 0) return result
@@ -397,7 +397,7 @@ export interface TemplateUpsertParams {
  */
 export async function insertOrUpdateTemplate(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   params: TemplateUpsertParams,
   existingTemplate?: CategorizationTemplate | null
 ): Promise<void> {
@@ -407,7 +407,7 @@ export async function insertOrUpdateTemplate(
     const { data } = await supabase
       .from('categorization_templates')
       .select('*')
-      .eq('user_id', userId)
+      .eq('company_id', companyId)
       .eq('counterparty_name', params.counterpartyName)
       .maybeSingle()
     existing = data as CategorizationTemplate | null
@@ -469,7 +469,7 @@ export async function insertOrUpdateTemplate(
     await supabase
       .from('categorization_templates')
       .insert({
-        user_id: userId,
+        company_id: companyId,
         counterparty_name: params.counterpartyName,
         counterparty_aliases: params.aliases,
         debit_account: params.debitAccount,
@@ -492,7 +492,7 @@ export async function insertOrUpdateTemplate(
  */
 export async function upsertCounterpartyTemplate(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   transaction: Transaction,
   mappingResult: MappingResult,
   source: CategorizationTemplateSource
@@ -505,7 +505,7 @@ export async function upsertCounterpartyTemplate(
 
   const category = transaction.category !== 'uncategorized' ? transaction.category : null
 
-  await insertOrUpdateTemplate(supabase, userId, {
+  await insertOrUpdateTemplate(supabase, companyId, {
     counterpartyName: normalized,
     aliases: [rawName.toLowerCase()],
     debitAccount: mappingResult.debit_account,
@@ -775,7 +775,7 @@ function averageLinePatterns(voucherPatterns: VoucherLinePattern[]): LinePattern
  */
 export async function populateTemplatesFromSieVouchers(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   vouchers: SIEVoucher[],
   options?: { recencyMonths?: number }
 ): Promise<number> {
@@ -883,7 +883,7 @@ export async function populateTemplatesFromSieVouchers(
   const { data: existingTemplates } = await supabase
     .from('categorization_templates')
     .select('*')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .eq('is_active', true)
 
   const templateMap = new Map<string, CategorizationTemplate>()
@@ -924,7 +924,7 @@ export async function populateTemplatesFromSieVouchers(
     const vatAccount = firstVat?.account ?? null
     const vatTreatment = vatAccount ? (VAT_ACCOUNT_TREATMENT[vatAccount] ?? null) : null
 
-    await insertOrUpdateTemplate(supabase, userId, {
+    await insertOrUpdateTemplate(supabase, companyId, {
       counterpartyName: item.normalizedName,
       aliases: item.aliases,
       debitAccount,

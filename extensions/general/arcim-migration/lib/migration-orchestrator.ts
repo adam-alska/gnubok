@@ -63,7 +63,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
           const { data: existing } = await supabase
             .from('company_settings')
             .select('company_name, org_number, vat_number')
-            .eq('user_id', userId)
+            .eq('company_id', userId)
             .single()
 
           const updates: Record<string, unknown> = {}
@@ -83,7 +83,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
           if (mapped.email) updates.email = mapped.email
 
           if (Object.keys(updates).length > 0) {
-            await supabase.from('company_settings').update(updates).eq('user_id', userId)
+            await supabase.from('company_settings').update(updates).eq('company_id', userId)
           }
           results.companyInfo = { imported: true }
         }
@@ -116,7 +116,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const { data: existing } = await supabase
               .from('customers')
               .select('id')
-              .eq('user_id', userId)
+              .eq('company_id', userId)
               .eq('org_number', orgNumber)
               .limit(1)
 
@@ -173,7 +173,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const { data: existing } = await supabase
               .from('suppliers')
               .select('id')
-              .eq('user_id', userId)
+              .eq('company_id', userId)
               .eq('org_number', orgNumber)
               .limit(1)
 
@@ -230,7 +230,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const { data: match } = await supabase
               .from('customers')
               .select('id')
-              .eq('user_id', userId)
+              .eq('company_id', userId)
               .eq('org_number', customerOrgNumber)
               .limit(1)
             if (match?.[0]) customerId = match[0].id
@@ -240,7 +240,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const { data: match } = await supabase
               .from('customers')
               .select('id')
-              .eq('user_id', userId)
+              .eq('company_id', userId)
               .eq('name', inv.customer.name)
               .limit(1)
             if (match?.[0]) customerId = match[0].id
@@ -277,7 +277,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
           const { data: existingInv } = await supabase
             .from('invoices')
             .select('id')
-            .eq('user_id', userId)
+            .eq('company_id', userId)
             .eq('invoice_number', inv.invoiceNumber)
             .limit(1)
 
@@ -341,7 +341,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const { data: match } = await supabase
               .from('suppliers')
               .select('id')
-              .eq('user_id', userId)
+              .eq('company_id', userId)
               .eq('org_number', supplierOrgNumber)
               .limit(1)
             if (match?.[0]) supplierId = match[0].id
@@ -351,7 +351,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const { data: match } = await supabase
               .from('suppliers')
               .select('id')
-              .eq('user_id', userId)
+              .eq('company_id', userId)
               .eq('name', inv.supplier.name)
               .limit(1)
             if (match?.[0]) supplierId = match[0].id
@@ -388,7 +388,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
           const { data: existingInv } = await supabase
             .from('supplier_invoices')
             .select('id')
-            .eq('user_id', userId)
+            .eq('company_id', userId)
             .eq('supplier_invoice_number', inv.invoiceNumber)
             .eq('supplier_id', supplierId)
             .limit(1)

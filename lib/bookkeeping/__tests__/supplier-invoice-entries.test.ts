@@ -6,7 +6,7 @@ import { makeSupplierInvoice } from '@/tests/helpers'
 vi.mock('../engine', () => ({
   findFiscalPeriod: vi.fn().mockResolvedValue('period-1'),
   createJournalEntry: vi.fn().mockImplementation(
-    async (_supabase: unknown, _userId: string, input: CreateJournalEntryInput) => ({
+    async (_supabase: unknown, _companyId: string, _userId: string, input: CreateJournalEntryInput) => ({
       id: 'entry-1',
       ...input,
       lines: input.lines,
@@ -113,7 +113,7 @@ describe('createSupplierInvoiceRegistrationEntry', () => {
     const items = [makeItem()]
 
     const result = await createSupplierInvoiceRegistrationEntry(
-      null as never, 'user-1', invoice, items, 'swedish_business'
+      null as never, 'company-1', 'user-1', invoice, items, 'swedish_business'
     )
 
     expect(result).toBeNull()
@@ -129,11 +129,11 @@ describe('createSupplierInvoiceRegistrationEntry', () => {
     const items = [makeItem({ line_total: 8000, account_number: '6200', vat_rate: 0.25 })]
 
     await createSupplierInvoiceRegistrationEntry(
-      null as never, 'user-1', invoice, items, 'swedish_business'
+      null as never, 'company-1', 'user-1', invoice, items, 'swedish_business'
     )
 
     expect(mockedCreateEntry).toHaveBeenCalledOnce()
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     const debit6200 = findByAccount(input.lines, '6200')
     expect(debit6200).toHaveLength(1)
@@ -159,10 +159,10 @@ describe('createSupplierInvoiceRegistrationEntry', () => {
     const items = [makeItem({ line_total: 5000, account_number: '5410', vat_rate: 0 })]
 
     await createSupplierInvoiceRegistrationEntry(
-      null as never, 'user-1', invoice, items, 'swedish_business'
+      null as never, 'company-1', 'user-1', invoice, items, 'swedish_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     const debit5410 = findByAccount(input.lines, '5410')
     expect(debit5410).toHaveLength(1)
@@ -186,10 +186,10 @@ describe('createSupplierInvoiceRegistrationEntry', () => {
     const items = [makeItem({ line_total: 10000, account_number: '6540', vat_rate: 0.25 })]
 
     await createSupplierInvoiceRegistrationEntry(
-      null as never, 'user-1', invoice, items, 'eu_business'
+      null as never, 'company-1', 'user-1', invoice, items, 'eu_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     const debit6540 = findByAccount(input.lines, '6540')
     expect(debit6540[0].debit_amount).toBe(10000)
@@ -220,10 +220,10 @@ describe('createSupplierInvoiceRegistrationEntry', () => {
     const items = [makeItem({ line_total: 5000, account_number: '6540', vat_rate: 0.12 })]
 
     await createSupplierInvoiceRegistrationEntry(
-      null as never, 'user-1', invoice, items, 'eu_business'
+      null as never, 'company-1', 'user-1', invoice, items, 'eu_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     const debit2645 = findByAccount(input.lines, '2645')
     expect(debit2645[0].debit_amount).toBe(600) // 5000 * 0.12
@@ -247,10 +247,10 @@ describe('createSupplierInvoiceRegistrationEntry', () => {
     ]
 
     await createSupplierInvoiceRegistrationEntry(
-      null as never, 'user-1', invoice, items, 'swedish_business'
+      null as never, 'company-1', 'user-1', invoice, items, 'swedish_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     const debit5410 = findByAccount(input.lines, '5410')
     expect(debit5410[0].debit_amount).toBe(3000)
@@ -276,10 +276,10 @@ describe('createSupplierInvoiceRegistrationEntry', () => {
     ]
 
     await createSupplierInvoiceRegistrationEntry(
-      null as never, 'user-1', invoice, items, 'swedish_business'
+      null as never, 'company-1', 'user-1', invoice, items, 'swedish_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     const lines6200 = findByAccount(input.lines, '6200')
     expect(lines6200).toHaveLength(1)
@@ -301,19 +301,19 @@ describe('createSupplierInvoiceRegistrationEntry', () => {
     ]
 
     await createSupplierInvoiceRegistrationEntry(
-      null as never, 'user-1', invoice, items, 'swedish_business'
+      null as never, 'company-1', 'user-1', invoice, items, 'swedish_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     const vat2641 = findByAccount(input.lines, '2641')
     expect(vat2641).toHaveLength(3)
 
     // 25%: 10000 * 0.25 = 2500
-    expect(vat2641.find((l) => l.line_description.includes('25%'))?.debit_amount).toBe(2500)
+    expect(vat2641.find((l) => l.line_description?.includes('25%'))?.debit_amount).toBe(2500)
     // 12%: 5000 * 0.12 = 600
-    expect(vat2641.find((l) => l.line_description.includes('12%'))?.debit_amount).toBe(600)
+    expect(vat2641.find((l) => l.line_description?.includes('12%'))?.debit_amount).toBe(600)
     // 6%: 3000 * 0.06 = 180
-    expect(vat2641.find((l) => l.line_description.includes('6%'))?.debit_amount).toBe(180)
+    expect(vat2641.find((l) => l.line_description?.includes('6%'))?.debit_amount).toBe(180)
 
     assertBalanced(input)
   })
@@ -329,10 +329,10 @@ describe('createSupplierInvoiceRegistrationEntry', () => {
     const items = [makeItem({ line_total: 800, account_number: '6200', vat_rate: 0 })]
 
     await createSupplierInvoiceRegistrationEntry(
-      null as never, 'user-1', invoice, items, 'swedish_business'
+      null as never, 'company-1', 'user-1', invoice, items, 'swedish_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     const credit2440 = findByAccount(input.lines, '2440')[0]
     expect(credit2440.currency).toBe('EUR')
     expect(credit2440.amount_in_currency).toBe(800)
@@ -344,10 +344,10 @@ describe('createSupplierInvoiceRegistrationEntry', () => {
     const items = [makeItem()]
 
     await createSupplierInvoiceRegistrationEntry(
-      null as never, 'user-1', invoice, items, 'swedish_business'
+      null as never, 'company-1', 'user-1', invoice, items, 'swedish_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.source_type).toBe('supplier_invoice_registered')
     expect(input.source_id).toBe('si-xyz')
   })
@@ -360,10 +360,10 @@ describe('createSupplierInvoiceRegistrationEntry', () => {
     const items = [makeItem()]
 
     await createSupplierInvoiceRegistrationEntry(
-      null as never, 'user-1', invoice, items, 'swedish_business'
+      null as never, 'company-1', 'user-1', invoice, items, 'swedish_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.description).toContain('LF-999')
     expect(input.description).toContain('42')
   })
@@ -376,10 +376,10 @@ describe('createSupplierInvoiceRegistrationEntry', () => {
     const items = [makeItem()]
 
     await createSupplierInvoiceRegistrationEntry(
-      null as never, 'user-1', invoice, items, 'swedish_business', 'Leverantör AB'
+      null as never, 'company-1', 'user-1', invoice, items, 'swedish_business', 'Leverantör AB'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.description).toBe('Leverantörsfaktura LF-100, Leverantör AB (ankomst 5)')
   })
 
@@ -391,10 +391,10 @@ describe('createSupplierInvoiceRegistrationEntry', () => {
     const items = [makeItem()]
 
     await createSupplierInvoiceRegistrationEntry(
-      null as never, 'user-1', invoice, items, 'swedish_business'
+      null as never, 'company-1', 'user-1', invoice, items, 'swedish_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.description).toBe('Leverantörsfaktura LF-100 (ankomst 5)')
   })
 
@@ -408,10 +408,10 @@ describe('createSupplierInvoiceRegistrationEntry', () => {
     const items = [makeItem({ line_total: 5000, vat_rate: 0.25, account_number: '6540' })]
 
     await createSupplierInvoiceRegistrationEntry(
-      null as never, 'user-1', invoice, items, 'non_eu_business'
+      null as never, 'company-1', 'user-1', invoice, items, 'non_eu_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     expect(findByAccount(input.lines, '2645')).toHaveLength(1)
     expect(findByAccount(input.lines, '2614')).toHaveLength(1)
@@ -433,10 +433,10 @@ describe('createSupplierInvoiceRegistrationEntry', () => {
     ]
 
     await createSupplierInvoiceRegistrationEntry(
-      null as never, 'user-1', invoice, items, 'eu_business'
+      null as never, 'company-1', 'user-1', invoice, items, 'eu_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     const vat2645 = findByAccount(input.lines, '2645')
     expect(vat2645).toHaveLength(2)
@@ -465,7 +465,7 @@ describe('createSupplierInvoicePaymentEntry', () => {
     const invoice = makeSupplierInvoice()
 
     const result = await createSupplierInvoicePaymentEntry(
-      null as never, 'user-1', invoice, 10000, '2024-07-01'
+      null as never, 'company-1', 'user-1', invoice, 10000, '2024-07-01'
     )
 
     expect(result).toBeNull()
@@ -476,10 +476,10 @@ describe('createSupplierInvoicePaymentEntry', () => {
     const invoice = makeSupplierInvoice({ total: 10000 })
 
     await createSupplierInvoicePaymentEntry(
-      null as never, 'user-1', invoice, 10000, '2024-07-01'
+      null as never, 'company-1', 'user-1', invoice, 10000, '2024-07-01'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.lines).toHaveLength(2)
 
     const debit2440 = findByAccount(input.lines, '2440')[0]
@@ -496,10 +496,10 @@ describe('createSupplierInvoicePaymentEntry', () => {
 
     // paymentAmount = original SEK amount, exchangeRateDifference > 0 = gain
     await createSupplierInvoicePaymentEntry(
-      null as never, 'user-1', invoice, 11500, '2024-07-15', 500
+      null as never, 'company-1', 'user-1', invoice, 11500, '2024-07-15', 500
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.lines).toHaveLength(3)
 
     const debit2440 = findByAccount(input.lines, '2440')[0]
@@ -519,10 +519,10 @@ describe('createSupplierInvoicePaymentEntry', () => {
 
     // exchangeRateDifference < 0 = loss
     await createSupplierInvoicePaymentEntry(
-      null as never, 'user-1', invoice, 11500, '2024-07-15', -300
+      null as never, 'company-1', 'user-1', invoice, 11500, '2024-07-15', -300
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.lines).toHaveLength(3)
 
     const debit2440 = findByAccount(input.lines, '2440')[0]
@@ -541,10 +541,10 @@ describe('createSupplierInvoicePaymentEntry', () => {
     const invoice = makeSupplierInvoice()
 
     await createSupplierInvoicePaymentEntry(
-      null as never, 'user-1', invoice, 10000, '2024-07-01', 0
+      null as never, 'company-1', 'user-1', invoice, 10000, '2024-07-01', 0
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.lines).toHaveLength(2)
 
     expect(findByAccount(input.lines, '3960')).toHaveLength(0)
@@ -557,10 +557,10 @@ describe('createSupplierInvoicePaymentEntry', () => {
     const invoice = makeSupplierInvoice()
 
     await createSupplierInvoicePaymentEntry(
-      null as never, 'user-1', invoice, 10000.555, '2024-07-01'
+      null as never, 'company-1', 'user-1', invoice, 10000.555, '2024-07-01'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     for (const line of input.lines) {
       if (line.debit_amount > 0) {
         expect(line.debit_amount).toBe(Math.round(10000.555 * 100) / 100)
@@ -575,10 +575,10 @@ describe('createSupplierInvoicePaymentEntry', () => {
     const invoice = makeSupplierInvoice({ id: 'si-pay-1' })
 
     await createSupplierInvoicePaymentEntry(
-      null as never, 'user-1', invoice, 10000, '2024-07-01'
+      null as never, 'company-1', 'user-1', invoice, 10000, '2024-07-01'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.source_type).toBe('supplier_invoice_paid')
     expect(input.source_id).toBe('si-pay-1')
   })
@@ -590,10 +590,10 @@ describe('createSupplierInvoicePaymentEntry', () => {
     })
 
     await createSupplierInvoicePaymentEntry(
-      null as never, 'user-1', invoice, 10000, '2024-07-01', undefined, 'Leverantör AB'
+      null as never, 'company-1', 'user-1', invoice, 10000, '2024-07-01', undefined, 'Leverantör AB'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.description).toBe('Utbetalning leverantörsfaktura LF-200, Leverantör AB (ankomst 10)')
   })
 
@@ -601,10 +601,10 @@ describe('createSupplierInvoicePaymentEntry', () => {
     const invoice = makeSupplierInvoice({ invoice_date: '2024-06-01' })
 
     await createSupplierInvoicePaymentEntry(
-      null as never, 'user-1', invoice, 10000, '2024-08-15'
+      null as never, 'company-1', 'user-1', invoice, 10000, '2024-08-15'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.entry_date).toBe('2024-08-15')
   })
 })
@@ -625,7 +625,7 @@ describe('createSupplierInvoiceCashEntry', () => {
     const items = [makeItem()]
 
     const result = await createSupplierInvoiceCashEntry(
-      null as never, 'user-1', invoice, items, '2024-07-01', 'swedish_business'
+      null as never, 'company-1', 'user-1', invoice, items, '2024-07-01', 'swedish_business'
     )
 
     expect(result).toBeNull()
@@ -641,10 +641,10 @@ describe('createSupplierInvoiceCashEntry', () => {
     const items = [makeItem({ line_total: 8000, account_number: '6200', vat_rate: 0.25 })]
 
     await createSupplierInvoiceCashEntry(
-      null as never, 'user-1', invoice, items, '2024-07-01', 'swedish_business'
+      null as never, 'company-1', 'user-1', invoice, items, '2024-07-01', 'swedish_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     expect(findByAccount(input.lines, '6200')[0].debit_amount).toBe(8000)
     expect(findByAccount(input.lines, '2641')[0].debit_amount).toBe(2000)
@@ -665,10 +665,10 @@ describe('createSupplierInvoiceCashEntry', () => {
     const items = [makeItem({ line_total: 5000, account_number: '5410', vat_rate: 0 })]
 
     await createSupplierInvoiceCashEntry(
-      null as never, 'user-1', invoice, items, '2024-07-01', 'swedish_business'
+      null as never, 'company-1', 'user-1', invoice, items, '2024-07-01', 'swedish_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     expect(findByAccount(input.lines, '5410')[0].debit_amount).toBe(5000)
     expect(findByAccount(input.lines, '1930')[0].credit_amount).toBe(5000)
@@ -687,10 +687,10 @@ describe('createSupplierInvoiceCashEntry', () => {
     const items = [makeItem({ line_total: 10000, account_number: '6540', vat_rate: 0.25 })]
 
     await createSupplierInvoiceCashEntry(
-      null as never, 'user-1', invoice, items, '2024-07-01', 'eu_business'
+      null as never, 'company-1', 'user-1', invoice, items, '2024-07-01', 'eu_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     expect(findByAccount(input.lines, '2645')[0].debit_amount).toBe(2500)
     expect(findByAccount(input.lines, '2614')[0].credit_amount).toBe(2500)
@@ -709,10 +709,10 @@ describe('createSupplierInvoiceCashEntry', () => {
     const items = [makeItem()]
 
     await createSupplierInvoiceCashEntry(
-      null as never, 'user-1', invoice, items, '2024-07-01', 'swedish_business'
+      null as never, 'company-1', 'user-1', invoice, items, '2024-07-01', 'swedish_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(findByAccount(input.lines, '2440')).toHaveLength(0)
   })
 
@@ -724,14 +724,14 @@ describe('createSupplierInvoiceCashEntry', () => {
     ]
 
     await createSupplierInvoiceCashEntry(
-      null as never, 'user-1', invoice, items, '2024-06-01', 'swedish_business'
+      null as never, 'company-1', 'user-1', invoice, items, '2024-06-01', 'swedish_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     const vat2641 = findByAccount(input.lines, '2641')
     expect(vat2641).toHaveLength(2)
-    expect(vat2641.find((l) => l.line_description.includes('25%'))?.debit_amount).toBe(2500)
-    expect(vat2641.find((l) => l.line_description.includes('6%'))?.debit_amount).toBe(180)
+    expect(vat2641.find((l) => l.line_description?.includes('25%'))?.debit_amount).toBe(2500)
+    expect(vat2641.find((l) => l.line_description?.includes('6%'))?.debit_amount).toBe(180)
 
     assertBalanced(input)
   })
@@ -741,10 +741,10 @@ describe('createSupplierInvoiceCashEntry', () => {
     const items = [makeItem()]
 
     await createSupplierInvoiceCashEntry(
-      null as never, 'user-1', invoice, items, '2024-07-01', 'swedish_business'
+      null as never, 'company-1', 'user-1', invoice, items, '2024-07-01', 'swedish_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.source_type).toBe('supplier_invoice_cash_payment')
     expect(input.source_id).toBe('si-cash-1')
   })
@@ -754,10 +754,10 @@ describe('createSupplierInvoiceCashEntry', () => {
     const items = [makeItem()]
 
     await createSupplierInvoiceCashEntry(
-      null as never, 'user-1', invoice, items, '2024-07-01', 'swedish_business', 'Leverantör AB'
+      null as never, 'company-1', 'user-1', invoice, items, '2024-07-01', 'swedish_business', 'Leverantör AB'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.description).toBe('Kontantbetalning leverantörsfaktura LF-300, Leverantör AB')
   })
 
@@ -766,10 +766,10 @@ describe('createSupplierInvoiceCashEntry', () => {
     const items = [makeItem()]
 
     await createSupplierInvoiceCashEntry(
-      null as never, 'user-1', invoice, items, '2024-07-01', 'swedish_business'
+      null as never, 'company-1', 'user-1', invoice, items, '2024-07-01', 'swedish_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.description).toBe('Kontantbetalning leverantörsfaktura LF-300')
   })
 })
@@ -790,7 +790,7 @@ describe('createSupplierCreditNoteEntry', () => {
     const items = [makeItem()]
 
     const result = await createSupplierCreditNoteEntry(
-      null as never, 'user-1', creditNote, items, 'swedish_business'
+      null as never, 'company-1', 'user-1', creditNote, items, 'swedish_business'
     )
 
     expect(result).toBeNull()
@@ -807,10 +807,10 @@ describe('createSupplierCreditNoteEntry', () => {
     const items = [makeItem({ line_total: -8000, account_number: '6200', vat_rate: 0.25 })]
 
     await createSupplierCreditNoteEntry(
-      null as never, 'user-1', creditNote, items, 'swedish_business'
+      null as never, 'company-1', 'user-1', creditNote, items, 'swedish_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     const debit2440 = findByAccount(input.lines, '2440')[0]
     expect(debit2440.debit_amount).toBe(10000) // abs
@@ -837,10 +837,10 @@ describe('createSupplierCreditNoteEntry', () => {
     const items = [makeItem({ line_total: -5000, account_number: '6200', vat_rate: 0 })]
 
     await createSupplierCreditNoteEntry(
-      null as never, 'user-1', creditNote, items, 'swedish_business'
+      null as never, 'company-1', 'user-1', creditNote, items, 'swedish_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     expect(findByAccount(input.lines, '2440')[0].debit_amount).toBe(5000)
     expect(findByAccount(input.lines, '6200')[0].credit_amount).toBe(5000)
@@ -860,10 +860,10 @@ describe('createSupplierCreditNoteEntry', () => {
     const items = [makeItem({ line_total: -10000, account_number: '6540', vat_rate: 0.25 })]
 
     await createSupplierCreditNoteEntry(
-      null as never, 'user-1', creditNote, items, 'eu_business'
+      null as never, 'company-1', 'user-1', creditNote, items, 'eu_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     // Reversed fiktiv moms
     const credit2645 = findByAccount(input.lines, '2645')[0]
@@ -892,10 +892,10 @@ describe('createSupplierCreditNoteEntry', () => {
     const items = [makeItem({ line_total: -7500, account_number: '6200', vat_rate: 0 })]
 
     await createSupplierCreditNoteEntry(
-      null as never, 'user-1', creditNote, items, 'swedish_business'
+      null as never, 'company-1', 'user-1', creditNote, items, 'swedish_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     for (const line of input.lines) {
       expect(line.debit_amount).toBeGreaterThanOrEqual(0)
       expect(line.credit_amount).toBeGreaterThanOrEqual(0)
@@ -911,10 +911,10 @@ describe('createSupplierCreditNoteEntry', () => {
     const items = [makeItem({ line_total: -8000, account_number: '6200', vat_rate: 0.25 })]
 
     await createSupplierCreditNoteEntry(
-      null as never, 'user-1', creditNote, items, 'swedish_business'
+      null as never, 'company-1', 'user-1', creditNote, items, 'swedish_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.lines[0].account_number).toBe('2440')
   })
 
@@ -929,10 +929,10 @@ describe('createSupplierCreditNoteEntry', () => {
     const items = [makeItem({ line_total: -8000, account_number: '6200', vat_rate: 0.25 })]
 
     await createSupplierCreditNoteEntry(
-      null as never, 'user-1', creditNote, items, 'swedish_business', 'Leverantör AB'
+      null as never, 'company-1', 'user-1', creditNote, items, 'swedish_business', 'Leverantör AB'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.description).toBe('Kreditfaktura leverantör LF-400, Leverantör AB (ankomst 7)')
   })
 
@@ -941,10 +941,10 @@ describe('createSupplierCreditNoteEntry', () => {
     const items = [makeItem()]
 
     await createSupplierCreditNoteEntry(
-      null as never, 'user-1', creditNote, items, 'swedish_business'
+      null as never, 'company-1', 'user-1', creditNote, items, 'swedish_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
     expect(input.source_type).toBe('supplier_credit_note')
     expect(input.source_id).toBe('si-cn-1')
   })
@@ -962,10 +962,10 @@ describe('createSupplierCreditNoteEntry', () => {
     ]
 
     await createSupplierCreditNoteEntry(
-      null as never, 'user-1', creditNote, items, 'eu_business'
+      null as never, 'company-1', 'user-1', creditNote, items, 'eu_business'
     )
 
-    const input = mockedCreateEntry.mock.calls[0][2]
+    const input = mockedCreateEntry.mock.calls[0][3]
 
     // 2645 credit lines: 2 (one per rate)
     const vat2645 = findByAccount(input.lines, '2645')

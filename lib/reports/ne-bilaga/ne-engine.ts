@@ -156,7 +156,7 @@ function roundToKrona(value: number): number {
  */
 export async function generateNEDeclaration(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   fiscalPeriodId: string
 ): Promise<NEDeclaration> {
 
@@ -165,7 +165,7 @@ export async function generateNEDeclaration(
     .from('fiscal_periods')
     .select('*')
     .eq('id', fiscalPeriodId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (periodError || !period) {
@@ -176,7 +176,7 @@ export async function generateNEDeclaration(
   const { data: settings } = await supabase
     .from('company_settings')
     .select('company_name, org_number, entity_type')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   // Check if it's enskild firma
@@ -188,7 +188,7 @@ export async function generateNEDeclaration(
   const { data: entries, error: entriesError } = await supabase
     .from('journal_entries')
     .select('*, lines:journal_entry_lines(*)')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .eq('fiscal_period_id', fiscalPeriodId)
     .in('status', ['posted', 'reversed'])
 
@@ -201,7 +201,7 @@ export async function generateNEDeclaration(
     supabase
       .from('chart_of_accounts')
       .select('account_number, account_name')
-      .eq('user_id', userId)
+      .eq('company_id', companyId)
       .range(from, to)
   )
 

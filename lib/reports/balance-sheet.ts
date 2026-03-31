@@ -11,10 +11,10 @@ import type { BalanceSheetReport, BalanceSheetSection, TrialBalanceRow } from '@
  */
 export async function generateBalanceSheet(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   fiscalPeriodId: string
 ): Promise<BalanceSheetReport> {
-  const { rows } = await generateTrialBalance(supabase, userId, fiscalPeriodId)
+  const { rows } = await generateTrialBalance(supabase, companyId, fiscalPeriodId)
 
   // Filter to balance sheet accounts (class 1-2)
   const balanceRows = rows.filter(

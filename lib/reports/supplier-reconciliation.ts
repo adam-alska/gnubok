@@ -12,7 +12,7 @@ export interface ReconciliationResult {
  */
 export async function generateReconciliation(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   periodId: string
 ): Promise<ReconciliationResult> {
 
@@ -20,7 +20,7 @@ export async function generateReconciliation(
   const { data: invoices } = await supabase
     .from('supplier_invoices')
     .select('remaining_amount')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .in('status', ['registered', 'approved', 'partially_paid', 'overdue'])
 
   const supplierLedgerTotal = (invoices || [])
@@ -34,12 +34,12 @@ export async function generateReconciliation(
       credit_amount,
       journal_entry:journal_entries!inner(
         status,
-        user_id,
+        company_id,
         fiscal_period_id
       )
     `)
     .eq('account_number', '2440')
-    .eq('journal_entries.user_id', userId)
+    .eq('journal_entries.company_id', companyId)
     .eq('journal_entries.fiscal_period_id', periodId)
     .eq('journal_entries.status', 'posted')
 

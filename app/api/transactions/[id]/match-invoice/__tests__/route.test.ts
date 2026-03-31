@@ -40,6 +40,10 @@ vi.mock('@/lib/init', () => ({
   ensureInitialized: vi.fn(),
 }))
 
+vi.mock('@/lib/company/context', () => ({
+  requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
 import { POST } from '../route'
 
 const VALID_UUID = '550e8400-e29b-41d4-a716-446655440000'
@@ -212,6 +216,7 @@ describe('POST /api/transactions/[id]/match-invoice', () => {
     // Verify accrual payment entry was called with paymentAmount
     expect(mockCreateInvoicePaymentJournalEntry).toHaveBeenCalledWith(
       expect.anything(),
+      'company-1',
       'user-1',
       expect.objectContaining({ id: VALID_UUID }),
       '2024-06-15',
@@ -270,7 +275,7 @@ describe('POST /api/transactions/[id]/match-invoice', () => {
     expect(status).toBe(200)
     expect(body.success).toBe(true)
     expect(body.journal_entry_id).toBe('je-payment')
-    expect(mockReverseEntry).toHaveBeenCalledWith(expect.anything(), 'user-1', 'je-conflict')
+    expect(mockReverseEntry).toHaveBeenCalledWith(expect.anything(), 'company-1', 'user-1', 'je-conflict')
   })
 
   it('returns 500 when storno fails — no partial state change', async () => {

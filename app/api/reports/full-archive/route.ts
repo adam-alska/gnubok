@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { generateFullArchive } from '@/lib/reports/full-archive-export'
+import { requireCompanyId } from '@/lib/company/context'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -10,6 +11,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { searchParams } = new URL(request.url)
   const periodId = searchParams.get('period_id')
 
@@ -18,7 +21,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const zipBuffer = await generateFullArchive(supabase, user.id, {
+    const zipBuffer = await generateFullArchive(supabase, companyId, {
       period_id: periodId,
       include_documents: searchParams.get('include_documents') !== 'false',
     })

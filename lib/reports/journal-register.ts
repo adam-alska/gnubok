@@ -41,7 +41,7 @@ export interface JournalRegisterReport {
  */
 export async function generateJournalRegister(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   periodId: string
 ): Promise<JournalRegisterReport> {
 
@@ -50,7 +50,7 @@ export async function generateJournalRegister(
     .from('fiscal_periods')
     .select('period_start, period_end')
     .eq('id', periodId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (!period) {
@@ -78,8 +78,8 @@ export async function generateJournalRegister(
   }>(({ from, to }) =>
     supabase
       .from('journal_entry_lines')
-      .select('account_number, debit_amount, credit_amount, journal_entry_id, journal_entries!inner(id, entry_date, voucher_number, voucher_series, description, source_type, status, user_id, fiscal_period_id)')
-      .eq('journal_entries.user_id', userId)
+      .select('account_number, debit_amount, credit_amount, journal_entry_id, journal_entries!inner(id, entry_date, voucher_number, voucher_series, description, source_type, status, company_id, fiscal_period_id)')
+      .eq('journal_entries.company_id', companyId)
       .eq('journal_entries.fiscal_period_id', periodId)
       .in('journal_entries.status', ['posted', 'reversed'])
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -95,7 +95,7 @@ export async function generateJournalRegister(
     supabase
       .from('chart_of_accounts')
       .select('account_number, account_name')
-      .eq('user_id', userId)
+      .eq('company_id', companyId)
       .range(from, to)
   )
 

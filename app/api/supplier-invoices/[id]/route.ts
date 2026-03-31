@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { validateBody } from '@/lib/api/validate'
 import { UpdateSupplierInvoiceSchema } from '@/lib/api/schemas'
+import { requireCompanyId } from '@/lib/company/context'
 
 export async function GET(
   _request: Request,
@@ -16,11 +17,13 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { data: invoice, error } = await supabase
     .from('supplier_invoices')
     .select('*, supplier:suppliers(*), items:supplier_invoice_items(*), payments:supplier_invoice_payments(*)')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (error || !invoice) {
@@ -43,12 +46,14 @@ export async function PUT(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Only allow editing registered invoices
   const { data: existing } = await supabase
     .from('supplier_invoices')
     .select('status')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (!existing) {
@@ -70,7 +75,7 @@ export async function PUT(
     .from('supplier_invoices')
     .update(body)
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .select()
     .single()
 
@@ -94,12 +99,14 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Only allow deleting registered invoices without journal entries
   const { data: existing } = await supabase
     .from('supplier_invoices')
     .select('status, registration_journal_entry_id')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (!existing) {
@@ -120,7 +127,7 @@ export async function DELETE(
     .from('supplier_invoices')
     .delete()
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

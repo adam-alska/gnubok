@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireCompanyId } from '@/lib/company/context'
 
 /**
  * DELETE /api/settings/api-keys/[id] — Revoke an API key (soft delete)
@@ -16,11 +17,13 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { error } = await supabase
     .from('api_keys')
     .update({ revoked_at: new Date().toISOString() })
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .is('revoked_at', null)
 
   if (error) {

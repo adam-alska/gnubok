@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { createAuthCode } from '@/lib/auth/oauth-codes'
+import { requireCompanyId } from '@/lib/company/context'
 
 /**
  * OAuth 2.0 Authorization Endpoint.
@@ -88,11 +89,13 @@ export async function GET(request: Request) {
     return buildLoginRedirect(request)
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Get company name for the consent page
   const { data: settings } = await supabase
     .from('company_settings')
     .select('company_name')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   const companyName = settings?.company_name || user.email
@@ -179,6 +182,8 @@ export async function POST(request: Request) {
   if (!user) {
     return buildLoginRedirect(request)
   }
+
+  await requireCompanyId(supabase, user.id)
 
   // Parse form body
   const formData = await request.formData()

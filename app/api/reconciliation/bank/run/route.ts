@@ -4,6 +4,7 @@ import { ensureInitialized } from '@/lib/init'
 import { runReconciliation } from '@/lib/reconciliation/bank-reconciliation'
 import { validateBody } from '@/lib/api/validate'
 import { RunReconciliationSchema } from '@/lib/api/schemas'
+import { requireCompanyId } from '@/lib/company/context'
 
 ensureInitialized()
 
@@ -15,11 +16,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const validation = await validateBody(request, RunReconciliationSchema)
   if (!validation.success) return validation.response
   const { date_from, date_to, dry_run } = validation.data
 
-  const result = await runReconciliation(supabase, user.id, {
+  const result = await runReconciliation(supabase, companyId, {
     dateFrom: date_from,
     dateTo: date_to,
     dryRun: dry_run ?? false,

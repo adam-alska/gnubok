@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireCompanyId } from '@/lib/company/context'
 
 /**
  * GET /api/import/sie
@@ -16,6 +17,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Parse query params
   const { searchParams } = new URL(request.url)
   const limit = parseInt(searchParams.get('limit') || '20', 10)
@@ -25,7 +28,7 @@ export async function GET(request: Request) {
   let query = supabase
     .from('sie_imports')
     .select('*', { count: 'exact' })
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 

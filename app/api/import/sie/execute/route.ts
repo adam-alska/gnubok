@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import { NextResponse } from 'next/server'
+import { requireCompanyId } from '@/lib/company/context'
 import { parseSIEFile, detectEncoding, decodeBuffer } from '@/lib/import/sie-parser'
 import { suggestMappings } from '@/lib/import/account-mapper'
 import { executeSIEImport } from '@/lib/import/sie-import'
@@ -25,6 +26,8 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   try {
     // Get form data with file and options
@@ -63,7 +66,7 @@ export async function POST(request: Request) {
       const { data: storedMappings } = await supabase
         .from('sie_account_mappings')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('company_id', companyId)
 
       mappings = suggestMappings(
         parsed.accounts,
@@ -90,14 +93,15 @@ export async function POST(request: Request) {
       ...new Set(mappings.filter((m) => m.targetAccount).map((m) => m.targetAccount)),
     ]
 
-    const existingAccounts = await fetchAllRows(({ from, to }) =>
+    const allCompanyAccounts = await fetchAllRows(({ from, to }) =>
       supabase
         .from('chart_of_accounts')
         .select('account_number')
-        .eq('user_id', user.id)
-        .in('account_number', mappedAccountNumbers)
+        .eq('company_id', companyId)
         .range(from, to)
     )
+    const mappedSet = new Set(mappedAccountNumbers)
+    const existingAccounts = allCompanyAccounts.filter((a) => mappedSet.has(a.account_number))
 
     // Build a lookup from SIE mappings for account names (used for bas_range accounts)
     const mappingNameLookup = new Map<string, string>()
@@ -116,6 +120,7 @@ export async function POST(request: Request) {
           // Account exists in BAS reference — use full metadata
           return {
             user_id: user.id,
+            company_id: companyId,
             account_number: ref.account_number,
             account_name: ref.account_name,
             account_class: ref.account_class,
@@ -146,6 +151,7 @@ export async function POST(request: Request) {
 
         return {
           user_id: user.id,
+          company_id: companyId,
           account_number: num,
           account_name: accountName,
           account_class: accountClass,
@@ -176,6 +182,7 @@ export async function POST(request: Request) {
     // Execute the import
     const result = await executeSIEImport(
       supabase,
+      companyId,
       user.id,
       parsed,
       mappings,

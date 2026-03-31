@@ -13,10 +13,10 @@ import type { IncomeStatementReport, IncomeStatementSection, TrialBalanceRow } f
  */
 export async function generateIncomeStatement(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   fiscalPeriodId: string
 ): Promise<IncomeStatementReport> {
-  const { rows } = await generateTrialBalance(supabase, userId, fiscalPeriodId)
+  const { rows } = await generateTrialBalance(supabase, companyId, fiscalPeriodId)
 
   // Filter to income/expense accounts (class 3-8)
   const incomeExpenseRows = rows.filter(

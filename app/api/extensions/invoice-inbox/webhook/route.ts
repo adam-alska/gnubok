@@ -79,12 +79,14 @@ export async function POST(request: Request) {
   const supabase = createServiceClient()
 
   // Resolve user from recipient email
-  const userId = await resolveUserFromEmail(payload.to, supabase)
+  const resolved = await resolveUserFromEmail(payload.to, supabase)
 
-  if (!userId) {
+  if (!resolved) {
     console.warn(`[document-inbox] No user found for email: ${payload.to}`)
     return NextResponse.json({ error: 'User not found' }, { status: 404 })
   }
+
+  const { userId, companyId } = resolved
 
   // Build raw email payload for BFL 7:2 archiving (no binary attachment content)
   const rawEmailPayload = buildRawEmailPayload(body, payload)
@@ -96,6 +98,7 @@ export async function POST(request: Request) {
     await supabase
       .from('invoice_inbox_items')
       .insert({
+        company_id: companyId,
         user_id: userId,
         status: 'error',
         source: 'email',
@@ -131,6 +134,7 @@ export async function POST(request: Request) {
       const { data: document, error: docError } = await supabase
         .from('document_attachments')
         .insert({
+          company_id: companyId,
           user_id: userId,
           storage_path: storagePath,
           file_name: attachment.filename,
@@ -159,6 +163,7 @@ export async function POST(request: Request) {
       const { data: inboxItem, error: itemError } = await supabase
         .from('invoice_inbox_items')
         .insert({
+          company_id: companyId,
           user_id: userId,
           status: 'processing',
           source: 'email',
@@ -197,7 +202,7 @@ export async function POST(request: Request) {
             const { data: suppliers } = await supabase
               .from('suppliers')
               .select('*')
-              .eq('user_id', userId)
+              .eq('company_id', companyId)
 
             if (suppliers && suppliers.length > 0) {
               const match = matchSupplier(extraction, suppliers)
@@ -222,7 +227,7 @@ export async function POST(request: Request) {
             // Use pre-extracted receipt data from unified call
             const { data: urlData } = supabase.storage.from('documents').getPublicUrl(storagePath)
 
-            const result = await processReceiptFromDocument(supabase, userId, attachment.content, attachment.content_type, {
+            const result = await processReceiptFromDocument(supabase, userId, companyId, attachment.content, attachment.content_type, {
               documentId: document.id,
               source: 'email',
               emailFrom: payload.from,

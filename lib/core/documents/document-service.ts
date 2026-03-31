@@ -57,6 +57,7 @@ export async function computeSHA256(buffer: ArrayBuffer): Promise<string> {
 export async function uploadDocument(
   supabase: SupabaseClient,
   userId: string,
+  companyId: string,
   file: { name: string; buffer: ArrayBuffer; type?: string },
   metadata: {
     upload_source?: DocumentUploadSource
@@ -116,7 +117,7 @@ export async function uploadDocument(
 
   await eventBus.emit({
     type: 'document.uploaded',
-    payload: { document: result, userId },
+    payload: { document: result, userId, companyId },
   })
 
   return result
@@ -192,7 +193,7 @@ export async function createNewVersion(
  */
 export async function linkToJournalEntry(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   documentId: string,
   journalEntryId: string,
   journalEntryLineId?: string
@@ -205,7 +206,7 @@ export async function linkToJournalEntry(
       journal_entry_line_id: journalEntryLineId || null,
     })
     .eq('id', documentId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .select()
     .single()
 
@@ -221,7 +222,7 @@ export async function linkToJournalEntry(
  */
 export async function verifyIntegrity(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   documentId: string
 ): Promise<{ valid: boolean; storedHash: string; computedHash: string }> {
 
@@ -230,7 +231,7 @@ export async function verifyIntegrity(
     .from('document_attachments')
     .select('storage_path, sha256_hash')
     .eq('id', documentId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (docError || !doc) {

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { generateApiKey, hashApiKey, DEFAULT_SCOPES, validateScopes } from '@/lib/auth/api-keys'
+import { requireCompanyId } from '@/lib/company/context'
 import type { ApiKeyScope } from '@/lib/auth/api-keys'
 
 /**
@@ -14,10 +15,12 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { data, error } = await supabase
     .from('api_keys')
     .select('id, key_prefix, name, scopes, rate_limit_rpm, last_used_at, revoked_at, created_at')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -39,6 +42,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   let name = 'Unnamed key'
   let scopes: ApiKeyScope[] = DEFAULT_SCOPES
   try {
@@ -54,11 +59,11 @@ export async function POST(request: Request) {
     // Empty body is fine, use defaults
   }
 
-  // Limit to 10 active keys per user
+  // Limit to 10 active keys per company
   const { count } = await supabase
     .from('api_keys')
     .select('id', { count: 'exact', head: true })
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .is('revoked_at', null)
 
   if (count !== null && count >= 10) {
@@ -74,6 +79,7 @@ export async function POST(request: Request) {
     .from('api_keys')
     .insert({
       user_id: user.id,
+      company_id: companyId,
       key_hash: hash,
       key_prefix: prefix,
       name,

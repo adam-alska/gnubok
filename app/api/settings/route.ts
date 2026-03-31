@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { didTaxFieldsChange, regenerateTaxDeadlinesForUser } from '@/lib/tax/deadline-generator'
 import { validateBody } from '@/lib/api/validate'
 import { UpdateSettingsSchema } from '@/lib/api/schemas'
+import { requireCompanyId } from '@/lib/company/context'
 
 export async function GET() {
   const supabase = await createClient()
@@ -13,10 +14,12 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { data, error } = await supabase
     .from('company_settings')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (error) {
@@ -35,11 +38,13 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Fetch current settings to check for tax-relevant changes
   const { data: oldSettings } = await supabase
     .from('company_settings')
     .select('entity_type, moms_period, f_skatt, vat_registered, pays_salaries, fiscal_year_start_month, onboarding_complete')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   const validation = await validateBody(request, UpdateSettingsSchema)
@@ -65,7 +70,7 @@ export async function PUT(request: Request) {
   const { data, error } = await supabase
     .from('company_settings')
     .update(body)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .select()
     .single()
 
@@ -76,7 +81,7 @@ export async function PUT(request: Request) {
   // Check if tax-relevant fields changed and regenerate deadlines
   if (oldSettings && didTaxFieldsChange(oldSettings, data)) {
     try {
-      await regenerateTaxDeadlinesForUser(supabase, user.id, {
+      await regenerateTaxDeadlinesForUser(supabase, companyId, {
         entity_type: data.entity_type,
         moms_period: data.moms_period,
         f_skatt: data.f_skatt,

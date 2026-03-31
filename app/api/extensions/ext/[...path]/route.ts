@@ -4,6 +4,7 @@ import { ensureInitialized } from '@/lib/init'
 import { extensionRegistry } from '@/lib/extensions/registry'
 import { createExtensionContext } from '@/lib/extensions/context-factory'
 import { hasAiConsent, isAiExtension } from '@/lib/extensions/ai-consent'
+import { requireCompanyId } from '@/lib/company/context'
 import type { ApiRouteDefinition } from '@/lib/extensions/types'
 
 ensureInitialized()
@@ -117,9 +118,11 @@ async function handleRequest(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // AI consent check
   if (isAiExtension(extensionId)) {
-    const consented = await hasAiConsent(supabase, user.id, extensionId)
+    const consented = await hasAiConsent(supabase, companyId, extensionId)
     if (!consented) {
       return NextResponse.json(
         { error: 'AI consent required', code: 'AI_CONSENT_REQUIRED' },
@@ -145,7 +148,7 @@ async function handleRequest(
   }
 
   // Build context and dispatch
-  const ctx = createExtensionContext(supabase, user.id, extensionId)
+  const ctx = createExtensionContext(supabase, user.id, companyId, extensionId)
   return matchedRoute.handler(handlerRequest, ctx)
 }
 

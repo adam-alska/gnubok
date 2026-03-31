@@ -17,6 +17,11 @@ vi.mock('@/lib/init', () => ({
   ensureInitialized: vi.fn(),
 }))
 
+vi.mock('@/lib/company/context', () => ({
+  requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+  getActiveCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
 const mockBuildMappingResultFromCategory = vi.fn()
 vi.mock('@/lib/bookkeeping/category-mapping', () => ({
   buildMappingResultFromCategory: (...args: unknown[]) =>
@@ -161,7 +166,7 @@ describe('POST /api/transactions/[id]/categorize', () => {
     expect(body.category).toBe('expense_software')
     expect(mockSaveUserMappingRule).toHaveBeenCalledWith(
       expect.anything(),
-      'user-1',
+      'company-1',
       'GitHub',
       '6200',
       '1930',

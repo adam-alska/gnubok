@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireCompanyId } from '@/lib/company/context'
 import type { CreateDeadlineInput } from '@/types'
 
 /**
@@ -21,11 +22,13 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { data, error } = await supabase
     .from('deadlines')
     .select('*, customer:customers(id, name)')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (error) {
@@ -57,6 +60,8 @@ export async function PUT(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const body: Partial<CreateDeadlineInput> = await request.json()
 
   // First, get existing deadline to verify ownership
@@ -64,7 +69,7 @@ export async function PUT(
     .from('deadlines')
     .select('*')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (fetchError) {
@@ -89,7 +94,7 @@ export async function PUT(
     .from('deadlines')
     .update(updateData)
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .select('*, customer:customers(id, name)')
     .single()
 
@@ -119,11 +124,13 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { error } = await supabase
     .from('deadlines')
     .delete()
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

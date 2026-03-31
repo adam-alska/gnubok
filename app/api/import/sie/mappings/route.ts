@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { saveMappings } from '@/lib/import/sie-import'
+import { requireCompanyId } from '@/lib/company/context'
 import type { AccountMapping } from '@/lib/import/types'
 
 /**
@@ -18,10 +19,12 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { data, error } = await supabase
     .from('sie_account_mappings')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .order('source_account')
 
   if (error) {
@@ -45,6 +48,8 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   const body = await request.json()
   const mappings: AccountMapping[] = body.mappings
@@ -79,6 +84,8 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const body = await request.json()
   const { sourceAccount, targetAccount } = body
 
@@ -93,6 +100,7 @@ export async function PUT(request: Request) {
     .from('sie_account_mappings')
     .upsert({
       user_id: user.id,
+      company_id: companyId,
       source_account: sourceAccount,
       target_account: targetAccount,
       confidence: 1.0,
@@ -125,6 +133,8 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { searchParams } = new URL(request.url)
   const sourceAccount = searchParams.get('sourceAccount')
 
@@ -133,7 +143,7 @@ export async function DELETE(request: Request) {
     const { error } = await supabase
       .from('sie_account_mappings')
       .delete()
-      .eq('user_id', user.id)
+      .eq('company_id', companyId)
       .eq('source_account', sourceAccount)
 
     if (error) {
@@ -144,7 +154,7 @@ export async function DELETE(request: Request) {
     const { error } = await supabase
       .from('sie_account_mappings')
       .delete()
-      .eq('user_id', user.id)
+      .eq('company_id', companyId)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })

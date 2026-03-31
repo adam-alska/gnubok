@@ -4,6 +4,7 @@ import { correctEntry } from '@/lib/core/bookkeeping/storno-service'
 import { ensureInitialized } from '@/lib/init'
 import { validateBody } from '@/lib/api/validate'
 import { CorrectJournalEntrySchema } from '@/lib/api/schemas'
+import { requireCompanyId } from '@/lib/company/context'
 
 ensureInitialized()
 
@@ -19,12 +20,14 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const validation = await validateBody(request, CorrectJournalEntrySchema)
   if (!validation.success) return validation.response
   const body = validation.data
 
   try {
-    const result = await correctEntry(supabase, user.id, id, body.lines)
+    const result = await correctEntry(supabase, companyId, user.id, id, body.lines)
     return NextResponse.json({ data: result })
   } catch (err) {
     return NextResponse.json(

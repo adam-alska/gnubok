@@ -12,6 +12,7 @@ import {
 } from '@/lib/email/invoice-templates'
 import { createInvoiceJournalEntry } from '@/lib/bookkeeping/invoice-entries'
 import { uploadDocument } from '@/lib/core/documents/document-service'
+import { requireCompanyId } from '@/lib/company/context'
 import type { Invoice, InvoiceItem, Customer, CompanySettings } from '@/types'
 
 ensureInitialized()
@@ -28,6 +29,8 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   // Check if email is configured
   const emailService = getEmailService()
@@ -47,7 +50,7 @@ export async function POST(
       items:invoice_items(*)
     `)
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (invoiceError || !invoice) {
@@ -67,7 +70,7 @@ export async function POST(
   const { data: company, error: companyError } = await supabase
     .from('company_settings')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (companyError || !company) {
@@ -161,7 +164,7 @@ export async function POST(
       .from('invoices')
       .update({ status: 'sent' })
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq('company_id', companyId)
 
     if (updateError) {
       console.error('Failed to update invoice status:', updateError)
@@ -175,6 +178,7 @@ export async function POST(
       try {
         const journalEntry = await createInvoiceJournalEntry(
           supabase,
+          companyId,
           user.id,
           invoice as Invoice,
           (company as CompanySettings).entity_type
@@ -196,7 +200,7 @@ export async function POST(
     if (isRealInvoice) {
       try {
         const pdfArrayBuffer = new Uint8Array(pdfBuffer).buffer as ArrayBuffer
-        await uploadDocument(supabase, user.id, {
+        await uploadDocument(supabase, user.id, companyId, {
           name: filename,
           buffer: pdfArrayBuffer,
           type: 'application/pdf',
@@ -212,7 +216,7 @@ export async function POST(
 
     await eventBus.emit({
       type: 'invoice.sent',
-      payload: { invoice: invoice as Invoice, userId: user.id },
+      payload: { invoice: invoice as Invoice, companyId, userId: user.id },
     })
 
     return NextResponse.json({

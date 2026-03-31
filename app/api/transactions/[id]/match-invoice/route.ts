@@ -10,6 +10,7 @@ import { MatchInvoiceSchema } from '@/lib/api/schemas'
 import { logMatchEvent } from '@/lib/invoices/match-log'
 import { eventBus } from '@/lib/events/bus'
 import { ensureInitialized } from '@/lib/init'
+import { requireCompanyId } from '@/lib/company/context'
 import type { EntityType, Invoice, Transaction } from '@/types'
 
 ensureInitialized()
@@ -39,6 +40,8 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Parse and validate request body
   const validation = await validateBody(request, MatchInvoiceSchema)
   if (!validation.success) return validation.response
@@ -49,7 +52,7 @@ export async function POST(
     .from('transactions')
     .select('*')
     .eq('id', transactionId)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (fetchTxError || !transaction) {
@@ -77,7 +80,7 @@ export async function POST(
     .from('invoices')
     .select('*, customer:customers(*), items:invoice_items(*)')
     .eq('id', invoice_id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (fetchInvError || !invoice) {
@@ -97,7 +100,7 @@ export async function POST(
   // If storno fails, return 500 immediately — nothing else has been modified.
   if (transaction.journal_entry_id) {
     try {
-      await reverseEntry(supabase, user.id, transaction.journal_entry_id)
+      await reverseEntry(supabase, companyId, user.id, transaction.journal_entry_id)
 
       // Clear the journal_entry_id on the transaction
       const { error: clearJeError } = await supabase
@@ -136,7 +139,7 @@ export async function POST(
   const { data: settings } = await supabase
     .from('company_settings')
     .select('accounting_method, entity_type')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   const accountingMethod = settings?.accounting_method || 'accrual'
@@ -151,6 +154,7 @@ export async function POST(
       // Kontantmetoden, full payment: combined revenue entry with per-line VAT rates
       const journalEntry = await createInvoiceCashEntry(
         supabase,
+        companyId,
         user.id,
         invoice as Invoice,
         transaction.date,
@@ -168,6 +172,7 @@ export async function POST(
       // final payment when createInvoiceCashEntry is called.
       const journalEntry = await createInvoicePaymentJournalEntry(
         supabase,
+        companyId,
         user.id,
         invoice as Invoice,
         transaction.date,
@@ -180,6 +185,7 @@ export async function POST(
       // Faktureringsmetoden: clear receivable (Debit 1930, Credit 1510)
       const journalEntry = await createInvoicePaymentJournalEntry(
         supabase,
+        companyId,
         user.id,
         invoice as Invoice,
         transaction.date,
@@ -235,6 +241,7 @@ export async function POST(
     .from('invoice_payments')
     .insert({
       user_id: user.id,
+      company_id: companyId,
       invoice_id,
       payment_date: transaction.date,
       amount: paidAmount,
@@ -292,6 +299,7 @@ export async function POST(
         invoice: invoice as Invoice,
         transaction: transaction as Transaction,
         userId: user.id,
+        companyId,
       },
     })
   } catch {

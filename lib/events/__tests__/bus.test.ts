@@ -25,11 +25,11 @@ describe('EventBus', () => {
 
     await eventBus.emit({
       type: 'journal_entry.committed',
-      payload: { entry: fakeEntry, userId: 'u1' },
+      payload: { entry: fakeEntry, userId: 'u1', companyId: 'company-1' },
     })
 
-    expect(handler1).toHaveBeenCalledWith({ entry: fakeEntry, userId: 'u1' })
-    expect(handler2).toHaveBeenCalledWith({ entry: fakeEntry, userId: 'u1' })
+    expect(handler1).toHaveBeenCalledWith({ entry: fakeEntry, userId: 'u1', companyId: 'company-1' })
+    expect(handler2).toHaveBeenCalledWith({ entry: fakeEntry, userId: 'u1', companyId: 'company-1' })
   })
 
   it('emit() uses Promise.allSettled — a failing handler does not crash others', async () => {
@@ -42,7 +42,7 @@ describe('EventBus', () => {
     // Should not throw
     await eventBus.emit({
       type: 'journal_entry.committed',
-      payload: { entry: fakeEntry, userId: 'u1' },
+      payload: { entry: fakeEntry, userId: 'u1', companyId: 'company-1' },
     })
 
     expect(failingHandler).toHaveBeenCalled()
@@ -53,7 +53,7 @@ describe('EventBus', () => {
     // Should not throw
     await eventBus.emit({
       type: 'journal_entry.drafted',
-      payload: { entry: fakeEntry, userId: 'u1' },
+      payload: { entry: fakeEntry, userId: 'u1', companyId: 'company-1' },
     })
   })
 
@@ -65,7 +65,7 @@ describe('EventBus', () => {
 
     await eventBus.emit({
       type: 'journal_entry.committed',
-      payload: { entry: fakeEntry, userId: 'u1' },
+      payload: { entry: fakeEntry, userId: 'u1', companyId: 'company-1' },
     })
 
     expect(handler).not.toHaveBeenCalled()
@@ -82,11 +82,11 @@ describe('EventBus', () => {
 
     await eventBus.emit({
       type: 'journal_entry.committed',
-      payload: { entry: fakeEntry, userId: 'u1' },
+      payload: { entry: fakeEntry, userId: 'u1', companyId: 'company-1' },
     })
     await eventBus.emit({
       type: 'journal_entry.drafted',
-      payload: { entry: fakeEntry, userId: 'u1' },
+      payload: { entry: fakeEntry, userId: 'u1', companyId: 'company-1' },
     })
 
     expect(handler1).not.toHaveBeenCalled()
@@ -102,7 +102,7 @@ describe('EventBus', () => {
 
     await eventBus.emit({
       type: 'journal_entry.committed',
-      payload: { entry: fakeEntry, userId: 'u1' },
+      payload: { entry: fakeEntry, userId: 'u1', companyId: 'company-1' },
     })
 
     expect(committedHandler).toHaveBeenCalledOnce()

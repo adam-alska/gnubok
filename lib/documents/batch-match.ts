@@ -26,14 +26,14 @@ export interface BatchMatchResult {
  */
 export async function runDocumentMatchingSweep(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   inboxItemIds?: string[]
 ): Promise<BatchMatchResult> {
   // 1. Fetch unmatched inbox items
   let query = supabase
     .from('invoice_inbox_items')
     .select('*')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .is('matched_transaction_id', null)
     .in('status', ['ready', 'processing'])
 
@@ -57,7 +57,7 @@ export async function runDocumentMatchingSweep(
   const { data: transactions, error: txError } = await supabase
     .from('transactions')
     .select('*')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .is('journal_entry_id', null)
     .is('is_business', null)
     .lt('amount', 0)
@@ -80,7 +80,7 @@ export async function runDocumentMatchingSweep(
   for (const item of inboxItems as InvoiceInboxItem[]) {
     const result = await matchDocumentToTransactions(
       supabase,
-      userId,
+      companyId,
       item,
       transactions as Transaction[]
     )
@@ -116,7 +116,7 @@ export async function runDocumentMatchingSweep(
         match_method: result.method,
       })
       .eq('id', inboxItemId)
-      .eq('user_id', userId)
+      .eq('company_id', companyId)
   }
 
   return {

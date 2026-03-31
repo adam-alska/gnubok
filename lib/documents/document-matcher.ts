@@ -44,7 +44,7 @@ export interface DocumentMatchResult {
  */
 export async function matchDocumentToTransactions(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   inboxItem: InvoiceInboxItem,
   candidateTransactions?: Transaction[]
 ): Promise<DocumentMatchResult | null> {
@@ -61,7 +61,7 @@ export async function matchDocumentToTransactions(
     return null
   }
 
-  const transactions = candidateTransactions ?? (await fetchCandidateTransactions(supabase, userId, inboxItem))
+  const transactions = candidateTransactions ?? (await fetchCandidateTransactions(supabase, companyId, inboxItem))
 
   console.log(`${tag} — ${transactions.length} candidate transactions`)
 
@@ -92,7 +92,7 @@ export async function matchDocumentToTransactions(
  */
 async function fetchCandidateTransactions(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   inboxItem: InvoiceInboxItem
 ): Promise<Transaction[]> {
   const docDate = getDocumentDate(inboxItem)
@@ -106,7 +106,7 @@ async function fetchCandidateTransactions(
   const { data, error } = await supabase
     .from('transactions')
     .select('*')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .is('journal_entry_id', null)
     .is('is_business', null)
     .lt('amount', 0)

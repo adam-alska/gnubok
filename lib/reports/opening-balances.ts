@@ -20,7 +20,7 @@ import { fetchAllRows } from '@/lib/supabase/fetch-all'
  */
 export async function getOpeningBalances(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   period: { period_start: string; opening_balance_entry_id: string | null } | null
 ): Promise<{
   balances: Map<string, { debit: number; credit: number }>
@@ -38,7 +38,7 @@ export async function getOpeningBalances(
     // Use the explicit opening balance entry (set by year-end closing).
     // Typically ~50 rows — one per balance sheet account. Uses fetchAllRows
     // for consistency (avoids silent truncation) and joins journal_entries
-    // to enforce user_id ownership (defense in depth alongside RLS).
+    // to enforce company_id ownership (defense in depth alongside RLS).
     const obLines = await fetchAllRows<{
       account_number: string
       debit_amount: number
@@ -46,9 +46,9 @@ export async function getOpeningBalances(
     }>(({ from, to }) =>
       supabase
         .from('journal_entry_lines')
-        .select('account_number, debit_amount, credit_amount, journal_entries!inner(user_id)')
+        .select('account_number, debit_amount, credit_amount, journal_entries!inner(company_id)')
         .eq('journal_entry_id', obEntryId)
-        .eq('journal_entries.user_id', userId)
+        .eq('journal_entries.company_id', companyId)
         .range(from, to)
     )
 
@@ -69,8 +69,8 @@ export async function getOpeningBalances(
     }>(({ from, to }) =>
       supabase
         .from('journal_entry_lines')
-        .select('account_number, debit_amount, credit_amount, journal_entries!inner(user_id, status, entry_date)')
-        .eq('journal_entries.user_id', userId)
+        .select('account_number, debit_amount, credit_amount, journal_entries!inner(company_id, status, entry_date)')
+        .eq('journal_entries.company_id', companyId)
         .in('journal_entries.status', ['posted', 'reversed'])
         .lt('journal_entries.entry_date', period.period_start)
         .range(from, to)

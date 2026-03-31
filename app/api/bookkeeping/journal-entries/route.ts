@@ -4,6 +4,7 @@ import { createJournalEntry } from '@/lib/bookkeeping/engine'
 import { ensureInitialized } from '@/lib/init'
 import { validateBody } from '@/lib/api/validate'
 import { CreateJournalEntrySchema } from '@/lib/api/schemas'
+import { requireCompanyId } from '@/lib/company/context'
 
 ensureInitialized()
 
@@ -14,6 +15,8 @@ export async function GET(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   const { searchParams } = new URL(request.url)
   const periodId = searchParams.get('period_id')
@@ -29,7 +32,7 @@ export async function GET(request: Request) {
   let query = supabase
     .from('journal_entries')
     .select('*, lines:journal_entry_lines(*)', { count: 'exact' })
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
 
   if (sortDate === 'asc' || sortDate === 'desc') {
     query = query
@@ -76,12 +79,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const validation = await validateBody(request, CreateJournalEntrySchema)
   if (!validation.success) return validation.response
   const body = validation.data
 
   try {
-    const entry = await createJournalEntry(supabase, user.id, body)
+    const entry = await createJournalEntry(supabase, companyId, user.id, body)
     return NextResponse.json({ data: entry })
   } catch (err) {
     return NextResponse.json(

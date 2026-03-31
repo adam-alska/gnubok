@@ -88,7 +88,7 @@ export const enableBankingExtension: Extension = {
           const { data: companySettings } = await supabase
             .from('company_settings')
             .select('entity_type')
-            .eq('user_id', user.id)
+            .eq('company_id', ctx?.companyId ?? user.id)
             .single()
 
           const psuType = companySettings?.entity_type === 'aktiebolag' ? 'business' : 'personal'
@@ -106,7 +106,7 @@ export const enableBankingExtension: Extension = {
           const { data: recentPending } = await supabase
             .from('bank_connections')
             .select('id, created_at')
-            .eq('user_id', user.id)
+            .eq('company_id', ctx?.companyId ?? user.id)
             .eq('bank_name', aspsp_name)
             .eq('status', 'pending')
             .order('created_at', { ascending: false })
@@ -136,7 +136,7 @@ export const enableBankingExtension: Extension = {
             await supabase
               .from('bank_connections')
               .update({ status: 'error', error_message: 'Superseded by new connection attempt', oauth_state: null })
-              .eq('user_id', user.id)
+              .eq('company_id', ctx?.companyId ?? user.id)
               .eq('bank_name', aspsp_name)
               .eq('status', 'pending')
           }
@@ -157,6 +157,7 @@ export const enableBankingExtension: Extension = {
           const { data: connection, error } = await supabase
             .from('bank_connections')
             .insert({
+              company_id: ctx?.companyId ?? user.id,
               user_id: user.id,
               provider: `${aspsp_name.toLowerCase().replace(/\s+/g, '-')}-${aspsp_country.toLowerCase()}`,
               bank_name: aspsp_name,
@@ -217,7 +218,7 @@ export const enableBankingExtension: Extension = {
           .from('bank_connections')
           .select('*')
           .eq('id', connection_id)
-          .eq('user_id', user.id)
+          .eq('company_id', ctx?.companyId ?? user.id)
           .single()
 
         if (connectionError || !connection) {
@@ -246,7 +247,7 @@ export const enableBankingExtension: Extension = {
           const { data: sieOverlap } = await supabase
             .from('sie_imports')
             .select('id')
-            .eq('user_id', user.id)
+            .eq('company_id', ctx?.companyId ?? user.id)
             .eq('status', 'completed')
             .gte('fiscal_year_end', fromDate)
             .limit(1)
@@ -264,9 +265,11 @@ export const enableBankingExtension: Extension = {
             })
           }
 
+          const companyId = ctx?.companyId ?? user.id
           const results = await Promise.all(
             accounts.map(account => syncAccountTransactions(
               supabase,
+              companyId,
               user.id,
               connection.id,
               account,
@@ -314,7 +317,7 @@ export const enableBankingExtension: Extension = {
             const { data: syncedTransactions } = await supabase
               .from('transactions')
               .select('*')
-              .eq('user_id', user.id)
+              .eq('company_id', ctx?.companyId ?? user.id)
               .eq('bank_connection_id', connection.id)
               .gte('created_at', syncStartedAt)
               .order('created_at', { ascending: false })
@@ -324,7 +327,7 @@ export const enableBankingExtension: Extension = {
               const emit = ctx?.emit ?? (await import('@/lib/events/bus')).eventBus.emit.bind((await import('@/lib/events/bus')).eventBus)
               await emit({
                 type: 'transaction.synced',
-                payload: { transactions: syncedTransactions as Transaction[], userId: user.id },
+                payload: { transactions: syncedTransactions as Transaction[], userId: user.id, companyId: ctx?.companyId ?? user.id },
               })
             }
           }
@@ -373,7 +376,7 @@ export const enableBankingExtension: Extension = {
           .from('bank_connections')
           .select('id, session_id, status')
           .eq('id', connection_id)
-          .eq('user_id', user.id)
+          .eq('company_id', ctx?.companyId ?? user.id)
           .single()
 
         if (findError || !connection) {

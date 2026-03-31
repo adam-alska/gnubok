@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { eventBus } from '@/lib/events'
 import { ensureInitialized } from '@/lib/init'
+import { requireCompanyId } from '@/lib/company/context'
 import type { Invoice } from '@/types'
 
 ensureInitialized()
@@ -25,12 +26,14 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Fetch proforma with items
   const { data: proforma, error: proformaError } = await supabase
     .from('invoices')
     .select('*, items:invoice_items(*)')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (proformaError || !proforma) {
@@ -61,6 +64,7 @@ export async function POST(
     .from('invoices')
     .insert({
       user_id: user.id,
+      company_id: companyId,
       customer_id: proforma.customer_id,
       invoice_number: invoiceNumber,
       invoice_date: new Date().toISOString().split('T')[0],
@@ -129,7 +133,7 @@ export async function POST(
   if (completeInvoice) {
     await eventBus.emit({
       type: 'invoice.created',
-      payload: { invoice: completeInvoice as Invoice, userId: user.id },
+      payload: { invoice: completeInvoice as Invoice, companyId, userId: user.id },
     })
   }
 

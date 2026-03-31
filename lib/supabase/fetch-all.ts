@@ -12,7 +12,7 @@ const PAGE_SIZE = 1000
  *   supabase
  *     .from('chart_of_accounts')
  *     .select('account_number, account_name')
- *     .eq('user_id', userId)
+ *     .eq('company_id', companyId)
  *     .range(from, to)
  * )
  * ```

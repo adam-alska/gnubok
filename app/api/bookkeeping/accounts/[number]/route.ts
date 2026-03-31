@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { validateBody } from '@/lib/api/validate'
 import { UpdateAccountSchema } from '@/lib/api/schemas'
+import { requireCompanyId } from '@/lib/company/context'
 
 export async function DELETE(
   request: Request,
@@ -15,11 +16,13 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Fetch the account to check if it's a system account
   const { data: account, error: fetchError } = await supabase
     .from('chart_of_accounts')
     .select('id, is_system_account')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .eq('account_number', number)
     .single()
 
@@ -51,7 +54,7 @@ export async function DELETE(
     .from('chart_of_accounts')
     .delete()
     .eq('id', account.id)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
 
   if (deleteError) {
     return NextResponse.json({ error: deleteError.message }, { status: 500 })
@@ -72,6 +75,8 @@ export async function PUT(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const validation = await validateBody(request, UpdateAccountSchema)
   if (!validation.success) return validation.response
   const body = validation.data
@@ -79,7 +84,7 @@ export async function PUT(
   const { data, error } = await supabase
     .from('chart_of_accounts')
     .update(body)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .eq('account_number', number)
     .select()
     .single()

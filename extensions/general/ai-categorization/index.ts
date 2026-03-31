@@ -43,7 +43,7 @@ export async function getSettings(userId: string): Promise<AiCategorizationSetti
   const { data } = await supabase
     .from('extension_data')
     .select('value')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .eq('extension_id', 'ai-categorization')
     .eq('key', 'settings')
     .single()
@@ -106,7 +106,7 @@ export async function categorizeTransactions(
   const { data: transactions } = await supabase
     .from('transactions')
     .select('id, description, amount, date, merchant_name, mcc_code, currency')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .in('id', transactionIds)
 
   if (!transactions || transactions.length === 0) return []
@@ -207,7 +207,7 @@ async function buildEnrichedContext(
   const { data: companySettings } = await supabase
     .from('company_settings')
     .select('entity_type')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .single()
 
   const entityType: EntityType = companySettings?.entity_type || 'enskild_firma'
@@ -216,7 +216,7 @@ async function buildEnrichedContext(
   const { data: historicalTxns } = await supabase
     .from('transactions')
     .select('description, category')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .not('is_business', 'is', null)
     .neq('category', 'uncategorized')
     .order('updated_at', { ascending: false })
@@ -233,7 +233,7 @@ async function buildEnrichedContext(
   const { data: accountUsageRows } = await supabase
     .from('journal_entry_lines')
     .select('account_number')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
 
   const accountCounts = new Map<string, number>()
   if (accountUsageRows) {
@@ -258,7 +258,7 @@ async function buildEnrichedContext(
     const { data: merchantRows } = await supabase
       .from('transactions')
       .select('merchant_name, category, template_id')
-      .eq('user_id', userId)
+      .eq('company_id', userId)
       .not('is_business', 'is', null)
       .neq('category', 'uncategorized')
       .in('merchant_name', merchantNames)

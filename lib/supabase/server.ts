@@ -36,27 +36,16 @@ export async function createClient() {
   )
 }
 
-export async function createServiceClient() {
-  const cookieStore = await cookies()
-
+export function createServiceClient() {
+  // Stateless service-role client — no cookies.
+  // Passing user session cookies causes @supabase/ssr to send the
+  // user's JWT as the Authorization header, which overrides the
+  // service role key and re-enables RLS. A cookie-less client
+  // ensures the service role key is used for authorization,
+  // properly bypassing RLS on every query.
   return createServerClient(
     safeUrl,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          } catch {
-            // Ignore in Server Components
-          }
-        },
-      },
-    }
+    { cookies: { getAll: () => [], setAll: () => {} } }
   )
 }

@@ -30,7 +30,7 @@ async function handleGetSuggestions(
   const { data: records } = await supabase
     .from('extension_data')
     .select('key, value')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .eq('extension_id', 'ai-categorization')
     .in('key', keys)
 

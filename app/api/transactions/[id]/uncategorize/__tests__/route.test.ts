@@ -16,6 +16,10 @@ vi.mock('@/lib/init', () => ({
   ensureInitialized: vi.fn(),
 }))
 
+vi.mock('@/lib/company/context', () => ({
+  requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
 const mockReverseEntry = vi.fn()
 vi.mock('@/lib/bookkeeping/engine', () => ({
   reverseEntry: (...args: unknown[]) => mockReverseEntry(...args),
@@ -103,6 +107,6 @@ describe('POST /api/transactions/[id]/uncategorize', () => {
 
     expect(status).toBe(200)
     expect(body).toEqual({ success: true })
-    expect(mockReverseEntry).toHaveBeenCalledWith(mockSupabase, 'user-1', 'je-1')
+    expect(mockReverseEntry).toHaveBeenCalledWith(mockSupabase, 'company-1', 'user-1', 'je-1')
   })
 })

@@ -5,10 +5,11 @@ import type { FiscalPeriod, PeriodStatus } from '@/types'
 
 /**
  * Lock a fiscal period — prevents new journal entries from being posted.
- * Requires: period exists, belongs to user, not already locked/closed.
+ * Requires: period exists, belongs to company, not already locked/closed.
  */
 export async function lockPeriod(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   fiscalPeriodId: string
 ): Promise<FiscalPeriod> {
@@ -18,7 +19,7 @@ export async function lockPeriod(
     .from('fiscal_periods')
     .select('*')
     .eq('id', fiscalPeriodId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (fetchError || !period) {
@@ -37,7 +38,7 @@ export async function lockPeriod(
   const { count: unbookedCount } = await supabase
     .from('transactions')
     .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .is('journal_entry_id', null)
     .eq('is_business', true)
     .gte('date', period.period_start)
@@ -53,7 +54,7 @@ export async function lockPeriod(
     .from('fiscal_periods')
     .update({ locked_at: new Date().toISOString() })
     .eq('id', fiscalPeriodId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .select()
     .single()
 
@@ -65,7 +66,7 @@ export async function lockPeriod(
 
   await eventBus.emit({
     type: 'period.locked',
-    payload: { period: result, userId },
+    payload: { period: result, companyId, userId },
   })
 
   return result
@@ -77,6 +78,7 @@ export async function lockPeriod(
  */
 export async function closePeriod(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   fiscalPeriodId: string
 ): Promise<FiscalPeriod> {
@@ -85,7 +87,7 @@ export async function closePeriod(
     .from('fiscal_periods')
     .select('*')
     .eq('id', fiscalPeriodId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (fetchError || !period) {
@@ -111,7 +113,7 @@ export async function closePeriod(
       closed_at: new Date().toISOString(),
     })
     .eq('id', fiscalPeriodId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .select()
     .single()
 
@@ -129,6 +131,7 @@ export async function closePeriod(
  */
 export async function createNextPeriod(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   currentPeriodId: string
 ): Promise<FiscalPeriod> {
@@ -137,7 +140,7 @@ export async function createNextPeriod(
     .from('fiscal_periods')
     .select('*')
     .eq('id', currentPeriodId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (fetchError || !current) {
@@ -177,7 +180,7 @@ export async function createNextPeriod(
   const { data: overlapping } = await supabase
     .from('fiscal_periods')
     .select('id')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .lte('period_start', nextEndStr)
     .gte('period_end', nextStartStr)
     .limit(1)
@@ -194,6 +197,7 @@ export async function createNextPeriod(
   const { data: newPeriod, error: insertError } = await supabase
     .from('fiscal_periods')
     .insert({
+      company_id: companyId,
       user_id: userId,
       name,
       period_start: nextStartStr,
@@ -215,6 +219,7 @@ export async function createNextPeriod(
  */
 export async function getPeriodStatus(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   fiscalPeriodId: string
 ): Promise<PeriodStatus> {
@@ -223,7 +228,7 @@ export async function getPeriodStatus(
     .from('fiscal_periods')
     .select('*')
     .eq('id', fiscalPeriodId)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (fetchError || !period) {
@@ -234,7 +239,7 @@ export async function getPeriodStatus(
   const { count: draftCount } = await supabase
     .from('journal_entries')
     .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .eq('fiscal_period_id', fiscalPeriodId)
     .eq('status', 'draft')
 
@@ -245,7 +250,7 @@ export async function getPeriodStatus(
   const { data: nextPeriod } = await supabase
     .from('fiscal_periods')
     .select('id')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .eq('previous_period_id', fiscalPeriodId)
     .maybeSingle()
 

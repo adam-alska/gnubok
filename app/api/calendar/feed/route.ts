@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireCompanyId } from '@/lib/company/context'
 import type { UpdateCalendarFeedInput } from '@/types'
 
 /**
@@ -15,10 +16,12 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const { data: feed, error } = await supabase
     .from('calendar_feeds')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (error && error.code !== 'PGRST116') {
@@ -57,11 +60,13 @@ export async function POST() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Check if feed already exists
   const { data: existingFeed } = await supabase
     .from('calendar_feeds')
     .select('id')
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .single()
 
   if (existingFeed) {
@@ -76,6 +81,7 @@ export async function POST() {
     .from('calendar_feeds')
     .insert({
       user_id: user.id,
+      company_id: companyId,
       is_active: true,
       include_tax_deadlines: true,
       include_invoices: true,
@@ -111,12 +117,14 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   const body: UpdateCalendarFeedInput = await request.json()
 
   const { data: feed, error } = await supabase
     .from('calendar_feeds')
     .update(body)
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .select()
     .single()
 
@@ -148,6 +156,8 @@ export async function DELETE() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // Generate a new token by updating with a new UUID
   const { data: feed, error } = await supabase
     .from('calendar_feeds')
@@ -156,7 +166,7 @@ export async function DELETE() {
       access_count: 0,
       last_accessed_at: null,
     })
-    .eq('user_id', user.id)
+    .eq('company_id', companyId)
     .select()
     .single()
 

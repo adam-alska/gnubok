@@ -13,7 +13,7 @@ import type { SIEExportOptions, JournalEntry, JournalEntryLine, BASAccount } fro
  */
 export async function generateSIEExport(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   options: SIEExportOptions
 ): Promise<string> {
 
@@ -22,7 +22,7 @@ export async function generateSIEExport(
     .from('fiscal_periods')
     .select('*')
     .eq('id', options.fiscal_period_id)
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (!period) {
@@ -34,7 +34,7 @@ export async function generateSIEExport(
     supabase
       .from('chart_of_accounts')
       .select('*')
-      .eq('user_id', userId)
+      .eq('company_id', companyId)
       .eq('is_active', true)
       .order('account_number')
       .range(from, to)
@@ -44,7 +44,7 @@ export async function generateSIEExport(
   const { data: entries } = await supabase
     .from('journal_entries')
     .select('*, lines:journal_entry_lines(*)')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .eq('fiscal_period_id', options.fiscal_period_id)
     .in('status', ['posted', 'reversed'])
     .order('voucher_number')
@@ -53,14 +53,14 @@ export async function generateSIEExport(
   const { data: costCenters } = await supabase
     .from('cost_centers')
     .select('*')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .eq('is_active', true)
     .order('code')
 
   const { data: projects } = await supabase
     .from('projects')
     .select('*')
-    .eq('user_id', userId)
+    .eq('company_id', companyId)
     .eq('is_active', true)
     .order('code')
 
@@ -121,7 +121,7 @@ export async function generateSIEExport(
       .from('journal_entries')
       .select('*, lines:journal_entry_lines(*)')
       .eq('id', period.opening_balance_entry_id)
-      .eq('user_id', userId)
+      .eq('company_id', companyId)
       .single()
 
     if (obEntry?.lines) {

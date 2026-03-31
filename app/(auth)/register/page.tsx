@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -12,13 +13,44 @@ import Image from 'next/image'
 import { getErrorMessage } from '@/lib/errors/get-error-message'
 
 export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <RegisterPageContent />
+    </Suspense>
+  )
+}
+
+function RegisterPageContent() {
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isRegistered, setIsRegistered] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState<string | null>(null)
   const { toast } = useToast()
   const supabase = createClient()
+
+  // When arriving from an invite link, fetch the invite info to pre-fill
+  // and lock the email field so the user registers with the correct address.
+  useEffect(() => {
+    const inviteToken = searchParams.get('invite')
+    if (!inviteToken) return
+
+    fetch(`/api/team/accept?token=${encodeURIComponent(inviteToken)}`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data?.data?.email) {
+          setInviteEmail(data.data.email)
+          setEmail(data.data.email)
+        }
+      })
+      .catch(() => {})
+  }, [searchParams])
 
   function isStrongPassword(pw: string): boolean {
     return pw.length >= 8
@@ -101,6 +133,43 @@ export default function RegisterPage() {
         confirmationSentAt: data.user?.confirmation_sent_at,
         provider: data.user?.app_metadata?.provider,
       })
+
+      // If auto-confirmed (local dev), process invite immediately and redirect
+      if (data.session) {
+        const cookieMatch = document.cookie.match(/gnubok-invite-token=([^;]+)/)
+        const inviteToken = cookieMatch?.[1]
+
+        if (inviteToken) {
+          try {
+            const res = await fetch('/api/team/accept', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: inviteToken }),
+            })
+
+            if (res.ok) {
+              document.cookie = 'gnubok-invite-token=; path=/; max-age=0'
+              console.log('[register] invite accepted after auto-confirm — redirecting')
+              window.location.href = '/'
+              return
+            }
+
+            // Log the error response so we can diagnose invite failures
+            const errBody = await res.json().catch(() => ({}))
+            console.error('[register] invite acceptance returned non-ok', {
+              status: res.status,
+              error: errBody.error,
+            })
+          } catch (err) {
+            console.error('[register] invite acceptance failed:', err)
+          }
+        }
+
+        // Auto-confirmed but no invite or invite failed — go to onboarding
+        // (invite cookie is preserved so the onboarding fallback can retry)
+        window.location.href = '/'
+        return
+      }
 
       setEmail(emailValue)
       setIsRegistered(true)
@@ -188,9 +257,15 @@ export default function RegisterPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={isLoading}
+                disabled={isLoading || !!inviteEmail}
+                readOnly={!!inviteEmail}
                 className="h-11"
               />
+              {inviteEmail && (
+                <p className="text-xs text-muted-foreground">
+                  Inbjudan skickades till denna adress.
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Lösenord</Label>

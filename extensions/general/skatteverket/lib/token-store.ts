@@ -79,7 +79,7 @@ export async function getTokens(
   const { data, error } = await supabase
     .from('skatteverket_tokens')
     .select('access_token, refresh_token, expires_at, refresh_count, scope')
-    .eq('user_id', userId)
+    .eq('company_id', userId)
     .single()
 
   if (error || !data) return null
@@ -108,5 +108,5 @@ export async function deleteTokens(
   await supabase
     .from('skatteverket_tokens')
     .delete()
-    .eq('user_id', userId)
+    .eq('company_id', userId)
 }

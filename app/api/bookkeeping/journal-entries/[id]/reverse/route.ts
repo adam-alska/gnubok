@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { reverseEntry } from '@/lib/bookkeeping/engine'
 import { ensureInitialized } from '@/lib/init'
+import { requireCompanyId } from '@/lib/company/context'
 
 ensureInitialized()
 
@@ -17,8 +18,10 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   try {
-    const reversalEntry = await reverseEntry(supabase, user.id, id)
+    const reversalEntry = await reverseEntry(supabase, companyId, user.id, id)
     return NextResponse.json({ data: reversalEntry })
   } catch (err) {
     return NextResponse.json(

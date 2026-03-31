@@ -65,6 +65,11 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: (...args: unknown[]) => mockCreateClient(...args),
 }))
 
+vi.mock('@/lib/company/context', () => ({
+  requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+  getActiveCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
 describe('POST /api/transactions/batch-describe', () => {
   let POST: typeof import('../route').POST
 
@@ -171,7 +176,7 @@ describe('POST /api/transactions/batch-describe', () => {
     // Verify mapping rule was saved with user description
     expect(mockSaveUserMappingRule).toHaveBeenCalledWith(
       expect.anything(),
-      'user-1',
+      'company-1',
       'Staples',
       '6110',
       '1930',
