@@ -90,7 +90,7 @@ function makeMappingResult(overrides: Partial<MappingResult> = {}): MappingResul
     rule: null,
     debit_account: '5410',
     credit_account: '1930',
-    risk_level: 'low',
+    risk_level: 'LOW',
     confidence: 0.95,
     requires_review: false,
     default_private: false,

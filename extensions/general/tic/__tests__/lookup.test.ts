@@ -73,7 +73,7 @@ describe('TIC lookup route', () => {
   it('returns full lookup result on happy path', async () => {
     mockSearch.mockResolvedValue(mockDoc)
     mockBank.mockResolvedValue([
-      { bankAccountType: 1, accountNumber: '123-456', swift_BIC: null },
+      { bankAccountType: 1, accountNumber: '123-456', swift_BIC: undefined },
     ])
     mockSNI.mockResolvedValue([
       { sni_2007Code: '62010', sni_2007Name: 'Dataprogrammering' },

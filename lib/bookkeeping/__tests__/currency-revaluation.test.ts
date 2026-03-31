@@ -106,23 +106,23 @@ function buildFilterChain(data: unknown[]) {
   })
 
   chain.eq = vi.fn().mockImplementation((col: string, val: unknown) => {
-    filtered = filtered.filter((row: Record<string, unknown>) => row[col] === val)
+    filtered = filtered.filter((row) => (row as Record<string, unknown>)[col] === val)
     return chain
   })
 
   chain.neq = vi.fn().mockImplementation((col: string, val: unknown) => {
-    filtered = filtered.filter((row: Record<string, unknown>) => row[col] !== val)
+    filtered = filtered.filter((row) => (row as Record<string, unknown>)[col] !== val)
     return chain
   })
 
   chain.in = vi.fn().mockImplementation((col: string, vals: unknown[]) => {
-    filtered = filtered.filter((row: Record<string, unknown>) => vals.includes(row[col]))
+    filtered = filtered.filter((row) => vals.includes((row as Record<string, unknown>)[col]))
     return chain
   })
 
   chain.not = vi.fn().mockImplementation((col: string, op: string, _val: unknown) => {
     if (op === 'is') {
-      filtered = filtered.filter((row: Record<string, unknown>) => row[col] != null)
+      filtered = filtered.filter((row) => (row as Record<string, unknown>)[col] != null)
     }
     return chain
   })

@@ -161,7 +161,7 @@ describe('MCP Receipt Matcher', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    ;(eventBus as { clear: ReturnType<typeof vi.fn> }).clear()
+    eventBus.clear()
     const mock = createQueuedMockSupabase()
     supabase = mock.supabase
     enqueueMany = mock.enqueueMany

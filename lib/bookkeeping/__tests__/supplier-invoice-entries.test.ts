@@ -309,11 +309,11 @@ describe('createSupplierInvoiceRegistrationEntry', () => {
     expect(vat2641).toHaveLength(3)
 
     // 25%: 10000 * 0.25 = 2500
-    expect(vat2641.find((l) => l.line_description.includes('25%'))?.debit_amount).toBe(2500)
+    expect(vat2641.find((l) => l.line_description?.includes('25%'))?.debit_amount).toBe(2500)
     // 12%: 5000 * 0.12 = 600
-    expect(vat2641.find((l) => l.line_description.includes('12%'))?.debit_amount).toBe(600)
+    expect(vat2641.find((l) => l.line_description?.includes('12%'))?.debit_amount).toBe(600)
     // 6%: 3000 * 0.06 = 180
-    expect(vat2641.find((l) => l.line_description.includes('6%'))?.debit_amount).toBe(180)
+    expect(vat2641.find((l) => l.line_description?.includes('6%'))?.debit_amount).toBe(180)
 
     assertBalanced(input)
   })
@@ -730,8 +730,8 @@ describe('createSupplierInvoiceCashEntry', () => {
     const input = mockedCreateEntry.mock.calls[0][3]
     const vat2641 = findByAccount(input.lines, '2641')
     expect(vat2641).toHaveLength(2)
-    expect(vat2641.find((l) => l.line_description.includes('25%'))?.debit_amount).toBe(2500)
-    expect(vat2641.find((l) => l.line_description.includes('6%'))?.debit_amount).toBe(180)
+    expect(vat2641.find((l) => l.line_description?.includes('25%'))?.debit_amount).toBe(2500)
+    expect(vat2641.find((l) => l.line_description?.includes('6%'))?.debit_amount).toBe(180)
 
     assertBalanced(input)
   })
