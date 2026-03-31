@@ -125,9 +125,9 @@ export async function POST(request: Request) {
   }
 
   // Send email
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   const emailService = getEmailService()
   if (emailService.isConfigured()) {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const inviteUrl = `${appUrl}/invite/${token}`
 
     const emailData = {
