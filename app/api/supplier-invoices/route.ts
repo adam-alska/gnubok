@@ -75,7 +75,7 @@ export async function POST(request: Request) {
 
   // Get next arrival number
   const { data: arrivalNum, error: arrivalError } = await supabase
-    .rpc('get_next_arrival_number', { p_user_id: user.id })
+    .rpc('get_next_arrival_number', { p_company_id: companyId })
 
   if (arrivalError) {
     return NextResponse.json({ error: 'Failed to get arrival number' }, { status: 500 })

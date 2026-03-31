@@ -44,7 +44,7 @@ export async function POST(
 
   // Get next arrival number
   const { data: arrivalNum } = await supabase
-    .rpc('get_next_arrival_number', { p_user_id: user.id })
+    .rpc('get_next_arrival_number', { p_company_id: companyId })
 
   // Create credit note invoice (negative amounts)
   const { data: creditNote, error: creditError } = await supabase

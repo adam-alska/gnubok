@@ -340,7 +340,7 @@ async function commitCreateInvoice(
 
   // Generate invoice number
   const { data: invoiceNumber } = await supabase.rpc('generate_invoice_number', {
-    p_user_id: userId,
+    p_company_id: companyId,
   })
 
   // Create invoice

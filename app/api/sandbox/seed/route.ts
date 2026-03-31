@@ -73,7 +73,7 @@ export async function POST() {
 
     // 3. Seed chart of accounts via RPC
     const { error: coaError } = await supabase.rpc('seed_chart_of_accounts', {
-      p_user_id: userId,
+      p_company_id: companyId,
       p_entity_type: 'enskild_firma',
     })
     if (coaError) throw coaError
@@ -294,7 +294,7 @@ export async function POST() {
 
     // 9. Create journal entries (inserted directly, not via engine, to avoid event emission)
     const { data: voucherNum1 } = await supabase.rpc('next_voucher_number', {
-      p_user_id: userId,
+      p_company_id: companyId,
       p_fiscal_period_id: fiscalPeriod.id,
       p_series: 'A',
     })
@@ -320,7 +320,7 @@ export async function POST() {
     if (je1Error) throw je1Error
 
     const { data: voucherNum2 } = await supabase.rpc('next_voucher_number', {
-      p_user_id: userId,
+      p_company_id: companyId,
       p_fiscal_period_id: fiscalPeriod.id,
       p_series: 'A',
     })

@@ -166,12 +166,12 @@ export async function POST(request: Request) {
   let invoiceNumber: string
   if (documentType === 'delivery_note') {
     const { data: dnNumber } = await supabase.rpc('generate_delivery_note_number', {
-      p_user_id: user.id,
+      p_company_id: companyId,
     })
     invoiceNumber = dnNumber
   } else {
     const { data: baseNumber } = await supabase.rpc('generate_invoice_number', {
-      p_user_id: user.id,
+      p_company_id: companyId,
     })
     invoiceNumber = documentType === 'proforma'
       ? `PF-${baseNumber}`

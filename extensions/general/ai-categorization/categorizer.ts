@@ -76,6 +76,7 @@ export interface CategorizationSuggestion {
 export interface TrackingContext {
   supabase: SupabaseClient
   userId: string
+  companyId?: string
 }
 
 export interface CategorizationProvider {
@@ -336,7 +337,7 @@ ${transactionList}`
             inputTokens: message.usage.input_tokens,
             outputTokens: message.usage.output_tokens,
             model: this.model,
-          })
+          }, tracking.companyId)
         }
 
         // Extract tool_use block from response

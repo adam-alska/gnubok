@@ -166,6 +166,7 @@ async function uploadAndCreateInboxItem(
     .from('invoice_inbox_items')
     .insert({
       user_id: userId,
+      company_id: companyId,
       status: 'processing',
       source: 'upload',
       document_id: document.id,
@@ -818,7 +819,7 @@ async function handleConfirmInboxItem(
 
     // Get next arrival number
     const { data: arrivalNum, error: arrivalError } = await supabase
-      .rpc('get_next_arrival_number', { p_user_id: userId })
+      .rpc('get_next_arrival_number', { p_company_id: companyId })
 
     if (arrivalError) {
       console.error('[invoice-inbox] Confirm: arrival number error:', arrivalError)

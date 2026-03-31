@@ -36,7 +36,7 @@ export interface ChatResult {
 export async function generateChatResponse(
   userMessage: string,
   conversationHistory: ChatMessage[],
-  tracking?: { supabase: SupabaseClient; userId: string }
+  tracking?: { supabase: SupabaseClient; userId: string; companyId?: string }
 ): Promise<ChatResult> {
   // 1. Retrieve relevant documents
   const relevantDocs = await retrieveRelevantDocuments(userMessage)
@@ -81,7 +81,7 @@ export async function generateChatResponse(
       inputTokens: response.usage_metadata.input_tokens ?? 0,
       outputTokens: response.usage_metadata.output_tokens ?? 0,
       model: CHATBOT_CONFIG.model,
-    })
+    }, tracking.companyId)
   }
 
   // 7. Extract content and sources

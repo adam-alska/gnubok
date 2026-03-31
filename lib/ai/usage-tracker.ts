@@ -16,12 +16,14 @@ export function trackTokenUsage(
   supabase: SupabaseClient,
   userId: string,
   extensionId: string,
-  usage: TokenUsage
+  usage: TokenUsage,
+  companyId?: string
 ): void {
   supabase
     .from('ai_usage_tracking')
     .insert({
       user_id: userId,
+      company_id: companyId,
       extension_id: extensionId,
       model: usage.model,
       input_tokens: usage.inputTokens,
