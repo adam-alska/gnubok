@@ -21,7 +21,7 @@ export type { RawTransaction, IngestResult } from '@/types'
  */
 async function buildBookedTransactionMap(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   rawTransactions: RawTransaction[]
 ): Promise<Map<string, number>> {
   const map = new Map<string, number>()
@@ -35,7 +35,7 @@ async function buildBookedTransactionMap(
     const { data: booked } = await supabase
       .from('transactions')
       .select('date, amount')
-      .eq('company_id', userId)
+      .eq('company_id', companyId)
       .not('journal_entry_id', 'is', null)
       .gte('date', dateFrom)
       .lte('date', dateTo)
@@ -70,6 +70,7 @@ async function buildBookedTransactionMap(
  */
 export async function ingestTransactions(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   rawTransactions: RawTransaction[],
   options?: IngestOptions
@@ -87,12 +88,12 @@ export async function ingestTransactions(
   // Pre-fetch booked transactions for content-based dedup (date+amount)
   // This catches cross-source duplicates (e.g. same transaction imported
   // via CSV and then again via PSD2 with different external_id)
-  const bookedMap = await buildBookedTransactionMap(supabase, userId, rawTransactions)
+  const bookedMap = await buildBookedTransactionMap(supabase, companyId, rawTransactions)
 
   // Pre-fetch unlinked GL lines for reconciliation (non-critical)
   let glLinePool: UnlinkedGLLine[] = []
   try {
-    glLinePool = await fetchUnlinkedGLLines(supabase, userId)
+    glLinePool = await fetchUnlinkedGLLines(supabase, companyId)
   } catch {
     // Non-critical — reconciliation will be skipped
   }
@@ -103,7 +104,7 @@ export async function ingestTransactions(
     const { data } = await supabase
       .from('supplier_invoices')
       .select('*, supplier:suppliers(*)')
-      .eq('company_id', userId)
+      .eq('company_id', companyId)
       .in('status', ['registered', 'approved'])
       .gt('remaining_amount', 0)
 
@@ -135,7 +136,7 @@ export async function ingestTransactions(
     const { data } = await supabase
       .from('transactions')
       .select('external_id')
-      .eq('company_id', userId)
+      .eq('company_id', companyId)
       .in('external_id', chunk)
     data?.forEach(r => existingExternalIds.add(r.external_id))
   }
@@ -173,6 +174,7 @@ export async function ingestTransactions(
     const { data: newTransaction, error: insertError } = await supabase
       .from('transactions')
       .insert({
+        company_id: companyId,
         user_id: userId,
         bank_connection_id: raw.bank_connection_id || null,
         external_id: raw.external_id,
@@ -232,7 +234,7 @@ export async function ingestTransactions(
         // (which calls findMatchingInvoices, which now checks references)
         const bestMatch = await getBestInvoiceMatch(
           supabase,
-          userId,
+          companyId,
           newTransaction as Transaction,
           0.50
         )
@@ -321,14 +323,14 @@ export async function ingestTransactions(
       try {
         const mappingResult = await evaluateMappingRules(
           supabase,
-          userId,
+          companyId,
           newTransaction as Transaction
         )
 
         if (mappingResult.confidence >= 0.8 && !mappingResult.requires_review) {
           const journalEntry = await createTransactionJournalEntry(
             supabase,
-            userId,
+            companyId,
             userId,
             newTransaction as Transaction,
             mappingResult
@@ -346,7 +348,7 @@ export async function ingestTransactions(
             // Upsert counterparty template (auto-learned, lower confidence)
             try {
               await upsertCounterpartyTemplate(
-                supabase, userId, newTransaction as Transaction,
+                supabase, companyId, newTransaction as Transaction,
                 mappingResult, 'auto_learned'
               )
             } catch {

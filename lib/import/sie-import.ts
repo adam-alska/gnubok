@@ -85,7 +85,7 @@ export function generateImportPreview(
  */
 export async function checkDuplicateImport(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   fileContent: string
 ): Promise<SIEImport | null> {
   const fileHash = await calculateFileHash(fileContent)
@@ -93,7 +93,7 @@ export async function checkDuplicateImport(
   const { data } = await supabase
     .from('sie_imports')
     .select('*')
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .eq('file_hash', fileHash)
     .eq('status', 'completed')
     .single()
@@ -107,7 +107,7 @@ export async function checkDuplicateImport(
  */
 async function cleanupStaleImportRecords(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   fileHash: string
 ): Promise<void> {
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
@@ -115,10 +115,9 @@ async function cleanupStaleImportRecords(
   await supabase
     .from('sie_imports')
     .delete()
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .eq('file_hash', fileHash)
     .in('status', ['pending', 'failed'])
-    .lt('created_at', oneHourAgo)
 }
 
 /**
@@ -126,7 +125,7 @@ async function cleanupStaleImportRecords(
  */
 async function ensureFiscalPeriod(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   startDate: Date,
   endDate: Date
 ): Promise<string> {
@@ -134,7 +133,7 @@ async function ensureFiscalPeriod(
   const { data: containing } = await supabase
     .from('fiscal_periods')
     .select('id')
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .lte('period_start', formatDate(startDate))
     .gte('period_end', formatDate(endDate))
     .single()
@@ -148,7 +147,7 @@ async function ensureFiscalPeriod(
   const { data: overlapping } = await supabase
     .from('fiscal_periods')
     .select('id')
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .lte('period_start', formatDate(endDate))
     .gte('period_end', formatDate(startDate))
     .order('period_start', { ascending: false })
@@ -168,7 +167,7 @@ async function ensureFiscalPeriod(
   const { data: newPeriod, error } = await supabase
     .from('fiscal_periods')
     .insert({
-      user_id: userId,
+      company_id: companyId,
       name,
       period_start: formatDate(startDate),
       period_end: formatDate(endDate),
@@ -257,6 +256,7 @@ export function validateIBBalance(
  */
 async function createOpeningBalanceEntry(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   fiscalPeriodId: string,
   parsed: ParsedSIEFile,
@@ -319,7 +319,7 @@ async function createOpeningBalanceEntry(
   const fiscalYearStart = parsed.stats.fiscalYearStart
   const entryDate = fiscalYearStart ? formatDate(fiscalYearStart) : formatDate(new Date())
 
-  const entry = await createJournalEntry(supabase, userId, userId, {
+  const entry = await createJournalEntry(supabase, companyId, userId, {
     fiscal_period_id: fiscalPeriodId,
     entry_date: entryDate,
     description: 'Ingående balanser från SIE-import',
@@ -336,6 +336,7 @@ async function createOpeningBalanceEntry(
  */
 async function importVouchers(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   fiscalPeriodId: string,
   parsed: ParsedSIEFile,
@@ -553,7 +554,7 @@ async function importVouchers(
   const { data: accounts } = await supabase
     .from('chart_of_accounts')
     .select('id, account_number')
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .in('account_number', [...allAccountNumbers])
 
   const accountIdMap = new Map<string, string>()
@@ -563,7 +564,7 @@ async function importVouchers(
 
   // Get starting voucher number
   const { data: startNumber } = await supabase.rpc('next_voucher_number', {
-    p_user_id: userId,
+    p_company_id: companyId,
     p_fiscal_period_id: fiscalPeriodId,
     p_series: voucherSeries,
   })
@@ -586,6 +587,7 @@ async function importVouchers(
     // Prepare journal entry headers
     const entryInserts = batch.map((v, i) => ({
       user_id: userId,
+      company_id: companyId,
       fiscal_period_id: fiscalPeriodId,
       voucher_number: currentVoucherNumber + batchStart + i,
       voucher_series: voucherSeries,
@@ -746,7 +748,7 @@ async function importVouchers(
   if (results.created > 0) {
     const highestUsed = currentVoucherNumber + preparedVouchers.length - 1
     await supabase.rpc('reserve_voucher_range', {
-      p_user_id: userId,
+      p_company_id: companyId,
       p_fiscal_period_id: fiscalPeriodId,
       p_series: voucherSeries,
       p_highest_used: highestUsed,
@@ -785,6 +787,7 @@ export function isBalanceSheetAccount(accountNumber: string): boolean {
  */
 async function createMigrationAdjustmentEntry(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   fiscalPeriodId: string,
   parsed: ParsedSIEFile,
@@ -916,7 +919,7 @@ async function createMigrationAdjustmentEntry(
   const firstDate = skippedDates[0] || '?'
   const lastDate = skippedDates[skippedDates.length - 1] || '?'
 
-  const entry = await createJournalEntry(supabase, userId, userId, {
+  const entry = await createJournalEntry(supabase, companyId, userId, {
     fiscal_period_id: fiscalPeriodId,
     entry_date: entryDate,
     description: `Omföringsverifikation: justering för ${skippedDetails.length} exkluderade verifikationer (${firstId}–${lastId}, ${firstDate}–${lastDate}) vid SIE-import`,
@@ -934,6 +937,7 @@ async function createMigrationAdjustmentEntry(
  */
 async function ensureAccountExists(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   accountNumber: string,
   accountName: string
@@ -941,7 +945,7 @@ async function ensureAccountExists(
   const { data } = await supabase
     .from('chart_of_accounts')
     .select('id')
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .eq('account_number', accountNumber)
     .single()
 
@@ -952,6 +956,7 @@ async function ensureAccountExists(
   if (basRef) {
     await supabase.from('chart_of_accounts').insert({
       user_id: userId,
+      company_id: companyId,
       account_number: accountNumber,
       account_name: basRef.account_name,
       account_class: basRef.account_class,
@@ -977,6 +982,7 @@ async function ensureAccountExists(
 
   await supabase.from('chart_of_accounts').insert({
     user_id: userId,
+    company_id: companyId,
     account_number: accountNumber,
     account_name: accountName,
     account_class: classNum,
@@ -996,6 +1002,7 @@ async function ensureAccountExists(
  */
 async function createPendingImportRecord(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   parsed: ParsedSIEFile,
   fileContent: string,
@@ -1004,12 +1011,13 @@ async function createPendingImportRecord(
   const fileHash = await calculateFileHash(fileContent)
 
   // Clean up any stale pending/failed records for this hash to avoid UNIQUE conflicts
-  await cleanupStaleImportRecords(supabase, userId, fileHash)
+  await cleanupStaleImportRecords(supabase, companyId, fileHash)
 
   const { data, error } = await supabase
     .from('sie_imports')
     .insert({
       user_id: userId,
+      company_id: companyId,
       filename,
       file_hash: fileHash,
       org_number: parsed.header.orgNumber,
@@ -1042,7 +1050,7 @@ async function createPendingImportRecord(
 async function finalizeImportRecord(
   supabase: SupabaseClient,
   importId: string,
-  userId: string,
+  companyId: string,
   result: ImportResult,
   fileContent: string,
   documentation?: MigrationDocumentation
@@ -1064,7 +1072,7 @@ async function finalizeImportRecord(
 
   // Archive the SIE file to Supabase Storage (BFL 7 kap 1-2§ retention)
   if (result.success) {
-    const storagePath = `${userId}/${importId}.se`
+    const storagePath = `${companyId}/${importId}.se`
     const fileBlob = new Blob([fileContent], { type: 'text/plain; charset=cp437' })
     const { error: uploadError } = await supabase.storage
       .from('sie-files')
@@ -1086,14 +1094,14 @@ async function finalizeImportRecord(
  */
 export async function saveMappings(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   mappings: AccountMapping[]
 ): Promise<void> {
   // Filter to only mapped accounts
   const mappingsToSave = mappings
     .filter((m) => m.targetAccount)
     .map((m) => ({
-      user_id: userId,
+      company_id: companyId,
       source_account: m.sourceAccount,
       source_name: m.sourceName,
       target_account: m.targetAccount,
@@ -1118,11 +1126,11 @@ export async function saveMappings(
 /**
  * Load existing account mappings for a user
  */
-export async function loadMappings(supabase: SupabaseClient, userId: string): Promise<Map<string, AccountMapping>> {
+export async function loadMappings(supabase: SupabaseClient, companyId: string): Promise<Map<string, AccountMapping>> {
   const { data } = await supabase
     .from('sie_account_mappings')
     .select('*')
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
 
   const map = new Map<string, AccountMapping>()
 
@@ -1146,6 +1154,7 @@ export async function loadMappings(supabase: SupabaseClient, userId: string): Pr
  */
 export async function executeSIEImport(
   supabase: SupabaseClient,
+  companyId: string,
   userId: string,
   parsed: ParsedSIEFile,
   mappings: AccountMapping[],
@@ -1180,7 +1189,7 @@ export async function executeSIEImport(
     }
 
     // Check for duplicate import (only completed imports count as duplicates)
-    const duplicate = await checkDuplicateImport(supabase, userId, options.fileContent)
+    const duplicate = await checkDuplicateImport(supabase, companyId, options.fileContent)
     if (duplicate) {
       result.errors.push(
         `This file has already been imported on ${duplicate.imported_at ? new Date(duplicate.imported_at).toLocaleDateString('sv-SE') : 'okänt datum'}`
@@ -1191,6 +1200,7 @@ export async function executeSIEImport(
     // Create pending import record early — ensures tracking even if later steps fail
     result.importId = await createPendingImportRecord(
       supabase,
+      companyId,
       userId,
       parsed,
       options.fileContent,
@@ -1210,6 +1220,7 @@ export async function executeSIEImport(
         seenTargets.add(mapping.targetAccount)
         await ensureAccountExists(
           supabase,
+          companyId,
           userId,
           mapping.targetAccount,
           mapping.targetName
@@ -1229,7 +1240,7 @@ export async function executeSIEImport(
     if (options.createFiscalPeriod) {
       result.fiscalPeriodId = await ensureFiscalPeriod(
         supabase,
-        userId,
+        companyId,
         fiscalYearStart,
         fiscalYearEnd
       )
@@ -1238,7 +1249,7 @@ export async function executeSIEImport(
       const { data: existing } = await supabase
         .from('fiscal_periods')
         .select('id')
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .lte('period_start', formatDate(fiscalYearStart))
         .gte('period_end', formatDate(fiscalYearEnd))
         .single()
@@ -1323,6 +1334,7 @@ export async function executeSIEImport(
 
           result.openingBalanceEntryId = await createOpeningBalanceEntry(
             supabase,
+            companyId,
             userId,
             result.fiscalPeriodId,
             parsed,
@@ -1362,10 +1374,11 @@ export async function executeSIEImport(
       }
 
       // Ensure öresutjämning account 3741 exists in the user's chart
-      await ensureAccountExists(supabase, userId, '3741', 'Öresutjämning vid import')
+      await ensureAccountExists(supabase, companyId, userId, '3741', 'Öresutjämning vid import')
 
       const voucherResults = await importVouchers(
         supabase,
+        companyId,
         userId,
         result.fiscalPeriodId,
         parsed,
@@ -1421,6 +1434,7 @@ export async function executeSIEImport(
         try {
           const adjustment = await createMigrationAdjustmentEntry(
             supabase,
+            companyId,
             userId,
             result.fiscalPeriodId,
             parsed,
@@ -1454,7 +1468,7 @@ export async function executeSIEImport(
 
     // Save account mappings for future use (non-fatal — import data is already committed)
     try {
-      await saveMappings(supabase, userId, mappings)
+      await saveMappings(supabase, companyId, mappings)
     } catch (mappingError) {
       console.error('[sie-import] Failed to save mappings (non-fatal):', mappingError)
       result.warnings.push('Kunde inte spara kontomappningar — påverkar inte importerade data')
@@ -1472,7 +1486,7 @@ export async function executeSIEImport(
         end: formatDate(fiscalYearEnd),
       },
       importedAt: new Date().toISOString(),
-      importedBy: userId,
+      importedBy: companyId,
       accountMappings: {
         total: mappingStats.total,
         exact: mappingStats.exact,
@@ -1527,7 +1541,7 @@ export async function executeSIEImport(
     await finalizeImportRecord(
       supabase,
       result.importId,
-      userId,
+      companyId,
       result,
       options.fileContent,
       documentation
@@ -1537,7 +1551,7 @@ export async function executeSIEImport(
     if (result.success && parsed.vouchers.length > 0) {
       try {
         const templateCount = await populateTemplatesFromSieVouchers(
-          supabase, userId, parsed.vouchers
+          supabase, companyId, parsed.vouchers
         )
         if (templateCount > 0) {
           console.info(`[sie-import] ${templateCount} counterparty templates extracted from voucher history`)
@@ -1565,7 +1579,7 @@ export async function executeSIEImport(
         await finalizeImportRecord(
           supabase,
           result.importId,
-          userId,
+          companyId,
           result,
           options.fileContent
         )

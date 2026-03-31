@@ -56,7 +56,7 @@ function formatDateISO(date: Date): string {
  */
 export async function generateTaxDeadlinesForUser(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   settings: CompanySettingsForDeadlines,
   years: number[] = []
 ): Promise<{ created: number; deleted: number }> {
@@ -76,7 +76,7 @@ export async function generateTaxDeadlinesForUser(
   const { data: deletedData, error: deleteError } = await supabase
     .from('deadlines')
     .delete()
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .eq('source', 'system')
     .gte('due_date', startDate)
     .lte('due_date', endDate)
@@ -91,7 +91,7 @@ export async function generateTaxDeadlinesForUser(
 
   // Generate new deadlines
   const deadlines: Array<{
-    user_id: string
+    company_id: string
     title: string
     due_date: string
     deadline_type: 'tax'
@@ -137,7 +137,7 @@ export async function generateTaxDeadlinesForUser(
         const linkedReportPeriod = createLinkedReportPeriod(instance, config.type)
 
         deadlines.push({
-          user_id: userId,
+          company_id: companyId,
           title,
           due_date: dueDate,
           deadline_type: 'tax',
@@ -215,11 +215,11 @@ function createLinkedReportPeriod(
  */
 export async function regenerateTaxDeadlinesForUser(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   newSettings: CompanySettingsForDeadlines
 ): Promise<{ created: number; deleted: number }> {
   const currentYear = new Date().getFullYear()
-  return generateTaxDeadlinesForUser(supabase, userId, newSettings, [currentYear, currentYear + 1])
+  return generateTaxDeadlinesForUser(supabase, companyId, newSettings, [currentYear, currentYear + 1])
 }
 
 /**

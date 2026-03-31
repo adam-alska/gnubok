@@ -436,12 +436,12 @@ export async function unlinkReconciliation(
 /** Fetch unlinked 1930 GL lines via the RPC function */
 export async function fetchUnlinkedGLLines(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   dateFrom?: string,
   dateTo?: string
 ): Promise<UnlinkedGLLine[]> {
   const { data, error } = await supabase.rpc('get_unlinked_1930_lines', {
-    p_user_id: userId,
+    p_user_id: companyId,
     p_date_from: dateFrom || null,
     p_date_to: dateTo || null,
   })

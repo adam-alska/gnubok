@@ -193,7 +193,7 @@ export async function createNewVersion(
  */
 export async function linkToJournalEntry(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   documentId: string,
   journalEntryId: string,
   journalEntryLineId?: string
@@ -206,7 +206,7 @@ export async function linkToJournalEntry(
       journal_entry_line_id: journalEntryLineId || null,
     })
     .eq('id', documentId)
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .select()
     .single()
 
@@ -222,7 +222,7 @@ export async function linkToJournalEntry(
  */
 export async function verifyIntegrity(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   documentId: string
 ): Promise<{ valid: boolean; storedHash: string; computedHash: string }> {
 
@@ -231,7 +231,7 @@ export async function verifyIntegrity(
     .from('document_attachments')
     .select('storage_path, sha256_hash')
     .eq('id', documentId)
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (docError || !doc) {

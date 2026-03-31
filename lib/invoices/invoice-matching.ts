@@ -119,7 +119,7 @@ function calculateMatchScore(
  */
 export async function findMatchingInvoices(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   transaction: Transaction
 ): Promise<InvoiceMatch[]> {
   // Only match income transactions
@@ -134,7 +134,7 @@ export async function findMatchingInvoices(
       *,
       customer:customers(*)
     `)
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .in('status', ['sent', 'overdue', 'partially_paid'])
     .order('due_date', { ascending: true })
 
@@ -231,11 +231,11 @@ export async function findMatchingInvoices(
  */
 export async function getBestInvoiceMatch(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   transaction: Transaction,
   minConfidence: number = 0.80
 ): Promise<InvoiceMatch | null> {
-  const matches = await findMatchingInvoices(supabase, userId, transaction)
+  const matches = await findMatchingInvoices(supabase, companyId, transaction)
 
   if (matches.length > 0 && matches[0].confidence >= minConfidence) {
     return matches[0]

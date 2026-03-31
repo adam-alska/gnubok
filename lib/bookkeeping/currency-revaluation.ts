@@ -18,12 +18,12 @@ import type {
  */
 export async function getOpenForeignCurrencyReceivables(
   supabase: SupabaseClient,
-  userId: string
+  companyId: string
 ): Promise<Invoice[]> {
   const { data, error } = await supabase
     .from('invoices')
     .select('*')
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .in('status', ['sent', 'overdue'])
     .neq('currency', 'SEK')
     .not('exchange_rate', 'is', null)
@@ -42,12 +42,12 @@ export async function getOpenForeignCurrencyReceivables(
  */
 export async function getOpenForeignCurrencyPayables(
   supabase: SupabaseClient,
-  userId: string
+  companyId: string
 ): Promise<SupplierInvoice[]> {
   const { data, error } = await supabase
     .from('supplier_invoices')
     .select('*')
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .in('status', ['registered', 'approved', 'overdue', 'partially_paid'])
     .neq('currency', 'SEK')
     .not('exchange_rate', 'is', null)
@@ -73,12 +73,12 @@ export async function getOpenForeignCurrencyPayables(
  */
 export async function previewCurrencyRevaluation(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   closingDate: string
 ): Promise<CurrencyRevaluationPreview> {
   const [receivables, payables] = await Promise.all([
-    getOpenForeignCurrencyReceivables(supabase, userId),
-    getOpenForeignCurrencyPayables(supabase, userId),
+    getOpenForeignCurrencyReceivables(supabase, companyId),
+    getOpenForeignCurrencyPayables(supabase, companyId),
   ])
 
   // Collect distinct currencies

@@ -48,7 +48,7 @@ function getCapitalizationThreshold(year: number): number {
  */
 export async function evaluateMappingRules(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   transaction: Transaction,
   entityType?: EntityType
 ): Promise<MappingResult> {
@@ -57,12 +57,12 @@ export async function evaluateMappingRules(
     .from('mapping_rules')
     .select('*')
     .eq('is_active', true)
-    .or(`company_id.eq.${userId},company_id.is.null`)
+    .or(`company_id.eq.${companyId},company_id.is.null`)
     .order('priority', { ascending: true })
 
   if (error || !rules || rules.length === 0) {
     // Try counterparty templates before static template fallback
-    const counterpartyResult = await evaluateCounterpartyTemplates(supabase, userId, transaction, entityType)
+    const counterpartyResult = await evaluateCounterpartyTemplates(supabase, companyId, transaction, entityType)
     if (counterpartyResult) return counterpartyResult
 
     const templateResult = evaluateTemplateRules(transaction, entityType)
@@ -78,7 +78,7 @@ export async function evaluateMappingRules(
   }
 
   // Try counterparty templates before static template fallback
-  const counterpartyResult = await evaluateCounterpartyTemplates(supabase, userId, transaction, entityType)
+  const counterpartyResult = await evaluateCounterpartyTemplates(supabase, companyId, transaction, entityType)
   if (counterpartyResult) return counterpartyResult
 
   // Try template-based matching before default fallback
@@ -117,12 +117,12 @@ function evaluateTemplateRules(
  */
 async function evaluateCounterpartyTemplates(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   transaction: Transaction,
   entityType?: EntityType
 ): Promise<MappingResult | null> {
   try {
-    const match = await findCounterpartyTemplate(supabase, userId, transaction)
+    const match = await findCounterpartyTemplate(supabase, companyId, transaction)
     if (!match) return null
 
     const threshold = match.template.source === 'auto_learned' ? 0.6 : 0.4
@@ -291,7 +291,7 @@ function getDefaultResult(transaction: Transaction): MappingResult {
  */
 export async function saveUserMappingRule(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   merchantName: string,
   debitAccount: string,
   creditAccount: string,
@@ -307,12 +307,12 @@ export async function saveUserMappingRule(
     await supabase
       .from('mapping_rules')
       .delete()
-      .eq('company_id', userId)
+      .eq('company_id', companyId)
       .eq('merchant_pattern', escapedMerchant)
       .eq('source', 'user_description')
 
     const { error } = await supabase.from('mapping_rules').insert({
-      user_id: userId,
+      company_id: companyId,
       rule_name: `Described: ${merchantName}`,
       rule_type: 'merchant_name',
       priority: 5,
@@ -333,7 +333,7 @@ export async function saveUserMappingRule(
     }
   } else {
     const { error } = await supabase.from('mapping_rules').insert({
-      user_id: userId,
+      company_id: companyId,
       rule_name: `Learned: ${merchantName}`,
       rule_type: 'merchant_name',
       priority: 10,
