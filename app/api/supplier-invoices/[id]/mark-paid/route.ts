@@ -123,6 +123,8 @@ export async function POST(
   const { error: paymentError } = await supabase
     .from('supplier_invoice_payments')
     .insert({
+      user_id: user.id,
+      company_id: companyId,
       supplier_invoice_id: id,
       payment_date: paymentDate,
       amount: paymentAmount,

@@ -56,7 +56,7 @@ export async function POST(
 
   // Generate real invoice number
   const { data: invoiceNumber } = await supabase.rpc('generate_invoice_number', {
-    p_user_id: user.id,
+    p_company_id: companyId,
   })
 
   // Create the real invoice

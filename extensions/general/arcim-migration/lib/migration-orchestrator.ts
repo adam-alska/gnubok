@@ -403,7 +403,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
 
           // Get next arrival number (ankomstnummer) — required NOT NULL column
           const { data: arrivalNum, error: arrivalError } = await supabase
-            .rpc('get_next_arrival_number', { p_user_id: userId })
+            .rpc('get_next_arrival_number', { p_company_id: userId })
 
           if (arrivalError || arrivalNum == null) {
             console.error(`[migration] Supplier invoice ${inv.invoiceNumber} skipped — could not get arrival number:`, arrivalError?.message)

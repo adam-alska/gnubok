@@ -210,6 +210,7 @@ export async function processOverdueReminders(): Promise<ProcessRemindersResult>
       .insert({
         invoice_id: invoice.id,
         user_id: invoice.user_id,
+        company_id: invoice.company_id,
         reminder_level: reminderLevel,
         email_to: customer.email
       })

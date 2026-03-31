@@ -91,6 +91,7 @@ export async function uploadDocument(
     .from('document_attachments')
     .insert({
       user_id: userId,
+      company_id: companyId,
       storage_path: storagePath,
       file_name: file.name,
       file_size_bytes: file.buffer.byteLength,
