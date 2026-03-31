@@ -200,7 +200,7 @@ export function CompanyMembersSection() {
             Medlemmar
           </CardTitle>
           <CardDescription>
-            {members.length} {members.length === 1 ? 'medlem' : 'medlemmar'} i {company.name}
+            {members.length} {members.length === 1 ? 'medlem' : 'medlemmar'} i {company?.name}
           </CardDescription>
         </CardHeader>
         <CardContent>
