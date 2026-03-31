@@ -104,6 +104,7 @@ export default function TicWorkspace({ userId }: WorkspaceComponentProps) {
   const [profile, setProfile] = useState<TICCompanyProfile | null>(null)
   const [isFetching, setIsFetching] = useState(false)
   const [noOrgNumber, setNoOrgNumber] = useState(false)
+  const [fetchFailed, setFetchFailed] = useState(false)
   const [initialLoad, setInitialLoad] = useState(true)
 
   // Load cached profile from extension data
@@ -119,6 +120,7 @@ export default function TicWorkspace({ userId }: WorkspaceComponentProps) {
   const fetchProfile = useCallback(async () => {
     setIsFetching(true)
     setNoOrgNumber(false)
+    setFetchFailed(false)
 
     try {
       // Get org_number from company settings
@@ -142,6 +144,7 @@ export default function TicWorkspace({ userId }: WorkspaceComponentProps) {
       if (!res.ok) {
         const { error } = await res.json()
         toast({ title: error ?? 'Kunde inte hämta företagsprofil', variant: 'destructive' })
+        setFetchFailed(true)
         return
       }
 
@@ -150,6 +153,7 @@ export default function TicWorkspace({ userId }: WorkspaceComponentProps) {
       await save('company_profile', data)
     } catch {
       toast({ title: 'Ett oväntat fel inträffade', variant: 'destructive' })
+      setFetchFailed(true)
     } finally {
       setIsFetching(false)
     }
@@ -157,10 +161,10 @@ export default function TicWorkspace({ userId }: WorkspaceComponentProps) {
 
   // Auto-fetch on first visit when no cached data
   useEffect(() => {
-    if (!initialLoad && !profile && !noOrgNumber && !isFetching) {
+    if (!initialLoad && !profile && !noOrgNumber && !isFetching && !fetchFailed) {
       fetchProfile()
     }
-  }, [initialLoad, profile, noOrgNumber, isFetching, fetchProfile])
+  }, [initialLoad, profile, noOrgNumber, isFetching, fetchFailed, fetchProfile])
 
   if (initialLoad || isDataLoading) {
     return <ProfileSkeleton />
@@ -185,6 +189,28 @@ export default function TicWorkspace({ userId }: WorkspaceComponentProps) {
 
   if (isFetching && !profile) {
     return <ProfileSkeleton />
+  }
+
+  if (fetchFailed && !profile) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <XCircle className="h-12 w-12 text-muted-foreground/40 mb-4" />
+        <h3 className="text-lg font-medium text-foreground">
+          Kunde inte hämta företagsprofil
+        </h3>
+        <p className="text-sm text-muted-foreground mt-1 max-w-md">
+          Kontrollera att organisationsnumret i inställningarna är korrekt och försök igen.
+        </p>
+        <div className="flex gap-3 mt-4">
+          <Button variant="outline" asChild>
+            <Link href="/settings">Inställningar</Link>
+          </Button>
+          <Button variant="outline" onClick={fetchProfile} disabled={isFetching}>
+            Försök igen
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   if (!profile) return null

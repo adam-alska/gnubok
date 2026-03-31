@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import DashboardContent from '@/components/dashboard/DashboardContent'
+import ConsultantEmptyState from '@/components/dashboard/ConsultantEmptyState'
 import { getActiveCompanyId } from '@/lib/company/context'
 import type { Deadline, ReceiptQueueSummary, OnboardingProgress } from '@/types'
 
@@ -17,10 +18,40 @@ export default async function DashboardPage() {
   }
 
   const cookieStore = await cookies()
-  const companyId = cookieStore.get('gnubok-company-id')?.value
+  const rawCompanyId = cookieStore.get('gnubok-company-id')?.value
     ?? await getActiveCompanyId(supabase, user.id)
 
+  // Validate the cookie/preference points to a company the user can access
+  let companyId = rawCompanyId
+  if (companyId) {
+    const { data: membership } = await supabase
+      .from('company_members')
+      .select('company_id')
+      .eq('company_id', companyId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (!membership) companyId = null
+  }
+
   if (!companyId) {
+    // Consultants (team members) see an empty state; solo users go to onboarding
+    const { data: teamMembership } = await supabase
+      .from('team_members')
+      .select('team_id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .maybeSingle()
+
+    if (teamMembership) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single()
+      const firstName = profile?.full_name?.split(' ')[0] || null
+      return <ConsultantEmptyState firstName={firstName} />
+    }
+
     redirect('/onboarding')
   }
 

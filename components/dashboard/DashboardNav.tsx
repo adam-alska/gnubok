@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 import { resolveIcon } from '@/lib/extensions/icon-resolver'
 import { SupportLink } from '@/components/ui/support-link'
+import CompanySwitcher from '@/components/dashboard/CompanySwitcher'
 import type { EntityType } from '@/types'
 
 interface ExtensionNavItem {
@@ -158,15 +159,13 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
       <aside className="hidden md:fixed md:inset-y-0 md:flex md:w-[232px] md:flex-col">
         <div className="flex min-h-0 flex-1 flex-col border-r border-border/30 bg-card/90">
           <div className="flex flex-1 flex-col overflow-y-auto pt-7 pb-4">
-            {/* Company name */}
+            {/* Company switcher */}
             <div className="px-5 mb-8">
-              <p className="text-[13px] font-semibold text-foreground truncate tracking-[-0.01em]">
-                {companyName}
-              </p>
+              <CompanySwitcher />
             </div>
 
             {/* Navigation with group headers */}
-            <nav className="flex-1 px-3" aria-label="Huvudnavigation">
+            <nav className="px-3" aria-label="Huvudnavigation">
               {/* Huvudmeny group */}
               <div className="mb-6">
                 <p className="px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em]">
@@ -404,7 +403,9 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
 
             {/* Header */}
             <div className="px-4 pb-2 flex items-center justify-between">
-              <p className="font-medium text-sm truncate">{companyName}</p>
+              <div className="flex-1 min-w-0 mr-2">
+                <CompanySwitcher />
+              </div>
               <Button
                 variant="ghost"
                 size="icon"

@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
+import { hashInviteToken } from '@/lib/auth/invite-tokens'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -22,7 +23,13 @@ export async function GET(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           pendingCookies.length = 0
-          cookiesToSet.forEach((cookie) => pendingCookies.push(cookie))
+          cookiesToSet.forEach((cookie) => {
+            // Mirror the cookie into request.cookies so subsequent getAll()
+            // calls within this request lifecycle return the updated values
+            // (matches the pattern used in middleware.ts).
+            request.cookies.set(cookie.name, cookie.value)
+            pendingCookies.push(cookie)
+          })
         },
       },
     }
@@ -59,14 +66,95 @@ export async function GET(request: NextRequest) {
         return response
       }
 
-      // Check if user has completed onboarding
-      const { data: settings } = await supabase
-        .from('company_settings')
-        .select('onboarding_complete')
+      // Check for pending invite token (set by invite page before redirecting to register)
+      const inviteToken = request.cookies.get('gnubok-invite-token')?.value
+      if (inviteToken) {
+        try {
+          const tokenHash = hashInviteToken(inviteToken)
+
+          // Use the service role client to bypass RLS for invite acceptance
+          const serviceClient = createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            { cookies: { getAll: () => [], setAll: () => {} } }
+          )
+
+          // Look up company invitation
+          const { data: invite } = await serviceClient
+            .from('company_invitations')
+            .select('id, company_id, email, role, status, expires_at')
+            .eq('token_hash', tokenHash)
+            .single()
+
+          if (
+            invite &&
+            invite.status === 'pending' &&
+            new Date(invite.expires_at) > new Date() &&
+            user.email?.toLowerCase() === invite.email.toLowerCase()
+          ) {
+            // Add user to company
+            await serviceClient.from('company_members').insert({
+              company_id: invite.company_id,
+              user_id: user.id,
+              role: invite.role,
+              source: 'direct',
+            })
+
+            // Set active company
+            await serviceClient.from('user_preferences').upsert({
+              user_id: user.id,
+              active_company_id: invite.company_id,
+            }, { onConflict: 'user_id' })
+
+            // Mark invite as accepted
+            await serviceClient
+              .from('company_invitations')
+              .update({ status: 'accepted' })
+              .eq('id', invite.id)
+
+            // Invited user goes straight to dashboard — no onboarding needed
+            redirectPath = '/'
+
+            // Clear invite cookie and set company cookie on response
+            const response = NextResponse.redirect(new URL(redirectPath, origin))
+            for (const { name, value, options } of pendingCookies) {
+              response.cookies.set({ name, value, ...options })
+            }
+            response.cookies.set('gnubok-company-id', invite.company_id, {
+              path: '/',
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              maxAge: 60 * 60 * 24 * 365,
+            })
+            response.cookies.delete('gnubok-invite-token')
+            return response
+          }
+        } catch (err) {
+          console.error('[auth/callback] invite acceptance failed:', err)
+          // Fall through to normal onboarding check
+        }
+      }
+
+      // Check if user has completed onboarding (for any company they belong to)
+      const { data: membership } = await supabase
+        .from('company_members')
+        .select('company_id')
         .eq('user_id', user.id)
+        .limit(1)
         .single()
 
-      if (!settings?.onboarding_complete) {
+      if (membership?.company_id) {
+        const { data: settings } = await supabase
+          .from('company_settings')
+          .select('onboarding_complete')
+          .eq('company_id', membership.company_id)
+          .single()
+
+        if (!settings?.onboarding_complete) {
+          redirectPath = '/onboarding'
+        }
+      } else {
         redirectPath = '/onboarding'
       }
     }
@@ -76,6 +164,8 @@ export async function GET(request: NextRequest) {
     for (const { name, value, options } of pendingCookies) {
       response.cookies.set({ name, value, ...options })
     }
+    // Keep the invite cookie alive so the onboarding page fallback can
+    // retry acceptance (only clear it when successfully processed above).
     return response
   }
 
