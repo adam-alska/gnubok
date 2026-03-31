@@ -38,7 +38,7 @@ CREATE TABLE public.company_members (
   user_id         uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   role            text NOT NULL DEFAULT 'member'
                     CHECK (role IN ('owner', 'admin', 'member', 'viewer')),
-  invited_by      uuid REFERENCES auth.users(id),
+  invited_by      uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   joined_at       timestamptz NOT NULL DEFAULT now(),
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now(),
@@ -147,12 +147,15 @@ BEGIN
   LOOP
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = tbl) THEN
       EXECUTE format(
-        'ALTER TABLE public.%I ADD COLUMN IF NOT EXISTS company_id uuid REFERENCES public.companies(id)',
+        'ALTER TABLE public.%I ADD COLUMN IF NOT EXISTS company_id uuid REFERENCES public.companies(id) ON DELETE CASCADE',
         tbl
       );
     END IF;
   END LOOP;
 END $$;
+
+-- Add onboarding_step column (tracks multi-step onboarding progress)
+ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS onboarding_step integer NOT NULL DEFAULT 1;
 
 -- =============================================================================
 -- 5. BACKFILL: Create one company per existing user
@@ -249,15 +252,18 @@ BEGIN
   END LOOP;
 END $$;
 -- mapping_rules, audit_log, event_log, notification_log, payment_match_log: company_id stays nullable
+-- audit_log.user_id: nullable because some tables (e.g. company_settings) no longer carry user_id
+ALTER TABLE public.audit_log ALTER COLUMN user_id DROP NOT NULL;
 
 -- Drop old unique constraints and create new ones with company_id
 -- company_settings: (user_id) → (company_id)
 ALTER TABLE public.company_settings DROP CONSTRAINT IF EXISTS company_settings_user_id_key;
+ALTER TABLE public.company_settings ALTER COLUMN user_id DROP NOT NULL;
 ALTER TABLE public.company_settings ADD CONSTRAINT company_settings_company_id_key UNIQUE (company_id);
 
 -- transactions: (user_id, external_id) → (company_id, external_id)
-DROP INDEX IF EXISTS transactions_user_id_external_id_key;
 ALTER TABLE public.transactions DROP CONSTRAINT IF EXISTS transactions_user_id_external_id_key;
+DROP INDEX IF EXISTS transactions_user_id_external_id_key;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_company_external_id
   ON public.transactions (company_id, external_id) WHERE external_id IS NOT NULL;
 
@@ -288,9 +294,13 @@ ALTER TABLE public.fiscal_periods ADD CONSTRAINT fiscal_periods_company_id_perio
   UNIQUE (company_id, period_start, period_end);
 
 -- account_balances: (user_id, fiscal_period_id, account_number) → (company_id, fiscal_period_id, account_number)
-ALTER TABLE public.account_balances DROP CONSTRAINT IF EXISTS account_balances_user_id_fiscal_period_id_account_number_key;
-ALTER TABLE public.account_balances ADD CONSTRAINT account_balances_company_id_fiscal_period_id_account_number_key
-  UNIQUE (company_id, fiscal_period_id, account_number);
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'account_balances') THEN
+    ALTER TABLE public.account_balances DROP CONSTRAINT IF EXISTS account_balances_user_id_fiscal_period_id_account_number_key;
+    ALTER TABLE public.account_balances ADD CONSTRAINT account_balances_company_id_fiscal_period_id_account_number_key
+      UNIQUE (company_id, fiscal_period_id, account_number);
+  END IF;
+END $$;
 
 -- voucher_sequences: (user_id, fiscal_period_id, voucher_series) → (company_id, fiscal_period_id, voucher_series)
 ALTER TABLE public.voucher_sequences DROP CONSTRAINT IF EXISTS voucher_sequences_user_id_fiscal_period_id_voucher_series_key;
@@ -434,13 +444,14 @@ CREATE POLICY "journal_entry_lines_update" ON public.journal_entry_lines
               AND je.company_id IN (SELECT public.user_company_ids()))
   );
 
--- account_balances
-CREATE POLICY "account_balances_select" ON public.account_balances
-  FOR SELECT USING (company_id IN (SELECT public.user_company_ids()));
-CREATE POLICY "account_balances_insert" ON public.account_balances
-  FOR INSERT WITH CHECK (company_id IN (SELECT public.user_company_ids()));
-CREATE POLICY "account_balances_update" ON public.account_balances
-  FOR UPDATE USING (company_id IN (SELECT public.user_company_ids()));
+-- account_balances (may not exist on fresh DBs)
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'account_balances') THEN
+    EXECUTE 'CREATE POLICY "account_balances_select" ON public.account_balances FOR SELECT USING (company_id IN (SELECT public.user_company_ids()))';
+    EXECUTE 'CREATE POLICY "account_balances_insert" ON public.account_balances FOR INSERT WITH CHECK (company_id IN (SELECT public.user_company_ids()))';
+    EXECUTE 'CREATE POLICY "account_balances_update" ON public.account_balances FOR UPDATE USING (company_id IN (SELECT public.user_company_ids()))';
+  END IF;
+END $$;
 
 -- voucher_sequences
 CREATE POLICY "voucher_sequences_select" ON public.voucher_sequences
@@ -654,21 +665,23 @@ CREATE POLICY "projects_insert" ON public.projects
 CREATE POLICY "projects_update" ON public.projects
   FOR UPDATE USING (company_id IN (SELECT public.user_company_ids()));
 
--- salary_payments
-CREATE POLICY "salary_payments_select" ON public.salary_payments
-  FOR SELECT USING (company_id IN (SELECT public.user_company_ids()));
-CREATE POLICY "salary_payments_insert" ON public.salary_payments
-  FOR INSERT WITH CHECK (company_id IN (SELECT public.user_company_ids()));
-CREATE POLICY "salary_payments_update" ON public.salary_payments
-  FOR UPDATE USING (company_id IN (SELECT public.user_company_ids()));
+-- salary_payments (may not exist on fresh DBs)
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'salary_payments') THEN
+    EXECUTE 'CREATE POLICY "salary_payments_select" ON public.salary_payments FOR SELECT USING (company_id IN (SELECT public.user_company_ids()))';
+    EXECUTE 'CREATE POLICY "salary_payments_insert" ON public.salary_payments FOR INSERT WITH CHECK (company_id IN (SELECT public.user_company_ids()))';
+    EXECUTE 'CREATE POLICY "salary_payments_update" ON public.salary_payments FOR UPDATE USING (company_id IN (SELECT public.user_company_ids()))';
+  END IF;
+END $$;
 
--- mileage_entries
-CREATE POLICY "mileage_entries_select" ON public.mileage_entries
-  FOR SELECT USING (company_id IN (SELECT public.user_company_ids()));
-CREATE POLICY "mileage_entries_insert" ON public.mileage_entries
-  FOR INSERT WITH CHECK (company_id IN (SELECT public.user_company_ids()));
-CREATE POLICY "mileage_entries_update" ON public.mileage_entries
-  FOR UPDATE USING (company_id IN (SELECT public.user_company_ids()));
+-- mileage_entries (may not exist on fresh DBs)
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'mileage_entries') THEN
+    EXECUTE 'CREATE POLICY "mileage_entries_select" ON public.mileage_entries FOR SELECT USING (company_id IN (SELECT public.user_company_ids()))';
+    EXECUTE 'CREATE POLICY "mileage_entries_insert" ON public.mileage_entries FOR INSERT WITH CHECK (company_id IN (SELECT public.user_company_ids()))';
+    EXECUTE 'CREATE POLICY "mileage_entries_update" ON public.mileage_entries FOR UPDATE USING (company_id IN (SELECT public.user_company_ids()))';
+  END IF;
+END $$;
 
 -- sie_imports
 CREATE POLICY "sie_imports_select" ON public.sie_imports
@@ -771,6 +784,7 @@ CREATE POLICY "audit_log_select" ON public.audit_log
 -- =============================================================================
 
 -- next_voucher_number: p_user_id → p_company_id
+DROP FUNCTION IF EXISTS public.next_voucher_number(uuid, uuid, text);
 CREATE OR REPLACE FUNCTION public.next_voucher_number(
   p_company_id uuid,
   p_fiscal_period_id uuid,
@@ -796,6 +810,7 @@ END;
 $$;
 
 -- seed_chart_of_accounts: p_user_id → p_company_id
+DROP FUNCTION IF EXISTS public.seed_chart_of_accounts(uuid, text);
 CREATE OR REPLACE FUNCTION public.seed_chart_of_accounts(p_company_id uuid, p_entity_type text)
 RETURNS void
 LANGUAGE plpgsql
@@ -912,6 +927,7 @@ END;
 $$;
 
 -- detect_voucher_gaps: p_user_id → p_company_id
+DROP FUNCTION IF EXISTS public.detect_voucher_gaps(uuid, uuid, text);
 CREATE OR REPLACE FUNCTION public.detect_voucher_gaps(
   p_company_id uuid,
   p_fiscal_period_id uuid,
@@ -943,6 +959,7 @@ END;
 $$;
 
 -- generate_invoice_number: p_user_id → p_company_id
+DROP FUNCTION IF EXISTS public.generate_invoice_number(uuid);
 CREATE OR REPLACE FUNCTION public.generate_invoice_number(p_company_id UUID)
 RETURNS TEXT
 LANGUAGE plpgsql
@@ -971,6 +988,7 @@ END;
 $$;
 
 -- generate_delivery_note_number: p_user_id → p_company_id
+DROP FUNCTION IF EXISTS public.generate_delivery_note_number(uuid);
 CREATE OR REPLACE FUNCTION public.generate_delivery_note_number(p_company_id UUID)
 RETURNS TEXT
 LANGUAGE plpgsql
@@ -998,6 +1016,7 @@ END;
 $$;
 
 -- get_next_arrival_number: p_user_id → p_company_id
+DROP FUNCTION IF EXISTS public.get_next_arrival_number(uuid);
 CREATE OR REPLACE FUNCTION public.get_next_arrival_number(p_company_id uuid)
 RETURNS integer
 LANGUAGE plpgsql
@@ -1128,6 +1147,9 @@ BEGIN
       END IF;
     END IF;
   END IF;
+
+  -- Fall back to auth.uid() when the row does not carry user_id
+  v_user_id := COALESCE(v_user_id, auth.uid());
 
   INSERT INTO public.audit_log (user_id, company_id, action, table_name, record_id, actor_id, old_state, new_state, description)
   VALUES (v_user_id, v_company_id, v_action, TG_TABLE_NAME, v_record_id, v_user_id, v_old_state, v_new_state, v_desc);
