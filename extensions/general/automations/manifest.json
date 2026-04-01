@@ -1,0 +1,19 @@
+{
+  "id": "automations",
+  "sector": "general",
+  "exportName": "automationsExtension",
+  "entryPoint": "@/extensions/general/automations",
+  "workspace": "@/components/extensions/general/AutomationsWorkspace",
+  "requiredEnvVars": ["ACTIVEPIECES_URL"],
+  "optionalEnvVars": ["ACTIVEPIECES_API_KEY"],
+  "npmDependencies": [],
+  "definition": {
+    "name": "Automatiseringar",
+    "category": "operations",
+    "icon": "Workflow",
+    "dataPattern": "manual",
+    "hasOwnData": false,
+    "description": "Bygg automatiseringar med 280+ integrationer",
+    "longDescription": "Koppla gnubok till Slack, Google Sheets, e-post och hundratals andra tjänster med en visuell flödesbyggare. Skapa automatiska flöden som reagerar på händelser i bokföringen."
+  }
+}
