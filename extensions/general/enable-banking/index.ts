@@ -289,7 +289,7 @@ export const enableBankingExtension: Extension = {
           // pass may have missed due to processing order.
           if (sieOverlap && totalImported > 0) {
             try {
-              const reconResult = await runReconciliation(supabase, user.id, {
+              const reconResult = await runReconciliation(supabase, ctx?.companyId ?? user.id, {
                 dateFrom: fromDate,
                 dateTo: toDate,
               })

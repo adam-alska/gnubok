@@ -67,6 +67,14 @@ export async function PUT(request: Request) {
     )
   }
 
+  // Validate: aktiebolag must use accrual accounting (BFNAR 2006:1)
+  if (effectiveEntityType === 'aktiebolag' && body.accounting_method === 'cash') {
+    return NextResponse.json(
+      { error: 'Aktiebolag måste använda faktureringsmetoden (BFNAR 2006:1)' },
+      { status: 400 }
+    )
+  }
+
   const { data, error } = await supabase
     .from('company_settings')
     .update(body)

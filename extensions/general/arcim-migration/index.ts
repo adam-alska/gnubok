@@ -560,6 +560,7 @@ export const arcimMigrationExtension: Extension = {
           const results = await executeMigration({
             consentId,
             userId: user.id,
+            companyId: ctx?.companyId ?? user.id,
             supabase,
             importCompanyInfo,
             importCustomers,

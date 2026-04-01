@@ -126,19 +126,19 @@ export function tryReconcileTransaction(
  */
 export async function runReconciliation(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   options: ReconciliationOptions = {}
 ): Promise<ReconciliationRunResult> {
   const { dateFrom, dateTo, dryRun = false } = options
 
   // Fetch unlinked GL lines via RPC
-  const glLines = await fetchUnlinkedGLLines(supabase, userId, dateFrom, dateTo)
+  const glLines = await fetchUnlinkedGLLines(supabase, companyId, dateFrom, dateTo)
 
   // Fetch unmatched transactions
   let query = supabase
     .from('transactions')
     .select('*')
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .is('journal_entry_id', null)
     .eq('currency', 'SEK')
 
@@ -172,7 +172,7 @@ export async function runReconciliation(
           is_business: true,
         })
         .eq('id', match.transaction.id)
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
 
       if (error) {
         errors++
@@ -185,8 +185,8 @@ export async function runReconciliation(
               transaction: match.transaction,
               journalEntryId: match.glLine.journal_entry_id,
               method: match.method,
-              userId,
-              companyId: userId,
+              userId: companyId,
+              companyId,
             },
           })
         } catch {
@@ -210,7 +210,7 @@ export async function runReconciliation(
  */
 export async function getReconciliationStatus(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   dateFrom?: string,
   dateTo?: string
 ): Promise<ReconciliationStatus> {
@@ -218,7 +218,7 @@ export async function getReconciliationStatus(
   let txQuery = supabase
     .from('transactions')
     .select('amount, journal_entry_id, reconciliation_method')
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .eq('currency', 'SEK')
 
   if (dateFrom) txQuery = txQuery.gte('date', dateFrom)
@@ -229,9 +229,9 @@ export async function getReconciliationStatus(
   // Get GL 1930 lines (all, not just unlinked)
   let glQuery = supabase
     .from('journal_entry_lines')
-    .select('debit_amount, credit_amount, journal_entries!inner(user_id, entry_date, status)')
+    .select('debit_amount, credit_amount, journal_entries!inner(company_id, entry_date, status)')
     .eq('account_number', '1930')
-    .eq('journal_entries.company_id', userId)
+    .eq('journal_entries.company_id', companyId)
     .eq('journal_entries.status', 'posted')
 
   if (dateFrom) glQuery = glQuery.gte('journal_entries.entry_date', dateFrom)
@@ -259,7 +259,7 @@ export async function getReconciliationStatus(
   ).length
 
   // Unlinked GL lines count
-  const unlinkedLines = await fetchUnlinkedGLLines(supabase, userId, dateFrom, dateTo)
+  const unlinkedLines = await fetchUnlinkedGLLines(supabase, companyId, dateFrom, dateTo)
 
   const difference = Math.round((bankTotal - glBalance) * 100) / 100
 
@@ -284,7 +284,7 @@ export async function getReconciliationStatus(
  */
 export async function manualLink(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   transactionId: string,
   journalEntryId: string
 ): Promise<{ success: boolean; error?: string }> {
@@ -293,7 +293,7 @@ export async function manualLink(
     .from('transactions')
     .select('*')
     .eq('id', transactionId)
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (txError || !tx) {
@@ -307,9 +307,9 @@ export async function manualLink(
   // Fetch journal entry + verify it has a 1930 line
   const { data: entry, error: entryError } = await supabase
     .from('journal_entries')
-    .select('id, user_id, status')
+    .select('id, company_id, status')
     .eq('id', journalEntryId)
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (entryError || !entry) {
@@ -336,7 +336,7 @@ export async function manualLink(
     .from('transactions')
     .select('id')
     .eq('journal_entry_id', journalEntryId)
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (existingLink) {
@@ -352,7 +352,7 @@ export async function manualLink(
       is_business: true,
     })
     .eq('id', transactionId)
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
 
   if (updateError) {
     return { success: false, error: 'Failed to link transaction' }
@@ -365,8 +365,8 @@ export async function manualLink(
         transaction: tx as Transaction,
         journalEntryId,
         method: 'manual' as ReconciliationMethod,
-        userId,
-        companyId: userId,
+        userId: companyId,
+        companyId,
       },
     })
   } catch {
@@ -382,7 +382,7 @@ export async function manualLink(
  */
 export async function unlinkReconciliation(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   transactionId: string
 ): Promise<{ success: boolean; error?: string }> {
   // Fetch transaction
@@ -390,7 +390,7 @@ export async function unlinkReconciliation(
     .from('transactions')
     .select('id, journal_entry_id, reconciliation_method')
     .eq('id', transactionId)
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (txError || !tx) {
@@ -413,13 +413,13 @@ export async function unlinkReconciliation(
       is_business: null,
     })
     .eq('id', transactionId)
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
 
   if (updateError) {
     return { success: false, error: 'Failed to unlink transaction' }
   }
 
-  logMatchEvent(supabase, userId, transactionId, 'unmatched', {
+  logMatchEvent(supabase, companyId, transactionId, 'unmatched', {
     previousState: {
       journal_entry_id: tx.journal_entry_id,
       reconciliation_method: tx.reconciliation_method,
@@ -441,7 +441,7 @@ export async function fetchUnlinkedGLLines(
   dateTo?: string
 ): Promise<UnlinkedGLLine[]> {
   const { data, error } = await supabase.rpc('get_unlinked_1930_lines', {
-    p_user_id: companyId,
+    p_company_id: companyId,
     p_date_from: dateFrom || null,
     p_date_to: dateTo || null,
   })

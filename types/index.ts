@@ -148,8 +148,10 @@ export interface CompanySettings {
   // Contact
   phone: string | null
   email: string | null
+  website: string | null
 
   // Tax registration
+  pays_salaries: boolean
   f_skatt: boolean
   vat_registered: boolean
   vat_number: string | null
@@ -170,6 +172,7 @@ export interface CompanySettings {
   clearing_number: string | null
   account_number: string | null
   bankgiro: string | null
+  plusgiro: string | null
   iban: string | null
   bic: string | null
 
