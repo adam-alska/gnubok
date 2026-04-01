@@ -5,9 +5,13 @@ import { Button } from '@/components/ui/button'
 import { Loader2, Check } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 
+type SaveResult =
+  | Record<string, unknown>
+  | { updates: Record<string, unknown>; onSuccess?: (data: Record<string, unknown>) => void }
+
 interface SettingsFormWrapperProps {
   children: React.ReactNode
-  onSave?: (formData: FormData) => Record<string, unknown>
+  onSave?: (formData: FormData) => SaveResult
   className?: string
 }
 
@@ -28,7 +32,12 @@ export function SettingsFormWrapper({ children, onSave, className }: SettingsFor
     if (!onSave) return
 
     const formData = new FormData(e.currentTarget)
-    const updates = onSave(formData)
+    const saveResult = onSave(formData)
+
+    // Support both plain object and { updates, onSuccess } return types
+    const isStructured = saveResult && 'updates' in saveResult && typeof saveResult.updates === 'object'
+    const updates = isStructured ? saveResult.updates : saveResult
+    const onSuccess = isStructured ? (saveResult as { onSuccess?: (data: Record<string, unknown>) => void }).onSuccess : undefined
 
     if (!updates || Object.keys(updates).length === 0) return
 
@@ -48,6 +57,7 @@ export function SettingsFormWrapper({ children, onSave, className }: SettingsFor
         throw new Error(result.error || 'Kunde inte spara inställningar')
       }
 
+      onSuccess?.(result.data ?? updates)
       setSaved(true)
       timerRef.current = setTimeout(() => setSaved(false), 2000)
     } catch (error) {

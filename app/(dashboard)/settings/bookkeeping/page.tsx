@@ -25,8 +25,12 @@ export default function BookkeepingSettingsPage() {
       auto_lock_period_days: autoLockValue === 'none' ? null : parseInt(autoLockValue),
       accounting_method: accountingMethod,
     }
-    updateSettings(updates as Partial<CompanySettings>)
-    return updates
+    return {
+      updates,
+      onSuccess: (data: Record<string, unknown>) => {
+        updateSettings(data as Partial<CompanySettings>)
+      },
+    }
   }
 
   return (

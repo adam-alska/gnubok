@@ -36,8 +36,12 @@ export default function InvoicingSettingsPage() {
       invoice_default_days: parseInt(formData.get('invoice_default_days') as string) || 30,
       invoice_default_notes: (formData.get('invoice_default_notes') as string) || null,
     }
-    updateSettings(updates as Partial<CompanySettings>)
-    return updates
+    return {
+      updates,
+      onSuccess: (data: Record<string, unknown>) => {
+        updateSettings(data as Partial<CompanySettings>)
+      },
+    }
   }
 
   return (
