@@ -105,8 +105,6 @@ export function EmptyInvoices() {
       description="Skapa din första faktura på under 60 sekunder. Vi fyller i dina uppgifter automatiskt."
       actionLabel="Skapa faktura"
       actionHref="/invoices/new"
-      secondaryActionLabel="Lägg till kund först"
-      secondaryActionHref="/customers/new"
     />
   )
 }
