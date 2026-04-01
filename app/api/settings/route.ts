@@ -43,7 +43,7 @@ export async function PUT(request: Request) {
   // Fetch current settings to check for tax-relevant changes
   const { data: oldSettings } = await supabase
     .from('company_settings')
-    .select('entity_type, moms_period, f_skatt, vat_registered, pays_salaries, fiscal_year_start_month, onboarding_complete')
+    .select('entity_type, moms_period, f_skatt, vat_registered, vat_number, pays_salaries, fiscal_year_start_month, onboarding_complete')
     .eq('company_id', companyId)
     .single()
 
@@ -73,6 +73,25 @@ export async function PUT(request: Request) {
       { error: 'Aktiebolag måste använda faktureringsmetoden (BFNAR 2006:1)' },
       { status: 400 }
     )
+  }
+
+  // Validate: VAT-registered must have VAT number (ML 11 kap. 8§) and moms period (SFL 26 kap.)
+  const effectiveVatRegistered = body.vat_registered ?? oldSettings?.vat_registered
+  if (effectiveVatRegistered === true) {
+    const effectiveVatNumber = body.vat_number ?? oldSettings?.vat_number
+    if (!effectiveVatNumber) {
+      return NextResponse.json(
+        { error: 'Momsregistreringsnummer krävs när företaget är momsregistrerat (ML 11 kap. 8§)' },
+        { status: 400 }
+      )
+    }
+    const effectiveMomsPeriod = body.moms_period ?? oldSettings?.moms_period
+    if (!effectiveMomsPeriod) {
+      return NextResponse.json(
+        { error: 'Momsperiod krävs när företaget är momsregistrerat (SFL 26 kap.)' },
+        { status: 400 }
+      )
+    }
   }
 
   const { data, error } = await supabase

@@ -1017,20 +1017,20 @@ describe('UpdateSettingsSchema', () => {
     expect(result.success).toBe(true)
   })
 
-  it('rejects vat_registered: true without vat_number (ML 11 kap. 8§)', () => {
+  it('accepts vat_registered: true without vat_number at schema level (route-level check uses effective state)', () => {
     const result = UpdateSettingsSchema.safeParse({
       vat_registered: true,
       moms_period: 'quarterly',
     })
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
   })
 
-  it('rejects vat_registered: true without moms_period (SFL 26 kap.)', () => {
+  it('accepts vat_registered: true without moms_period at schema level (route-level check uses effective state)', () => {
     const result = UpdateSettingsSchema.safeParse({
       vat_registered: true,
       vat_number: 'SE556123456701',
     })
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
   })
 
   it('rejects aktiebolag with kontantmetoden (BFNAR 2006:1)', () => {

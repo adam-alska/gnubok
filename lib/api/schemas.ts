@@ -374,7 +374,7 @@ export const UpdateSettingsSchema = z.object({
   clearing_number: z.string().regex(/^\d{4,5}$/, 'Clearingnummer måste vara 4-5 siffror').optional().or(z.literal('')),
   account_number: z.string().regex(/^\d{6,12}$/, 'Kontonummer måste vara 6-12 siffror').optional().or(z.literal('')),
   bankgiro: z.string().regex(/^(\d{3,4}-\d{4}|\d{7,8})$/, 'Ogiltigt bankgironummer (7-8 siffror)').nullable().optional().or(z.literal('')),
-  plusgiro: z.string().nullable().optional(),
+  plusgiro: z.string().regex(/^\d{1,7}-\d{1}$/, 'Ogiltigt plusgironummer').nullable().optional().or(z.literal('')),
   iban: z.string().optional(),
   bic: z.string().optional(),
   accounting_method: AccountingMethodSchema.optional(),
@@ -398,30 +398,6 @@ export const UpdateSettingsSchema = z.object({
   {
     message: 'Enskild firma must have fiscal year starting in January (BFL 3 kap.)',
     path: ['fiscal_year_start_month'],
-  }
-).refine(
-  (data) => {
-    // ML 11 kap. 8§: VAT-registered entities must have a VAT number
-    if (data.vat_registered === true) {
-      return !!data.vat_number
-    }
-    return true
-  },
-  {
-    message: 'Momsregistreringsnummer krävs när företaget är momsregistrerat (ML 11 kap. 8§)',
-    path: ['vat_number'],
-  }
-).refine(
-  (data) => {
-    // SFL 26 kap.: VAT-registered entities must have a reporting period
-    if (data.vat_registered === true) {
-      return !!data.moms_period
-    }
-    return true
-  },
-  {
-    message: 'Momsperiod krävs när företaget är momsregistrerat (SFL 26 kap.)',
-    path: ['moms_period'],
   }
 ).refine(
   (data) => {
