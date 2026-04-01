@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { requireCompanyId } from '@/lib/company/context'
 
@@ -32,8 +32,9 @@ export async function POST(request: Request) {
   const ext = file.name.split('.').pop() || 'png'
   const storagePath = `logos/${companyId}/logo.${ext}`
 
-  // Upload (upsert to replace existing)
-  const { error: uploadError } = await supabase.storage
+  // Upload with service client to bypass storage RLS (auth already verified above)
+  const serviceClient = createServiceClient()
+  const { error: uploadError } = await serviceClient.storage
     .from('documents')
     .upload(storagePath, buffer, {
       contentType: file.type,
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
   }
 
   // Get public URL
-  const { data: urlData } = supabase.storage
+  const { data: urlData } = serviceClient.storage
     .from('documents')
     .getPublicUrl(storagePath)
 
@@ -82,7 +83,8 @@ export async function DELETE() {
     const url = new URL(settings.logo_url)
     const pathMatch = url.pathname.match(/\/object\/public\/documents\/(.+)/)
     if (pathMatch) {
-      await supabase.storage.from('documents').remove([pathMatch[1]])
+      const serviceClient = createServiceClient()
+      await serviceClient.storage.from('documents').remove([pathMatch[1]])
     }
   }
 

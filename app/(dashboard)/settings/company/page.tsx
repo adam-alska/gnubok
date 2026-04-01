@@ -24,8 +24,12 @@ export default function CompanySettingsPage() {
       email: (formData.get('email') as string) || '',
       website: (formData.get('website') as string) || '',
     }
-    updateSettings(updates as Partial<CompanySettings>)
-    return updates
+    return {
+      updates,
+      onSuccess: (data: Record<string, unknown>) => {
+        updateSettings(data as Partial<CompanySettings>)
+      },
+    }
   }
 
   return (

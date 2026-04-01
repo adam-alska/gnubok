@@ -12,15 +12,27 @@ export default function TaxSettingsPage() {
   if (isLoading || !settings) return <SettingsLoadingSkeleton />
 
   function handleSave(formData: FormData) {
+    const vatRegistered = formData.get('vat_registered') === 'true'
+
     const updates: Record<string, unknown> = {
+      f_skatt: formData.get('f_skatt') === 'true',
+      vat_registered: vatRegistered,
+      vat_number: vatRegistered ? ((formData.get('vat_number') as string) || null) : null,
+      moms_period: vatRegistered ? ((formData.get('moms_period') as string) || null) : null,
+      fiscal_year_start_month: parseInt(formData.get('fiscal_year_start_month') as string) || 1,
+      pays_salaries: formData.get('pays_salaries') === 'true',
       preliminary_tax_monthly: parseFloat(formData.get('preliminary_tax_monthly') as string) || null,
     }
-    updateSettings(updates as Partial<CompanySettings>)
-    return updates
+    return {
+      updates,
+      onSuccess: (data: Record<string, unknown>) => {
+        updateSettings(data as Partial<CompanySettings>)
+      },
+    }
   }
 
   return (
-    <SettingsFormWrapper onSave={handleSave} className="space-y-8">
+    <SettingsFormWrapper onSave={handleSave} className="space-y-0">
       <TaxSettingsForm settings={settings} />
     </SettingsFormWrapper>
   )
