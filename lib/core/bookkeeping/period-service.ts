@@ -151,20 +151,12 @@ export async function createNextPeriod(
   const nextStart = new Date(current.period_end)
   nextStart.setDate(nextStart.getDate() + 1)
 
-  // Compute period length from current period to handle broken fiscal years
-  const currentStart = new Date(current.period_start)
-  const currentEnd = new Date(current.period_end)
-
-  // Calculate months difference
-  const monthsDiff =
-    (currentEnd.getFullYear() - currentStart.getFullYear()) * 12 +
-    (currentEnd.getMonth() - currentStart.getMonth())
-
-  // Next period end: add same number of months from next start, then go to end of that month
+  // After a broken first fiscal year, subsequent years should always be
+  // 12 months (standard fiscal year). The first year is the only one that
+  // can be longer/shorter than 12 months per BFL 3 kap.
   const nextEnd = new Date(nextStart)
-  nextEnd.setMonth(nextEnd.getMonth() + monthsDiff)
-  // Go to end of the month
-  nextEnd.setMonth(nextEnd.getMonth() + 1)
+  nextEnd.setMonth(nextEnd.getMonth() + 12)
+  // Go to last day of that month
   nextEnd.setDate(0)
 
   const nextStartStr = nextStart.toISOString().split('T')[0]

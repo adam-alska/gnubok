@@ -63,7 +63,7 @@ The engine (`lib/bookkeeping/engine.ts`) is the most critical system. All accoun
 
 `standard_25`, `reduced_12`, `reduced_6`, `reverse_charge`, `export`, `exempt`
 
-Invoice items support individual `vat_rate` values (mixed-rate invoices). `generatePerRateLines()` in `invoice-entries.ts` groups by rate. Use `getAvailableVatRates(customerType, vatNumberValidated)` from `lib/invoices/vat-rules.ts`.
+Invoice items support individual `vat_rate` values (mixed-rate invoices). `generatePerRateLines()` in `lib/bookkeeping/invoice-entries.ts` groups by rate. Use `getAvailableVatRates(customerType, vatNumberValidated)` from `lib/invoices/vat-rules.ts`.
 
 ### VAT Declaration Rutor (SKV 4700)
 
@@ -115,7 +115,7 @@ Extensions are opt-in plugins in `extensions/general/<name>/`, controlled by `ex
 
 gnubok exposes its bookkeeping engine as an MCP (Model Context Protocol) server, letting users do bookkeeping through Claude Desktop, Claude Code, or any MCP-compatible client.
 
-**MCP extension** (`extensions/general/mcp-server/`): 10 tools — transactions, categorization, customers, invoices, trial balance, VAT report, KPI report, income statement. JSON-RPC 2.0 protocol implemented directly (no SDK dependency). Endpoint: `/api/extensions/ext/mcp-server/mcp`.
+**MCP extension** (`extensions/general/mcp-server/`): 26 tools — transactions, categorization, customers, suppliers, invoices, supplier invoices, accounts, fiscal periods, trial balance, general ledger, balance sheet, income statement, AR/supplier ledger, reconciliation, VAT report, KPI report, receipt matching, invoice payments/sending. JSON-RPC 2.0 protocol implemented directly (no SDK dependency). Endpoint: `/api/extensions/ext/mcp-server/mcp`.
 
 **API key infrastructure** (`lib/auth/api-keys.ts`, `api_keys` table): SHA-256 hashed keys with `gnubok_sk_` prefix. Rate limited at 100 RPM via atomic DB RPC (`validate_and_increment_api_key`). `createServiceClientNoCookies()` creates a Supabase service client without cookies for API key auth — all queries filter by `user_id` (defense in depth).
 
@@ -176,7 +176,7 @@ export async function POST(request: Request) {
 
 ## Database & Migrations
 
-**Location**: `supabase/migrations/` — 70 files. Early migrations use sequential numbering (`20240101000001`–`20240101000038`), later ones use real timestamps.
+**Location**: `supabase/migrations/` — 80 files. Early migrations use sequential numbering (`20240101000001`–`20240101000038`), later ones use real timestamps.
 
 ### Migration Rules
 
@@ -202,7 +202,7 @@ export async function POST(request: Request) {
 
 ## Deployment
 
-Hosted on **Vercel**. Cron jobs defined in `vercel.json` (banking sync, deadlines, reminders, tax deadlines, document verification, sandbox cleanup).
+Hosted on **Vercel**. Cron jobs defined in `vercel.json` (banking sync, deadlines, reminders, tax deadlines, document verification, sandbox cleanup, event cleanup).
 
 **Core env vars**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`. **Auth env vars**: `NEXT_PUBLIC_REQUIRE_MFA` (set `true` on hosted), `NEXT_PUBLIC_SELF_HOSTED` (set `true` for Docker). Extension env vars only needed when that extension is enabled.
 

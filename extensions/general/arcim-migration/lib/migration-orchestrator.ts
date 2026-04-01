@@ -33,6 +33,7 @@ import {
 export interface MigrationOptions {
   consentId: string
   userId: string
+  companyId: string
   supabase: SupabaseClient
   importCompanyInfo?: boolean
   importCustomers?: boolean
@@ -49,7 +50,7 @@ function emitProgress(options: MigrationOptions, progress: MigrationProgress) {
 // ── Main orchestrator ─────────────────────────────────────────────
 
 export async function executeMigration(options: MigrationOptions): Promise<MigrationResults> {
-  const { consentId, userId, supabase } = options
+  const { consentId, userId, companyId, supabase } = options
   const results: MigrationResults = {}
 
   try {
@@ -63,7 +64,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
           const { data: existing } = await supabase
             .from('company_settings')
             .select('company_name, org_number, vat_number')
-            .eq('company_id', userId)
+            .eq('company_id', companyId)
             .single()
 
           const updates: Record<string, unknown> = {}
@@ -83,7 +84,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
           if (mapped.email) updates.email = mapped.email
 
           if (Object.keys(updates).length > 0) {
-            await supabase.from('company_settings').update(updates).eq('company_id', userId)
+            await supabase.from('company_settings').update(updates).eq('company_id', companyId)
           }
           results.companyInfo = { imported: true }
         }
@@ -116,7 +117,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const { data: existing } = await supabase
               .from('customers')
               .select('id')
-              .eq('company_id', userId)
+              .eq('company_id', companyId)
               .eq('org_number', orgNumber)
               .limit(1)
 
@@ -128,7 +129,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             }
           }
 
-          const mapped = mapCustomer(customer, userId)
+          const mapped = mapCustomer(customer, userId, companyId)
           const { data: inserted, error } = await supabase
             .from('customers')
             .insert(mapped)
@@ -173,7 +174,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const { data: existing } = await supabase
               .from('suppliers')
               .select('id')
-              .eq('company_id', userId)
+              .eq('company_id', companyId)
               .eq('org_number', orgNumber)
               .limit(1)
 
@@ -185,7 +186,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             }
           }
 
-          const mapped = mapSupplier(supplier, userId)
+          const mapped = mapSupplier(supplier, userId, companyId)
           const { data: inserted, error } = await supabase
             .from('suppliers')
             .insert(mapped)
@@ -230,7 +231,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const { data: match } = await supabase
               .from('customers')
               .select('id')
-              .eq('company_id', userId)
+              .eq('company_id', companyId)
               .eq('org_number', customerOrgNumber)
               .limit(1)
             if (match?.[0]) customerId = match[0].id
@@ -240,7 +241,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const { data: match } = await supabase
               .from('customers')
               .select('id')
-              .eq('company_id', userId)
+              .eq('company_id', companyId)
               .eq('name', inv.customer.name)
               .limit(1)
             if (match?.[0]) customerId = match[0].id
@@ -250,6 +251,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const customerType = inferTypeFromParty(inv.customer)
             const minimalCustomer = {
               user_id: userId,
+              company_id: companyId,
               name: inv.customer.name,
               customer_type: customerType,
               default_payment_terms: 30,
@@ -277,7 +279,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
           const { data: existingInv } = await supabase
             .from('invoices')
             .select('id')
-            .eq('company_id', userId)
+            .eq('company_id', companyId)
             .eq('invoice_number', inv.invoiceNumber)
             .limit(1)
 
@@ -287,7 +289,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             continue
           }
 
-          const { invoice: mappedInvoice, items: mappedItems } = mapSalesInvoice(inv, userId, customerId)
+          const { invoice: mappedInvoice, items: mappedItems } = mapSalesInvoice(inv, userId, companyId, customerId)
 
           const { data: insertedInv, error: invError } = await supabase
             .from('invoices')
@@ -341,7 +343,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const { data: match } = await supabase
               .from('suppliers')
               .select('id')
-              .eq('company_id', userId)
+              .eq('company_id', companyId)
               .eq('org_number', supplierOrgNumber)
               .limit(1)
             if (match?.[0]) supplierId = match[0].id
@@ -351,7 +353,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const { data: match } = await supabase
               .from('suppliers')
               .select('id')
-              .eq('company_id', userId)
+              .eq('company_id', companyId)
               .eq('name', inv.supplier.name)
               .limit(1)
             if (match?.[0]) supplierId = match[0].id
@@ -361,6 +363,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const supplierType = inferTypeFromParty(inv.supplier)
             const minimalSupplier = {
               user_id: userId,
+              company_id: companyId,
               name: inv.supplier.name,
               supplier_type: supplierType,
               default_payment_terms: 30,
@@ -388,7 +391,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
           const { data: existingInv } = await supabase
             .from('supplier_invoices')
             .select('id')
-            .eq('company_id', userId)
+            .eq('company_id', companyId)
             .eq('supplier_invoice_number', inv.invoiceNumber)
             .eq('supplier_id', supplierId)
             .limit(1)
@@ -399,11 +402,11 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             continue
           }
 
-          const { invoice: mappedInvoice, items: mappedItems } = mapSupplierInvoice(inv, userId, supplierId)
+          const { invoice: mappedInvoice, items: mappedItems } = mapSupplierInvoice(inv, userId, companyId, supplierId)
 
           // Get next arrival number (ankomstnummer) — required NOT NULL column
           const { data: arrivalNum, error: arrivalError } = await supabase
-            .rpc('get_next_arrival_number', { p_company_id: userId })
+            .rpc('get_next_arrival_number', { p_company_id: companyId })
 
           if (arrivalError || arrivalNum == null) {
             console.error(`[migration] Supplier invoice ${inv.invoiceNumber} skipped — could not get arrival number:`, arrivalError?.message)

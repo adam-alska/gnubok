@@ -503,6 +503,12 @@ export function InvoicePDF({ invoice, customer, items, company, originalInvoiceN
                 <Text style={styles.paymentValue}>{company.bankgiro}</Text>
               </View>
             )}
+            {company.plusgiro && (
+              <View style={styles.paymentRow}>
+                <Text style={styles.paymentLabel}>Plusgiro:</Text>
+                <Text style={styles.paymentValue}>{company.plusgiro}</Text>
+              </View>
+            )}
             {company.iban && (
               <View style={styles.paymentRow}>
                 <Text style={styles.paymentLabel}>IBAN:</Text>

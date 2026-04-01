@@ -366,7 +366,7 @@ export const UpdateSettingsSchema = z.object({
   country: z.string().optional(),
   f_skatt: z.boolean().optional(),
   vat_registered: z.boolean().optional(),
-  vat_number: z.string().optional(),
+  vat_number: z.string().regex(/^SE\d{12}$/, 'Momsregistreringsnummer måste vara SE följt av 12 siffror').nullable().optional(),
   moms_period: MomsPeriodSchema.nullable().optional(),
   fiscal_year_start_month: z.number().int().min(1).max(12).optional(),
   preliminary_tax_monthly: z.number().nullable().optional(),
@@ -374,6 +374,7 @@ export const UpdateSettingsSchema = z.object({
   clearing_number: z.string().regex(/^\d{4,5}$/, 'Clearingnummer måste vara 4-5 siffror').optional().or(z.literal('')),
   account_number: z.string().regex(/^\d{6,12}$/, 'Kontonummer måste vara 6-12 siffror').optional().or(z.literal('')),
   bankgiro: z.string().regex(/^(\d{3,4}-\d{4}|\d{7,8})$/, 'Ogiltigt bankgironummer (7-8 siffror)').nullable().optional().or(z.literal('')),
+  plusgiro: z.string().regex(/^\d{1,7}-\d{1}$/, 'Ogiltigt plusgironummer').nullable().optional().or(z.literal('')),
   iban: z.string().optional(),
   bic: z.string().optional(),
   accounting_method: AccountingMethodSchema.optional(),
@@ -381,7 +382,9 @@ export const UpdateSettingsSchema = z.object({
   next_invoice_number: z.number().int().positive().optional(),
   invoice_default_days: z.number().int().positive().optional(),
   invoice_default_notes: z.string().nullable().optional(),
+  phone: z.string().optional(),
   email: z.string().email().optional(),
+  website: z.string().optional().or(z.literal('')),
   pays_salaries: z.boolean().optional(),
   sector_slug: z.string().nullable().optional(),
 }).refine(
@@ -395,6 +398,18 @@ export const UpdateSettingsSchema = z.object({
   {
     message: 'Enskild firma must have fiscal year starting in January (BFL 3 kap.)',
     path: ['fiscal_year_start_month'],
+  }
+).refine(
+  (data) => {
+    // BFNAR 2006:1: Aktiebolag must use accrual accounting (faktureringsmetoden)
+    if (data.entity_type === 'aktiebolag' && data.accounting_method !== undefined) {
+      return data.accounting_method === 'accrual'
+    }
+    return true
+  },
+  {
+    message: 'Aktiebolag måste använda faktureringsmetoden (BFNAR 2006:1)',
+    path: ['accounting_method'],
   }
 )
 
