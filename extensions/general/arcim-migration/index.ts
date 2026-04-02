@@ -8,9 +8,9 @@ import {
   exchangeAuthToken,
   submitProviderToken,
   deleteConsent,
-  fetchCompanyInfo,
-  fetchSIEExport,
-} from './lib/arcim-client'
+  resolveConsent,
+  fetchCompanyInfoDirect,
+} from './lib/provider-client'
 import { mapCompanyInfo } from './lib/entity-mapper'
 import { executeMigration } from './lib/migration-orchestrator'
 import type { ArcimProvider } from './types'
@@ -19,29 +19,29 @@ import { parseSIEFile, validateSIEFile } from '@/lib/import/sie-parser'
 import { suggestMappings, getMappingStats, isSystemAccount } from '@/lib/import/account-mapper'
 import { loadMappings, generateImportPreview, executeSIEImport, saveMappings } from '@/lib/import/sie-import'
 import { BAS_REFERENCE } from '@/lib/bookkeeping/bas-reference'
+import { FortnoxClient } from '@/lib/providers/fortnox/client'
+import type { ProviderName } from '@/lib/providers/types'
 
 /** Fiscal years we support importing — older data is not needed */
 const ALLOWED_FISCAL_YEARS = new Set([2024, 2025, 2026])
 
+const fortnoxClient = new FortnoxClient()
+
 /**
- * Arcim Migration extension
+ * Provider Migration extension
  *
  * Migrates bookkeeping data from external Swedish accounting systems
- * (Fortnox, Visma, Bokio, Björn Lundén, Briox) into gnubok via
- * the Arcim Sync unified API gateway.
+ * (Fortnox, Visma, Bokio, Björn Lundén, Briox) into gnubok by talking
+ * directly to each provider's API.
  *
  * Bookkeeping data (accounts, balances, vouchers) is imported via SIE
- * files fetched from the gateway. Entity data (customers, suppliers,
- * invoices) is imported via the REST API.
- *
- * Required environment variables:
- * - ARCIM_SYNC_GATEWAY_URL
- * - ARCIM_SYNC_API_KEY
+ * files fetched from providers. Entity data (customers, suppliers,
+ * invoices) is imported via the provider REST APIs.
  */
 export const arcimMigrationExtension: Extension = {
   id: 'arcim-migration',
-  name: 'Systemmigration (Arcim Sync)',
-  version: '1.0.0',
+  name: 'Systemmigration',
+  version: '2.0.0',
 
   apiRoutes: [
     // ── List available providers ───────────────────────────────────
@@ -66,6 +66,8 @@ export const arcimMigrationExtension: Extension = {
           return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        const companyId = ctx?.companyId ?? user.id
+
         const { provider, companyName, orgNumber } = await request.json() as {
           provider: ArcimProvider
           companyName?: string
@@ -82,8 +84,9 @@ export const arcimMigrationExtension: Extension = {
         }
 
         try {
-          // Create consent in Arcim Sync
+          // Create consent directly in Supabase
           const consent = await createConsent(
+            companyId,
             provider,
             `gnubok-migration-${user.id}`,
             orgNumber,
@@ -100,15 +103,14 @@ export const arcimMigrationExtension: Extension = {
             // Generate OTC for OAuth flow
             const otc = await generateOtc(consent.id)
 
-            // Build the OAuth callback URL using the current app URL (localhost in dev, production in prod)
+            // Build the OAuth callback URL
             const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
             const callbackUrl = `${appUrl}/api/extensions/ext/arcim-migration/callback`
 
-            // Encode consentId + provider in state so the callback doesn't depend on session storage
+            // Encode consentId + provider in state
             const statePayload = JSON.stringify({ otc: otc.code, consentId: consent.id, provider })
             const stateEncoded = Buffer.from(statePayload).toString('base64url')
 
-            // Pass callbackUrl as redirectUri so Fortnox redirects here (works for localhost and production)
             const { url } = await getAuthUrl(provider, stateEncoded, callbackUrl)
 
             return NextResponse.json({
@@ -162,7 +164,6 @@ export const arcimMigrationExtension: Extension = {
         }
 
         // BL uses server-side client credentials — only needs companyId
-        // Bokio and Briox need an API token
         if (provider !== 'bjornlunden' && !apiToken) {
           return NextResponse.json(
             { error: 'apiToken is required for this provider' },
@@ -170,7 +171,6 @@ export const arcimMigrationExtension: Extension = {
           )
         }
 
-        // Bokio and BL require companyId
         if ((provider === 'bokio' || provider === 'bjornlunden') && !companyId) {
           return NextResponse.json(
             { error: 'companyId is required for this provider' },
@@ -192,10 +192,6 @@ export const arcimMigrationExtension: Extension = {
     },
 
     // ── OAuth callback ────────────────────────────────────────────
-    // This handler is called by the OAuth provider redirect. It does NOT
-    // require user auth — the request comes from the provider, not the user's
-    // browser session. Authentication is validated via the OTC code + consent.
-    // The 'skipAuth' flag is checked by the extension dispatch route.
     {
       method: 'GET',
       path: '/callback',
@@ -211,24 +207,19 @@ export const arcimMigrationExtension: Extension = {
         }
 
         try {
-          // Decode state — supports both new format (base64url JSON with consentId/provider)
-          // and legacy format (plain OTC code string)
           let consentId: string | null = null
           let provider: ArcimProvider | null = null
-          let otcCode: string = stateRaw
 
           try {
             const decoded = JSON.parse(Buffer.from(stateRaw, 'base64url').toString())
-            if (decoded.consentId && decoded.provider && decoded.otc) {
+            if (decoded.consentId && decoded.provider) {
               consentId = decoded.consentId
               provider = decoded.provider as ArcimProvider
-              otcCode = decoded.otc
             }
           } catch {
-            // Legacy: state is just the OTC code — fall back to ctx.settings
+            // Legacy fallback
           }
 
-          // Fall back to session-based settings if state didn't contain the data
           if (!consentId || !provider) {
             consentId = ctx?.settings
               ? await ctx.settings.get<string>('consent_id')
@@ -242,18 +233,43 @@ export const arcimMigrationExtension: Extension = {
             return NextResponse.json({ error: 'No active migration session' }, { status: 400 })
           }
 
-          // The redirectUri used for the token exchange must match the one used in the auth URL
           const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
           const redirectUri = `${appUrl}/api/extensions/ext/arcim-migration/callback`
 
-          await exchangeAuthToken(consentId, provider, otcCode, code, redirectUri)
+          // Exchange OAuth code directly with the provider
+          await exchangeAuthToken(consentId, provider, code, redirectUri)
 
-          // Redirect to import page with success
-          return NextResponse.redirect(`${appUrl}/import?migration=connected&consentId=${consentId}`)
+          // Return an HTML page that notifies the opener tab and closes itself
+          const html = `<!DOCTYPE html><html><body><script>
+            if (window.opener) {
+              window.opener.postMessage({ type: 'arcim-oauth-success', consentId: '${consentId}' }, '${appUrl}');
+              window.close();
+            } else {
+              window.location.href = '${appUrl}/import?migration=connected&consentId=${consentId}';
+            }
+          </script><p>Anslutningen lyckades. Du kan stänga denna flik.</p></body></html>`
+
+          return new Response(html, {
+            status: 200,
+            headers: { 'Content-Type': 'text/html' },
+          })
         } catch (error) {
           log.error('OAuth callback error:', error)
           const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
-          return NextResponse.redirect(`${appUrl}/import?migration=error`)
+
+          const html = `<!DOCTYPE html><html><body><script>
+            if (window.opener) {
+              window.opener.postMessage({ type: 'arcim-oauth-error' }, '${appUrl}');
+              window.close();
+            } else {
+              window.location.href = '${appUrl}/import?migration=error';
+            }
+          </script><p>Något gick fel. Du kan stänga denna flik.</p></body></html>`
+
+          return new Response(html, {
+            status: 200,
+            headers: { 'Content-Type': 'text/html' },
+          })
         }
       },
     },
@@ -271,6 +287,8 @@ export const arcimMigrationExtension: Extension = {
           return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        const companyId = ctx?.companyId ?? user.id
+
         const url = new URL(request.url)
         const consentId = url.searchParams.get('consentId')
 
@@ -279,7 +297,6 @@ export const arcimMigrationExtension: Extension = {
         }
 
         try {
-          // Verify consent is accepted
           const consent = await getConsent(consentId)
           if (consent.status !== 1) {
             return NextResponse.json(
@@ -288,45 +305,64 @@ export const arcimMigrationExtension: Extension = {
             )
           }
 
-          // Fetch company info for preview (non-blocking — continue if it fails)
+          // Resolve consent to get access token
+          const resolved = await resolveConsent(companyId, consentId)
+          const provider = resolved.consent.provider as ProviderName
+
+          // Fetch company info directly from provider
           let mapped = null
           try {
-            const companyInfo = await fetchCompanyInfo(consentId)
+            const companyInfo = await fetchCompanyInfoDirect(provider, resolved.accessToken, resolved.providerCompanyId)
             mapped = companyInfo ? mapCompanyInfo(companyInfo) : null
           } catch (err) {
             log.info('Company info fetch failed:', err instanceof Error ? err.message : String(err))
           }
 
-          // Try to fetch SIE stats (non-blocking — continue if it fails)
+          // Try to fetch SIE data (Fortnox has native SIE export)
           let sieAvailable = false
           let sieStats: { accountCount: number; transactionCount: number; fiscalYears: number[] } | null = null
 
-          try {
-            log.info(`Fetching SIE export for consent ${consentId}...`)
-            const sieResult = await fetchSIEExport(consentId, 4)
-            log.info(`SIE export response: ${sieResult.files.length} files returned`)
+          if (provider === 'fortnox') {
+            try {
+              log.info(`Fetching SIE export from Fortnox for consent ${consentId}...`)
+              // Fortnox SIE export endpoint: /3/sie/{type}?financialyear={id}
+              // First get financial years
+              const fyResponse = await fortnoxClient.get<Record<string, unknown>>(
+                resolved.accessToken,
+                '/financialyears'
+              )
+              const years = (fyResponse['FinancialYears'] as Record<string, unknown>[] | undefined) ?? []
+              const allowedYears = years
+                .map(fy => ({
+                  id: fy['Id'] as number,
+                  fromDate: fy['FromDate'] as string,
+                  toDate: fy['ToDate'] as string,
+                }))
+                .filter(fy => {
+                  const year = new Date(fy.fromDate).getFullYear()
+                  return ALLOWED_FISCAL_YEARS.has(year)
+                })
 
-            // Only keep fiscal years we need (2024–2026)
-            const filteredFiles = sieResult.files.filter(f => ALLOWED_FISCAL_YEARS.has(f.fiscalYear))
-            if (filteredFiles.length < sieResult.files.length) {
-              const skippedYears = sieResult.files
-                .filter(f => !ALLOWED_FISCAL_YEARS.has(f.fiscalYear))
-                .map(f => f.fiscalYear)
-              log.info(`Filtered out fiscal years: ${skippedYears.join(', ')} (only importing ${[...ALLOWED_FISCAL_YEARS].join(', ')})`)
+              if (allowedYears.length > 0) {
+                // Fetch SIE type 4 for the most recent allowed year to get stats
+                const latestYear = allowedYears[allowedYears.length - 1]
+                const sieContent = await fortnoxClient.getText(
+                  resolved.accessToken,
+                  `/sie/4?financialyear=${latestYear.id}`
+                )
+                if (sieContent) {
+                  const parsed = parseSIEFile(sieContent)
+                  sieAvailable = true
+                  sieStats = {
+                    accountCount: parsed.accounts.length,
+                    transactionCount: parsed.vouchers.length,
+                    fiscalYears: allowedYears.map(fy => new Date(fy.fromDate).getFullYear()),
+                  }
+                }
+              }
+            } catch (err) {
+              log.info('SIE export failed:', err instanceof Error ? err.message : String(err))
             }
-
-            if (filteredFiles.length > 0) {
-              sieAvailable = true
-              const totalAccounts = Math.max(...filteredFiles.map(f => f.accountCount))
-              const totalTransactions = filteredFiles.reduce((sum, f) => sum + f.transactionCount, 0)
-              const fiscalYears = filteredFiles.map(f => f.fiscalYear).sort()
-              sieStats = { accountCount: totalAccounts, transactionCount: totalTransactions, fiscalYears }
-              log.info(`SIE stats: ${totalAccounts} accounts, ${totalTransactions} transactions, years: ${fiscalYears.join(', ')}`)
-            } else {
-              log.info('No SIE files within allowed fiscal years')
-            }
-          } catch (err) {
-            log.info('SIE export failed:', err instanceof Error ? err.message : String(err))
           }
 
           return NextResponse.json({
@@ -363,6 +399,8 @@ export const arcimMigrationExtension: Extension = {
           return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        const companyId = ctx?.companyId ?? user.id
+
         const url = new URL(request.url)
         const consentId = url.searchParams.get('consentId')
 
@@ -371,22 +409,69 @@ export const arcimMigrationExtension: Extension = {
         }
 
         try {
-          // Fetch SIE from gateway and filter to allowed fiscal years (2024–2026)
-          const sieResult = await fetchSIEExport(consentId, 4)
-          const filteredFiles = sieResult.files.filter(f => ALLOWED_FISCAL_YEARS.has(f.fiscalYear))
-          if (filteredFiles.length === 0) {
+          // Resolve consent
+          const resolved = await resolveConsent(companyId, consentId)
+          const provider = resolved.consent.provider as ProviderName
+
+          if (provider !== 'fortnox') {
+            return NextResponse.json(
+              { error: `SIE export is currently only supported for Fortnox. Provider: ${provider}` },
+              { status: 400 }
+            )
+          }
+
+          // Fetch financial years from Fortnox
+          const fyResponse = await fortnoxClient.get<Record<string, unknown>>(
+            resolved.accessToken,
+            '/financialyears'
+          )
+          const years = (fyResponse['FinancialYears'] as Record<string, unknown>[] | undefined) ?? []
+          const allowedYears = years
+            .map(fy => ({
+              id: fy['Id'] as number,
+              fromDate: fy['FromDate'] as string,
+              toDate: fy['ToDate'] as string,
+            }))
+            .filter(fy => {
+              const year = new Date(fy.fromDate).getFullYear()
+              return ALLOWED_FISCAL_YEARS.has(year)
+            })
+
+          if (allowedYears.length === 0) {
+            return NextResponse.json({ error: 'No SIE data available for fiscal years 2024–2026' }, { status: 404 })
+          }
+
+          // Fetch SIE type 4 for each allowed year
+          const sieFiles: { fiscalYear: number; rawContent: string }[] = []
+          for (const fy of allowedYears) {
+            try {
+              const sieContent = await fortnoxClient.getText(
+                resolved.accessToken,
+                `/sie/4?financialyear=${fy.id}`
+              )
+              if (sieContent) {
+                sieFiles.push({
+                  fiscalYear: new Date(fy.fromDate).getFullYear(),
+                  rawContent: sieContent,
+                })
+              }
+            } catch (err) {
+              log.info(`Failed to fetch SIE for year ${fy.id}:`, err instanceof Error ? err.message : String(err))
+            }
+          }
+
+          if (sieFiles.length === 0) {
             return NextResponse.json({ error: 'No SIE data available for fiscal years 2024–2026' }, { status: 404 })
           }
 
           // Parse most recent file for preview/validation
-          const sieFile = filteredFiles[filteredFiles.length - 1]
+          const sieFile = sieFiles[sieFiles.length - 1]
           const parsed = parseSIEFile(sieFile.rawContent)
           const validation = validateSIEFile(parsed)
 
           // Collect ALL unique accounts across ALL fiscal year files
-          // so mappings cover every account that will be imported
           const allAccountsMap = new Map<string, { number: string; name: string }>()
-          for (const file of filteredFiles) {
+          for (const file of sieFiles) {
             const fileParsed = parseSIEFile(file.rawContent)
             for (const acc of fileParsed.accounts) {
               if (!allAccountsMap.has(acc.number)) {
@@ -394,14 +479,12 @@ export const arcimMigrationExtension: Extension = {
               }
             }
           }
-          // Filter out source-system internal accounts (e.g. Fortnox 0099)
-          // that have no BAS equivalent — same as core SIE import
           const allAccounts = [...allAccountsMap.values()]
             .filter(a => !isSystemAccount(a.number))
             .map(a => ({ number: a.number, name: a.name }))
 
           // Load existing user mappings
-          const existingMappings = await loadMappings(supabase, ctx?.companyId ?? user.id)
+          const existingMappings = await loadMappings(supabase, companyId)
           const existingRecords = [...existingMappings.values()].map(m => ({
             id: '',
             user_id: user.id,
@@ -414,7 +497,7 @@ export const arcimMigrationExtension: Extension = {
             updated_at: '',
           }))
 
-          // Suggest mappings using accounts from ALL fiscal years
+          // Suggest mappings
           const basAccounts = BAS_REFERENCE.map(b => ({
             account_number: b.account_number,
             account_name: b.account_name,
@@ -422,13 +505,10 @@ export const arcimMigrationExtension: Extension = {
           const mappings = suggestMappings(allAccounts, basAccounts, existingRecords)
           const mappingStats = getMappingStats(mappings)
 
-          log.info(`Account mapping: ${allAccounts.length} unique accounts across ${filteredFiles.length} files, ${mappingStats.unmapped} unmapped`)
+          log.info(`Account mapping: ${allAccounts.length} unique accounts across ${sieFiles.length} files, ${mappingStats.unmapped} unmapped`)
 
-          // Generate preview
           const preview = generateImportPreview(parsed, mappings)
-
-          // Collect all raw SIE content (filtered fiscal years only)
-          const allRawContent = filteredFiles.map(f => f.rawContent)
+          const allRawContent = sieFiles.map(f => f.rawContent)
 
           return NextResponse.json({
             parsed,
@@ -462,6 +542,8 @@ export const arcimMigrationExtension: Extension = {
           return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        const companyId = ctx?.companyId ?? user.id
+
         const { rawContent, mappings, options } = await request.json() as {
           rawContent: string
           mappings: import('@/lib/import/types').AccountMapping[]
@@ -478,14 +560,11 @@ export const arcimMigrationExtension: Extension = {
         }
 
         try {
-          // Parse the SIE content
           const parsed = parseSIEFile(rawContent)
 
-          // Save the user's mappings for future use
           await saveMappings(supabase, user.id, mappings)
 
-          // Execute the import via core engine
-          const result = await executeSIEImport(supabase, ctx?.companyId ?? user.id, user.id, parsed, mappings, {
+          const result = await executeSIEImport(supabase, companyId, user.id, parsed, mappings, {
             filename: `migration-sie-${Date.now()}.se`,
             fileContent: rawContent,
             createFiscalPeriod: options.createFiscalPeriod,
@@ -525,6 +604,8 @@ export const arcimMigrationExtension: Extension = {
           return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        const companyId = ctx?.companyId ?? user.id
+
         const {
           consentId,
           importCompanyInfo = true,
@@ -546,7 +627,6 @@ export const arcimMigrationExtension: Extension = {
         }
 
         try {
-          // Verify consent
           const consent = await getConsent(consentId)
           if (consent.status !== 1) {
             return NextResponse.json(
@@ -559,6 +639,7 @@ export const arcimMigrationExtension: Extension = {
 
           const results = await executeMigration({
             consentId,
+            companyId,
             userId: user.id,
             supabase,
             importCompanyInfo,
@@ -603,7 +684,6 @@ export const arcimMigrationExtension: Extension = {
         try {
           await deleteConsent(consentId)
 
-          // Clear stored consent from settings
           if (ctx?.settings) {
             await ctx.settings.set('consent_id', null)
             await ctx.settings.set('provider', null)
