@@ -122,15 +122,51 @@ interface PreviewData {
   } | null
 }
 
+interface SIEFileStatus {
+  fiscalYear: number
+  alreadyImported: boolean
+  importedAt: string | null
+}
+
 interface SIEData {
   parsed: ParsedSIEFile
   mappings: AccountMapping[]
   mappingStats: { total: number; mapped: number; unmapped: number }
   rawContent: string[]
+  fileStatuses: SIEFileStatus[]
+  allImported: boolean
+  newFileCount: number
   basAccounts: BASAccount[]
 }
 
 // ── Provider selection step ──────────────────────────────────────
+
+interface ConnectionStatus {
+  consents: {
+    id: string
+    provider: ArcimProvider
+    status: number
+    companyName?: string
+    createdAt?: string
+  }[]
+  sieImports: {
+    id: string
+    filename: string
+    status: string
+    accounts_count: number | null
+    transactions_count: number | null
+    company_name: string | null
+    fiscal_year_start: string | null
+    fiscal_year_end: string | null
+    imported_at: string | null
+    created_at: string
+  }[]
+  entityCounts: {
+    customers: number
+    suppliers: number
+    invoices: number
+  }
+}
 
 const COMING_SOON_PROVIDERS = new Set<ArcimProvider>(['visma', 'bjornlunden', 'briox'])
 
@@ -142,53 +178,159 @@ const PROVIDER_LOGOS: Record<ArcimProvider, string> = {
   briox: '/logos/Briox_logo.png',
 }
 
-function ProviderStep({ onSelect }: { onSelect: (provider: ArcimProvider) => void }) {
+function ProviderStep({
+  onSelect,
+  onResync,
+  onDisconnect,
+  connectionStatus,
+  isLoadingStatus,
+}: {
+  onSelect: (provider: ArcimProvider) => void
+  onResync: (provider: ArcimProvider, consentId: string) => void
+  onDisconnect: (consentId: string) => void
+  connectionStatus: ConnectionStatus | null
+  isLoadingStatus: boolean
+}) {
+  const activeConsents = connectionStatus?.consents.filter(c => c.status === 1) ?? []
+
   return (
     <div className="space-y-4">
+      {/* Existing connections */}
+      {activeConsents.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Aktiva anslutningar</CardTitle>
+            <CardDescription>
+              Du har redan anslutna leverantörer. Synka igen för att hämta ny data.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {activeConsents.map((consent) => {
+              const providerInfo = ARCIM_PROVIDERS.find(p => p.id === consent.provider)
+              const completedImports = connectionStatus?.sieImports.filter(i => i.status === 'completed') ?? []
+              const lastImport = completedImports[0]
+
+              return (
+                <div
+                  key={consent.id}
+                  className="flex items-center gap-4 rounded-lg border border-border bg-card p-4"
+                >
+                  <img
+                    src={PROVIDER_LOGOS[consent.provider]}
+                    alt={providerInfo?.name ?? consent.provider}
+                    className="h-10 w-10 shrink-0 rounded-lg object-contain"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{providerInfo?.name ?? consent.provider}</p>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                        <CheckCircle className="h-3 w-3" />
+                        Ansluten
+                      </span>
+                    </div>
+                    <div className="mt-0.5 space-y-0.5">
+                      {consent.companyName && (
+                        <p className="text-xs text-muted-foreground">{consent.companyName}</p>
+                      )}
+                      {lastImport ? (
+                        <p className="text-xs text-muted-foreground">
+                          Senaste import: {new Date(lastImport.imported_at ?? lastImport.created_at).toLocaleDateString('sv-SE')}
+                          {lastImport.transactions_count != null && ` — ${lastImport.transactions_count} verifikationer`}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          Ansluten {consent.createdAt ? new Date(consent.createdAt).toLocaleDateString('sv-SE') : ''}
+                        </p>
+                      )}
+                      {(connectionStatus?.entityCounts.customers ?? 0) > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {connectionStatus?.entityCounts.customers} kunder, {connectionStatus?.entityCounts.suppliers} leverantörer, {connectionStatus?.entityCounts.invoices} fakturor
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onResync(consent.provider, consent.id)}
+                    >
+                      <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                      Synka igen
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => onDisconnect(consent.id)}
+                    >
+                      <XCircle className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              )
+            })}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Provider selection */}
       <Card>
         <CardHeader>
-          <CardTitle>Välj ditt nuvarande bokföringssystem</CardTitle>
+          <CardTitle>{activeConsents.length > 0 ? 'Anslut ytterligare system' : 'Välj ditt nuvarande bokföringssystem'}</CardTitle>
           <CardDescription>
             Vi hämtar bokföringsdata via SIE och kunder, leverantörer och fakturor via API:et.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {ARCIM_PROVIDERS.map((provider) => {
-              const comingSoon = COMING_SOON_PROVIDERS.has(provider.id)
-              return (
-                <button
-                  key={provider.id}
-                  disabled={comingSoon}
-                  className={`relative flex items-center gap-4 rounded-lg border p-4 text-left transition-all ${
-                    comingSoon
-                      ? 'cursor-not-allowed border-border/50 opacity-60'
-                      : 'border-border hover:border-primary/50 hover:bg-accent/50 active:scale-[0.98]'
-                  }`}
-                  onClick={() => !comingSoon && onSelect(provider.id)}
-                >
-                  <img
-                    src={PROVIDER_LOGOS[provider.id]}
-                    alt={provider.name}
-                    className="h-10 w-10 shrink-0 rounded-lg object-contain"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{provider.name}</p>
-                      {comingSoon && (
-                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                          Kommer snart
-                        </span>
-                      )}
+          {isLoadingStatus ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {ARCIM_PROVIDERS.map((provider) => {
+                const comingSoon = COMING_SOON_PROVIDERS.has(provider.id)
+                const alreadyConnected = activeConsents.some(c => c.provider === provider.id)
+                return (
+                  <button
+                    key={provider.id}
+                    disabled={comingSoon || alreadyConnected}
+                    className={`relative flex items-center gap-4 rounded-lg border p-4 text-left transition-all ${
+                      comingSoon || alreadyConnected
+                        ? 'cursor-not-allowed border-border/50 opacity-60'
+                        : 'border-border hover:border-primary/50 hover:bg-accent/50 active:scale-[0.98]'
+                    }`}
+                    onClick={() => !comingSoon && !alreadyConnected && onSelect(provider.id)}
+                  >
+                    <img
+                      src={PROVIDER_LOGOS[provider.id]}
+                      alt={provider.name}
+                      className="h-10 w-10 shrink-0 rounded-lg object-contain"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{provider.name}</p>
+                        {comingSoon && (
+                          <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            Kommer snart
+                          </span>
+                        )}
+                        {alreadyConnected && (
+                          <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                            Ansluten
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {alreadyConnected ? 'Använd "Synka igen" ovan' : provider.authType === 'oauth' ? 'Anslut via inloggning' : 'Anslut med API-nyckel'}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {provider.authType === 'oauth' ? 'Anslut via inloggning' : 'Anslut med API-nyckel'}
-                    </p>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -539,12 +681,14 @@ function MappingStep({
 function OptionsStep({
   options,
   sieAvailable,
+  sieData,
   onChange,
   onStart,
   onBack,
 }: {
   options: MigrationOptions
   sieAvailable: boolean
+  sieData: SIEData | null
   onChange: (options: MigrationOptions) => void
   onStart: () => void
   onBack: () => void
@@ -554,6 +698,10 @@ function OptionsStep({
   const toggleOption = (key: keyof MigrationOptions) => {
     onChange({ ...options, [key]: !options[key] })
   }
+
+  const fileStatuses = sieData?.fileStatuses ?? []
+  const allSieImported = sieData?.allImported ?? false
+  const newFileCount = sieData?.newFileCount ?? 0
 
   const selectedItems: string[] = []
   if (options.importCompanyInfo) selectedItems.push('Företagsinformation')
@@ -586,11 +734,39 @@ function OptionsStep({
               <OptionRow
                 icon={<Database className="h-4 w-4" />}
                 label="Bokföringsdata (SIE)"
-                description="Kontoplan, ingående balanser och verifikationer"
-                checked={options.importSIEData}
-                onChange={() => toggleOption('importSIEData')}
+                description={allSieImported
+                  ? 'All bokföringsdata är redan importerad — inga ändringar'
+                  : newFileCount > 0
+                    ? `${newFileCount} ny(a) räkenskapsår att importera`
+                    : 'Kontoplan, ingående balanser och verifikationer'
+                }
+                checked={options.importSIEData && !allSieImported}
+                onChange={() => !allSieImported && toggleOption('importSIEData')}
+                disabled={allSieImported}
               />
-              {options.importSIEData && (
+              {/* Per-file import status */}
+              {fileStatuses.length > 0 && (
+                <div className="ml-4 space-y-1.5">
+                  {fileStatuses.map((fs) => (
+                    <div key={fs.fiscalYear} className="flex items-center gap-2 text-xs">
+                      {fs.alreadyImported ? (
+                        <>
+                          <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
+                          <span className="text-muted-foreground">
+                            Räkenskapsår {fs.fiscalYear} — importerad {fs.importedAt ? new Date(fs.importedAt).toLocaleDateString('sv-SE') : ''}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Calendar className="h-3.5 w-3.5 text-primary" />
+                          <span className="font-medium">Räkenskapsår {fs.fiscalYear} — ny data att importera</span>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {options.importSIEData && !allSieImported && (
                 <div className="flex items-center gap-3 rounded-lg border border-border p-3 ml-4">
                   <div className="text-muted-foreground">
                     <FileText className="h-4 w-4" />
@@ -686,17 +862,22 @@ function OptionRow({
   description,
   checked,
   onChange,
+  disabled,
 }: {
   icon: React.ReactNode
   label: string
   description: string
   checked: boolean
   onChange: () => void
+  disabled?: boolean
 }) {
   return (
     <div
-      className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent/50"
-      onClick={onChange}
+      className={cn(
+        'flex items-center gap-3 rounded-lg border border-border p-3 transition-colors',
+        disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:bg-accent/50'
+      )}
+      onClick={() => !disabled && onChange()}
     >
       <div className="text-muted-foreground">{icon}</div>
       <div className="flex-1">
@@ -705,7 +886,8 @@ function OptionRow({
       </div>
       <Switch
         checked={checked}
-        onCheckedChange={onChange}
+        onCheckedChange={() => !disabled && onChange()}
+        disabled={disabled}
         onClick={(e) => e.stopPropagation()}
       />
     </div>
@@ -1001,6 +1183,16 @@ function ResultStep({
   const allSieSucceeded = sieResults.length > 0 && sieResults.every(r => r.success)
   const anySieFailed = sieResults.some(r => r.errors.length > 0 && r.journalEntriesCreated === 0)
 
+  // Check if anything meaningful was imported via entities
+  // Company info is always re-fetched (upsert) so it doesn't count as "new"
+  const entityImported = results && (
+    (results.customers && (results.customers.imported > 0 || results.customers.skipped > 0)) ||
+    (results.suppliers && (results.suppliers.imported > 0 || results.suppliers.skipped > 0)) ||
+    (results.salesInvoices && (results.salesInvoices.imported > 0 || results.salesInvoices.skipped > 0)) ||
+    (results.supplierInvoices && (results.supplierInvoices.imported > 0 || results.supplierInvoices.skipped > 0))
+  )
+  const nothingNew = sieResults.length === 0 && !entityImported
+
   // Overall status
   const overallIcon = anySieFailed ? 'error' as const :
     (!allSieSucceeded || totalErrors > 0) ? 'warning' as const : 'success' as const
@@ -1011,13 +1203,16 @@ function ResultStep({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2.5">
-            <StatusIcon status={overallIcon} />
-            {anySieFailed ? 'Migrering delvis genomförd' :
+            <StatusIcon status={nothingNew ? 'success' : overallIcon} />
+            {nothingNew ? 'Allt är uppdaterat' :
+             anySieFailed ? 'Migrering delvis genomförd' :
              !allSieSucceeded ? 'Migrering klar med anmärkningar' :
              'Migrering klar'}
           </CardTitle>
           <CardDescription className="text-sm">
-            {totalJournalEntries > 0 && (
+            {nothingNew ? (
+              'Det finns ingen ny data att importera från leverantören.'
+            ) : totalJournalEntries > 0 ? (
               <>
                 <span className="tabular-nums font-medium text-foreground">
                   {totalJournalEntries.toLocaleString('sv-SE')}
@@ -1030,7 +1225,7 @@ function ResultStep({
                   </span>
                 )}
               </>
-            )}
+            ) : null}
           </CardDescription>
         </CardHeader>
       </Card>
@@ -1051,60 +1246,71 @@ function ResultStep({
       )}
 
       {/* ── API import results (company info, customers, etc.) ── */}
-      {results && (
-        <div className="space-y-2">
-          <h3 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <FileText className="h-4 w-4" />
-            Övriga data
-          </h3>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {results.companyInfo && (
-              <EntityResultRow
-                icon={<Building2 className="h-4 w-4" />}
-                label="Företagsinformation"
-                status={results.companyInfo.imported ? 'success' : 'skipped'}
-                statusText={results.companyInfo.imported ? 'Importerad' : 'Hoppades över'}
-              />
-            )}
-            {results.customers && (
-              <EntityResultRow
-                icon={<Users className="h-4 w-4" />}
-                label="Kunder"
-                status="success"
-                statusText={`${results.customers.imported} importerade`}
-                detail={results.customers.skipped > 0 ? `${results.customers.skipped} fanns redan` : undefined}
-              />
-            )}
-            {results.suppliers && (
-              <EntityResultRow
-                icon={<Truck className="h-4 w-4" />}
-                label="Leverantörer"
-                status="success"
-                statusText={`${results.suppliers.imported} importerade`}
-                detail={results.suppliers.skipped > 0 ? `${results.suppliers.skipped} fanns redan` : undefined}
-              />
-            )}
-            {results.salesInvoices && (
-              <EntityResultRow
-                icon={<FileText className="h-4 w-4" />}
-                label="Kundfakturor"
-                status="success"
-                statusText={`${results.salesInvoices.imported} importerade`}
-                detail={results.salesInvoices.skipped > 0 ? `${results.salesInvoices.skipped} hoppades över` : undefined}
-              />
-            )}
-            {results.supplierInvoices && (
-              <EntityResultRow
-                icon={<FileText className="h-4 w-4" />}
-                label="Leverantörsfakturor"
-                status="success"
-                statusText={`${results.supplierInvoices.imported} importerade`}
-                detail={results.supplierInvoices.skipped > 0 ? `${results.supplierInvoices.skipped} hoppades över` : undefined}
-              />
-            )}
+      {results && (() => {
+        const hasCompanyInfo = results.companyInfo?.imported
+        const hasCustomers = results.customers && (results.customers.imported > 0 || results.customers.skipped > 0)
+        const hasSuppliers = results.suppliers && (results.suppliers.imported > 0 || results.suppliers.skipped > 0)
+        const hasSalesInvoices = results.salesInvoices && (results.salesInvoices.imported > 0 || results.salesInvoices.skipped > 0)
+        const hasSupplierInvoices = results.supplierInvoices && (results.supplierInvoices.imported > 0 || results.supplierInvoices.skipped > 0)
+        const hasAnything = hasCompanyInfo || hasCustomers || hasSuppliers || hasSalesInvoices || hasSupplierInvoices
+
+        if (!hasAnything) return null
+
+        return (
+          <div className="space-y-2">
+            <h3 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <FileText className="h-4 w-4" />
+              Övriga data
+            </h3>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {hasCompanyInfo && (
+                <EntityResultRow
+                  icon={<Building2 className="h-4 w-4" />}
+                  label="Företagsinformation"
+                  status="success"
+                  statusText="Importerad"
+                />
+              )}
+              {hasCustomers && (
+                <EntityResultRow
+                  icon={<Users className="h-4 w-4" />}
+                  label="Kunder"
+                  status="success"
+                  statusText={`${results.customers!.imported} importerade`}
+                  detail={results.customers!.skipped > 0 ? `${results.customers!.skipped} fanns redan` : undefined}
+                />
+              )}
+              {hasSuppliers && (
+                <EntityResultRow
+                  icon={<Truck className="h-4 w-4" />}
+                  label="Leverantörer"
+                  status="success"
+                  statusText={`${results.suppliers!.imported} importerade`}
+                  detail={results.suppliers!.skipped > 0 ? `${results.suppliers!.skipped} fanns redan` : undefined}
+                />
+              )}
+              {hasSalesInvoices && (
+                <EntityResultRow
+                  icon={<FileText className="h-4 w-4" />}
+                  label="Kundfakturor"
+                  status="success"
+                  statusText={`${results.salesInvoices!.imported} importerade`}
+                  detail={results.salesInvoices!.skipped > 0 ? `${results.salesInvoices!.skipped} hoppades över` : undefined}
+                />
+              )}
+              {hasSupplierInvoices && (
+                <EntityResultRow
+                  icon={<FileText className="h-4 w-4" />}
+                  label="Leverantörsfakturor"
+                  status="success"
+                  statusText={`${results.supplierInvoices!.imported} importerade`}
+                  detail={results.supplierInvoices!.skipped > 0 ? `${results.supplierInvoices!.skipped} hoppades över` : undefined}
+                />
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* ── Next steps ── */}
       <Card className="bg-muted/50">
@@ -1200,7 +1406,11 @@ export default function ArcimMigrationWorkspace(_props: WorkspaceComponentProps)
 
   const [step, setStep] = useState<WizardStep>('provider')
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingStatus, setIsLoadingStatus] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Connection status (existing connections + import history)
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus | null>(null)
 
   // Connection state
   const [selectedProvider, setSelectedProvider] = useState<ArcimProvider | null>(null)
@@ -1234,6 +1444,28 @@ export default function ArcimMigrationWorkspace(_props: WorkspaceComponentProps)
   const progressPercent = isInteractiveStep
     ? ((currentUserStepIndex + 1) / userSteps.length) * 100
     : 100
+
+  // ── Fetch connection status on mount ───────────────────────────
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      setIsLoadingStatus(true)
+      const res = await fetch('/api/extensions/ext/arcim-migration/status')
+      if (res.ok) {
+        const data = await res.json()
+        setConnectionStatus(data)
+      }
+    } catch {
+      // Non-critical — just means we can't show existing connections
+    } finally {
+      setIsLoadingStatus(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchStatus()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── Step handlers ──────────────────────────────────────────────
 
@@ -1286,6 +1518,12 @@ export default function ArcimMigrationWorkspace(_props: WorkspaceComponentProps)
       setConsentId(data.consentId)
       setAuthType(data.authType)
 
+      if (data.alreadyConnected) {
+        // Existing connection — skip auth, go straight to preview
+        await loadPreview(data.consentId)
+        return
+      }
+
       if (data.authType === 'oauth' && data.authUrl) {
         setAuthUrl(data.authUrl)
       }
@@ -1295,7 +1533,37 @@ export default function ArcimMigrationWorkspace(_props: WorkspaceComponentProps)
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [loadPreview])
+
+  // Re-sync with existing consent — go straight to preview
+  const handleResync = useCallback(async (provider: ArcimProvider, existingConsentId: string) => {
+    setSelectedProvider(provider)
+    setConsentId(existingConsentId)
+    setMigrationOptions(DEFAULT_OPTIONS)
+    setMigrationResults(null)
+    setSieImportResults([])
+    setSieData(null)
+    await loadPreview(existingConsentId)
+  }, [loadPreview])
+
+  // Disconnect an existing consent
+  const handleDisconnect = useCallback(async (consentIdToDelete: string) => {
+    try {
+      const res = await fetch('/api/extensions/ext/arcim-migration/disconnect', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ consentId: consentIdToDelete }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Kunde inte koppla från')
+      }
+      toast({ title: 'Frånkopplad', description: 'Anslutningen har tagits bort.' })
+      await fetchStatus()
+    } catch (err) {
+      toast({ title: 'Fel', description: err instanceof Error ? err.message : 'Något gick fel', variant: 'destructive' })
+    }
+  }, [toast, fetchStatus])
 
   // Handle token submission for token-based providers (Bokio, etc.)
   const handleTokenSubmit = useCallback(async (apiToken: string, companyId: string) => {
@@ -1397,8 +1665,13 @@ export default function ArcimMigrationWorkspace(_props: WorkspaceComponentProps)
       const data = await res.json()
       setSieData(data)
 
-      // Auto-skip mapping step if all accounts are mapped
-      if (data.mappingStats.unmapped === 0) {
+      // If all SIE files are already imported, disable SIE import by default
+      if (data.allImported) {
+        setMigrationOptions(prev => ({ ...prev, importSIEData: false }))
+      }
+
+      // Auto-skip mapping step if all accounts are mapped or all files already imported
+      if (data.mappingStats.unmapped === 0 || data.allImported) {
         setStep('options')
       }
     } catch (err) {
@@ -1452,38 +1725,42 @@ export default function ArcimMigrationWorkspace(_props: WorkspaceComponentProps)
         setMigrationProgress(10)
         setSieImportResults([])
 
-        // Import all fiscal years' SIE content
-        for (let i = 0; i < sieData.rawContent.length; i++) {
-          const progress = 10 + Math.round((i / sieData.rawContent.length) * 40)
-          setMigrationProgress(progress)
-          setMigrationStep(`Importerar bokföringsdata (SIE) — fil ${i + 1} av ${sieData.rawContent.length}...`)
+        // Only import files that haven't been imported yet
+        const filesToImport = sieData.rawContent
+          .map((content, i) => ({ content, status: sieData.fileStatuses?.[i] }))
+          .filter(f => !f.status?.alreadyImported)
 
-          const res = await fetch('/api/extensions/ext/arcim-migration/import-sie', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              rawContent: sieData.rawContent[i],
-              mappings: sieData.mappings,
-              options: {
-                createFiscalPeriod: true,
-                importOpeningBalances: true,
-                importTransactions: true,
-                voucherSeries: migrationOptions.voucherSeries,
-              },
-            }),
-          })
+        if (filesToImport.length === 0) {
+          // All files already imported — skip SIE phase
+          setSieImportResults([])
+        } else {
+          for (let i = 0; i < filesToImport.length; i++) {
+            const progress = 10 + Math.round((i / filesToImport.length) * 40)
+            setMigrationProgress(progress)
+            setMigrationStep(`Importerar bokföringsdata (SIE) — fil ${i + 1} av ${filesToImport.length}...`)
 
-          if (!res.ok) {
-            const data = await res.json().catch(() => ({}))
-            throw new Error(data.error || `SIE import HTTP ${res.status}`)
-          }
+            const res = await fetch('/api/extensions/ext/arcim-migration/import-sie', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                rawContent: filesToImport[i].content,
+                mappings: sieData.mappings,
+                options: {
+                  createFiscalPeriod: true,
+                  importOpeningBalances: true,
+                  importTransactions: true,
+                  voucherSeries: migrationOptions.voucherSeries,
+                },
+              }),
+            })
 
-          const result = await res.json() as ImportResult
-          setSieImportResults(prev => [...prev, result])
+            if (!res.ok) {
+              const data = await res.json().catch(() => ({}))
+              throw new Error(data.error || `SIE import HTTP ${res.status}`)
+            }
 
-          if (!result.success && result.errors.length > 0) {
-            // Log but don't fail — continue with API import
-            // Non-critical — continue with API import
+            const result = await res.json() as ImportResult
+            setSieImportResults(prev => [...prev, result])
           }
         }
       }
@@ -1548,7 +1825,9 @@ export default function ArcimMigrationWorkspace(_props: WorkspaceComponentProps)
     setMigrationResults(null)
     setSieImportResults([])
     setError(null)
-  }, [])
+    // Refresh status so provider step shows updated import history
+    fetchStatus()
+  }, [fetchStatus])
 
   // ── Render ─────────────────────────────────────────────────────
 
@@ -1583,7 +1862,13 @@ export default function ArcimMigrationWorkspace(_props: WorkspaceComponentProps)
 
       {/* Step content */}
       {step === 'provider' && (
-        <ProviderStep onSelect={handleSelectProvider} />
+        <ProviderStep
+          onSelect={handleSelectProvider}
+          onResync={handleResync}
+          onDisconnect={handleDisconnect}
+          connectionStatus={connectionStatus}
+          isLoadingStatus={isLoadingStatus}
+        />
       )}
 
       {step === 'connect' && selectedProvider && (
@@ -1627,6 +1912,7 @@ export default function ArcimMigrationWorkspace(_props: WorkspaceComponentProps)
         <OptionsStep
           options={migrationOptions}
           sieAvailable={preview?.sieAvailable ?? false}
+          sieData={sieData}
           onChange={setMigrationOptions}
           onStart={handleStartMigration}
           onBack={() => preview?.sieAvailable ? setStep('mapping') : setStep('preview')}
