@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import {
   createConsent,
   getConsent,
+  listConsents,
   generateOtc,
   getAuthUrl,
   exchangeAuthToken,
@@ -15,10 +16,11 @@ import { mapCompanyInfo } from './lib/entity-mapper'
 import { executeMigration } from './lib/migration-orchestrator'
 import type { ArcimProvider } from './types'
 import { ARCIM_PROVIDERS } from './types'
-import { parseSIEFile, validateSIEFile } from '@/lib/import/sie-parser'
+import { parseSIEFile, validateSIEFile, calculateFileHash } from '@/lib/import/sie-parser'
 import { suggestMappings, getMappingStats, isSystemAccount } from '@/lib/import/account-mapper'
 import { loadMappings, generateImportPreview, executeSIEImport, saveMappings } from '@/lib/import/sie-import'
-import { BAS_REFERENCE } from '@/lib/bookkeeping/bas-reference'
+import { BAS_REFERENCE, getBASReference } from '@/lib/bookkeeping/bas-reference'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import { FortnoxClient } from '@/lib/providers/fortnox/client'
 import type { ProviderName } from '@/lib/providers/types'
 
@@ -53,6 +55,68 @@ export const arcimMigrationExtension: Extension = {
       },
     },
 
+    // ── Check existing connections and import history ──────────────
+    {
+      method: 'GET',
+      path: '/status',
+      handler: async (request: Request, ctx?: ExtensionContext) => {
+        const supabase = ctx?.supabase ?? await (await import('@/lib/supabase/server')).createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (!user) {
+          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        const companyId = ctx?.companyId ?? user.id
+
+        try {
+          // Get accepted consents only (status 1) — not abandoned/created ones
+          const allConsents = await listConsents(companyId)
+          const consents = allConsents.filter(c => c.status === 1)
+
+          // Get SIE import history
+          const { data: sieImports } = await supabase
+            .from('sie_imports')
+            .select('id, filename, status, accounts_count, transactions_count, company_name, fiscal_year_start, fiscal_year_end, imported_at, created_at')
+            .eq('company_id', companyId)
+            .order('created_at', { ascending: false })
+            .limit(10)
+
+          // Get entity counts (to show what's already been imported)
+          const [
+            { count: customerCount },
+            { count: supplierCount },
+            { count: invoiceCount },
+          ] = await Promise.all([
+            supabase.from('customers').select('*', { count: 'exact', head: true }).eq('company_id', companyId),
+            supabase.from('suppliers').select('*', { count: 'exact', head: true }).eq('company_id', companyId),
+            supabase.from('invoices').select('*', { count: 'exact', head: true }).eq('company_id', companyId),
+          ])
+
+          return NextResponse.json({
+            consents: consents.map(c => ({
+              id: c.id,
+              provider: c.provider,
+              status: c.status,
+              companyName: c.companyName,
+              createdAt: c.createdAt,
+            })),
+            sieImports: sieImports ?? [],
+            entityCounts: {
+              customers: customerCount ?? 0,
+              suppliers: supplierCount ?? 0,
+              invoices: invoiceCount ?? 0,
+            },
+          })
+        } catch (error) {
+          return NextResponse.json(
+            { error: error instanceof Error ? error.message : 'Failed to fetch status' },
+            { status: 500 }
+          )
+        }
+      },
+    },
+
     // ── Start consent flow (create consent + OTC) ─────────────────
     {
       method: 'POST',
@@ -84,7 +148,31 @@ export const arcimMigrationExtension: Extension = {
         }
 
         try {
-          // Create consent directly in Supabase
+          // Reuse existing accepted consent if one exists for this provider
+          const existingConsents = await listConsents(companyId)
+          const existing = existingConsents.find(c => c.provider === provider && c.status === 1)
+
+          if (existing) {
+            // Already connected — skip OAuth, go straight to preview
+            if (ctx?.settings) {
+              await ctx.settings.set('consent_id', existing.id)
+              await ctx.settings.set('provider', provider)
+            }
+
+            return NextResponse.json({
+              consentId: existing.id,
+              authType: providerInfo.authType,
+              alreadyConnected: true,
+            })
+          }
+
+          // Clean up abandoned consents (status 0 = Created but never completed OAuth)
+          const abandoned = existingConsents.filter(c => c.provider === provider && c.status === 0)
+          for (const a of abandoned) {
+            await deleteConsent(a.id)
+          }
+
+          // Create new consent
           const consent = await createConsent(
             companyId,
             provider,
@@ -93,7 +181,6 @@ export const arcimMigrationExtension: Extension = {
             companyName
           )
 
-          // Store consent ID in extension settings for this user
           if (ctx?.settings) {
             await ctx.settings.set('consent_id', consent.id)
             await ctx.settings.set('provider', provider)
@@ -469,6 +556,14 @@ export const arcimMigrationExtension: Extension = {
           const parsed = parseSIEFile(sieFile.rawContent)
           const validation = validateSIEFile(parsed)
 
+          if (!validation.valid) {
+            return NextResponse.json({
+              error: 'validation',
+              message: 'SIE file validation failed',
+              validation,
+            }, { status: 400 })
+          }
+
           // Collect ALL unique accounts across ALL fiscal year files
           const allAccountsMap = new Map<string, { number: string; name: string }>()
           for (const file of sieFiles) {
@@ -508,7 +603,29 @@ export const arcimMigrationExtension: Extension = {
           log.info(`Account mapping: ${allAccounts.length} unique accounts across ${sieFiles.length} files, ${mappingStats.unmapped} unmapped`)
 
           const preview = generateImportPreview(parsed, mappings)
-          const allRawContent = sieFiles.map(f => f.rawContent)
+
+          // Check each file's hash against existing imports
+          const fileStatuses: { fiscalYear: number; rawContent: string; alreadyImported: boolean; importedAt: string | null }[] = []
+          for (const file of sieFiles) {
+            const fileHash = await calculateFileHash(file.rawContent)
+            const { data: existingImport } = await supabase
+              .from('sie_imports')
+              .select('imported_at')
+              .eq('company_id', companyId)
+              .eq('file_hash', fileHash)
+              .eq('status', 'completed')
+              .maybeSingle()
+
+            fileStatuses.push({
+              fiscalYear: file.fiscalYear,
+              rawContent: file.rawContent,
+              alreadyImported: !!existingImport,
+              importedAt: existingImport?.imported_at ?? null,
+            })
+          }
+
+          const allImported = fileStatuses.every(f => f.alreadyImported)
+          const newFiles = fileStatuses.filter(f => !f.alreadyImported)
 
           return NextResponse.json({
             parsed,
@@ -516,7 +633,14 @@ export const arcimMigrationExtension: Extension = {
             mappingStats,
             preview,
             validation,
-            rawContent: allRawContent,
+            rawContent: fileStatuses.map(f => f.rawContent),
+            fileStatuses: fileStatuses.map(f => ({
+              fiscalYear: f.fiscalYear,
+              alreadyImported: f.alreadyImported,
+              importedAt: f.importedAt,
+            })),
+            allImported,
+            newFileCount: newFiles.length,
             basAccounts: BAS_REFERENCE,
           })
         } catch (error) {
@@ -561,6 +685,105 @@ export const arcimMigrationExtension: Extension = {
 
         try {
           const parsed = parseSIEFile(rawContent)
+
+          // Validate all accounts are mapped (same as manual upload)
+          const unmapped = mappings.filter((m: import('@/lib/import/types').AccountMapping) => !m.targetAccount)
+          if (unmapped.length > 0) {
+            return NextResponse.json({
+              error: 'validation',
+              message: `${unmapped.length} account(s) are not mapped`,
+              unmappedAccounts: unmapped.map((m: import('@/lib/import/types').AccountMapping) => ({
+                account: m.sourceAccount,
+                name: m.sourceName,
+              })),
+            }, { status: 400 })
+          }
+
+          // Auto-activate mapped BAS accounts not yet in user's chart (same as manual upload)
+          const mappedAccountNumbers = [
+            ...new Set(mappings.filter((m: import('@/lib/import/types').AccountMapping) => m.targetAccount).map((m: import('@/lib/import/types').AccountMapping) => m.targetAccount)),
+          ]
+
+          const allCompanyAccounts = await fetchAllRows(({ from, to }) =>
+            supabase
+              .from('chart_of_accounts')
+              .select('account_number')
+              .eq('company_id', companyId)
+              .range(from, to)
+          )
+          const existingNumbers = new Set(allCompanyAccounts.map((a: { account_number: string }) => a.account_number))
+
+          const mappingNameLookup = new Map<string, string>()
+          for (const m of mappings) {
+            if (m.targetAccount) {
+              mappingNameLookup.set(m.targetAccount, m.targetName || m.sourceName)
+            }
+          }
+
+          const accountsToActivate = mappedAccountNumbers
+            .filter((num) => !existingNumbers.has(num))
+            .map((num) => {
+              const ref = getBASReference(num)
+              if (ref) {
+                return {
+                  user_id: user.id,
+                  company_id: companyId,
+                  account_number: ref.account_number,
+                  account_name: ref.account_name,
+                  account_class: ref.account_class,
+                  account_group: ref.account_group,
+                  account_type: ref.account_type,
+                  normal_balance: ref.normal_balance,
+                  plan_type: 'full_bas' as const,
+                  is_active: true,
+                  is_system_account: false,
+                  description: ref.description,
+                  sru_code: ref.sru_code,
+                  sort_order: parseInt(ref.account_number),
+                }
+              }
+
+              const accountClass = parseInt(num.charAt(0), 10)
+              const accountGroup = num.substring(0, 2)
+              const accountName = mappingNameLookup.get(num) || `Konto ${num}`
+              const accountType =
+                accountClass === 1 ? 'asset'
+                  : accountClass === 2 ? 'liability'
+                    : accountClass === 3 ? 'revenue'
+                      : 'expense'
+              const normalBalance =
+                accountClass <= 1 || accountClass >= 4 ? 'debit' : 'credit'
+
+              return {
+                user_id: user.id,
+                company_id: companyId,
+                account_number: num,
+                account_name: accountName,
+                account_class: accountClass,
+                account_group: accountGroup,
+                account_type: accountType,
+                normal_balance: normalBalance,
+                plan_type: 'full_bas' as const,
+                is_active: true,
+                is_system_account: false,
+                description: accountName,
+                sru_code: null,
+                sort_order: parseInt(num),
+              }
+            })
+
+          if (accountsToActivate.length > 0) {
+            const { error: activateError } = await supabase
+              .from('chart_of_accounts')
+              .insert(accountsToActivate)
+
+            if (activateError) {
+              return NextResponse.json({
+                error: `Failed to activate accounts: ${activateError.message}`,
+              }, { status: 500 })
+            }
+            log.info(`Auto-activated ${accountsToActivate.length} accounts`)
+          }
 
           await saveMappings(supabase, user.id, mappings)
 

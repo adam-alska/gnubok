@@ -63,6 +63,32 @@ export async function createConsent(
   }
 }
 
+export async function listConsents(companyId: string): Promise<ConsentRecord[]> {
+  const supabase = createServiceClient()
+
+  const { data, error } = await supabase
+    .from('provider_consents')
+    .select('*')
+    .eq('company_id', companyId)
+    .in('status', [0, 1]) // Created or Accepted
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    throw new Error(`Failed to list consents: ${error.message}`)
+  }
+
+  return (data ?? []).map(d => ({
+    id: d.id,
+    name: d.name,
+    provider: d.provider as ProviderName,
+    status: d.status,
+    orgNumber: d.org_number,
+    companyName: d.company_name,
+    createdAt: d.created_at,
+    updatedAt: d.updated_at,
+  }))
+}
+
 export async function getConsent(consentId: string): Promise<ConsentRecord> {
   const supabase = createServiceClient()
 
