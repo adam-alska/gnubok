@@ -596,6 +596,16 @@ async function importVouchers(
 
   const currentVoucherNumber = (startNumber as number) || 1
 
+  // Reserve the full voucher number range upfront to prevent concurrent
+  // operations from claiming numbers in our range during batch insertion.
+  const reservedHighest = currentVoucherNumber + preparedVouchers.length - 1
+  await supabase.rpc('reserve_voucher_range', {
+    p_company_id: companyId,
+    p_fiscal_period_id: fiscalPeriodId,
+    p_series: voucherSeries,
+    p_highest_used: reservedHighest,
+  })
+
   // Batch insert journal entries (in chunks of 100) with retry logic.
   // Retries handle transient errors (Supabase rate limits, Cloudflare 500s).
   const BATCH_SIZE = 100
@@ -603,6 +613,7 @@ async function importVouchers(
   const INTER_BATCH_DELAY_MS = 50  // Prevent rate limiting under sustained load
   let retriedBatches = 0
   let failedBatches = 0
+  let highestInsertedVoucher = currentVoucherNumber - 1  // nothing inserted yet
 
   for (let batchStart = 0; batchStart < preparedVouchers.length; batchStart += BATCH_SIZE) {
     const batch = preparedVouchers.slice(batchStart, batchStart + BATCH_SIZE)
@@ -643,6 +654,9 @@ async function importVouchers(
       if (!entryError && data) {
         entries = data
         lastEntryError = null
+        // Track highest voucher number from this successful batch
+        const batchHighest = currentVoucherNumber + batchStart + batch.length - 1
+        highestInsertedVoucher = Math.max(highestInsertedVoucher, batchHighest)
         break
       }
 
@@ -767,16 +781,18 @@ async function importVouchers(
     }
   }
 
-  // Update voucher sequence to reflect all assigned numbers.
-  // next_voucher_number() was called once but we assigned N numbers manually,
-  // so the sequence only got incremented by 1. Fix with GREATEST to avoid races.
-  if (results.created > 0) {
-    const highestUsed = currentVoucherNumber + preparedVouchers.length - 1
-    await supabase.rpc('reserve_voucher_range', {
+  // Adjust voucher sequence after insertion.
+  // Range was pre-reserved to `reservedHighest`. If some batches failed,
+  // release the unused portion to avoid burned numbers and gap-explanation friction.
+  if (highestInsertedVoucher < reservedHighest) {
+    const releaseTarget = highestInsertedVoucher >= currentVoucherNumber
+      ? highestInsertedVoucher       // partial success: set to actual highest
+      : currentVoucherNumber - 1     // total failure: roll back fully
+    await supabase.rpc('release_voucher_range', {
       p_company_id: companyId,
       p_fiscal_period_id: fiscalPeriodId,
       p_series: voucherSeries,
-      p_highest_used: highestUsed,
+      p_actual_last: releaseTarget,
     })
   }
 

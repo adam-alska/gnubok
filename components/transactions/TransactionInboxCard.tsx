@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
-import { ArrowUpRight, ArrowDownRight, FileText, Loader2, MessageSquareText, Paperclip } from 'lucide-react'
+import { ArrowUpRight, ArrowDownRight, FileText, Loader2, Paperclip } from 'lucide-react'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/info-tooltip'
 import { getAccountName, formatAccountWithName } from '@/lib/bookkeeping/client-account-names'
 import { getTemplateById } from '@/lib/bookkeeping/booking-templates'
@@ -26,7 +26,7 @@ interface TransactionInboxCardProps {
   onMarkPrivate: (id: string) => void
   onOpenMatchDialog: (transaction: TransactionWithInvoice) => void
   onOpenCategoryDialog: (transaction: TransactionWithInvoice) => void
-  onOpenDescribe?: (transaction: TransactionWithInvoice) => void
+
   onOpenQuickReview?: (transaction: TransactionWithInvoice, suggestion: SuggestedCategory) => void
   onOpenTemplateReview?: (transaction: TransactionWithInvoice, templateId: string) => void
   onToggleSelect: (id: string) => void
@@ -45,7 +45,7 @@ export default function TransactionInboxCard({
   onMarkPrivate,
   onOpenMatchDialog,
   onOpenCategoryDialog,
-  onOpenDescribe,
+
   onOpenQuickReview,
   onOpenTemplateReview,
   onToggleSelect,
@@ -238,20 +238,6 @@ export default function TransactionInboxCard({
                   )}
                 </Button>
               ) : null}
-
-              {/* Describe transaction */}
-              {onOpenDescribe && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-9 text-xs"
-                  onClick={() => onOpenDescribe(transaction)}
-                  disabled={isProcessing || isDisabled}
-                >
-                  <MessageSquareText className="mr-1.5 h-3 w-3" />
-                  Beskriv...
-                </Button>
-              )}
 
               {/* Open category dialog / template picker */}
               <Button
