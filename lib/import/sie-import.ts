@@ -113,13 +113,16 @@ export async function checkDuplicatePeriodImport(
   fiscalYearStart: string,
   fiscalYearEnd: string
 ): Promise<SIEImport | null> {
+  // Range overlap check: start <= other_end AND end >= other_start.
+  // Two imports whose räkenskapsår overlap would produce duplicate
+  // verifikationer, violating BFL 4:1 (löpande bokföring).
   const { data } = await supabase
     .from('sie_imports')
     .select('*')
     .eq('company_id', companyId)
-    .eq('fiscal_year_start', fiscalYearStart)
-    .eq('fiscal_year_end', fiscalYearEnd)
     .eq('status', 'completed')
+    .lte('fiscal_year_start', fiscalYearEnd)
+    .gte('fiscal_year_end', fiscalYearStart)
     .limit(1)
     .maybeSingle()
 
@@ -1334,7 +1337,7 @@ export async function executeSIEImport(
     )
     if (periodDuplicate) {
       result.errors.push(
-        `En SIE-import för perioden ${fiscalYearStart} – ${fiscalYearEnd} finns redan (ID: ${periodDuplicate.id})`
+        `En SIE-import för ett överlappande räkenskapsår (${periodDuplicate.fiscal_year_start} – ${periodDuplicate.fiscal_year_end}) finns redan`
       )
       return result
     }
