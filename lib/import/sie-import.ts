@@ -654,9 +654,6 @@ async function importVouchers(
       if (!entryError && data) {
         entries = data
         lastEntryError = null
-        // Track highest voucher number from this successful batch
-        const batchHighest = currentVoucherNumber + batchStart + batch.length - 1
-        highestInsertedVoucher = Math.max(highestInsertedVoucher, batchHighest)
         break
       }
 
@@ -737,6 +734,11 @@ async function importVouchers(
       }
 
       if (linesInserted) {
+        // Track highest voucher number only after both headers AND lines succeed,
+        // to avoid counting orphaned entries with no lines as "used".
+        const batchHighest = currentVoucherNumber + batchStart + batch.length - 1
+        highestInsertedVoucher = Math.max(highestInsertedVoucher, batchHighest)
+
         // Track movements ONLY for successfully inserted vouchers.
         // This ensures the migration adjustment correctly compensates for
         // any batches that failed completely.
@@ -793,6 +795,7 @@ async function importVouchers(
       p_fiscal_period_id: fiscalPeriodId,
       p_series: voucherSeries,
       p_actual_last: releaseTarget,
+      p_reserved_highest: reservedHighest,
     })
   }
 

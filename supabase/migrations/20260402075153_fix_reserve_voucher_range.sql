@@ -43,7 +43,8 @@ CREATE OR REPLACE FUNCTION public.release_voucher_range(
   p_company_id uuid,
   p_fiscal_period_id uuid,
   p_series text,
-  p_actual_last integer
+  p_actual_last integer,
+  p_reserved_highest integer  -- the ceiling this import originally reserved
 )
 RETURNS void
 LANGUAGE plpgsql
@@ -51,14 +52,18 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
+  -- Only release within the range this import originally reserved.
+  -- The upper-bound guard (last_number <= p_reserved_highest) prevents rolling
+  -- back past numbers that a concurrent operation has legitimately claimed.
   UPDATE public.voucher_sequences
   SET last_number = p_actual_last,
       updated_at = now()
   WHERE company_id = p_company_id
     AND fiscal_period_id = p_fiscal_period_id
     AND voucher_series = p_series
-    AND last_number > p_actual_last;
+    AND last_number > p_actual_last
+    AND last_number <= p_reserved_highest;
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.release_voucher_range(uuid, uuid, text, integer) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.release_voucher_range(uuid, uuid, text, integer, integer) TO authenticated;
