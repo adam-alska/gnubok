@@ -1,8 +1,8 @@
 /**
  * Migration orchestrator — coordinates the data migration from
- * an external accounting system via Arcim Sync into gnubok.
+ * an external accounting system directly via provider APIs into gnubok.
  *
- * Bookkeeping data (accounts, balances, vouchers) is now imported
+ * Bookkeeping data (accounts, balances, vouchers) is imported
  * via SIE files through the core SIE import engine. This orchestrator
  * handles only entity-level imports:
  *   1. Company info → pre-fill company_settings
@@ -14,13 +14,15 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { MigrationProgress, MigrationResults } from '../types'
+import type { ProviderName } from '@/lib/providers/types'
+import { resolveConsent } from '@/lib/providers/resolve-consent'
 import {
-  fetchCompanyInfo,
-  fetchCustomers,
-  fetchSuppliers,
-  fetchSalesInvoices,
-  fetchSupplierInvoices,
-} from './arcim-client'
+  fetchCompanyInfoDirect,
+  fetchCustomersDirect,
+  fetchSuppliersDirect,
+  fetchSalesInvoicesDirect,
+  fetchSupplierInvoicesDirect,
+} from '@/lib/providers/provider-data-fetcher'
 import {
   mapCustomer,
   mapSupplier,
@@ -32,6 +34,7 @@ import {
 
 export interface MigrationOptions {
   consentId: string
+  companyId: string
   userId: string
   supabase: SupabaseClient
   importCompanyInfo?: boolean
@@ -49,21 +52,27 @@ function emitProgress(options: MigrationOptions, progress: MigrationProgress) {
 // ── Main orchestrator ─────────────────────────────────────────────
 
 export async function executeMigration(options: MigrationOptions): Promise<MigrationResults> {
-  const { consentId, userId, supabase } = options
+  const { consentId, companyId, userId, supabase } = options
   const results: MigrationResults = {}
+
+  // Resolve consent to get access token and provider
+  const resolved = await resolveConsent(companyId, consentId)
+  const provider = resolved.consent.provider as ProviderName
+  const accessToken = resolved.accessToken
+  const providerCompanyId = resolved.providerCompanyId
 
   try {
     // ── Step 1: Company information ───────────────────────────────
     if (options.importCompanyInfo !== false) {
       emitProgress(options, { status: 'fetching', currentStep: 'Hämtar företagsinformation...', progress: 5 })
       try {
-        const companyInfo = await fetchCompanyInfo(consentId)
+        const companyInfo = await fetchCompanyInfoDirect(provider, accessToken, providerCompanyId)
         if (companyInfo) {
           const mapped = mapCompanyInfo(companyInfo)
           const { data: existing } = await supabase
             .from('company_settings')
             .select('company_name, org_number, vat_number')
-            .eq('company_id', userId)
+            .eq('company_id', companyId)
             .single()
 
           const updates: Record<string, unknown> = {}
@@ -83,7 +92,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
           if (mapped.email) updates.email = mapped.email
 
           if (Object.keys(updates).length > 0) {
-            await supabase.from('company_settings').update(updates).eq('company_id', userId)
+            await supabase.from('company_settings').update(updates).eq('company_id', companyId)
           }
           results.companyInfo = { imported: true }
         }
@@ -99,7 +108,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
     if (options.importCustomers !== false) {
       emitProgress(options, { status: 'importing', currentStep: 'Importerar kunder...', progress: 20 })
       try {
-        const customers = await fetchCustomers(consentId)
+        const customers = await fetchCustomersDirect(provider, accessToken, providerCompanyId)
         let imported = 0
         let skipped = 0
 
@@ -116,7 +125,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const { data: existing } = await supabase
               .from('customers')
               .select('id')
-              .eq('company_id', userId)
+              .eq('company_id', companyId)
               .eq('org_number', orgNumber)
               .limit(1)
 
@@ -156,7 +165,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
     if (options.importSuppliers !== false) {
       emitProgress(options, { status: 'importing', currentStep: 'Importerar leverantörer...', progress: 40 })
       try {
-        const suppliers = await fetchSuppliers(consentId)
+        const suppliers = await fetchSuppliersDirect(provider, accessToken, providerCompanyId)
         let imported = 0
         let skipped = 0
 
@@ -173,7 +182,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const { data: existing } = await supabase
               .from('suppliers')
               .select('id')
-              .eq('company_id', userId)
+              .eq('company_id', companyId)
               .eq('org_number', orgNumber)
               .limit(1)
 
@@ -211,7 +220,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
     if (options.importSalesInvoices !== false) {
       emitProgress(options, { status: 'importing', currentStep: 'Importerar kundfakturor...', progress: 60 })
       try {
-        const invoices = await fetchSalesInvoices(consentId)
+        const invoices = await fetchSalesInvoicesDirect(provider, accessToken, providerCompanyId)
         const openInvoices = invoices.filter(i =>
           i.status === 'sent' || i.status === 'overdue' || i.status === 'booked'
         )
@@ -230,7 +239,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const { data: match } = await supabase
               .from('customers')
               .select('id')
-              .eq('company_id', userId)
+              .eq('company_id', companyId)
               .eq('org_number', customerOrgNumber)
               .limit(1)
             if (match?.[0]) customerId = match[0].id
@@ -240,7 +249,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const { data: match } = await supabase
               .from('customers')
               .select('id')
-              .eq('company_id', userId)
+              .eq('company_id', companyId)
               .eq('name', inv.customer.name)
               .limit(1)
             if (match?.[0]) customerId = match[0].id
@@ -277,7 +286,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
           const { data: existingInv } = await supabase
             .from('invoices')
             .select('id')
-            .eq('company_id', userId)
+            .eq('company_id', companyId)
             .eq('invoice_number', inv.invoiceNumber)
             .limit(1)
 
@@ -322,7 +331,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
     if (options.importSupplierInvoices !== false) {
       emitProgress(options, { status: 'importing', currentStep: 'Importerar leverantörsfakturor...', progress: 80 })
       try {
-        const invoices = await fetchSupplierInvoices(consentId)
+        const invoices = await fetchSupplierInvoicesDirect(provider, accessToken, providerCompanyId)
         const openInvoices = invoices.filter(i =>
           i.status === 'sent' || i.status === 'overdue' || i.status === 'booked' || i.status === 'draft'
         )
@@ -341,7 +350,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const { data: match } = await supabase
               .from('suppliers')
               .select('id')
-              .eq('company_id', userId)
+              .eq('company_id', companyId)
               .eq('org_number', supplierOrgNumber)
               .limit(1)
             if (match?.[0]) supplierId = match[0].id
@@ -351,7 +360,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const { data: match } = await supabase
               .from('suppliers')
               .select('id')
-              .eq('company_id', userId)
+              .eq('company_id', companyId)
               .eq('name', inv.supplier.name)
               .limit(1)
             if (match?.[0]) supplierId = match[0].id
@@ -388,7 +397,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
           const { data: existingInv } = await supabase
             .from('supplier_invoices')
             .select('id')
-            .eq('company_id', userId)
+            .eq('company_id', companyId)
             .eq('supplier_invoice_number', inv.invoiceNumber)
             .eq('supplier_id', supplierId)
             .limit(1)
@@ -403,7 +412,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
 
           // Get next arrival number (ankomstnummer) — required NOT NULL column
           const { data: arrivalNum, error: arrivalError } = await supabase
-            .rpc('get_next_arrival_number', { p_company_id: userId })
+            .rpc('get_next_arrival_number', { p_company_id: companyId })
 
           if (arrivalError || arrivalNum == null) {
             console.error(`[migration] Supplier invoice ${inv.invoiceNumber} skipped — could not get arrival number:`, arrivalError?.message)

@@ -16,7 +16,7 @@ import type {
   CompanyInformationDto,
   PostalAddress,
   PartyDto,
-} from '../types'
+} from '@/lib/providers/dto'
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
