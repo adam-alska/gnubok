@@ -104,7 +104,7 @@ export async function checkDuplicateImport(
 /**
  * Check if a completed SIE import already exists for the same fiscal year period.
  * Prevents importing two different SIE files that cover the same accounting period,
- * which would create duplicate verifikationer violating BFNAR 2013:2.
+ * which would create duplicate verifikationer violating BFL 4:1 (löpande bokföring).
  * Only blocks on status='completed' — failed/pending imports don't prevent retries.
  */
 export async function checkDuplicatePeriodImport(
