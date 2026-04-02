@@ -79,7 +79,7 @@ export async function POST(request: Request) {
       if (periodDuplicate) {
         return NextResponse.json({
           error: 'duplicate_period',
-          message: `En SIE-import för perioden ${parsed.stats.fiscalYearStart} – ${parsed.stats.fiscalYearEnd} finns redan (importerad ${periodDuplicate.imported_at ? new Date(periodDuplicate.imported_at).toLocaleDateString('sv-SE') : 'okänt datum'})`,
+          message: `En SIE-import för ett överlappande räkenskapsår (${periodDuplicate.fiscal_year_start} – ${periodDuplicate.fiscal_year_end}) finns redan (importerad ${periodDuplicate.imported_at ? new Date(periodDuplicate.imported_at).toLocaleDateString('sv-SE') : 'okänt datum'})`,
           importId: periodDuplicate.id,
         }, { status: 409 })
       }
