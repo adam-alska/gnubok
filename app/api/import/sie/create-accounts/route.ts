@@ -108,7 +108,7 @@ export async function POST(request: Request) {
       const { data: upserted, error } = await supabase
         .from('chart_of_accounts')
         .upsert(batch, {
-          onConflict: 'user_id,account_number',
+          onConflict: 'company_id,account_number',
           ignoreDuplicates: true,
           count: 'exact',
         })

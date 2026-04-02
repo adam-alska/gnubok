@@ -340,16 +340,6 @@ export const MatchSupplierInvoiceSchema = z.object({
   supplier_invoice_id: uuid,
 })
 
-export const DescribeTransactionSchema = z.object({
-  description: z.string().min(3).max(500),
-})
-
-export const BatchDescribeSchema = z.object({
-  merchant_name: z.string().min(1),
-  template_id: z.string().min(1),
-  is_business: z.boolean(),
-  user_description: z.string().max(500).optional(),
-})
 
 // ============================================================
 // Settings schemas
