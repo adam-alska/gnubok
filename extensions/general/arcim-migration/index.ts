@@ -864,7 +864,6 @@ export const arcimMigrationExtension: Extension = {
             consentId,
             companyId,
             userId: user.id,
-            companyId: ctx?.companyId ?? user.id,
             supabase,
             importCompanyInfo,
             importCustomers,
