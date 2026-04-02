@@ -1250,20 +1250,68 @@ export async function executeSIEImport(
     const accountMap = mappingsToMap(mappings)
 
     // Ensure all mapped target accounts exist in chart_of_accounts.
-    // The mapping contains every account referenced in the SIE file; accounts
-    // that were not seeded during onboarding need to be created here so that
-    // journal entry lines can link to them via account_id.
-    const seenTargets = new Set<string>()
-    for (const mapping of mappings) {
-      if (mapping.targetAccount && !seenTargets.has(mapping.targetAccount)) {
-        seenTargets.add(mapping.targetAccount)
-        await ensureAccountExists(
-          supabase,
-          companyId,
-          userId,
-          mapping.targetAccount,
-          mapping.targetName
-        )
+    // Uses a single batch query + batch insert instead of per-account round trips.
+    const targetAccounts = [...new Set(
+      mappings.filter(m => m.targetAccount).map(m => m.targetAccount!)
+    )]
+
+    if (targetAccounts.length > 0) {
+      const { data: existing } = await supabase
+        .from('chart_of_accounts')
+        .select('account_number')
+        .eq('company_id', companyId)
+        .in('account_number', targetAccounts)
+
+      const existingSet = new Set((existing || []).map(a => a.account_number))
+      const missing = targetAccounts.filter(num => !existingSet.has(num))
+
+      if (missing.length > 0) {
+        const targetNameMap = new Map<string, string>()
+        for (const m of mappings) {
+          if (m.targetAccount) targetNameMap.set(m.targetAccount, m.targetName || m.sourceName)
+        }
+
+        const inserts = missing.map(num => {
+          const basRef = getBASReference(num)
+          if (basRef) {
+            return {
+              user_id: userId,
+              company_id: companyId,
+              account_number: num,
+              account_name: basRef.account_name,
+              account_class: basRef.account_class,
+              account_group: basRef.account_group,
+              account_type: basRef.account_type,
+              normal_balance: basRef.normal_balance,
+              sru_code: basRef.sru_code ?? computeSRUCode(num),
+              k2_excluded: basRef.k2_excluded,
+              plan_type: 'full_bas' as const,
+              is_active: true,
+              is_system_account: false,
+            }
+          }
+          const classNum = parseInt(num.charAt(0), 10)
+          const group = num.substring(0, 2)
+          const accountType = classNum === 1 ? 'asset'
+            : classNum === 2 ? (group === '21' ? 'untaxed_reserves' : (group === '20' ? 'equity' : 'liability'))
+            : classNum === 3 ? 'revenue' : 'expense'
+          return {
+            user_id: userId,
+            company_id: companyId,
+            account_number: num,
+            account_name: targetNameMap.get(num) || `Konto ${num}`,
+            account_class: classNum,
+            account_group: group,
+            account_type: accountType,
+            normal_balance: classNum <= 1 || classNum >= 4 ? 'debit' : 'credit',
+            sru_code: computeSRUCode(num),
+            plan_type: 'full_bas' as const,
+            is_active: true,
+            is_system_account: false,
+          }
+        })
+
+        await supabase.from('chart_of_accounts').insert(inserts)
       }
     }
 
