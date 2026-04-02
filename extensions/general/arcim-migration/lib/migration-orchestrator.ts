@@ -36,7 +36,6 @@ export interface MigrationOptions {
   consentId: string
   companyId: string
   userId: string
-  companyId: string
   supabase: SupabaseClient
   importCompanyInfo?: boolean
   importCustomers?: boolean
