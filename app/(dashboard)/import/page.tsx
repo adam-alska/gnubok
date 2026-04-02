@@ -491,6 +491,10 @@ function SIEImportWizard() {
       const data = await res.json()
 
       if (!res.ok) {
+        if (data.error === 'duplicate') {
+          setError(data.message || 'Denna fil har redan importerats')
+          return
+        }
         if (data.result) { setImportResult(data.result) } else { setError(data.error || 'Import failed'); return }
       } else {
         setImportResult(data.result)

@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 import { requireCompanyId } from '@/lib/company/context'
 import { parseSIEFile, detectEncoding, decodeBuffer } from '@/lib/import/sie-parser'
 import { suggestMappings } from '@/lib/import/account-mapper'
-import { executeSIEImport } from '@/lib/import/sie-import'
+import { executeSIEImport, checkDuplicateImport } from '@/lib/import/sie-import'
 import { BAS_REFERENCE } from '@/lib/bookkeeping/bas-data'
 import { getBASReference } from '@/lib/bookkeeping/bas-reference'
 import type { AccountMapping, SIEAccountMappingRecord } from '@/lib/import/types'
@@ -55,6 +55,15 @@ export async function POST(request: Request) {
 
     // Parse the SIE file
     const parsed = parseSIEFile(content)
+
+    // Check for duplicate import before doing any work
+    const duplicate = await checkDuplicateImport(supabase, companyId, content)
+    if (duplicate) {
+      return NextResponse.json({
+        error: 'duplicate',
+        message: `Denna fil har redan importerats ${duplicate.imported_at ? new Date(duplicate.imported_at).toLocaleDateString('sv-SE') : ''}`.trim(),
+      }, { status: 409 })
+    }
 
     // Get mappings - either from request or generate new ones
     let mappings: AccountMapping[]
