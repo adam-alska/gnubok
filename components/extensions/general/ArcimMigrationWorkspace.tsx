@@ -285,14 +285,21 @@ function ConnectStep({
           {authType === 'oauth' && authUrl && !isLoading && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Klicka nedan för att logga in i {providerName} i ett nytt fönster.
-                När du är klar skickas du tillbaka hit automatiskt.
+                Klicka nedan för att logga in i {providerName}.
+                Fönstret stängs automatiskt när du är klar.
               </p>
-              <Button asChild className="min-h-11">
-                <a href={authUrl} target="_blank" rel="noopener noreferrer">
-                  Logga in i {providerName}
-                  <ExternalLink className="ml-2 h-4 w-4" />
-                </a>
+              <Button
+                className="min-h-11"
+                onClick={() => {
+                  const w = 600
+                  const h = 700
+                  const left = window.screenX + (window.outerWidth - w) / 2
+                  const top = window.screenY + (window.outerHeight - h) / 2
+                  window.open(authUrl, 'arcim-oauth', `width=${w},height=${h},left=${left},top=${top}`)
+                }}
+              >
+                Logga in i {providerName}
+                <ExternalLink className="ml-2 h-4 w-4" />
               </Button>
             </div>
           )}
@@ -1352,11 +1359,25 @@ export default function ArcimMigrationWorkspace(_props: WorkspaceComponentProps)
     }
   }, [loadPreview])
 
-  // Check for OAuth callback on mount
+  // Check for OAuth callback on mount (fallback for non-popup flow)
   useEffect(() => {
     handleOAuthReturn()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Listen for postMessage from OAuth popup
+  useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return
+      if (event.data?.type === 'arcim-oauth-success' && event.data.consentId) {
+        loadPreview(event.data.consentId)
+      } else if (event.data?.type === 'arcim-oauth-error') {
+        setError('OAuth-anslutningen misslyckades. Försök igen.')
+      }
+    }
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [loadPreview])
 
   // Load SIE data when entering mapping step
   const loadSIEData = useCallback(async () => {
