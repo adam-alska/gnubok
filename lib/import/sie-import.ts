@@ -1292,7 +1292,11 @@ export async function executeSIEImport(
           }
         })
 
-        await supabase.from('chart_of_accounts').insert(inserts)
+        const { error: insertError } = await supabase.from('chart_of_accounts').insert(inserts)
+        if (insertError && !insertError.message.includes('duplicate')) {
+          result.errors.push(`Failed to create accounts: ${insertError.message}`)
+          return result
+        }
       }
     }
 

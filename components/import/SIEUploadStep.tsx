@@ -16,9 +16,10 @@ interface SIEUploadStepProps {
   onFileSelect: (file: File) => void
   isLoading: boolean
   error: string | null
+  errorType?: 'duplicate' | 'duplicate_period' | 'validation' | 'parse'
 }
 
-export default function SIEUploadStep({ onFileSelect, isLoading, error }: SIEUploadStepProps) {
+export default function SIEUploadStep({ onFileSelect, isLoading, error, errorType }: SIEUploadStepProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [loadingPhase, setLoadingPhase] = useState(0)
@@ -162,7 +163,9 @@ export default function SIEUploadStep({ onFileSelect, isLoading, error }: SIEUpl
               <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium text-destructive">
-                  {error.includes('redan importerats') ? 'Filen har redan importerats' : 'Kunde inte läsa filen'}
+                  {errorType === 'duplicate' || errorType === 'duplicate_period'
+                    ? 'Filen har redan importerats'
+                    : 'Kunde inte läsa filen'}
                 </p>
                 <p className="text-sm text-muted-foreground">{error}</p>
               </div>

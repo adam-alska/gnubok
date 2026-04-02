@@ -322,6 +322,7 @@ function SIEImportWizard() {
   const [step, setStep] = useState<ImportWizardStep>('upload')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errorType, setErrorType] = useState<'duplicate' | 'duplicate_period' | 'validation' | 'parse' | undefined>()
 
   const [file, setFile] = useState<File | null>(null)
   const [, setParsed] = useState<ParsedSIEFile | null>(null)
@@ -345,6 +346,7 @@ function SIEImportWizard() {
   const handleFileSelect = useCallback(async (selectedFile: File) => {
     setFile(selectedFile)
     setError(null)
+    setErrorType(undefined)
     setIsLoading(true)
 
     try {
@@ -360,10 +362,13 @@ function SIEImportWizard() {
 
       if (!res.ok) {
         if (data.error === 'duplicate' || data.error === 'duplicate_period') {
+          setErrorType(data.error)
           setError(data.message)
         } else if (data.error === 'validation') {
+          setErrorType('validation')
           setError(`${data.message}: ${data.errors?.join(', ') || 'Unknown validation error'}`)
         } else {
+          setErrorType('parse')
           setError(data.error || 'Failed to parse file')
         }
         return
@@ -481,7 +486,7 @@ function SIEImportWizard() {
     } finally {
       setIsCreatingAccounts(false)
     }
-  }, [missingAccounts, file, toast])
+  }, [missingAccounts, toast])
 
   const handleExecuteImport = useCallback(async (options: ImportExecuteOptions) => {
     if (!file) { setError('No file selected'); return }
@@ -525,7 +530,7 @@ function SIEImportWizard() {
 
   const handleNewImport = () => {
     setStep('upload'); setFile(null); setParsed(null); setMappings([])
-    setPreview(null); setIssues([]); setImportResult(null); setError(null)
+    setPreview(null); setIssues([]); setImportResult(null); setError(null); setErrorType(undefined)
     setSieAccounts([]); setIsCreatingAccounts(false)
   }
 
@@ -552,7 +557,7 @@ function SIEImportWizard() {
         </CardContent>
       </Card>
 
-      {step === 'upload' && <SIEUploadStep onFileSelect={handleFileSelect} isLoading={isLoading} error={error} />}
+      {step === 'upload' && <SIEUploadStep onFileSelect={handleFileSelect} isLoading={isLoading} error={error} errorType={errorType} />}
       {step === 'preview' && preview && (
         <SIEPreviewStep preview={preview} issues={issues} missingAccounts={missingAccounts}
           onCreateAccounts={handleCreateAccounts} isCreatingAccounts={isCreatingAccounts}
