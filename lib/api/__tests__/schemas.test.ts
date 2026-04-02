@@ -1004,7 +1004,47 @@ describe('UpdateSettingsSchema', () => {
   it('accepts partial update', () => {
     const result = UpdateSettingsSchema.safeParse({
       company_name: 'My AB',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts vat_registered: true with required vat_number and moms_period', () => {
+    const result = UpdateSettingsSchema.safeParse({
       vat_registered: true,
+      vat_number: 'SE556123456701',
+      moms_period: 'quarterly',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts vat_registered: true without vat_number at schema level (route-level check uses effective state)', () => {
+    const result = UpdateSettingsSchema.safeParse({
+      vat_registered: true,
+      moms_period: 'quarterly',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts vat_registered: true without moms_period at schema level (route-level check uses effective state)', () => {
+    const result = UpdateSettingsSchema.safeParse({
+      vat_registered: true,
+      vat_number: 'SE556123456701',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects aktiebolag with kontantmetoden (BFNAR 2006:1)', () => {
+    const result = UpdateSettingsSchema.safeParse({
+      entity_type: 'aktiebolag',
+      accounting_method: 'cash',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('allows enskild firma with kontantmetoden', () => {
+    const result = UpdateSettingsSchema.safeParse({
+      entity_type: 'enskild_firma',
+      accounting_method: 'cash',
     })
     expect(result.success).toBe(true)
   })

@@ -219,10 +219,11 @@ function inferVatRate(taxPercent?: number): number {
 
 // ── Public mappers ──────────────────────────────────────────────────
 
-export function mapCustomer(dto: CustomerDto, userId: string): Record<string, unknown> {
+export function mapCustomer(dto: CustomerDto, userId: string, companyId: string): Record<string, unknown> {
   const addr = formatAddress(dto.party.postalAddress)
   return {
     user_id: userId,
+    company_id: companyId,
     name: dto.party.name,
     customer_type: inferCustomerType(dto),
     email: dto.party.contact?.email || null,
@@ -236,10 +237,11 @@ export function mapCustomer(dto: CustomerDto, userId: string): Record<string, un
   }
 }
 
-export function mapSupplier(dto: SupplierDto, userId: string): Record<string, unknown> {
+export function mapSupplier(dto: SupplierDto, userId: string, companyId: string): Record<string, unknown> {
   const addr = formatAddress(dto.party.postalAddress)
   return {
     user_id: userId,
+    company_id: companyId,
     name: dto.party.name,
     supplier_type: inferSupplierType(dto),
     email: dto.party.contact?.email || null,
@@ -262,6 +264,7 @@ export function mapSupplier(dto: SupplierDto, userId: string): Record<string, un
 export function mapSalesInvoice(
   dto: SalesInvoiceDto,
   userId: string,
+  companyId: string,
   customerId: string
 ): { invoice: Record<string, unknown>; items: Record<string, unknown>[] } {
   const subtotal = round2(dto.legalMonetaryTotal.lineExtensionAmount.value)
@@ -287,6 +290,7 @@ export function mapSalesInvoice(
 
   const invoice: Record<string, unknown> = {
     user_id: userId,
+    company_id: companyId,
     customer_id: customerId,
     invoice_number: dto.invoiceNumber,
     invoice_date: dto.issueDate,
@@ -331,6 +335,7 @@ function mapSalesInvoiceLine(line: SalesInvoiceLineDto, index: number): Record<s
 export function mapSupplierInvoice(
   dto: SupplierInvoiceDto,
   userId: string,
+  companyId: string,
   supplierId: string
 ): { invoice: Record<string, unknown>; items: Record<string, unknown>[] } {
   const subtotal = round2(dto.legalMonetaryTotal.lineExtensionAmount.value)
@@ -354,6 +359,7 @@ export function mapSupplierInvoice(
 
   const invoice: Record<string, unknown> = {
     user_id: userId,
+    company_id: companyId,
     supplier_id: supplierId,
     supplier_invoice_number: dto.invoiceNumber,
     invoice_date: dto.issueDate,

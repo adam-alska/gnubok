@@ -36,6 +36,7 @@ export interface MigrationOptions {
   consentId: string
   companyId: string
   userId: string
+  companyId: string
   supabase: SupabaseClient
   importCompanyInfo?: boolean
   importCustomers?: boolean
@@ -137,7 +138,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             }
           }
 
-          const mapped = mapCustomer(customer, userId)
+          const mapped = mapCustomer(customer, userId, companyId)
           const { data: inserted, error } = await supabase
             .from('customers')
             .insert(mapped)
@@ -194,7 +195,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             }
           }
 
-          const mapped = mapSupplier(supplier, userId)
+          const mapped = mapSupplier(supplier, userId, companyId)
           const { data: inserted, error } = await supabase
             .from('suppliers')
             .insert(mapped)
@@ -259,6 +260,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const customerType = inferTypeFromParty(inv.customer)
             const minimalCustomer = {
               user_id: userId,
+              company_id: companyId,
               name: inv.customer.name,
               customer_type: customerType,
               default_payment_terms: 30,
@@ -296,7 +298,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             continue
           }
 
-          const { invoice: mappedInvoice, items: mappedItems } = mapSalesInvoice(inv, userId, customerId)
+          const { invoice: mappedInvoice, items: mappedItems } = mapSalesInvoice(inv, userId, companyId, customerId)
 
           const { data: insertedInv, error: invError } = await supabase
             .from('invoices')
@@ -370,6 +372,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             const supplierType = inferTypeFromParty(inv.supplier)
             const minimalSupplier = {
               user_id: userId,
+              company_id: companyId,
               name: inv.supplier.name,
               supplier_type: supplierType,
               default_payment_terms: 30,
@@ -408,7 +411,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             continue
           }
 
-          const { invoice: mappedInvoice, items: mappedItems } = mapSupplierInvoice(inv, userId, supplierId)
+          const { invoice: mappedInvoice, items: mappedItems } = mapSupplierInvoice(inv, userId, companyId, supplierId)
 
           // Get next arrival number (ankomstnummer) — required NOT NULL column
           const { data: arrivalNum, error: arrivalError } = await supabase

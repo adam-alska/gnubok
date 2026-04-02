@@ -340,16 +340,6 @@ export const MatchSupplierInvoiceSchema = z.object({
   supplier_invoice_id: uuid,
 })
 
-export const DescribeTransactionSchema = z.object({
-  description: z.string().min(3).max(500),
-})
-
-export const BatchDescribeSchema = z.object({
-  merchant_name: z.string().min(1),
-  template_id: z.string().min(1),
-  is_business: z.boolean(),
-  user_description: z.string().max(500).optional(),
-})
 
 // ============================================================
 // Settings schemas
@@ -366,7 +356,7 @@ export const UpdateSettingsSchema = z.object({
   country: z.string().optional(),
   f_skatt: z.boolean().optional(),
   vat_registered: z.boolean().optional(),
-  vat_number: z.string().optional(),
+  vat_number: z.string().regex(/^SE\d{12}$/, 'Momsregistreringsnummer måste vara SE följt av 12 siffror').nullable().optional(),
   moms_period: MomsPeriodSchema.nullable().optional(),
   fiscal_year_start_month: z.number().int().min(1).max(12).optional(),
   preliminary_tax_monthly: z.number().nullable().optional(),
@@ -374,6 +364,7 @@ export const UpdateSettingsSchema = z.object({
   clearing_number: z.string().regex(/^\d{4,5}$/, 'Clearingnummer måste vara 4-5 siffror').optional().or(z.literal('')),
   account_number: z.string().regex(/^\d{6,12}$/, 'Kontonummer måste vara 6-12 siffror').optional().or(z.literal('')),
   bankgiro: z.string().regex(/^(\d{3,4}-\d{4}|\d{7,8})$/, 'Ogiltigt bankgironummer (7-8 siffror)').nullable().optional().or(z.literal('')),
+  plusgiro: z.string().regex(/^\d{1,7}-\d{1}$/, 'Ogiltigt plusgironummer').nullable().optional().or(z.literal('')),
   iban: z.string().optional(),
   bic: z.string().optional(),
   accounting_method: AccountingMethodSchema.optional(),
@@ -381,9 +372,21 @@ export const UpdateSettingsSchema = z.object({
   next_invoice_number: z.number().int().positive().optional(),
   invoice_default_days: z.number().int().positive().optional(),
   invoice_default_notes: z.string().nullable().optional(),
-  email: z.string().email().optional(),
+  phone: z.string().optional(),
+  email: z.string().email().optional().or(z.literal('')),
+  website: z.string().optional().or(z.literal('')),
   pays_salaries: z.boolean().optional(),
   sector_slug: z.string().nullable().optional(),
+  // Bookkeeping lock
+  bookkeeping_locked_through: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ogiltigt datumformat (YYYY-MM-DD)').nullable().optional(),
+  auto_lock_period_days: z.number().int().positive().nullable().optional(),
+  // Invoice PDF settings
+  ore_rounding: z.boolean().optional(),
+  invoice_show_ocr: z.boolean().optional(),
+  invoice_show_bankgiro: z.boolean().optional(),
+  invoice_show_plusgiro: z.boolean().optional(),
+  invoice_late_fee_text: z.string().nullable().optional(),
+  invoice_credit_terms_text: z.string().nullable().optional(),
 }).refine(
   (data) => {
     // BFL 3 kap.: Enskild firma must have fiscal year starting January
@@ -395,6 +398,18 @@ export const UpdateSettingsSchema = z.object({
   {
     message: 'Enskild firma must have fiscal year starting in January (BFL 3 kap.)',
     path: ['fiscal_year_start_month'],
+  }
+).refine(
+  (data) => {
+    // BFNAR 2006:1: Aktiebolag must use accrual accounting (faktureringsmetoden)
+    if (data.entity_type === 'aktiebolag' && data.accounting_method !== undefined) {
+      return data.accounting_method === 'accrual'
+    }
+    return true
+  },
+  {
+    message: 'Aktiebolag måste använda faktureringsmetoden (BFNAR 2006:1)',
+    path: ['accounting_method'],
   }
 )
 
@@ -557,4 +572,21 @@ export const PendingOperationsQuerySchema = z.object({
   status: z.enum(['pending', 'committed', 'rejected']).default('pending'),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().nonnegative().default(0),
+})
+
+// ============================================================
+// Voucher gap schemas
+// ============================================================
+
+export const VoucherGapQuerySchema = z.object({
+  fiscal_period_id: uuid,
+  voucher_series: z.string().optional(),
+})
+
+export const SaveGapExplanationSchema = z.object({
+  fiscal_period_id: uuid,
+  voucher_series: z.string().default('A'),
+  gap_start: z.number().int().positive(),
+  gap_end: z.number().int().positive(),
+  explanation: z.string().min(1).max(500),
 })

@@ -174,7 +174,7 @@ export async function GET(request: Request) {
       // Batch reconciliation sweep when SIE overlap detected
       if (sieOverlap && totalImported > 0) {
         try {
-          await runReconciliation(supabase, connection.user_id, {
+          await runReconciliation(supabase, connection.company_id, {
             dateFrom: fromDate,
             dateTo: toDate,
           })
@@ -291,7 +291,7 @@ async function sendConsentExpiryNotification(
     const emailData = {
       bankName: connection.bank_name as string,
       daysUntilExpiry: daysLeft,
-      renewalUrl: `${baseUrl}/settings?tab=banking`,
+      renewalUrl: `${baseUrl}/settings/banking`,
       companyName: companySettings?.company_name || 'gnubok',
       isExpired,
     }

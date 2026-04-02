@@ -20,7 +20,7 @@ import InboxZeroState from '@/components/transactions/InboxZeroState'
 import InvoiceMatchDialog from '@/components/transactions/InvoiceMatchDialog'
 import TransactionBookingDialog from '@/components/transactions/TransactionBookingDialog'
 import QuickReviewDialog from '@/components/transactions/QuickReviewDialog'
-import DescribeTransactionDialog from '@/components/transactions/DescribeTransactionDialog'
+
 import TemplatePicker from '@/components/transactions/TemplatePicker'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/components/transactions/transaction-types'
 import { getDefaultAccountForCategory, getDefaultVatTreatmentForCategory } from '@/lib/bookkeeping/category-mapping'
@@ -31,7 +31,6 @@ import { useCompany } from '@/contexts/CompanyContext'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { TransactionCategory, CreateTransactionInput, Invoice, Customer, VatTreatment, InvoiceInboxItem, EntityType, LinePatternEntry } from '@/types'
 import type { SuggestedCategory, SuggestedTemplate } from '@/lib/transactions/category-suggestions'
-import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
 
 interface QuickReviewState {
   transaction: TransactionWithInvoice
@@ -77,10 +76,6 @@ export default function TransactionsPage() {
   // Quick review dialog (suggestion review before booking)
   const [quickReviewOpen, setQuickReviewOpen] = useState(false)
   const [quickReview, setQuickReview] = useState<QuickReviewState | null>(null)
-
-  // Describe dialog
-  const [describeDialogOpen, setDescribeDialogOpen] = useState(false)
-  const [describeDialogTransaction, setDescribeDialogTransaction] = useState<TransactionWithInvoice | null>(null)
 
   // Entity type for tooltip context
   const [entityType, setEntityType] = useState<string>('enskild_firma')
@@ -717,33 +712,6 @@ export default function TransactionsPage() {
     return journalEntryId
   }
 
-  function openDescribeDialog(transaction: TransactionWithInvoice) {
-    setDescribeDialogTransaction(transaction)
-    setDescribeDialogOpen(true)
-  }
-
-  function handleDescribeCategorized(transactionId: string, journalEntryId: string | null) {
-    setExitingIds((prev) => new Set(prev).add(transactionId))
-    setTimeout(() => {
-      setTransactions((prev) =>
-        prev.map((t) =>
-          t.id === transactionId
-            ? { ...t, is_business: true, journal_entry_id: journalEntryId }
-            : t
-        )
-      )
-      setExitingIds((prev) => {
-        const next = new Set(prev)
-        next.delete(transactionId)
-        return next
-      })
-    }, 350)
-  }
-
-  function handleBatchApplied() {
-    fetchTransactions()
-  }
-
   // Swipe view
   if (showSwipeView && uncategorizedTransactions.length > 0) {
     return (
@@ -814,7 +782,7 @@ export default function TransactionsPage() {
                   onMarkPrivate={handleMarkPrivate}
                   onOpenMatchDialog={openMatchDialog}
                   onOpenCategoryDialog={openCategoryDialog}
-                  onOpenDescribe={ENABLED_EXTENSION_IDS.has('ai-categorization') ? openDescribeDialog : undefined}
+
                   onOpenQuickReview={handleOpenQuickReview}
                   onOpenTemplateReview={handleOpenTemplateReview}
                   onToggleSelect={toggleBatchSelect}
@@ -935,14 +903,6 @@ export default function TransactionsPage() {
         counterpartyLinePattern={quickReview?.linePattern ?? null}
         onConfirm={handleQuickReviewConfirm}
         onChangeTemplate={handleChangeTemplate}
-      />
-
-      <DescribeTransactionDialog
-        open={describeDialogOpen}
-        onOpenChange={setDescribeDialogOpen}
-        transaction={describeDialogTransaction}
-        onCategorized={handleDescribeCategorized}
-        onBatchApplied={handleBatchApplied}
       />
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

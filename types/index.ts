@@ -148,8 +148,10 @@ export interface CompanySettings {
   // Contact
   phone: string | null
   email: string | null
+  website: string | null
 
   // Tax registration
+  pays_salaries: boolean
   f_skatt: boolean
   vat_registered: boolean
   vat_number: string | null
@@ -170,6 +172,7 @@ export interface CompanySettings {
   clearing_number: string | null
   account_number: string | null
   bankgiro: string | null
+  plusgiro: string | null
   iban: string | null
   bic: string | null
 
@@ -182,6 +185,21 @@ export interface CompanySettings {
   next_delivery_note_number: number
   invoice_default_days: number
   invoice_default_notes: string | null
+
+  // Bookkeeping lock
+  bookkeeping_locked_through: string | null
+  auto_lock_period_days: number | null
+
+  // Invoice PDF settings
+  ore_rounding: boolean
+  invoice_show_ocr: boolean
+  invoice_show_bankgiro: boolean
+  invoice_show_plusgiro: boolean
+  invoice_late_fee_text: string | null
+  invoice_credit_terms_text: string | null
+
+  // Logo
+  logo_url: string | null
 
   // Onboarding
   onboarding_step: number
@@ -1993,6 +2011,26 @@ export interface Project {
 export interface VoucherGap {
   gap_start: number
   gap_end: number
+  series: string
+}
+
+export interface VoucherGapExplanation {
+  id: string
+  company_id: string
+  user_id: string
+  fiscal_period_id: string
+  voucher_series: string
+  gap_start: number
+  gap_end: number
+  explanation: string
+  created_at: string
+  updated_at: string
+}
+
+export interface SequenceMismatch {
+  series: string
+  sequenceCounter: number
+  actualMax: number
 }
 
 // ============================================================
@@ -2005,6 +2043,8 @@ export interface YearEndValidation {
   warnings: string[]
   draftCount: number
   voucherGaps: VoucherGap[]
+  unexplainedGaps: VoucherGap[]
+  sequenceMismatches: SequenceMismatch[]
   trialBalanceBalanced: boolean
 }
 
@@ -2022,6 +2062,26 @@ export interface YearEndResult {
   nextPeriod: FiscalPeriod
   openingBalanceEntry: JournalEntry
   revaluationEntry: JournalEntry | null
+}
+
+// ============================================================
+// IB/UB Continuity Check Types (Avstämning ingående/utgående balans)
+// ============================================================
+
+export interface ContinuityDiscrepancy {
+  account_number: string
+  account_name: string
+  previous_ub_net: number
+  current_ib_net: number
+  difference: number
+}
+
+export interface ContinuityCheckResult {
+  valid: boolean
+  period_name: string
+  previous_period_name: string | null
+  discrepancies: ContinuityDiscrepancy[]
+  checked_accounts: number
 }
 
 // ============================================================

@@ -102,6 +102,34 @@ export async function checkDuplicateImport(
 }
 
 /**
+ * Check if a completed SIE import already exists for the same fiscal year period.
+ * Prevents importing two different SIE files that cover the same accounting period,
+ * which would create duplicate verifikationer violating BFL 4:1 (löpande bokföring).
+ * Only blocks on status='completed' — failed/pending imports don't prevent retries.
+ */
+export async function checkDuplicatePeriodImport(
+  supabase: SupabaseClient,
+  companyId: string,
+  fiscalYearStart: string,
+  fiscalYearEnd: string
+): Promise<SIEImport | null> {
+  // Range overlap check: start <= other_end AND end >= other_start.
+  // Two imports whose räkenskapsår overlap would produce duplicate
+  // verifikationer, violating BFL 4:1 (löpande bokföring).
+  const { data } = await supabase
+    .from('sie_imports')
+    .select('*')
+    .eq('company_id', companyId)
+    .eq('status', 'completed')
+    .lte('fiscal_year_start', fiscalYearEnd)
+    .gte('fiscal_year_end', fiscalYearStart)
+    .limit(1)
+    .maybeSingle()
+
+  return data as SIEImport | null
+}
+
+/**
  * Clean up stale pending/failed import records for a given file hash.
  * Prevents UNIQUE constraint conflicts when re-importing after a failure.
  */
@@ -121,21 +149,22 @@ async function cleanupStaleImportRecords(
 }
 
 /**
- * Create a fiscal period if one doesn't exist for the date range
+ * Create a fiscal period if one doesn't exist for the date range.
+ * Dates are ISO strings "YYYY-MM-DD" to avoid timezone issues.
  */
 async function ensureFiscalPeriod(
   supabase: SupabaseClient,
   companyId: string,
-  startDate: Date,
-  endDate: Date
+  startDate: string,
+  endDate: string
 ): Promise<string> {
   // Check for an existing period that contains the SIE date range
   const { data: containing } = await supabase
     .from('fiscal_periods')
     .select('id')
     .eq('company_id', companyId)
-    .lte('period_start', formatDate(startDate))
-    .gte('period_end', formatDate(endDate))
+    .lte('period_start', startDate)
+    .gte('period_end', endDate)
     .single()
 
   if (containing) {
@@ -148,8 +177,8 @@ async function ensureFiscalPeriod(
     .from('fiscal_periods')
     .select('id')
     .eq('company_id', companyId)
-    .lte('period_start', formatDate(endDate))
-    .gte('period_end', formatDate(startDate))
+    .lte('period_start', endDate)
+    .gte('period_end', startDate)
     .order('period_start', { ascending: false })
     .limit(1)
 
@@ -158,8 +187,8 @@ async function ensureFiscalPeriod(
   }
 
   // Create new fiscal period
-  const startYear = startDate.getFullYear()
-  const endYear = endDate.getFullYear()
+  const startYear = parseInt(startDate.substring(0, 4), 10)
+  const endYear = parseInt(endDate.substring(0, 4), 10)
   const name = startYear === endYear
     ? `Räkenskapsår ${startYear}`
     : `Räkenskapsår ${startYear}/${endYear}`
@@ -169,8 +198,8 @@ async function ensureFiscalPeriod(
     .insert({
       company_id: companyId,
       name,
-      period_start: formatDate(startDate),
-      period_end: formatDate(endDate),
+      period_start: startDate,
+      period_end: endDate,
       is_closed: false,
       opening_balances_set: false,
     })
@@ -316,8 +345,7 @@ async function createOpeningBalanceEntry(
     }
   }
 
-  const fiscalYearStart = parsed.stats.fiscalYearStart
-  const entryDate = fiscalYearStart ? formatDate(fiscalYearStart) : formatDate(new Date())
+  const entryDate = parsed.stats.fiscalYearStart ?? formatDate(new Date())
 
   const entry = await createJournalEntry(supabase, companyId, userId, {
     fiscal_period_id: fiscalPeriodId,
@@ -571,6 +599,16 @@ async function importVouchers(
 
   const currentVoucherNumber = (startNumber as number) || 1
 
+  // Reserve the full voucher number range upfront to prevent concurrent
+  // operations from claiming numbers in our range during batch insertion.
+  const reservedHighest = currentVoucherNumber + preparedVouchers.length - 1
+  await supabase.rpc('reserve_voucher_range', {
+    p_company_id: companyId,
+    p_fiscal_period_id: fiscalPeriodId,
+    p_series: voucherSeries,
+    p_highest_used: reservedHighest,
+  })
+
   // Batch insert journal entries (in chunks of 100) with retry logic.
   // Retries handle transient errors (Supabase rate limits, Cloudflare 500s).
   const BATCH_SIZE = 100
@@ -578,6 +616,7 @@ async function importVouchers(
   const INTER_BATCH_DELAY_MS = 50  // Prevent rate limiting under sustained load
   let retriedBatches = 0
   let failedBatches = 0
+  let highestInsertedVoucher = currentVoucherNumber - 1  // nothing inserted yet
 
   for (let batchStart = 0; batchStart < preparedVouchers.length; batchStart += BATCH_SIZE) {
     const batch = preparedVouchers.slice(batchStart, batchStart + BATCH_SIZE)
@@ -698,6 +737,11 @@ async function importVouchers(
       }
 
       if (linesInserted) {
+        // Track highest voucher number only after both headers AND lines succeed,
+        // to avoid counting orphaned entries with no lines as "used".
+        const batchHighest = currentVoucherNumber + batchStart + batch.length - 1
+        highestInsertedVoucher = Math.max(highestInsertedVoucher, batchHighest)
+
         // Track movements ONLY for successfully inserted vouchers.
         // This ensures the migration adjustment correctly compensates for
         // any batches that failed completely.
@@ -742,16 +786,19 @@ async function importVouchers(
     }
   }
 
-  // Update voucher sequence to reflect all assigned numbers.
-  // next_voucher_number() was called once but we assigned N numbers manually,
-  // so the sequence only got incremented by 1. Fix with GREATEST to avoid races.
-  if (results.created > 0) {
-    const highestUsed = currentVoucherNumber + preparedVouchers.length - 1
-    await supabase.rpc('reserve_voucher_range', {
+  // Adjust voucher sequence after insertion.
+  // Range was pre-reserved to `reservedHighest`. If some batches failed,
+  // release the unused portion to avoid burned numbers and gap-explanation friction.
+  if (highestInsertedVoucher < reservedHighest) {
+    const releaseTarget = highestInsertedVoucher >= currentVoucherNumber
+      ? highestInsertedVoucher       // partial success: set to actual highest
+      : currentVoucherNumber - 1     // total failure: roll back fully
+    await supabase.rpc('release_voucher_range', {
       p_company_id: companyId,
       p_fiscal_period_id: fiscalPeriodId,
       p_series: voucherSeries,
-      p_highest_used: highestUsed,
+      p_actual_last: releaseTarget,
+      p_reserved_highest: reservedHighest,
     })
   }
 
@@ -908,8 +955,7 @@ async function createMigrationAdjustmentEntry(
   }
 
   // Date the adjustment at fiscal year end
-  const fiscalYearEnd = parsed.stats.fiscalYearEnd
-  const entryDate = fiscalYearEnd ? formatDate(fiscalYearEnd) : formatDate(new Date())
+  const entryDate = parsed.stats.fiscalYearEnd ?? formatDate(new Date())
 
   // Fix 4: Build structured description with skipped voucher details
   const skippedIds = skippedDetails.map(d => d.voucherId)
@@ -1023,12 +1069,8 @@ async function createPendingImportRecord(
       org_number: parsed.header.orgNumber,
       company_name: parsed.header.companyName,
       sie_type: parsed.header.sieType,
-      fiscal_year_start: parsed.stats.fiscalYearStart
-        ? formatDate(parsed.stats.fiscalYearStart)
-        : null,
-      fiscal_year_end: parsed.stats.fiscalYearEnd
-        ? formatDate(parsed.stats.fiscalYearEnd)
-        : null,
+      fiscal_year_start: parsed.stats.fiscalYearStart ?? null,
+      fiscal_year_end: parsed.stats.fiscalYearEnd ?? null,
       accounts_count: parsed.stats.totalAccounts,
       transactions_count: 0,
       status: 'pending',
@@ -1211,20 +1253,72 @@ export async function executeSIEImport(
     const accountMap = mappingsToMap(mappings)
 
     // Ensure all mapped target accounts exist in chart_of_accounts.
-    // The mapping contains every account referenced in the SIE file; accounts
-    // that were not seeded during onboarding need to be created here so that
-    // journal entry lines can link to them via account_id.
-    const seenTargets = new Set<string>()
-    for (const mapping of mappings) {
-      if (mapping.targetAccount && !seenTargets.has(mapping.targetAccount)) {
-        seenTargets.add(mapping.targetAccount)
-        await ensureAccountExists(
-          supabase,
-          companyId,
-          userId,
-          mapping.targetAccount,
-          mapping.targetName
-        )
+    // Uses a single batch query + batch insert instead of per-account round trips.
+    const targetAccounts = [...new Set(
+      mappings.filter(m => m.targetAccount).map(m => m.targetAccount!)
+    )]
+
+    if (targetAccounts.length > 0) {
+      const { data: existing } = await supabase
+        .from('chart_of_accounts')
+        .select('account_number')
+        .eq('company_id', companyId)
+        .in('account_number', targetAccounts)
+
+      const existingSet = new Set((existing || []).map(a => a.account_number))
+      const missing = targetAccounts.filter(num => !existingSet.has(num))
+
+      if (missing.length > 0) {
+        const targetNameMap = new Map<string, string>()
+        for (const m of mappings) {
+          if (m.targetAccount) targetNameMap.set(m.targetAccount, m.targetName || m.sourceName)
+        }
+
+        const inserts = missing.map(num => {
+          const basRef = getBASReference(num)
+          if (basRef) {
+            return {
+              user_id: userId,
+              company_id: companyId,
+              account_number: num,
+              account_name: basRef.account_name,
+              account_class: basRef.account_class,
+              account_group: basRef.account_group,
+              account_type: basRef.account_type,
+              normal_balance: basRef.normal_balance,
+              sru_code: basRef.sru_code ?? computeSRUCode(num),
+              k2_excluded: basRef.k2_excluded,
+              plan_type: 'full_bas' as const,
+              is_active: true,
+              is_system_account: false,
+            }
+          }
+          const classNum = parseInt(num.charAt(0), 10)
+          const group = num.substring(0, 2)
+          const accountType = classNum === 1 ? 'asset'
+            : classNum === 2 ? (group === '21' ? 'untaxed_reserves' : (group === '20' ? 'equity' : 'liability'))
+            : classNum === 3 ? 'revenue' : 'expense'
+          return {
+            user_id: userId,
+            company_id: companyId,
+            account_number: num,
+            account_name: targetNameMap.get(num) || `Konto ${num}`,
+            account_class: classNum,
+            account_group: group,
+            account_type: accountType,
+            normal_balance: classNum <= 1 || classNum >= 4 ? 'debit' : 'credit',
+            sru_code: computeSRUCode(num),
+            plan_type: 'full_bas' as const,
+            is_active: true,
+            is_system_account: false,
+          }
+        })
+
+        const { error: insertError } = await supabase.from('chart_of_accounts').insert(inserts)
+        if (insertError && !insertError.message.includes('duplicate')) {
+          result.errors.push(`Failed to create accounts: ${insertError.message}`)
+          return result
+        }
       }
     }
 
@@ -1234,6 +1328,17 @@ export async function executeSIEImport(
 
     if (!fiscalYearStart || !fiscalYearEnd) {
       result.errors.push('No fiscal year defined in the SIE file')
+      return result
+    }
+
+    // Safety net: reject if a completed import already exists for this period
+    const periodDuplicate = await checkDuplicatePeriodImport(
+      supabase, companyId, fiscalYearStart, fiscalYearEnd
+    )
+    if (periodDuplicate) {
+      result.errors.push(
+        `En SIE-import för ett överlappande räkenskapsår (${periodDuplicate.fiscal_year_start} – ${periodDuplicate.fiscal_year_end}) finns redan`
+      )
       return result
     }
 
@@ -1250,8 +1355,8 @@ export async function executeSIEImport(
         .from('fiscal_periods')
         .select('id')
         .eq('company_id', companyId)
-        .lte('period_start', formatDate(fiscalYearStart))
-        .gte('period_end', formatDate(fiscalYearEnd))
+        .lte('period_start', fiscalYearStart)
+        .gte('period_end', fiscalYearEnd)
         .single()
 
       if (!existing) {
@@ -1359,15 +1464,19 @@ export async function executeSIEImport(
         const earliestVoucher = new Date(Math.min(...voucherDates))
         const latestVoucher = new Date(Math.max(...voucherDates))
 
+        // Parse fiscal year string dates for comparison (append T00:00:00 to avoid UTC shift)
+        const fyStart = new Date(fiscalYearStart + 'T00:00:00')
+        const fyEnd = new Date(fiscalYearEnd + 'T00:00:00')
+
         // Allow 30 days margin from fiscal year start/end for partial detection
         const msPerDay = 86400000
-        const startGap = earliestVoucher.getTime() - fiscalYearStart.getTime()
-        const endGap = fiscalYearEnd.getTime() - latestVoucher.getTime()
+        const startGap = earliestVoucher.getTime() - fyStart.getTime()
+        const endGap = fyEnd.getTime() - latestVoucher.getTime()
 
         if (startGap > 60 * msPerDay || endGap > 60 * msPerDay) {
           result.warnings.push(
             `SIE-filen verkar innehålla ett ofullständigt räkenskapsår: verifikationer ${formatDate(earliestVoucher)}–${formatDate(latestVoucher)}, ` +
-            `räkenskapsår ${formatDate(fiscalYearStart)}–${formatDate(fiscalYearEnd)}. ` +
+            `räkenskapsår ${fiscalYearStart}–${fiscalYearEnd}. ` +
             `Omföringsverifikationen kan bli felaktig om #UB/#RES avser hela året men verifikationerna bara täcker en del.`
           )
         }
@@ -1480,10 +1589,10 @@ export async function executeSIEImport(
       sourceSystem: parsed.header.program,
       sourceVersion: parsed.header.programVersion,
       sieType: parsed.header.sieType,
-      generatedDate: parsed.header.generatedDate ? formatDate(parsed.header.generatedDate) : null,
+      generatedDate: parsed.header.generatedDate ?? null,
       fiscalYear: {
-        start: formatDate(fiscalYearStart),
-        end: formatDate(fiscalYearEnd),
+        start: fiscalYearStart,
+        end: fiscalYearEnd,
       },
       importedAt: new Date().toISOString(),
       importedBy: companyId,
@@ -1512,7 +1621,7 @@ export async function executeSIEImport(
       voucherStats.skippedSingleLine + voucherStats.skippedEmpty
     result.details = {
       fiscalYear: fiscalYearStart && fiscalYearEnd
-        ? { start: formatDate(fiscalYearStart), end: formatDate(fiscalYearEnd) }
+        ? { start: fiscalYearStart, end: fiscalYearEnd }
         : undefined,
       skippedVouchers: totalSkippedForDetails > 0 ? {
         unbalanced: voucherStats.skippedUnbalanced,
