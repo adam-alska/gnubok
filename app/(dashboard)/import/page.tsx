@@ -450,23 +450,31 @@ function SIEImportWizard() {
 
       toast({ title: 'Konton skapade', description: `${data.created} nya konton har lagts till i din kontoplan` })
 
-      if (file) {
-        const formData = new FormData()
-        formData.append('file', file)
-
-        const parseRes = await fetch('/api/import/sie/parse', { method: 'POST', body: formData })
-        const parseData = await parseRes.json()
-
-        if (parseRes.ok) {
-          setMappings(parseData.mappings)
-          setPreview(parseData.preview)
-
-          const accountsRes = await fetch('/api/bookkeeping/accounts')
-          if (accountsRes.ok) {
-            const accountsData = await accountsRes.json()
-            setBasAccounts(accountsData.data || [])
-          }
+      // Optimistically update mappings: mark created accounts as self-mapped
+      const createdSet = new Set(missingAccounts.map(a => a.number))
+      setMappings(prev => prev.map(m =>
+        !m.targetAccount && createdSet.has(m.sourceAccount)
+          ? { ...m, targetAccount: m.sourceAccount, targetName: m.sourceName, confidence: 1.0 }
+          : m
+      ))
+      setPreview(prev => {
+        if (!prev) return prev
+        const newMapped = prev.mappingStatus.mapped + createdSet.size
+        return {
+          ...prev,
+          mappingStatus: {
+            ...prev.mappingStatus,
+            mapped: newMapped,
+            unmapped: Math.max(0, prev.mappingStatus.unmapped - createdSet.size),
+          },
         }
+      })
+
+      // Also refresh BAS accounts list
+      const accountsRes = await fetch('/api/bookkeeping/accounts')
+      if (accountsRes.ok) {
+        const accountsData = await accountsRes.json()
+        setBasAccounts(accountsData.data || [])
       }
     } catch (err) {
       toast({ title: 'Kunde inte skapa konton', description: err instanceof Error ? err.message : 'Försök igen.', variant: 'destructive' })
