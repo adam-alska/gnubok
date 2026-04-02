@@ -168,7 +168,11 @@ interface ConnectionStatus {
   }
 }
 
-const COMING_SOON_PROVIDERS = new Set<ArcimProvider>(['visma', 'bjornlunden', 'briox'])
+const COMING_SOON_PROVIDERS = new Set<ArcimProvider>(
+  process.env.NODE_ENV === 'development'
+    ? ['bjornlunden', 'briox']
+    : ['visma', 'bjornlunden', 'briox']
+)
 
 const PROVIDER_LOGOS: Record<ArcimProvider, string> = {
   fortnox: '/logos/fortnox.svg',
