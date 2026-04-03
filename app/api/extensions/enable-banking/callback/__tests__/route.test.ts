@@ -131,4 +131,13 @@ describe('GET /api/extensions/enable-banking/callback', () => {
     expect(location).toContain('/settings/banking?')
     expect(location).toContain('bank_error=missing_parameters')
   })
+
+  it('redirects with error when code fails format validation', async () => {
+    const response = await GET(makeRequest({ code: '!!bad!!', state: 'some-state' }))
+
+    expect(response.status).toBe(307)
+    const location = response.headers.get('location') || ''
+    expect(location).toContain('/settings/banking?')
+    expect(location).toContain('bank_error=invalid_code_format')
+  })
 })
