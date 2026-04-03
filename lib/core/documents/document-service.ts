@@ -11,6 +11,52 @@ import type { DocumentAttachment, DocumentUploadSource } from '@/types'
  * for documents linked to committed entries.
  */
 
+/**
+ * Sanitize a filename for use in Supabase Storage keys.
+ * Replaces spaces and non-ASCII characters with underscores,
+ * collapses consecutive underscores, and truncates to avoid
+ * exceeding Supabase Storage path length limits.
+ */
+function sanitizeFileName(name: string): string {
+  const dotIndex = name.lastIndexOf('.')
+  const ext = dotIndex > 0 ? name.slice(dotIndex) : ''
+  const base = dotIndex > 0 ? name.slice(0, dotIndex) : name
+
+  const sanitizedBase = base
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '')
+    .slice(0, 100)
+  const sanitizedExt = ext.replace(/[^a-zA-Z0-9.]/g, '_')
+
+  return sanitizedBase + sanitizedExt
+}
+
+export const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024 // 10 MB
+export const ALLOWED_DOCUMENT_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+]
+
+/**
+ * Validate file size and MIME type before upload.
+ * Returns an error string or null if valid.
+ */
+export function validateDocumentFile(file: { size: number; type?: string }): string | null {
+  if (file.size === 0) {
+    return 'Filen är tom'
+  }
+  if (file.size > MAX_DOCUMENT_SIZE) {
+    return `Filen är för stor (max ${MAX_DOCUMENT_SIZE / 1024 / 1024} MB)`
+  }
+  if (file.type && !ALLOWED_DOCUMENT_TYPES.includes(file.type)) {
+    return 'Otillåten filtyp. Tillåtna: PDF, JPG, PNG, WebP.'
+  }
+  return null
+}
+
 let bucketVerified = false
 
 /** @internal Reset bucket verification flag — for testing only */
@@ -72,7 +118,7 @@ export async function uploadDocument(
 
   // Generate storage path
   const timestamp = Date.now()
-  const storagePath = `documents/${userId}/${timestamp}_${file.name}`
+  const storagePath = `documents/${userId}/${timestamp}_${sanitizeFileName(file.name)}`
 
   // Upload to Supabase Storage
   const { error: uploadError } = await supabase.storage
@@ -145,7 +191,7 @@ export async function createNewVersion(
 
   // Upload new file to Storage
   const timestamp = Date.now()
-  const storagePath = `documents/${userId}/${timestamp}_${file.name}`
+  const storagePath = `documents/${userId}/${timestamp}_${sanitizeFileName(file.name)}`
 
   const { error: uploadError } = await supabase.storage
     .from('documents')
