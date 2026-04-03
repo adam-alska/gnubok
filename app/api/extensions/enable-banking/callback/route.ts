@@ -61,18 +61,18 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.redirect(
-      `${baseUrl}/settings?bank_error=${encodeURIComponent(errorMessage)}`
+      `${baseUrl}/settings/banking?bank_error=${encodeURIComponent(errorMessage)}`
     )
   }
 
   if (!code || !state) {
-    return NextResponse.redirect(`${baseUrl}/settings?bank_error=missing_parameters`)
+    return NextResponse.redirect(`${baseUrl}/settings/banking?bank_error=missing_parameters`)
   }
 
   // Validate authorization code format
   const codePattern = /^[a-zA-Z0-9._~+\/-]{8,2048}$/
   if (!codePattern.test(code)) {
-    return NextResponse.redirect(`${baseUrl}/settings?bank_error=invalid_code_format`)
+    return NextResponse.redirect(`${baseUrl}/settings/banking?bank_error=invalid_code_format`)
   }
 
   const supabase = await createServiceClient()
@@ -93,7 +93,7 @@ export async function GET(request: Request) {
         hasCode: !!code,
       })
       return NextResponse.redirect(
-        `${baseUrl}/settings?bank_error=${encodeURIComponent('invalid_state')}`
+        `${baseUrl}/settings/banking?bank_error=${encodeURIComponent('invalid_state')}`
       )
     }
 
@@ -171,7 +171,7 @@ export async function GET(request: Request) {
       .single()
 
     const redirectTarget = userSettings?.onboarding_complete
-      ? `/settings?bank_connected=true&connection_id=${connectionId}`
+      ? `/settings/banking?bank_connected=true&connection_id=${connectionId}`
       : `/onboarding?bank_connected=true&connection_id=${connectionId}`
 
     return NextResponse.redirect(`${baseUrl}${redirectTarget}`)
@@ -197,7 +197,7 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.redirect(
-      `${baseUrl}/settings?bank_error=${encodeURIComponent('Connection failed')}`
+      `${baseUrl}/settings/banking?bank_error=${encodeURIComponent('Connection failed')}`
     )
   }
 }

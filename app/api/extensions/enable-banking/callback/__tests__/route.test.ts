@@ -57,6 +57,7 @@ describe('GET /api/extensions/enable-banking/callback', () => {
 
     expect(response.status).toBe(307)
     const location = response.headers.get('location') || ''
+    expect(location).toContain('/settings/banking?')
     expect(location).toContain('bank_error=invalid_state')
   })
 
@@ -87,6 +88,7 @@ describe('GET /api/extensions/enable-banking/callback', () => {
 
     expect(response.status).toBe(307)
     const location = response.headers.get('location') || ''
+    expect(location).toContain('/settings/banking?')
     expect(location).toContain('bank_connected=true')
     expect(location).toContain('connection_id=conn-1')
   })
@@ -96,6 +98,7 @@ describe('GET /api/extensions/enable-banking/callback', () => {
 
     expect(response.status).toBe(307)
     const location = response.headers.get('location') || ''
+    expect(location).toContain('/settings/banking?')
     expect(location).toContain('bank_error=User%20cancelled')
     // No state → no DB cleanup attempted
     expect(mockFrom).not.toHaveBeenCalled()
@@ -114,6 +117,7 @@ describe('GET /api/extensions/enable-banking/callback', () => {
 
     expect(response.status).toBe(307)
     const location = response.headers.get('location') || ''
+    expect(location).toContain('/settings/banking?')
     expect(location).toContain('bank_error=Denied%20data%20sharing%20consent')
     // Should clean up the pending row
     expect(mockFrom).toHaveBeenCalledWith('bank_connections')
@@ -124,6 +128,16 @@ describe('GET /api/extensions/enable-banking/callback', () => {
 
     expect(response.status).toBe(307)
     const location = response.headers.get('location') || ''
+    expect(location).toContain('/settings/banking?')
     expect(location).toContain('bank_error=missing_parameters')
+  })
+
+  it('redirects with error when code fails format validation', async () => {
+    const response = await GET(makeRequest({ code: '!!bad!!', state: 'some-state' }))
+
+    expect(response.status).toBe(307)
+    const location = response.headers.get('location') || ''
+    expect(location).toContain('/settings/banking?')
+    expect(location).toContain('bank_error=invalid_code_format')
   })
 })
