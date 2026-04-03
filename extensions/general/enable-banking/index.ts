@@ -84,14 +84,9 @@ export const enableBankingExtension: Extension = {
         }
 
         try {
-          // Determine PSU type from entity type
-          const { data: companySettings } = await supabase
-            .from('company_settings')
-            .select('entity_type')
-            .eq('company_id', ctx?.companyId ?? user.id)
-            .single()
-
-          const psuType = companySettings?.entity_type === 'aktiebolag' ? 'business' : 'personal'
+          // Always use 'business' PSU type — gnubok is accounting software,
+          // users connect business accounts regardless of entity type (AB or EF)
+          const psuType = 'business'
 
           log.info('[enable-banking] Starting bank connection', {
             user_id: user.id,
