@@ -145,7 +145,7 @@ export const invoiceInboxExtension: Extension = {
           return NextResponse.json({ error: 'No file provided' }, { status: 400 })
         }
         if (file.size > MAX_FILE_SIZE) {
-          return NextResponse.json({ error: 'File too large (max 20 MB)' }, { status: 400 })
+          return NextResponse.json({ error: `File too large (max ${MAX_FILE_SIZE / 1024 / 1024} MB)` }, { status: 400 })
         }
         if (!UPLOAD_ALLOWED_MIME_TYPES.has(file.type)) {
           return NextResponse.json(
