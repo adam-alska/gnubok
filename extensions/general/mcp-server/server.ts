@@ -39,7 +39,7 @@ import {
   generateInvoiceEmailText,
   generateInvoiceEmailSubject,
 } from '@/lib/email/invoice-templates'
-import { uploadDocument } from '@/lib/core/documents/document-service'
+import { uploadDocument, MAX_DOCUMENT_SIZE } from '@/lib/core/documents/document-service'
 // classifyDocument is dynamically imported from invoice-inbox (may not be enabled)
 // ensureInitialized() is called by the extension router (ext/[...path]/route.ts)
 // which dispatches to this handler — no duplicate call needed here.
@@ -2140,9 +2140,16 @@ const tools: McpTool[] = [
         if (!mimeType) throw new Error(`Cannot infer MIME type from extension: .${ext}`)
       }
 
+      const allowedMimeTypes = new Set([
+        'application/pdf', 'image/jpeg', 'image/png', 'image/heic', 'image/webp',
+      ])
+      if (!allowedMimeTypes.has(mimeType)) {
+        throw new Error(`Unsupported file type: ${mimeType}. Allowed: PDF, JPEG, PNG, HEIC, WebP`)
+      }
+
       const buffer = Buffer.from(base64Content, 'base64')
-      if (buffer.byteLength > 20 * 1024 * 1024) {
-        throw new Error('File too large (max 20 MB)')
+      if (buffer.byteLength > MAX_DOCUMENT_SIZE) {
+        throw new Error(`File too large (max ${MAX_DOCUMENT_SIZE / 1024 / 1024} MB)`)
       }
 
       // Store in WORM archive

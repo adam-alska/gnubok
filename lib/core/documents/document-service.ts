@@ -26,7 +26,7 @@ function sanitizeFileName(name: string): string {
     .replace(/[^a-zA-Z0-9._-]/g, '_')
     .replace(/_+/g, '_')
     .replace(/^_|_$/g, '')
-    .slice(0, 100)
+    .slice(0, 100) || 'file'
   const sanitizedExt = ext.replace(/[^a-zA-Z0-9.]/g, '_')
 
   return sanitizedBase + sanitizedExt
@@ -51,7 +51,7 @@ export function validateDocumentFile(file: { size: number; type?: string }): str
   if (file.size > MAX_DOCUMENT_SIZE) {
     return `Filen är för stor (max ${MAX_DOCUMENT_SIZE / 1024 / 1024} MB)`
   }
-  if (file.type && !ALLOWED_DOCUMENT_TYPES.includes(file.type)) {
+  if (!file.type || !ALLOWED_DOCUMENT_TYPES.includes(file.type)) {
     return 'Otillåten filtyp. Tillåtna: PDF, JPG, PNG, WebP.'
   }
   return null

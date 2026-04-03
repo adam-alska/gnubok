@@ -7,7 +7,7 @@ import { encryptState, decryptState, encryptToken, decryptToken } from './lib/gm
 import { scanGmailConnection } from './lib/gmail-scanner'
 import type { InvoiceExtractionResult } from '@/types'
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // Match MAX_DOCUMENT_SIZE from document-service
 
 const UPLOAD_ALLOWED_MIME_TYPES = new Set([
   'application/pdf',
