@@ -92,7 +92,6 @@ export const enableBankingExtension: Extension = {
             user_id: user.id,
             bank: aspsp_name,
             country: aspsp_country,
-            entity_type: companySettings?.entity_type,
             psu_type: psuType,
           })
 

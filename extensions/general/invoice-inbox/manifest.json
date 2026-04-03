@@ -1,0 +1,20 @@
+{
+  "id": "invoice-inbox",
+  "sector": "general",
+  "exportName": "invoiceInboxExtension",
+  "entryPoint": "@/extensions/general/invoice-inbox",
+  "workspace": null,
+  "requiredEnvVars": ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION", "BEDROCK_MODEL_ID"],
+  "optionalEnvVars": ["BEDROCK_MAX_TOKENS", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GMAIL_TOKEN_ENCRYPTION_KEY"],
+  "npmDependencies": ["@aws-sdk/client-bedrock-runtime"],
+  "definition": {
+    "name": "Dokumentinkorg",
+    "category": "import",
+    "icon": "Inbox",
+    "dataPattern": "both",
+    "hasOwnData": true,
+    "readsCoreTables": ["document_attachments", "suppliers", "transactions"],
+    "description": "AI-klassificering och extraktion av leverantörsfakturor och kvitton",
+    "longDescription": "Ladda upp eller ta emot dokument via Gmail. AI klassificerar dokumenttyp, extraherar strukturerad data (leverantör, belopp, moms) och matchar mot transaktioner. Kräver AWS Bedrock-åtkomst."
+  }
+}

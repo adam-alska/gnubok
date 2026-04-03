@@ -68,5 +68,21 @@ export const EXTENSION_DEFINITIONS: Record<string, ExtensionDefinition[]> = {
           "description": "Gör bokföring via Claude, Cursor eller annan MCP-klient",
           "longDescription": "Exponerar gnuboks bokföringsmotor som MCP-verktyg (Model Context Protocol). Koppla din MCP-klient med en API-nyckel och gör bokföring genom konversation: visa okategoriserade transaktioner, bokför dem, skapa fakturor."
     },
+    {
+          "slug": "invoice-inbox",
+          "name": "Dokumentinkorg",
+          "sector": "general",
+          "category": "import",
+          "icon": "Inbox",
+          "dataPattern": "both",
+          "description": "AI-klassificering och extraktion av leverantörsfakturor och kvitton",
+          "longDescription": "Ladda upp eller ta emot dokument via Gmail. AI klassificerar dokumenttyp, extraherar strukturerad data (leverantör, belopp, moms) och matchar mot transaktioner. Kräver AWS Bedrock-åtkomst.",
+          "readsCoreTables": [
+                "document_attachments",
+                "suppliers",
+                "transactions"
+          ],
+          "hasOwnData": true
+    },
   ],
 }

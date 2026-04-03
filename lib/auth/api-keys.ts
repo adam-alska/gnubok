@@ -71,6 +71,10 @@ export const TOOL_SCOPE_MAP: Record<string, ApiKeyScope> = {
   gnubok_get_supplier_ledger:             'reports:read',
   gnubok_list_fiscal_periods:             'reports:read',
   gnubok_get_reconciliation_status:       'reports:read',
+  // Document inbox
+  gnubok_upload_document:                 'transactions:write',
+  gnubok_list_inbox_items:                'transactions:read',
+  gnubok_get_inbox_item:                  'transactions:read',
 }
 
 export function validateScopes(scopes: unknown): ApiKeyScope[] | null {
