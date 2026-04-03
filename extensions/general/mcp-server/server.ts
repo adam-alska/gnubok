@@ -40,7 +40,7 @@ import {
   generateInvoiceEmailSubject,
 } from '@/lib/email/invoice-templates'
 import { uploadDocument } from '@/lib/core/documents/document-service'
-import { classifyDocument } from '@/extensions/general/invoice-inbox/lib/classify-document'
+// classifyDocument is dynamically imported from invoice-inbox (may not be enabled)
 // ensureInitialized() is called by the extension router (ext/[...path]/route.ts)
 // which dispatches to this handler — no duplicate call needed here.
 import type { Transaction, TransactionCategory, EntityType, VatTreatment, Invoice, Currency, CompanySettings, Customer, InvoiceItem } from '@/types'
@@ -2152,10 +2152,11 @@ const tools: McpTool[] = [
         type: mimeType,
       }, { upload_source: 'api' })
 
-      // Classify
+      // Classify (invoice-inbox extension may not be enabled)
       let classificationResult
       let classificationError: string | null = null
       try {
+        const { classifyDocument } = await import('@/extensions/general/invoice-inbox/lib/classify-document')
         classificationResult = await classifyDocument({
           fileBuffer: buffer,
           mimeType,

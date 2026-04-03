@@ -6,5 +6,4 @@ export const ENABLED_EXTENSION_IDS: ReadonlySet<string> = new Set([
   'arcim-migration',
   'tic',
   'mcp-server',
-  'invoice-inbox',
 ])
