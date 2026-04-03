@@ -34,7 +34,7 @@ export default function BankingSettingsPage() {
         fetch('/api/extensions/ext/enable-banking/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ connection_id: connectionId, days_back: 90 }),
+          body: JSON.stringify({ connection_id: connectionId, days_back: 120 }),
         })
           .then(res => res.json())
           .then(data => {
