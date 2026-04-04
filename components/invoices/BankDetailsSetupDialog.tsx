@@ -98,7 +98,7 @@ export function BankDetailsSetupDialog({ open, onOpenChange, onComplete }: BankD
     // Include bank name from combobox
     data.bank_name = bankName
 
-    // Clean empty strings to null for API
+    // Omit empty strings — API schema accepts undefined but not null
     const payload: Record<string, string | number | null> = {}
     for (const [key, val] of Object.entries(data)) {
       if (key === 'next_invoice_number') {
