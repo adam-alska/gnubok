@@ -38,7 +38,7 @@ function errorRedirect(redirectUri: string, state: string | null, error: string,
   url.searchParams.set('error', error)
   url.searchParams.set('error_description', desc)
   if (state) url.searchParams.set('state', state)
-  return NextResponse.redirect(url.toString())
+  return NextResponse.redirect(url.toString(), 303)
 }
 
 /**
@@ -205,7 +205,10 @@ export async function POST(request: Request) {
   callbackUrl.searchParams.set('code', code)
   if (state) callbackUrl.searchParams.set('state', state)
 
-  return NextResponse.redirect(callbackUrl.toString())
+  // 303 See Other: forces browser to GET the callback URL, even though this
+  // handler was reached via POST. NextResponse.redirect() defaults to 307,
+  // which preserves POST and causes Claude's callback to return 405.
+  return NextResponse.redirect(callbackUrl.toString(), 303)
 }
 
 function escapeHtml(str: string): string {
