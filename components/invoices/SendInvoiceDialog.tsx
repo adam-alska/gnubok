@@ -147,7 +147,11 @@ export default function SendInvoiceDialog({
       onSuccess()
 
       if (mode === 'email') {
-        setSentMessage(data.message || `Fakturan har skickats till ${invoice.customer.email}`)
+        onOpenChange(false)
+        toast({
+          title: 'Faktura skickad',
+          description: data.message || `Fakturan har skickats till ${invoice.customer.email}`,
+        })
       } else {
         // For manual send, just close — no email to confirm
         onOpenChange(false)

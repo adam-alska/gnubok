@@ -105,7 +105,8 @@ export function BankDetailsSetupDialog({ open, onOpenChange, onComplete }: BankD
         const num = val ? parseInt(val as string, 10) : null
         if (num !== null) payload[key] = num
       } else {
-        payload[key] = (val as string) || null
+        const str = val as string
+        if (str) payload[key] = str
       }
     }
 
