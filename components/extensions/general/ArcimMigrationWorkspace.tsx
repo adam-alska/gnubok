@@ -217,46 +217,57 @@ function ProviderStep({
               return (
                 <div
                   key={consent.id}
-                  className="flex items-center gap-4 rounded-lg border border-border bg-card p-4"
+                  className="rounded-lg border border-border bg-card p-4"
                 >
-                  <img
-                    src={PROVIDER_LOGOS[consent.provider]}
-                    alt={providerInfo?.name ?? consent.provider}
-                    className="h-10 w-10 shrink-0 rounded-lg object-contain"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{providerInfo?.name ?? consent.provider}</p>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-                        <CheckCircle className="h-3 w-3" />
-                        Ansluten
-                      </span>
+                  <div className="flex items-start gap-3 sm:items-center sm:gap-4">
+                    <img
+                      src={PROVIDER_LOGOS[consent.provider]}
+                      alt={providerInfo?.name ?? consent.provider}
+                      className="h-10 w-10 shrink-0 rounded-lg object-contain"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{providerInfo?.name ?? consent.provider}</p>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                          <CheckCircle className="h-3 w-3" />
+                          Ansluten
+                        </span>
+                      </div>
+                      <div className="mt-0.5 space-y-0.5">
+                        {consent.companyName && (
+                          <p className="text-xs text-muted-foreground">{consent.companyName}</p>
+                        )}
+                        {lastImport ? (
+                          <p className="text-xs text-muted-foreground">
+                            Senaste import: {new Date(lastImport.imported_at ?? lastImport.created_at).toLocaleDateString('sv-SE')}
+                            {lastImport.transactions_count != null && ` — ${lastImport.transactions_count} verifikationer`}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            Ansluten {consent.createdAt ? new Date(consent.createdAt).toLocaleDateString('sv-SE') : ''}
+                          </p>
+                        )}
+                        {(connectionStatus?.entityCounts.customers ?? 0) > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            {connectionStatus?.entityCounts.customers} kunder, {connectionStatus?.entityCounts.suppliers} leverantörer, {connectionStatus?.entityCounts.invoices} fakturor
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div className="mt-0.5 space-y-0.5">
-                      {consent.companyName && (
-                        <p className="text-xs text-muted-foreground">{consent.companyName}</p>
-                      )}
-                      {lastImport ? (
-                        <p className="text-xs text-muted-foreground">
-                          Senaste import: {new Date(lastImport.imported_at ?? lastImport.created_at).toLocaleDateString('sv-SE')}
-                          {lastImport.transactions_count != null && ` — ${lastImport.transactions_count} verifikationer`}
-                        </p>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">
-                          Ansluten {consent.createdAt ? new Date(consent.createdAt).toLocaleDateString('sv-SE') : ''}
-                        </p>
-                      )}
-                      {(connectionStatus?.entityCounts.customers ?? 0) > 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          {connectionStatus?.entityCounts.customers} kunder, {connectionStatus?.entityCounts.suppliers} leverantörer, {connectionStatus?.entityCounts.invoices} fakturor
-                        </p>
-                      )}
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="hidden shrink-0 text-muted-foreground hover:text-destructive sm:inline-flex"
+                      onClick={() => onDisconnect(consent.id)}
+                    >
+                      <XCircle className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                  <div className="flex shrink-0 gap-2">
+                  <div className="mt-3 flex items-center gap-2 sm:mt-0 sm:pl-[52px]">
                     <Button
                       variant="outline"
                       size="sm"
+                      className="flex-1 sm:flex-none"
                       onClick={() => onResync(consent.provider, consent.id)}
                     >
                       <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
@@ -265,7 +276,7 @@ function ProviderStep({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-muted-foreground hover:text-destructive"
+                      className="shrink-0 text-muted-foreground hover:text-destructive sm:hidden"
                       onClick={() => onDisconnect(consent.id)}
                     >
                       <XCircle className="h-3.5 w-3.5" />
