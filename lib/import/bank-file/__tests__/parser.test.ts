@@ -189,6 +189,20 @@ const NORDEA_BUSINESS_CSV_SWEDISH_CHARS = [
 
 const HEADER_ONLY_NORDEA_BUSINESS = 'Bokföringsdag;Belopp;Avsändare;Mottagare;Namn;Rubrik;Saldo;Valuta\n'
 
+const NORDEA_BUSINESS_CSV_VARIANT_A = [
+  'Bokföringsdag;Värdedag;Betalningstyp;Betalare/Mottagare;Meddelande/Referens;Belopp;Saldo',
+  '2024-01-15;2024-01-15;Kortbetalning;SPOTIFY AB;Spotify Premium;-99,00;12 345,67',
+  '2024-01-14;2024-01-14;Kortbetalning;ICA MAXI;Dagligvaror;-432,50;12 444,67',
+  '2024-01-13;2024-01-13;Inbetalning;ARBETSGIVAREN AB;Lön jan;25 000,00;12 877,17',
+].join('\n')
+
+const NORDEA_BUSINESS_CSV_VARIANT_B = [
+  'Bokföringsdatum;Valutadatum;Text;Belopp;Saldo',
+  '2024-01-15;2024-01-15;SPOTIFY AB;-99,00;12 345,67',
+  '2024-01-14;2024-01-14;ICA MAXI LINDHAGEN;-432,50;12 444,67',
+  '2024-01-13;2024-01-13;LÖNEUTBETALNING;25 000,00;12 877,17',
+].join('\n')
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -210,6 +224,25 @@ describe('detectFileFormat', () => {
     const format = detectFileFormat(NORDEA_BUSINESS_CSV, 'export.csv')
     expect(format).not.toBeNull()
     expect(format!.id).toBe('nordea_business')
+  })
+
+  it('detects Nordea Business CSV variant with Betalare/Mottagare combined column', () => {
+    const format = detectFileFormat(NORDEA_BUSINESS_CSV_VARIANT_A, 'nordea_ftg.csv')
+    expect(format).not.toBeNull()
+    expect(format!.id).toBe('nordea_business')
+  })
+
+  it('detects Nordea Business CSV variant with Bokföringsdatum header', () => {
+    const format = detectFileFormat(NORDEA_BUSINESS_CSV_VARIANT_B, 'nordea_ftg.csv')
+    expect(format).not.toBeNull()
+    expect(format!.id).toBe('nordea_business')
+  })
+
+  it('does not misidentify SEB as Nordea Business when valutadag is present', () => {
+    const sebLike = 'Bokföringsdag;Valutadag;Verifikationsnummer;Text;Belopp;Saldo\n2024-01-15;2024-01-15;123;SPOTIFY;-99,00;12345,67'
+    const format = detectFileFormat(sebLike, 'export.csv')
+    expect(format).not.toBeNull()
+    expect(format!.id).toBe('seb')
   })
 
   it('detects SEB CSV from semicolon-delimited header with bokföringsdag', () => {
@@ -495,6 +528,71 @@ describe('parseBankFile — Nordea Business format', () => {
     expect(result.stats.total_expenses).toBe(-531.5)
     expect(result.stats.parsed_rows).toBe(3)
     expect(result.stats.skipped_rows).toBe(0)
+  })
+})
+
+describe('parseBankFile — Nordea Business variant A (Betalare/Mottagare)', () => {
+  it('parses the alternate Nordea Business format with combined party column', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV_VARIANT_A, 'nordea_ftg.csv')
+
+    expect(result.format).toBe('nordea_business')
+    expect(result.transactions).toHaveLength(3)
+    expect(result.issues).toHaveLength(0)
+  })
+
+  it('builds description from Betalningstyp and Meddelande/Referens', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV_VARIANT_A, 'nordea_ftg.csv')
+
+    expect(result.transactions[0].description).toBe('Kortbetalning — Spotify Premium')
+    expect(result.transactions[2].description).toBe('Inbetalning — Lön jan')
+  })
+
+  it('extracts counterparty from combined Betalare/Mottagare column', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV_VARIANT_A, 'nordea_ftg.csv')
+
+    expect(result.transactions[0].counterparty).toBe('SPOTIFY AB')
+    expect(result.transactions[2].counterparty).toBe('ARBETSGIVAREN AB')
+  })
+
+  it('parses amounts and dates correctly', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV_VARIANT_A, 'nordea_ftg.csv')
+
+    expect(result.transactions[0].amount).toBe(-99)
+    expect(result.transactions[0].date).toBe('2024-01-15')
+    expect(result.transactions[2].amount).toBe(25000)
+  })
+})
+
+describe('parseBankFile — Nordea Business variant B (Bokföringsdatum)', () => {
+  it('parses the simple Nordea Business format with Bokföringsdatum', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV_VARIANT_B, 'nordea_ftg.csv')
+
+    expect(result.format).toBe('nordea_business')
+    expect(result.transactions).toHaveLength(3)
+    expect(result.issues).toHaveLength(0)
+  })
+
+  it('builds description from Text column', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV_VARIANT_B, 'nordea_ftg.csv')
+
+    expect(result.transactions[0].description).toBe('SPOTIFY AB')
+    expect(result.transactions[2].description).toBe('LÖNEUTBETALNING')
+  })
+
+  it('parses amounts correctly', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV_VARIANT_B, 'nordea_ftg.csv')
+
+    expect(result.transactions[0].amount).toBe(-99)
+    expect(result.transactions[1].amount).toBe(-432.5)
+    expect(result.transactions[2].amount).toBe(25000)
+  })
+
+  it('calculates correct stats', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV_VARIANT_B, 'nordea_ftg.csv')
+
+    expect(result.stats.total_income).toBe(25000)
+    expect(result.stats.total_expenses).toBe(-531.5)
+    expect(result.stats.parsed_rows).toBe(3)
   })
 })
 

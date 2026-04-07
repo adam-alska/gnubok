@@ -1,14 +1,19 @@
 /**
  * Nordea Business CSV format parser
  *
- * Format: Semicolon-delimited, comma decimal separator
- * Columns: Bokföringsdag, Belopp, Avsändare, Mottagare, Namn, Rubrik, Saldo, Valuta
+ * Supports multiple Nordea Business / Internetbanken Företag export formats:
+ *
+ * Format A (classic): Semicolon-delimited, comma decimal separator
+ *   Columns: Bokföringsdag, Belopp, Avsändare, Mottagare, Namn, Rubrik, Saldo, Valuta
+ *
+ * Format B (alternate): Semicolon-delimited
+ *   Columns: Bokföringsdag, Värdedag, Betalningstyp, Betalare/Mottagare, Meddelande/Referens, Belopp, Saldo
+ *
+ * Format C (simple): Semicolon-delimited
+ *   Columns: Bokföringsdatum, Valutadatum, Text, Belopp, Saldo
+ *
  * Date format: YYYY-MM-DD
  * Encoding: UTF-8 or Windows-1252
- *
- * This is the format used by Nordea Business / Internetbanken Företag
- * (netbank.nordea.se), including Plusgiro and corporate accounts.
- * It differs from the personal banking format which is comma-delimited.
  */
 
 import type { BankFileFormat, BankFileParseResult, ParsedBankTransaction, BankFileParseIssue } from '../types'
@@ -22,18 +27,46 @@ function parseCommaDecimal(value: string): number {
 export const nordeaBusinessFormat: BankFileFormat = {
   id: 'nordea_business',
   name: 'Nordea Företag',
-  description: 'Nordea Företag CSV (Bokföringsdag;Belopp;Avsändare;Mottagare;Namn;Rubrik;Saldo;Valuta)',
+  description: 'Nordea Företag CSV (semicolon-delimited business banking export)',
   fileExtensions: ['.csv', '.txt'],
 
   detect(content: string, _filename: string): boolean {
     const prepared = prepareContent(content)
     const firstLine = prepared.split('\n')[0]?.toLowerCase() || ''
-    // Nordea Business: semicolon-delimited with "bokföringsdag" and "rubrik"
-    // "rubrik" distinguishes from SEB (which has "valutadag"/"verifikationsnummer")
+
+    if (!firstLine.includes(';')) return false
+
+    // Must have a date column that looks like Nordea Business
+    const hasNordeaDateCol =
+      firstLine.includes('bokföringsdag') ||
+      firstLine.includes('bokforingsdag') ||
+      firstLine.includes('bokföringsdatum') ||
+      firstLine.includes('bokforingsdatum')
+
+    if (!hasNordeaDateCol) return false
+
+    // Exclude SEB (which also has bokföringsdag/bokföringsdatum but adds valutadag/verifikationsnummer)
+    if (firstLine.includes('valutadag') || firstLine.includes('verifikationsnummer')) return false
+
+    // Exclude Länsförsäkringar (has separate "datum" column alongside "bokföringsdag" + "typ")
+    // LF headers are quoted: "Datum";"Bokföringsdag";"Typ";"Text";"Belopp";"Saldo"
+    const headers = firstLine.split(';').map(h => h.replace(/"/g, '').trim())
+    const hasSeparateDatum = headers.some(h => h === 'datum')
+    if (hasSeparateDatum && headers.some(h => h === 'typ')) return false
+
+    // Accept any of these Nordea Business patterns:
     return (
-      firstLine.includes(';') &&
-      (firstLine.includes('bokföringsdag') || firstLine.includes('bokforingsdag')) &&
-      (firstLine.includes('rubrik') || (firstLine.includes('avsändare') && firstLine.includes('mottagare')))
+      // Pattern 1: "rubrik" column (classic format)
+      firstLine.includes('rubrik') ||
+      // Pattern 2: separate "avsändare" + "mottagare" columns
+      (firstLine.includes('avsändare') && firstLine.includes('mottagare')) ||
+      (firstLine.includes('avsandare') && firstLine.includes('mottagare')) ||
+      // Pattern 3: "betalare" (e.g., combined "Betalare/Mottagare" column)
+      firstLine.includes('betalare') ||
+      // Pattern 4: "betalningstyp" column (Nordea business payment type indicator)
+      firstLine.includes('betalningstyp') ||
+      // Pattern 5: simple format with "text" + "belopp" (for Bokföringsdatum;...;Text;Belopp;Saldo)
+      (firstLine.includes('text') && firstLine.includes('belopp'))
     )
   },
 
@@ -49,21 +82,35 @@ export const nordeaBusinessFormat: BankFileFormat = {
     const headerLine = lines[0] || ''
     const headers = headerLine.split(';').map((h) => h.trim().toLowerCase().replace(/"/g, ''))
 
+    // Date column: accept multiple Nordea naming patterns
     const dateIdx = headers.findIndex(
-      (h) => h.includes('bokföringsdag') || h.includes('bokforingsdag')
+      (h) => h.includes('bokföringsdag') || h.includes('bokforingsdag') ||
+             h.includes('bokföringsdatum') || h.includes('bokforingsdatum')
     )
     const amountIdx = headers.findIndex((h) => h === 'belopp' || h.includes('belopp'))
     const senderIdx = headers.findIndex((h) => h.includes('avsändare') || h.includes('avsandare'))
-    const receiverIdx = headers.findIndex((h) => h.includes('mottagare'))
+    // Receiver: standalone "mottagare" (not combined "betalare/mottagare")
+    const receiverIdx = headers.findIndex(
+      (h) => h.includes('mottagare') && !h.includes('betalare') && !h.includes('/')
+    )
+    // Combined "Betalare/Mottagare" column
+    const combinedPartyIdx = headers.findIndex(
+      (h) => (h.includes('betalare') && h.includes('mottagare')) || h === 'betalare/mottagare'
+    )
     const nameIdx = headers.findIndex((h) => h === 'namn')
     const subjectIdx = headers.findIndex((h) => h === 'rubrik')
+    // Description fallbacks: "text", "meddelande", "meddelande/referens", "beskrivning"
+    const textIdx = headers.findIndex(
+      (h) => h === 'text' || h.includes('meddelande') || h.includes('beskrivning')
+    )
+    const paymentTypeIdx = headers.findIndex((h) => h.includes('betalningstyp'))
     const balanceIdx = headers.findIndex((h) => h === 'saldo' || h.includes('saldo'))
     const currencyIdx = headers.findIndex((h) => h === 'valuta' || h.includes('valuta'))
 
     if (dateIdx === -1 || amountIdx === -1) {
       issues.push({
         row: 1,
-        message: 'Could not identify required columns (Bokföringsdag, Belopp)',
+        message: 'Could not identify required columns (Bokföringsdag/Bokföringsdatum, Belopp)',
         severity: 'error',
       })
       return {
@@ -106,15 +153,32 @@ export const nordeaBusinessFormat: BankFileFormat = {
         continue
       }
 
-      // Build description from Namn + Rubrik (name is the counterparty, rubrik is the subject/memo)
+      // Build description from available columns with fallback chain
       const name = nameIdx >= 0 ? fields[nameIdx]?.trim() : ''
       const subject = subjectIdx >= 0 ? fields[subjectIdx]?.trim() : ''
-      const description = [name, subject].filter(Boolean).join(' — ') || 'Unknown'
+      const text = textIdx >= 0 ? fields[textIdx]?.trim() : ''
+      const paymentType = paymentTypeIdx >= 0 ? fields[paymentTypeIdx]?.trim() : ''
 
-      // Counterparty from Avsändare (incoming) or Mottagare (outgoing)
-      const sender = senderIdx >= 0 ? fields[senderIdx]?.trim() : null
-      const receiver = receiverIdx >= 0 ? fields[receiverIdx]?.trim() : null
-      const counterparty = (amount > 0 ? sender : receiver) || null
+      let description: string
+      if (name || subject) {
+        // Classic format: Namn — Rubrik
+        description = [name, subject].filter(Boolean).join(' — ') || 'Unknown'
+      } else if (text) {
+        // Alternate format: use Text/Meddelande column
+        description = [paymentType, text].filter(Boolean).join(' — ') || text
+      } else {
+        description = 'Unknown'
+      }
+
+      // Counterparty from sender/receiver or combined column
+      let counterparty: string | null = null
+      if (combinedPartyIdx >= 0) {
+        counterparty = fields[combinedPartyIdx]?.trim() || null
+      } else {
+        const sender = senderIdx >= 0 ? fields[senderIdx]?.trim() : null
+        const receiver = receiverIdx >= 0 ? fields[receiverIdx]?.trim() : null
+        counterparty = (amount > 0 ? sender : receiver) || null
+      }
 
       const balance = balanceIdx >= 0 && fields[balanceIdx] ? parseCommaDecimal(fields[balanceIdx]) : null
       const currency = currencyIdx >= 0 && fields[currencyIdx] ? fields[currencyIdx].trim() : 'SEK'
