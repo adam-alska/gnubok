@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { ensureInitialized } from '@/lib/init'
-import { createNewVersion } from '@/lib/core/documents/document-service'
+import { createNewVersion, validateDocumentFile } from '@/lib/core/documents/document-service'
 import { requireCompanyId } from '@/lib/company/context'
 
 ensureInitialized()
@@ -35,6 +35,11 @@ export async function POST(
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+    }
+
+    const validationError = validateDocumentFile({ size: file.size, type: file.type })
+    if (validationError) {
+      return NextResponse.json({ error: validationError }, { status: 400 })
     }
 
     const buffer = await file.arrayBuffer()

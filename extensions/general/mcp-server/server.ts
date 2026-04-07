@@ -39,7 +39,8 @@ import {
   generateInvoiceEmailText,
   generateInvoiceEmailSubject,
 } from '@/lib/email/invoice-templates'
-import { uploadDocument } from '@/lib/core/documents/document-service'
+import { uploadDocument, MAX_DOCUMENT_SIZE } from '@/lib/core/documents/document-service'
+// classifyDocument is dynamically imported from invoice-inbox (may not be enabled)
 // ensureInitialized() is called by the extension router (ext/[...path]/route.ts)
 // which dispatches to this handler — no duplicate call needed here.
 import type { Transaction, TransactionCategory, EntityType, VatTreatment, Invoice, Currency, CompanySettings, Customer, InvoiceItem } from '@/types'
@@ -77,6 +78,7 @@ interface McpTool {
   _meta?: { ui: { resourceUri: string } }
   execute: (
     args: Record<string, unknown>,
+    companyId: string,
     userId: string,
     supabase: SupabaseClient
   ) => Promise<unknown>
@@ -102,6 +104,7 @@ const VALID_VAT_TREATMENTS = [
 async function stagePendingOperation(
   supabase: SupabaseClient,
   companyId: string,
+  userId: string,
   operationType: string,
   title: string,
   params: Record<string, unknown>,
@@ -111,6 +114,7 @@ async function stagePendingOperation(
     .from('pending_operations')
     .insert({
       company_id: companyId,
+      user_id: userId,
       operation_type: operationType,
       title,
       params,
@@ -174,7 +178,7 @@ async function categorizeTransactionCore(
     .from('transactions')
     .select('*')
     .eq('id', txId)
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (fetchError || !transaction) {
@@ -200,7 +204,7 @@ async function categorizeTransactionCore(
   const { data: settings } = await supabase
     .from('company_settings')
     .select('entity_type, fiscal_year_start_month')
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   const entityType: EntityType = (settings?.entity_type as EntityType) || 'enskild_firma'
@@ -376,7 +380,7 @@ const tools: McpTool[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       const limit = Math.min(Math.max(1, Number(args.limit) || 20), 100)
       const offset = Math.max(0, Number(args.offset) || 0)
 
@@ -384,7 +388,7 @@ const tools: McpTool[] = [
       const { count: totalCount, error: countError } = await supabase
         .from('transactions')
         .select('id', { count: 'exact', head: true })
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .is('journal_entry_id', null)
 
       if (countError) throw new Error(`Database error: ${countError.message}`)
@@ -394,7 +398,7 @@ const tools: McpTool[] = [
         .select(
           'id, date, description, amount, currency, merchant_name, reference, is_business, category'
         )
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .is('journal_entry_id', null)
         .order('date', { ascending: false })
         .range(offset, offset + limit - 1)
@@ -461,14 +465,14 @@ const tools: McpTool[] = [
       idempotentHint: false,
       openWorldHint: false,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       // Compute the preview (accounts, amounts, VAT lines)
       const result = await categorizeTransactionCore(
         args.transaction_id as string,
         args.category as TransactionCategory,
         args.vat_treatment as VatTreatment | undefined,
         userId,
-        userId,
+        companyId,
         supabase,
         false // preview mode — execution happens via web UI commit
       )
@@ -484,7 +488,7 @@ const tools: McpTool[] = [
         .from('transactions')
         .select('description, merchant_name, amount, currency')
         .eq('id', args.transaction_id as string)
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .single()
 
       const txDesc = tx
@@ -492,7 +496,7 @@ const tools: McpTool[] = [
         : String(args.transaction_id)
 
       // Stage for user approval
-      return stagePendingOperation(supabase, userId, 'categorize_transaction',
+      return stagePendingOperation(supabase, companyId, userId, 'categorize_transaction',
         `Kategorisera: ${txDesc}`,
         {
           transaction_id: args.transaction_id,
@@ -541,7 +545,7 @@ const tools: McpTool[] = [
       openWorldHint: false,
     },
     _meta: { ui: { resourceUri: 'ui://receipt-matcher/app.html' } },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       const limit = Math.min(Math.max(1, Number(args.limit) || 20), 50)
 
       const { data, error } = await supabase
@@ -549,7 +553,7 @@ const tools: McpTool[] = [
         .select(
           'id, date, description, amount, currency, merchant_name, reference, is_business, category'
         )
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .is('journal_entry_id', null)
         .order('date', { ascending: false })
         .limit(limit)
@@ -581,11 +585,11 @@ const tools: McpTool[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
-    async execute(_args, userId, supabase) {
+    async execute(_args, companyId, userId, supabase) {
       const { data, error } = await supabase
         .from('customers')
         .select('id, name, customer_type, email, org_number, vat_number, default_payment_terms, city, country')
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .order('name')
 
       if (error) throw new Error(`Database error: ${error.message}`)
@@ -641,7 +645,7 @@ const tools: McpTool[] = [
       idempotentHint: false,
       openWorldHint: false,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       const name = args.name as string
       const customerType = args.customer_type as string
 
@@ -663,7 +667,7 @@ const tools: McpTool[] = [
         country: (args.country as string) || 'Sweden',
       }
 
-      return stagePendingOperation(supabase, userId, 'create_customer',
+      return stagePendingOperation(supabase, companyId, userId, 'create_customer',
         `Ny kund: ${params.name}`,
         params,
         params // params ARE the preview for customers
@@ -703,14 +707,14 @@ const tools: McpTool[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       const limit = Math.min(Math.max(1, Number(args.limit) || 50), 100)
       const status = args.status as string | undefined
 
       let query = supabase
         .from('invoices')
         .select('id, invoice_number, status, customer_id, total, currency, invoice_date, due_date, document_type, customers(name)', { count: 'exact' })
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
 
       if (status) {
         query = query.eq('status', status)
@@ -800,7 +804,7 @@ const tools: McpTool[] = [
       idempotentHint: false,
       openWorldHint: false,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       const customerId = args.customer_id as string
       const items = args.items as Array<{
         description: string
@@ -829,7 +833,7 @@ const tools: McpTool[] = [
         .from('customers')
         .select('*')
         .eq('id', customerId)
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .single()
 
       if (custError || !customer) {
@@ -866,7 +870,7 @@ const tools: McpTool[] = [
       }
 
       // Stage for user approval instead of creating directly
-      return stagePendingOperation(supabase, userId, 'create_invoice',
+      return stagePendingOperation(supabase, companyId, userId, 'create_invoice',
         `Ny faktura: ${customer.name} ${Math.round(total * 100) / 100} ${currency}`,
         {
           customer_id: customerId,
@@ -924,7 +928,7 @@ const tools: McpTool[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       let periodId = args.period_id as string | undefined
 
       // If no period specified, find the most recent one
@@ -932,7 +936,7 @@ const tools: McpTool[] = [
         const { data: periods } = await supabase
           .from('fiscal_periods')
           .select('id, name')
-          .eq('company_id', userId)
+          .eq('company_id', companyId)
           .order('period_start', { ascending: false })
           .limit(1)
           .single()
@@ -948,7 +952,7 @@ const tools: McpTool[] = [
         .from('fiscal_periods')
         .select('id, name, period_start, period_end')
         .eq('id', periodId)
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .single()
 
       if (!period) throw new Error('Fiscal period not found.')
@@ -957,7 +961,7 @@ const tools: McpTool[] = [
       const { data: lines, error } = await supabase
         .from('journal_entry_lines')
         .select('account_number, debit_amount, credit_amount, journal_entries!inner(status, user_id, fiscal_period_id)')
-        .eq('journal_entries.company_id', userId)
+        .eq('journal_entries.company_id', companyId)
         .eq('journal_entries.fiscal_period_id', periodId)
         .in('journal_entries.status', ['posted', 'reversed'])
 
@@ -967,7 +971,7 @@ const tools: McpTool[] = [
       const { data: accounts } = await supabase
         .from('chart_of_accounts')
         .select('account_number, account_name')
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
 
       const accountMap = new Map((accounts ?? []).map((a: { account_number: string; account_name: string }) => [a.account_number, a.account_name]))
 
@@ -1043,7 +1047,7 @@ const tools: McpTool[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       const periodType = args.period_type as string
       const year = Number(args.year)
       const period = Number(args.period)
@@ -1078,7 +1082,7 @@ const tools: McpTool[] = [
       const { data: lines, error } = await supabase
         .from('journal_entry_lines')
         .select('account_number, debit_amount, credit_amount, journal_entries!inner(entry_date, status, user_id)')
-        .eq('journal_entries.company_id', userId)
+        .eq('journal_entries.company_id', companyId)
         .in('journal_entries.status', ['posted', 'reversed'])
         .gte('journal_entries.entry_date', startDate)
         .lte('journal_entries.entry_date', endDate)
@@ -1175,14 +1179,14 @@ const tools: McpTool[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       let periodId = args.period_id as string | undefined
 
       if (!periodId) {
         const { data: periods } = await supabase
           .from('fiscal_periods')
           .select('id')
-          .eq('company_id', userId)
+          .eq('company_id', companyId)
           .order('period_start', { ascending: false })
           .limit(1)
           .single()
@@ -1198,7 +1202,7 @@ const tools: McpTool[] = [
         .from('fiscal_periods')
         .select('id, name, period_start, period_end')
         .eq('id', periodId)
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .single()
 
       if (!period) throw new Error('Fiscal period not found.')
@@ -1206,14 +1210,14 @@ const tools: McpTool[] = [
       // Run queries in parallel (same as the KPI API route)
       const [incomeStatement, trialBalance, arLedger, monthlyBreakdown, paidInvoices] =
         await Promise.all([
-          generateIncomeStatement(supabase, userId, periodId!),
-          generateTrialBalance(supabase, userId, periodId!),
-          generateARLedger(supabase, userId),
-          generateMonthlyBreakdown(supabase, userId, periodId!),
+          generateIncomeStatement(supabase, companyId, periodId!),
+          generateTrialBalance(supabase, companyId, periodId!),
+          generateARLedger(supabase, companyId),
+          generateMonthlyBreakdown(supabase, companyId, periodId!),
           supabase
             .from('invoices')
             .select('invoice_date, paid_at')
-            .eq('company_id', userId)
+            .eq('company_id', companyId)
             .eq('status', 'paid')
             .not('paid_at', 'is', null),
         ])
@@ -1285,14 +1289,14 @@ const tools: McpTool[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       let periodId = args.period_id as string | undefined
 
       if (!periodId) {
         const { data: periods } = await supabase
           .from('fiscal_periods')
           .select('id')
-          .eq('company_id', userId)
+          .eq('company_id', companyId)
           .order('period_start', { ascending: false })
           .limit(1)
           .single()
@@ -1307,12 +1311,12 @@ const tools: McpTool[] = [
         .from('fiscal_periods')
         .select('id, name, period_start, period_end')
         .eq('id', periodId)
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .single()
 
       if (!period) throw new Error('Fiscal period not found.')
 
-      const result = await generateIncomeStatement(supabase, userId, periodId!)
+      const result = await generateIncomeStatement(supabase, companyId, periodId!)
       result.period = { start: period.period_start, end: period.period_end }
 
       return {
@@ -1353,7 +1357,7 @@ const tools: McpTool[] = [
       idempotentHint: false,
       openWorldHint: false,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       const invoiceId = args.invoice_id as string
       if (!invoiceId) throw new Error('invoice_id is required')
 
@@ -1361,7 +1365,7 @@ const tools: McpTool[] = [
         .from('invoices')
         .select('*, customer:customers(*)')
         .eq('id', invoiceId)
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .single()
 
       if (invoiceError || !invoice) throw new Error('Invoice not found')
@@ -1371,7 +1375,7 @@ const tools: McpTool[] = [
 
       const paymentDate = (args.payment_date as string) || new Date().toISOString().split('T')[0]
 
-      return stagePendingOperation(supabase, userId, 'mark_invoice_paid',
+      return stagePendingOperation(supabase, companyId, userId, 'mark_invoice_paid',
         `Betald: ${invoice.invoice_number} ${invoice.customer?.name || ''} ${invoice.total} ${invoice.currency}`,
         { invoice_id: invoiceId, payment_date: paymentDate },
         {
@@ -1415,7 +1419,7 @@ const tools: McpTool[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       const invoiceId = args.invoice_id as string
       if (!invoiceId) throw new Error('invoice_id is required')
 
@@ -1428,7 +1432,7 @@ const tools: McpTool[] = [
         .from('invoices')
         .select('*, customer:customers(*)')
         .eq('id', invoiceId)
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .single()
 
       if (invoiceError || !invoice) throw new Error('Invoice not found')
@@ -1436,7 +1440,7 @@ const tools: McpTool[] = [
       const customer = invoice.customer as Customer
       if (!customer.email) throw new Error('Customer has no email address. Update customer details first.')
 
-      return stagePendingOperation(supabase, userId, 'send_invoice',
+      return stagePendingOperation(supabase, companyId, userId, 'send_invoice',
         `Skicka: ${invoice.invoice_number} till ${customer.email}`,
         { invoice_id: invoiceId },
         {
@@ -1476,7 +1480,7 @@ const tools: McpTool[] = [
       idempotentHint: false,
       openWorldHint: false,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       const invoiceId = args.invoice_id as string
       if (!invoiceId) throw new Error('invoice_id is required')
 
@@ -1484,13 +1488,13 @@ const tools: McpTool[] = [
         .from('invoices')
         .select('*, customer:customers(*)')
         .eq('id', invoiceId)
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .single()
 
       if (invoiceError || !invoice) throw new Error('Invoice not found')
       if (invoice.status !== 'draft') throw new Error('Only draft invoices can be marked as sent')
 
-      return stagePendingOperation(supabase, userId, 'mark_invoice_sent',
+      return stagePendingOperation(supabase, companyId, userId, 'mark_invoice_sent',
         `Markera skickad: ${invoice.invoice_number} ${invoice.customer?.name || ''}`,
         { invoice_id: invoiceId },
         {
@@ -1520,11 +1524,11 @@ const tools: McpTool[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
-    async execute(_args, userId, supabase) {
+    async execute(_args, companyId, userId, supabase) {
       const { data, error } = await supabase
         .from('suppliers')
         .select('id, name, supplier_type, email, phone, org_number, vat_number, default_expense_account, default_payment_terms, default_currency, city, country')
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .order('name', { ascending: true })
 
       if (error) throw new Error(`Database error: ${error.message}`)
@@ -1562,14 +1566,14 @@ const tools: McpTool[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       const limit = Math.min(Math.max(1, Number(args.limit) || 50), 100)
       const status = (args.status as string) || 'all'
 
       let query = supabase
         .from('supplier_invoices')
         .select('id, supplier_invoice_number, invoice_date, due_date, status, total, total_sek, currency, vat_treatment, remaining_amount, supplier:suppliers(id, name)')
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
 
       if (status !== 'all') {
         if (status === 'to_pay') {
@@ -1612,13 +1616,13 @@ const tools: McpTool[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       const limit = Math.min(Math.max(1, Number(args.limit) || 100), 200)
 
       const { data, error } = await supabase
         .from('categorization_templates')
         .select('id, counterparty_name, counterparty_aliases, debit_account, credit_account, vat_treatment, vat_account, category, line_pattern, occurrence_count, confidence, last_seen_date, source')
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .eq('is_active', true)
         .order('occurrence_count', { ascending: false })
         .limit(limit)
@@ -1664,7 +1668,7 @@ const tools: McpTool[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       const ids = args.transaction_ids as string[]
       if (!ids || ids.length === 0) throw new Error('transaction_ids is required (non-empty array)')
       const limitedIds = ids.slice(0, 20)
@@ -1673,7 +1677,7 @@ const tools: McpTool[] = [
       const { data: transactions, error: txError } = await supabase
         .from('transactions')
         .select('*')
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .in('id', limitedIds)
 
       if (txError) throw new Error(`Database error: ${txError.message}`)
@@ -1683,7 +1687,7 @@ const tools: McpTool[] = [
       const { data: mappingRules } = await supabase
         .from('mapping_rules')
         .select('*')
-        .or(`company_id.eq.${userId},company_id.is.null`)
+        .or(`company_id.eq.${companyId},company_id.is.null`)
         .eq('is_active', true)
         .order('priority', { ascending: false })
 
@@ -1691,7 +1695,7 @@ const tools: McpTool[] = [
       const { data: historicalTxns } = await supabase
         .from('transactions')
         .select('category')
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .not('is_business', 'is', null)
         .neq('category', 'uncategorized')
         .neq('category', 'private')
@@ -1704,7 +1708,7 @@ const tools: McpTool[] = [
 
       // Batch counterparty template matching
       const counterpartyMatches = await findCounterpartyTemplatesBatch(
-        supabase, userId, transactions as Transaction[]
+        supabase, companyId, transactions as Transaction[]
       )
 
       // Generate suggestions per transaction
@@ -1760,14 +1764,14 @@ const tools: McpTool[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       const activeOnly = args.active_only !== false
       const accountClass = args.account_class as number | undefined
 
       let query = supabase
         .from('chart_of_accounts')
         .select('account_number, account_name, account_class, account_group, account_type, normal_balance, is_active, description')
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .order('sort_order')
 
       if (activeOnly) query = query.eq('is_active', true)
@@ -1804,14 +1808,14 @@ const tools: McpTool[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       let periodId = args.period_id as string | undefined
 
       if (!periodId) {
         const { data: periods } = await supabase
           .from('fiscal_periods')
           .select('id')
-          .eq('company_id', userId)
+          .eq('company_id', companyId)
           .order('period_start', { ascending: false })
           .limit(1)
           .single()
@@ -1824,12 +1828,12 @@ const tools: McpTool[] = [
         .from('fiscal_periods')
         .select('id, name, period_start, period_end')
         .eq('id', periodId)
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .single()
 
       if (!period) throw new Error('Fiscal period not found.')
 
-      const result = await generateBalanceSheet(supabase, userId, periodId!)
+      const result = await generateBalanceSheet(supabase, companyId, periodId!)
 
       return {
         period_name: period.name,
@@ -1865,14 +1869,14 @@ const tools: McpTool[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       let periodId = args.period_id as string | undefined
 
       if (!periodId) {
         const { data: periods } = await supabase
           .from('fiscal_periods')
           .select('id')
-          .eq('company_id', userId)
+          .eq('company_id', companyId)
           .order('period_start', { ascending: false })
           .limit(1)
           .single()
@@ -1884,7 +1888,7 @@ const tools: McpTool[] = [
       const accountFrom = args.account_from as string | undefined
       const accountTo = args.account_to as string | undefined
 
-      return await generateGeneralLedger(supabase, userId, periodId!, accountFrom, accountTo)
+      return await generateGeneralLedger(supabase, companyId, periodId!, accountFrom, accountTo)
     },
   },
 
@@ -1911,9 +1915,9 @@ const tools: McpTool[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       const asOfDate = args.as_of_date as string | undefined
-      return await generateARLedger(supabase, userId, asOfDate)
+      return await generateARLedger(supabase, companyId, asOfDate)
     },
   },
 
@@ -1940,9 +1944,9 @@ const tools: McpTool[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       const asOfDate = args.as_of_date as string | undefined
-      return await generateSupplierLedger(supabase, userId, asOfDate)
+      return await generateSupplierLedger(supabase, companyId, asOfDate)
     },
   },
 
@@ -1978,7 +1982,7 @@ const tools: McpTool[] = [
       idempotentHint: false,
       openWorldHint: false,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       const transactionId = args.transaction_id as string
       const invoiceId = args.invoice_id as string
       if (!transactionId || !invoiceId) throw new Error('transaction_id and invoice_id are required')
@@ -1988,7 +1992,7 @@ const tools: McpTool[] = [
         .from('transactions')
         .select('id, description, merchant_name, amount, currency, invoice_id')
         .eq('id', transactionId)
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .single()
 
       if (txError || !transaction) throw new Error('Transaction not found')
@@ -1999,7 +2003,7 @@ const tools: McpTool[] = [
         .from('invoices')
         .select('*, customer:customers(*)')
         .eq('id', invoiceId)
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .single()
 
       if (invError || !invoice) throw new Error('Invoice not found')
@@ -2009,7 +2013,7 @@ const tools: McpTool[] = [
 
       const txDesc = transaction.merchant_name || transaction.description || transactionId
 
-      return stagePendingOperation(supabase, userId, 'match_transaction_invoice',
+      return stagePendingOperation(supabase, companyId, userId, 'match_transaction_invoice',
         `Matcha: ${txDesc} → ${invoice.invoice_number}`,
         { transaction_id: transactionId, invoice_id: invoiceId },
         {
@@ -2042,11 +2046,11 @@ const tools: McpTool[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
-    async execute(_args, userId, supabase) {
+    async execute(_args, companyId, userId, supabase) {
       const { data, error } = await supabase
         .from('fiscal_periods')
         .select('id, name, period_start, period_end, status')
-        .eq('company_id', userId)
+        .eq('company_id', companyId)
         .order('period_start', { ascending: false })
 
       if (error) throw new Error(`Database error: ${error.message}`)
@@ -2081,10 +2085,277 @@ const tools: McpTool[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
-    async execute(args, userId, supabase) {
+    async execute(args, companyId, userId, supabase) {
       const dateFrom = args.date_from as string | undefined
       const dateTo = args.date_to as string | undefined
-      return await getReconciliationStatus(supabase, userId, dateFrom, dateTo)
+      return await getReconciliationStatus(supabase, companyId, dateFrom, dateTo)
+    },
+  },
+
+  // ── Document Inbox Tools ────────────────────────────────────
+
+  {
+    name: 'gnubok_upload_document',
+    description:
+      'Upload a document (invoice, receipt) to the inbox for AI classification.\n\n' +
+      'Args:\n' +
+      '  - file_name (string, required): File name with extension (e.g. "faktura.pdf")\n' +
+      '  - file_content_base64 (string, required): Base64-encoded file content\n' +
+      '  - mime_type (string, optional): MIME type. Inferred from extension if omitted.\n\n' +
+      'Returns JSON:\n' +
+      '  { document_id, inbox_item_id, status, document_type, extracted_data, confidence }\n\n' +
+      'Supported types: PDF, JPEG, PNG, HEIC, WebP. Max 20 MB.\n' +
+      'Classification runs synchronously (~2-5 seconds).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file_name: { type: 'string', description: 'File name with extension (e.g. "faktura.pdf")' },
+        file_content_base64: { type: 'string', description: 'Base64-encoded file content' },
+        mime_type: { type: 'string', description: 'MIME type (optional, inferred from extension)' },
+      },
+      required: ['file_name', 'file_content_base64'],
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    async execute(args, companyId, userId, supabase) {
+      const fileName = args.file_name as string
+      const base64Content = args.file_content_base64 as string
+      let mimeType = args.mime_type as string | undefined
+
+      if (!mimeType) {
+        const ext = fileName.split('.').pop()?.toLowerCase()
+        const mimeMap: Record<string, string> = {
+          pdf: 'application/pdf',
+          jpg: 'image/jpeg',
+          jpeg: 'image/jpeg',
+          png: 'image/png',
+          heic: 'image/heic',
+          webp: 'image/webp',
+        }
+        mimeType = ext ? mimeMap[ext] : undefined
+        if (!mimeType) throw new Error(`Cannot infer MIME type from extension: .${ext}`)
+      }
+
+      const allowedMimeTypes = new Set([
+        'application/pdf', 'image/jpeg', 'image/png', 'image/heic', 'image/webp',
+      ])
+      if (!allowedMimeTypes.has(mimeType)) {
+        throw new Error(`Unsupported file type: ${mimeType}. Allowed: PDF, JPEG, PNG, HEIC, WebP`)
+      }
+
+      const buffer = Buffer.from(base64Content, 'base64')
+      if (buffer.byteLength > MAX_DOCUMENT_SIZE) {
+        throw new Error(`File too large (max ${MAX_DOCUMENT_SIZE / 1024 / 1024} MB)`)
+      }
+
+      // Store in WORM archive
+      const doc = await uploadDocument(supabase, userId, companyId, {
+        name: fileName,
+        buffer: buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
+        type: mimeType,
+      }, { upload_source: 'api' })
+
+      // Classify (invoice-inbox extension may not be enabled)
+      let classificationResult
+      let classificationError: string | null = null
+      try {
+        const { classifyDocument } = await import('@/extensions/general/invoice-inbox/lib/classify-document')
+        classificationResult = await classifyDocument({
+          fileBuffer: buffer,
+          mimeType,
+          fileName,
+        })
+      } catch (err) {
+        classificationError = err instanceof Error ? err.message : 'Classification failed'
+      }
+
+      // Supplier matching
+      let matchedSupplierId: string | null = null
+      if (classificationResult?.documentType === 'supplier_invoice' && classificationResult.extractedData) {
+        const extractedData = classificationResult.extractedData as { supplier?: { orgNumber?: string | null } }
+        const orgNumber = extractedData.supplier?.orgNumber
+        if (orgNumber) {
+          const { data: s } = await supabase
+            .from('suppliers')
+            .select('id')
+            .eq('company_id', companyId)
+            .eq('org_number', orgNumber.replace(/\D/g, ''))
+            .limit(1)
+            .maybeSingle()
+          if (s) matchedSupplierId = s.id
+        }
+      }
+
+      // Create inbox item
+      const { data: inbox, error: inboxError } = await supabase
+        .from('invoice_inbox_items')
+        .insert({
+          company_id: companyId,
+          user_id: userId,
+          status: classificationError ? 'error' : 'ready',
+          source: 'upload',
+          document_id: doc.id,
+          document_type: classificationResult?.documentType || 'unknown',
+          extracted_data: classificationResult?.extractedData || null,
+          raw_llm_response: classificationResult?.rawResponse || null,
+          confidence: classificationResult?.confidence ? classificationResult.confidence / 100 : null,
+          matched_supplier_id: matchedSupplierId,
+          error_message: classificationError,
+        })
+        .select('id, status, document_type, confidence')
+        .single()
+
+      if (inboxError) throw new Error(`Failed to create inbox item: ${inboxError.message}`)
+
+      return {
+        document_id: doc.id,
+        inbox_item_id: inbox.id,
+        status: inbox.status,
+        document_type: inbox.document_type,
+        extracted_data: classificationResult?.extractedData || null,
+        confidence: inbox.confidence,
+        error_message: classificationError,
+      }
+    },
+  },
+
+  {
+    name: 'gnubok_list_inbox_items',
+    description:
+      'List document inbox items (classified invoices, receipts, etc.).\n\n' +
+      'Args:\n' +
+      '  - status (string, optional): Filter by status (pending, processing, ready, confirmed, rejected, error)\n' +
+      '  - document_type (string, optional): Filter by type (supplier_invoice, receipt, government_letter, unknown)\n' +
+      '  - limit (number, optional): Max results, 1–50 (default 20)\n\n' +
+      'Returns JSON:\n' +
+      '  { items: [{ id, status, document_type, confidence, source, created_at,\n' +
+      '              vendor_name, amount, invoice_date, matched_supplier_id }],\n' +
+      '    count: number }',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: {
+          type: 'string',
+          enum: ['pending', 'processing', 'ready', 'confirmed', 'rejected', 'error'],
+          description: 'Filter by status',
+        },
+        document_type: {
+          type: 'string',
+          enum: ['supplier_invoice', 'receipt', 'government_letter', 'unknown'],
+          description: 'Filter by document type',
+        },
+        limit: {
+          type: 'number',
+          description: 'Max results (default 20, max 50)',
+        },
+      },
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    async execute(args, companyId, userId, supabase) {
+      const limit = Math.min(Math.max(1, Number(args.limit) || 20), 50)
+      const status = args.status as string | undefined
+      const documentType = args.document_type as string | undefined
+
+      let query = supabase
+        .from('invoice_inbox_items')
+        .select('id, status, document_type, confidence, source, created_at, extracted_data, matched_supplier_id, email_from, email_subject, error_message')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+
+      if (status) query = query.eq('status', status)
+      if (documentType) query = query.eq('document_type', documentType)
+
+      const { data, error } = await query
+      if (error) throw new Error(`Database error: ${error.message}`)
+
+      // Extract key fields from extracted_data for summary
+      const items = (data || []).map((item) => {
+        const extracted = item.extracted_data as Record<string, unknown> | null
+        let vendorName: string | null = null
+        let amount: number | null = null
+        let invoiceDate: string | null = null
+
+        if (extracted && item.document_type === 'supplier_invoice') {
+          const supplier = extracted.supplier as Record<string, unknown> | undefined
+          const invoice = extracted.invoice as Record<string, unknown> | undefined
+          const totals = extracted.totals as Record<string, unknown> | undefined
+          vendorName = (supplier?.name as string) || null
+          amount = (totals?.total as number) || null
+          invoiceDate = (invoice?.invoiceDate as string) || null
+        } else if (extracted && item.document_type === 'receipt') {
+          const merchant = extracted.merchant as Record<string, unknown> | undefined
+          const totals = extracted.totals as Record<string, unknown> | undefined
+          vendorName = (merchant?.name as string) || null
+          amount = (totals?.total as number) || null
+        }
+
+        return {
+          id: item.id,
+          status: item.status,
+          document_type: item.document_type,
+          confidence: item.confidence,
+          source: item.source,
+          created_at: item.created_at,
+          vendor_name: vendorName,
+          amount,
+          invoice_date: invoiceDate,
+          matched_supplier_id: item.matched_supplier_id,
+          email_from: item.email_from,
+          email_subject: item.email_subject,
+          error_message: item.error_message,
+        }
+      })
+
+      return { items, count: items.length }
+    },
+  },
+
+  {
+    name: 'gnubok_get_inbox_item',
+    description:
+      'Get a single document inbox item with full extracted data.\n\n' +
+      'Args:\n' +
+      '  - inbox_item_id (string, required): UUID of the inbox item\n\n' +
+      'Returns JSON:\n' +
+      '  Full inbox item with id, status, document_type, confidence, source,\n' +
+      '  extracted_data (complete), matched_supplier_id, email metadata, timestamps.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        inbox_item_id: { type: 'string', description: 'UUID of the inbox item' },
+      },
+      required: ['inbox_item_id'],
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    async execute(args, companyId, userId, supabase) {
+      const id = args.inbox_item_id as string
+
+      const { data, error } = await supabase
+        .from('invoice_inbox_items')
+        .select('*, document_attachments(id, file_name, mime_type, file_size_bytes, created_at)')
+        .eq('id', id)
+        .eq('company_id', companyId)
+        .single()
+
+      if (error) throw new Error(`Database error: ${error.message}`)
+      if (!data) throw new Error('Inbox item not found')
+
+      return data
     },
   },
 ]
@@ -2248,7 +2519,7 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
       }
 
       try {
-        const result = await tool.execute(toolArgs, companyId, supabase)
+        const result = await tool.execute(toolArgs, companyId, userId, supabase)
         const response: Record<string, unknown> = {
           content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         }

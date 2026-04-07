@@ -12,6 +12,8 @@ export interface UploadedFile {
   error?: string
   fileName: string
   fileSize: number
+  /** Unique key to track this upload (handles duplicate filenames) */
+  uploadKey: string
 }
 
 interface DocumentUploadZoneProps {
@@ -23,6 +25,7 @@ interface DocumentUploadZoneProps {
   compact?: boolean
 }
 
+let uploadCounter = 0
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
 const ACCEPTED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
 const ACCEPTED_EXTENSIONS = '.pdf,.jpg,.jpeg,.png,.webp'
@@ -87,6 +90,7 @@ export default function DocumentUploadZone({
           error: 'Filtypen stöds inte',
           fileName: file.name,
           fileSize: file.size,
+          uploadKey: `upload-${++uploadCounter}`,
         })
         continue
       }
@@ -97,6 +101,7 @@ export default function DocumentUploadZone({
           error: 'Filen är för stor (max 10 MB)',
           fileName: file.name,
           fileSize: file.size,
+          uploadKey: `upload-${++uploadCounter}`,
         })
         continue
       }
@@ -105,6 +110,7 @@ export default function DocumentUploadZone({
         status: 'uploading',
         fileName: file.name,
         fileSize: file.size,
+        uploadKey: `upload-${++uploadCounter}`,
       })
     }
 
@@ -115,7 +121,7 @@ export default function DocumentUploadZone({
     for (const f of validFiles.filter((f) => f.status === 'uploading')) {
       const result = await uploadFile(f)
       currentFiles = currentFiles.map((cf) =>
-        cf.fileName === result.fileName && cf.status === 'uploading' ? result : cf
+        cf.uploadKey === f.uploadKey ? result : cf
       )
       onFilesChange([...currentFiles])
     }
@@ -200,7 +206,7 @@ export default function DocumentUploadZone({
         <div className="space-y-1">
           {files.map((file, index) => (
             <div
-              key={`${file.fileName}-${index}`}
+              key={file.uploadKey}
               className="flex items-center gap-2 text-sm py-1.5 px-2 rounded bg-muted/50"
             >
               {isImageType(file.file.type) ? (
