@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -14,8 +15,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
+import { DestructiveConfirmDialog, useDestructiveConfirm } from '@/components/ui/destructive-confirm-dialog'
 import { useToast } from '@/components/ui/use-toast'
-import { Loader2, Plus, Copy, Check, Trash2, Key } from 'lucide-react'
+import { Loader2, Plus, Copy, Check, Trash2, Key, ChevronDown } from 'lucide-react'
 
 const SCOPE_GROUPS = [
   {
@@ -104,19 +106,51 @@ interface ApiKey {
   created_at: string
 }
 
+function CopyBlock({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+
+  function handleCopy() {
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="relative group">
+      <pre className="rounded-md bg-muted p-4 pr-12 text-xs font-mono overflow-x-auto whitespace-pre-wrap break-all">
+        {text}
+      </pre>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="absolute right-1.5 top-1.5 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        onClick={handleCopy}
+        aria-label="Kopiera"
+      >
+        {copied ? (
+          <Check className="h-3.5 w-3.5 text-green-600" />
+        ) : (
+          <Copy className="h-3.5 w-3.5" />
+        )}
+      </Button>
+    </div>
+  )
+}
+
 export function ApiKeysPanel() {
   const { toast } = useToast()
+  const { dialogProps: revokeDialogProps, confirm: confirmRevoke } = useDestructiveConfirm()
 
   const [keys, setKeys] = useState<ApiKey[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isCreating, setIsCreating] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showKeyDialog, setShowKeyDialog] = useState(false)
+  const [showApiKeyMethods, setShowApiKeyMethods] = useState(false)
   const [newKeyName, setNewKeyName] = useState('')
   const [newKeyScopes, setNewKeyScopes] = useState<Set<Scope>>(new Set(ALL_SCOPES))
   const [newKeyValue, setNewKeyValue] = useState('')
   const [copied, setCopied] = useState(false)
-  const [revokingId, setRevokingId] = useState<string | null>(null)
 
   const fetchKeys = useCallback(async () => {
     try {
@@ -164,16 +198,20 @@ export function ApiKeysPanel() {
     }
   }
 
-  async function handleRevoke(id: string) {
-    setRevokingId(id)
+  async function handleRevoke(id: string, name: string) {
+    const ok = await confirmRevoke({
+      title: 'Återkalla API-nyckel',
+      description: `"${name}" återkallas permanent. Alla klienter som använder nyckeln slutar fungera omedelbart.`,
+      confirmLabel: 'Återkalla',
+    })
+    if (!ok) return
+
     try {
       await fetch(`/api/settings/api-keys/${id}`, { method: 'DELETE' })
       setKeys((prev) => prev.filter((k) => k.id !== id))
       toast({ title: 'Nyckel återkallad' })
     } catch {
       toast({ title: 'Fel', description: 'Kunde inte återkalla nyckel', variant: 'destructive' })
-    } finally {
-      setRevokingId(null)
     }
   }
 
@@ -232,59 +270,50 @@ export function ApiKeysPanel() {
             </div>
           ) : (
             <div className="space-y-3">
-              {keys.map((key) => (
-                <div
-                  key={key.id}
-                  className="flex items-center justify-between rounded-md border px-4 py-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium truncate">{key.name}</p>
-                      <div className="flex items-center gap-1 flex-wrap">
-                        {(key.scopes ?? []).map((s) => (
-                          <span
-                            key={s}
-                            className="inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                          >
-                            {SCOPE_LABELS[s as Scope] ?? s}
-                          </span>
-                        ))}
-                        {(!key.scopes || key.scopes.length === 0) && (
-                          <span className="inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                            Enbart läs
-                          </span>
-                        )}
+              {keys.map((key) => {
+                const scopeCount = key.scopes?.length ?? 0
+                return (
+                  <div
+                    key={key.id}
+                    className="flex items-center justify-between rounded-md border px-4 py-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium truncate">{key.name}</p>
+                        <span className="text-xs text-muted-foreground">
+                          {scopeCount === ALL_SCOPES.length
+                            ? 'Alla behörigheter'
+                            : scopeCount === 0
+                              ? 'Enbart läs'
+                              : `${scopeCount} behörigheter`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1">
+                        <code className="text-xs text-muted-foreground font-mono">
+                          {key.key_prefix}...
+                        </code>
+                        <span className="text-xs text-muted-foreground">
+                          Skapad {formatDate(key.created_at)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {key.last_used_at
+                            ? `Använd ${formatDate(key.last_used_at)}`
+                            : 'Aldrig använd'}
+                        </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 mt-1">
-                      <code className="text-xs text-muted-foreground font-mono">
-                        {key.key_prefix}...
-                      </code>
-                      <span className="text-xs text-muted-foreground">
-                        Skapad {formatDate(key.created_at)}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {key.last_used_at
-                          ? `Använd ${formatDate(key.last_used_at)}`
-                          : 'Aldrig använd'}
-                      </span>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleRevoke(key.id)}
-                    disabled={revokingId === key.id}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    {revokingId === key.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRevoke(key.id, key.name)}
+                      aria-label={`Återkalla ${key.name}`}
+                      className="text-destructive hover:text-destructive"
+                    >
                       <Trash2 className="h-3.5 w-3.5" />
-                    )}
-                  </Button>
-                </div>
-              ))}
+                    </Button>
+                  </div>
+                )
+              })}
             </div>
           )}
         </CardContent>
@@ -296,12 +325,42 @@ export function ApiKeysPanel() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div>
-            <p className="text-sm font-medium mb-1">Claude Desktop</p>
+            <div className="flex items-center gap-2 mb-2">
+              <p className="text-sm font-medium">Claude.ai</p>
+              <Badge variant="secondary" className="text-[10px] font-normal px-1.5 py-0">Rekommenderat</Badge>
+            </div>
             <p className="text-xs text-muted-foreground mb-2">
-              Lägg till i <code className="text-xs">claude_desktop_config.json</code> (Inställningar &rarr; Developer):
+              Gå till <strong>Settings &rarr; Integrations &rarr; Add Integration</strong> och klistra in MCP-serverns URL.
+              Du loggas in via ditt gnubok-konto — ingen API-nyckel behövs.
             </p>
-            <pre className="rounded-md bg-muted p-4 text-xs font-mono overflow-x-auto select-all">
-{`{
+            <CopyBlock text={mcpUrl} />
+          </div>
+
+          <div>
+            <p className="text-sm font-medium mb-2">Claude Code / Cursor</p>
+            <p className="text-xs text-muted-foreground mb-2">
+              Kör i terminalen — loggar in via webbläsaren:
+            </p>
+            <CopyBlock text={`claude mcp add gnubok --transport http ${mcpUrl}`} />
+          </div>
+
+          <div className="border-t pt-4">
+            <button
+              type="button"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => setShowApiKeyMethods(!showApiKeyMethods)}
+            >
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showApiKeyMethods ? '' : '-rotate-90'}`} />
+              Anslut med API-nyckel istället
+            </button>
+            {showApiKeyMethods && (
+              <div className="space-y-6 pt-4 animate-in slide-in-from-top-1 duration-150">
+                <div>
+                  <p className="text-sm font-medium mb-1">Claude Desktop</p>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Lägg till i <code className="text-xs">claude_desktop_config.json</code> (Inställningar &rarr; Developer):
+                  </p>
+                  <CopyBlock text={`{
   "mcpServers": {
     "gnubok": {
       "command": "npx",
@@ -311,20 +370,20 @@ export function ApiKeysPanel() {
       }
     }
   }
-}`}
-            </pre>
-          </div>
+}`} />
+                </div>
 
-          <div>
-            <p className="text-sm font-medium mb-1">Claude Code / Cursor</p>
-            <p className="text-xs text-muted-foreground mb-2">
-              Kör i terminalen med en API-nyckel:
-            </p>
-            <pre className="rounded-md bg-muted p-4 text-xs font-mono overflow-x-auto">
-{`claude mcp add gnubok --transport http \\
+                <div>
+                  <p className="text-sm font-medium mb-1">Claude Code / Cursor</p>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Kör i terminalen med en API-nyckel:
+                  </p>
+                  <CopyBlock text={`claude mcp add gnubok --transport http \\
   --url ${mcpUrl} \\
-  --header "Authorization: Bearer gnubok_sk_..."`}
-            </pre>
+  --header "Authorization: Bearer gnubok_sk_..."`} />
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -418,6 +477,8 @@ export function ApiKeysPanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DestructiveConfirmDialog {...revokeDialogProps} />
 
       {/* Show key once dialog */}
       <Dialog open={showKeyDialog} onOpenChange={(open) => {

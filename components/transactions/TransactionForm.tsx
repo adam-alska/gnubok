@@ -78,15 +78,13 @@ export default function TransactionForm({ onSubmit, isLoading }: TransactionForm
   const isIncome = categories.find((c) => c.value === watchCategory)?.isIncome
 
   const onFormSubmit = (data: FormData) => {
-    const isBusiness = data.category ? data.category !== 'private' : undefined
-
     onSubmit({
       date: data.date,
       description: data.description,
       amount: data.amount,
       currency: data.currency,
       category: data.category as TransactionCategory,
-      is_business: isBusiness,
+      is_business: undefined,
       notes: data.notes,
     })
   }

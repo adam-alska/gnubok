@@ -138,7 +138,7 @@ export default function TransactionHistoryList({
                               Bokförd
                             </Badge>
                           </>
-                        ) : transaction.is_business === null ? (
+                        ) : (transaction.is_business === null || !transaction.journal_entry_id) ? (
                           <>
                             <span>·</span>
                             <button
@@ -167,7 +167,7 @@ export default function TransactionHistoryList({
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    {transaction.is_business === null && !transaction.journal_entry_id && (
+                    {!transaction.journal_entry_id && (
                       <Button
                         size="sm"
                         variant="default"

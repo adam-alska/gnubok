@@ -488,7 +488,7 @@ export default function TransactionsPage() {
         amount: data.amount,
         currency: data.currency,
         category: data.category || 'uncategorized',
-        is_business: data.is_business,
+        is_business: null,
         notes: data.notes,
       })
       .select()
