@@ -88,6 +88,8 @@ export class TokenBucketRateLimiter {
     const waitMs = this.refillRateMs - (Date.now() - this.lastRefill);
     await new Promise((resolve) => setTimeout(resolve, Math.max(0, waitMs)));
     this.refill();
-    this.tokens--;
+    if (this.tokens > 0) {
+      this.tokens--;
+    }
   }
 }
