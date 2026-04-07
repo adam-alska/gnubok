@@ -22,23 +22,16 @@ CREATE INDEX idx_provider_consents_company_provider ON provider_consents(company
 ALTER TABLE provider_consents ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY provider_consents_select ON provider_consents
-  FOR SELECT USING (company_id IN (
-    SELECT company_id FROM team_members WHERE user_id = auth.uid()
-  ));
+  FOR SELECT USING (company_id IN (SELECT public.user_company_ids()));
 
 CREATE POLICY provider_consents_insert ON provider_consents
-  FOR INSERT WITH CHECK (company_id IN (
-    SELECT company_id FROM team_members WHERE user_id = auth.uid()
-  ));
+  FOR INSERT WITH CHECK (company_id IN (SELECT public.user_company_ids()));
 
 CREATE POLICY provider_consents_update ON provider_consents
-  FOR UPDATE USING (company_id IN (
-    SELECT company_id FROM team_members WHERE user_id = auth.uid()
-  ));
+  FOR UPDATE USING (company_id IN (SELECT public.user_company_ids()));
 
 CREATE POLICY provider_consents_delete ON provider_consents
-  FOR DELETE USING (company_id IN (
-    SELECT company_id FROM team_members WHERE user_id = auth.uid()
+  FOR DELETE USING (company_id IN (SELECT public.user_company_ids()));
   ));
 
 CREATE TRIGGER update_provider_consents_updated_at
