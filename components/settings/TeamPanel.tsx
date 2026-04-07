@@ -59,9 +59,6 @@ export function TeamPanel() {
             <Users className="h-4 w-4" />
             {teamName || 'Team'}
           </CardTitle>
-          <CardDescription>
-            Ditt team har en ägare. Bjud in medarbetare via enskilda företag.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="divide-y divide-border/40">
