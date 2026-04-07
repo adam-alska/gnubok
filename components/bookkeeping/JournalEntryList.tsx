@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch'
 import { ArrowDownNarrowWide, ArrowUpNarrowWide, ChevronDown, ChevronRight, Paperclip, AlertTriangle, Loader2, BookOpen, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { AccountNumber } from '@/components/ui/account-number'
+import { getAccountDescription } from '@/lib/bookkeeping/account-descriptions'
 import JournalEntryAttachments from '@/components/bookkeeping/JournalEntryAttachments'
 import CorrectionEntryDialog from '@/components/bookkeeping/CorrectionEntryDialog'
 import JournalEntryStatusBadge from '@/components/bookkeeping/JournalEntryStatusBadge'
@@ -176,26 +177,40 @@ export default function JournalEntryList({ periodId }: Props) {
   return (
     <div className="space-y-4">
       {/* Filters and sorting */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Switch
-            id="missing-attachments"
-            checked={showMissingOnly}
-            onCheckedChange={setShowMissingOnly}
-          />
-          <Label htmlFor="missing-attachments" className="text-sm cursor-pointer">
-            Visa saknade underlag
-          </Label>
-          {showMissingOnly && (
-            <Badge variant="secondary" className="text-xs">
-              {filteredEntries.length}
-            </Badge>
-          )}
+      <div className="space-y-3 sm:space-y-0 sm:flex sm:items-center sm:gap-4 sm:flex-wrap">
+        <div className="flex items-center justify-between sm:justify-start gap-2">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="missing-attachments"
+              checked={showMissingOnly}
+              onCheckedChange={setShowMissingOnly}
+            />
+            <Label htmlFor="missing-attachments" className="text-sm cursor-pointer">
+              Visa saknade underlag
+            </Label>
+            {showMissingOnly && (
+              <Badge variant="secondary" className="text-xs">
+                {filteredEntries.length}
+              </Badge>
+            )}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5 sm:hidden"
+            onClick={() => { setDateSortDir(dateSortDir === 'desc' ? 'asc' : 'desc'); setPage(0) }}
+          >
+            {dateSortDir === 'desc' ? (
+              <ArrowDownNarrowWide className="h-4 w-4" />
+            ) : (
+              <ArrowUpNarrowWide className="h-4 w-4" />
+            )}
+          </Button>
         </div>
         <Button
           variant="outline"
           size="sm"
-          className="h-8 gap-1.5"
+          className="h-8 gap-1.5 hidden sm:inline-flex"
           onClick={() => { setDateSortDir(dateSortDir === 'desc' ? 'asc' : 'desc'); setPage(0) }}
         >
           {dateSortDir === 'desc' ? (
@@ -223,7 +238,7 @@ export default function JournalEntryList({ periodId }: Props) {
                 applyDateFilter()
               }
             }}
-            className="h-8 w-[145px] text-xs"
+            className="h-8 flex-1 sm:flex-none sm:w-[145px] text-xs"
           />
           <Input
             type="text"
@@ -242,12 +257,12 @@ export default function JournalEntryList({ periodId }: Props) {
                 applyDateFilter()
               }
             }}
-            className="h-8 w-[145px] text-xs"
+            className="h-8 flex-1 sm:flex-none sm:w-[145px] text-xs"
           />
           <Button
             variant="outline"
             size="sm"
-            className="h-8 text-xs"
+            className="h-8 text-xs shrink-0"
             onClick={applyDateFilter}
           >
             Filtrera
@@ -256,7 +271,7 @@ export default function JournalEntryList({ periodId }: Props) {
             <button
               type="button"
               onClick={() => { setDateFrom(''); setDateTo(''); setDateFromInput(''); setDateToInput(''); setPage(0) }}
-              className="p-1 rounded-sm hover:bg-muted text-muted-foreground"
+              className="p-1 rounded-sm hover:bg-muted text-muted-foreground shrink-0"
               title="Rensa datumfilter"
             >
               <X className="h-4 w-4" />
@@ -354,92 +369,46 @@ export default function JournalEntryList({ periodId }: Props) {
                     <p className="text-sm text-muted-foreground py-2">Inga kontorader hittades för denna verifikation.</p>
                   ) : (
                   <>
-                    {/* Mobile: stacked cards */}
-                    <div className="sm:hidden space-y-2">
+                    <div className="space-y-3">
                       {lines
                         .sort((a, b) => a.sort_order - b.sort_order)
-                        .map((line) => (
-                          <div key={line.id} className="flex items-center justify-between py-2 border-b last:border-0 gap-2">
-                            <div className="min-w-0 flex-1">
-                              <div className="text-sm"><AccountNumber number={line.account_number} showName /></div>
-                              {line.line_description && (
-                                <p className="text-xs text-muted-foreground truncate">{line.line_description}</p>
-                              )}
+                        .map((line) => {
+                          const accountName = getAccountDescription(line.account_number)?.name
+                          const desc = line.line_description
+                          const showDesc = desc
+                            && desc.toLowerCase() !== accountName?.toLowerCase()
+                            && desc.toLowerCase() !== entry.description?.toLowerCase()
+                          return (
+                          <div key={line.id} className="rounded-lg border p-3 space-y-1.5">
+                            <div className="text-sm">
+                              <AccountNumber number={line.account_number} showName />
                             </div>
-                            <div className="text-right shrink-0 text-sm tabular-nums">
-                              {Number(line.debit_amount) > 0 && (
-                                <p>{Number(line.debit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} D</p>
-                              )}
-                              {Number(line.credit_amount) > 0 && (
-                                <p>{Number(line.credit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} K</p>
-                              )}
+                            {showDesc && (
+                              <p className="text-xs text-muted-foreground">{desc}</p>
+                            )}
+                            <div className="flex justify-between items-center pt-1 border-t text-sm">
+                              <span className="text-muted-foreground">
+                                {Number(line.debit_amount) > 0 ? 'Debet' : 'Kredit'}
+                              </span>
+                              <span className="font-mono tabular-nums font-medium">
+                                {Number(line.debit_amount) > 0
+                                  ? Number(line.debit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })
+                                  : Number(line.credit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
+                              </span>
                             </div>
                           </div>
-                        ))}
-                      <div className="flex justify-between font-semibold text-sm pt-1">
-                        <span>Summa</span>
-                        <div className="flex gap-3 tabular-nums">
-                          <span>D: {lines.reduce((sum, l) => sum + (Number(l.debit_amount) || 0), 0).toLocaleString('sv-SE', { minimumFractionDigits: 2 })}</span>
-                          <span>K: {lines.reduce((sum, l) => sum + (Number(l.credit_amount) || 0), 0).toLocaleString('sv-SE', { minimumFractionDigits: 2 })}</span>
+                          )
+                        })}
+                      <div className="rounded-lg bg-muted/50 p-3 text-sm font-semibold space-y-1">
+                        <div className="flex justify-between">
+                          <span>Summa debet</span>
+                          <span className="font-mono tabular-nums">{lines.reduce((sum, l) => sum + (Number(l.debit_amount) || 0), 0).toLocaleString('sv-SE', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Summa kredit</span>
+                          <span className="font-mono tabular-nums">{lines.reduce((sum, l) => sum + (Number(l.credit_amount) || 0), 0).toLocaleString('sv-SE', { minimumFractionDigits: 2 })}</span>
                         </div>
                       </div>
-                    </div>
-
-                    {/* Desktop: table */}
-                    <div className="hidden sm:block">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b text-left text-muted-foreground">
-                          <th className="py-2 w-48">Konto</th>
-                          <th className="py-2">Beskrivning</th>
-                          <th className="py-2 w-28 text-right">Debet</th>
-                          <th className="py-2 w-28 text-right">Kredit</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {lines
-                          .sort((a, b) => a.sort_order - b.sort_order)
-                          .map((line) => (
-                            <tr key={line.id} className="border-b last:border-0">
-                              <td className="py-2"><AccountNumber number={line.account_number} showName /></td>
-                              <td className="py-2 text-muted-foreground">
-                                {line.line_description || ''}
-                              </td>
-                              <td className="py-2 text-right tabular-nums">
-                                {Number(line.debit_amount) > 0
-                                  ? Number(line.debit_amount).toLocaleString('sv-SE', {
-                                      minimumFractionDigits: 2,
-                                    })
-                                  : ''}
-                              </td>
-                              <td className="py-2 text-right tabular-nums">
-                                {Number(line.credit_amount) > 0
-                                  ? Number(line.credit_amount).toLocaleString('sv-SE', {
-                                      minimumFractionDigits: 2,
-                                    })
-                                  : ''}
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="font-semibold">
-                          <td colSpan={2} className="py-2">
-                            Summa
-                          </td>
-                          <td className="py-2 text-right">
-                            {lines
-                              .reduce((sum, l) => sum + (Number(l.debit_amount) || 0), 0)
-                              .toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="py-2 text-right">
-                            {lines
-                              .reduce((sum, l) => sum + (Number(l.credit_amount) || 0), 0)
-                              .toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
                     </div>
                   </>
                   )}
@@ -449,14 +418,15 @@ export default function JournalEntryList({ periodId }: Props) {
                     onCountChange={(c) => handleAttachmentCountChange(entry.id, c)}
                   />
 
-                  <div className="mt-4 pt-3 border-t flex gap-2">
-                    <Button variant="outline" size="sm" asChild>
+                  <div className="mt-4 pt-3 border-t flex flex-col sm:flex-row gap-2">
+                    <Button variant="outline" size="sm" className="w-full sm:w-auto" asChild>
                       <Link href={`/bookkeeping/${entry.id}`}>Visa detaljer</Link>
                     </Button>
                     {entry.status === 'posted' && entry.source_type !== 'storno' && entry.source_type !== 'correction' && (
                       <Button
                         variant="outline"
                         size="sm"
+                        className="w-full sm:w-auto"
                         onClick={() => setCorrectionEntry(entry)}
                       >
                         Skapa ändringsverifikation
