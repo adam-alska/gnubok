@@ -149,7 +149,7 @@ export default function TransactionHistoryList({
                               Ej bokförd
                             </button>
                           </>
-                        ) : null}
+                        )}
                         {transaction.potential_invoice && !transaction.invoice_id && (
                           <>
                             <span>·</span>
