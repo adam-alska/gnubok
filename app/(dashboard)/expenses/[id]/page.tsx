@@ -170,13 +170,13 @@ export default function ExpenseDetailPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/expenses')}>
+      <div className="space-y-4">
+        <div className="flex items-start gap-4">
+          <Button variant="ghost" size="icon" className="shrink-0 mt-1" onClick={() => router.push('/expenses')}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
-            <div className="flex items-center gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight">
                 Utgift #{invoice.arrival_number}
               </h1>
@@ -184,39 +184,40 @@ export default function ExpenseDetailPage() {
                 {status.label}
               </Badge>
             </div>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground truncate">
               {invoice.supplier?.name} · Faktura {invoice.supplier_invoice_number}
             </p>
           </div>
         </div>
 
         {/* Context-aware actions */}
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
           {invoice.status === 'registered' && (
             <>
-              <Button onClick={handleApprove} disabled={isProcessing}>
+              <Button className="w-full sm:w-auto" onClick={handleApprove} disabled={isProcessing}>
                 <CheckCircle className="mr-2 h-4 w-4" />
                 Godkänn
               </Button>
-              <Button variant="destructive" size="icon" onClick={handleDelete} disabled={isProcessing}>
-                <Trash2 className="h-4 w-4" />
+              <Button variant="destructive" className="w-full sm:w-auto" onClick={handleDelete} disabled={isProcessing}>
+                <Trash2 className="mr-2 h-4 w-4 sm:mr-0" />
+                <span className="sm:hidden">Ta bort</span>
               </Button>
             </>
           )}
           {['approved', 'overdue'].includes(invoice.status) && (
             <>
-              <Button onClick={() => setIsPayDialogOpen(true)} disabled={isProcessing}>
+              <Button className="w-full sm:w-auto" onClick={() => setIsPayDialogOpen(true)} disabled={isProcessing}>
                 <CreditCard className="mr-2 h-4 w-4" />
                 Markera betald
               </Button>
-              <Button variant="outline" onClick={handleCredit} disabled={isProcessing}>
+              <Button variant="outline" className="w-full sm:w-auto" onClick={handleCredit} disabled={isProcessing}>
                 <FileText className="mr-2 h-4 w-4" />
                 Kreditfaktura
               </Button>
             </>
           )}
           {invoice.status === 'partially_paid' && (
-            <Button onClick={() => setIsPayDialogOpen(true)} disabled={isProcessing}>
+            <Button className="w-full sm:w-auto" onClick={() => setIsPayDialogOpen(true)} disabled={isProcessing}>
               <CreditCard className="mr-2 h-4 w-4" />
               Registrera betalning
             </Button>
@@ -231,7 +232,7 @@ export default function ExpenseDetailPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Info grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div>
               <span className="text-muted-foreground">Leverantör</span>
               <p className="font-medium">
@@ -282,28 +283,51 @@ export default function ExpenseDetailPage() {
           {/* Line items */}
           {items.length > 0 && (
             <div className="border-t pt-4">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-2">Beskrivning</th>
-                    <th className="pb-2 w-20">Konto</th>
-                    <th className="pb-2 w-16 text-right">Moms%</th>
-                    <th className="pb-2 w-28 text-right">Belopp</th>
-                    <th className="pb-2 w-24 text-right">Moms</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((item) => (
-                    <tr key={item.id} className="border-b last:border-0">
-                      <td className="py-2">{item.description}</td>
-                      <td className="py-2"><AccountNumber number={item.account_number} /></td>
-                      <td className="py-2 text-right">{Math.round(item.vat_rate * 100)}%</td>
-                      <td className="py-2 text-right font-mono">{formatAmount(item.line_total)}</td>
-                      <td className="py-2 text-right font-mono">{formatAmount(item.vat_amount)}</td>
+              {/* Desktop: table */}
+              <div className="hidden sm:block">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-muted-foreground">
+                      <th className="pb-2">Beskrivning</th>
+                      <th className="pb-2 w-20">Konto</th>
+                      <th className="pb-2 w-16 text-right">Moms%</th>
+                      <th className="pb-2 w-28 text-right">Belopp</th>
+                      <th className="pb-2 w-24 text-right">Moms</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {items.map((item) => (
+                      <tr key={item.id} className="border-b last:border-0">
+                        <td className="py-2">{item.description}</td>
+                        <td className="py-2"><AccountNumber number={item.account_number} /></td>
+                        <td className="py-2 text-right">{Math.round(item.vat_rate * 100)}%</td>
+                        <td className="py-2 text-right font-mono">{formatAmount(item.line_total)}</td>
+                        <td className="py-2 text-right font-mono">{formatAmount(item.vat_amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile: stacked cards */}
+              <div className="sm:hidden space-y-3">
+                {items.map((item) => (
+                  <div key={item.id} className="border rounded-lg p-3 space-y-2 text-sm">
+                    <div className="flex justify-between items-start gap-2">
+                      <span className="font-medium">{item.description || 'Ingen beskrivning'}</span>
+                      <AccountNumber number={item.account_number} />
+                    </div>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Belopp</span>
+                      <span className="font-mono">{formatAmount(item.line_total)}</span>
+                    </div>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Moms ({Math.round(item.vat_rate * 100)}%)</span>
+                      <span className="font-mono">{formatAmount(item.vat_amount)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
 
               {/* Amounts summary */}
               <div className="mt-4 pt-4 border-t space-y-1 text-sm">
@@ -351,32 +375,59 @@ export default function ExpenseDetailPage() {
             {payments.length > 0 && (
               <div>
                 <p className="text-sm font-medium mb-2">Betalningshistorik</p>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-muted-foreground">
-                      <th className="pb-2">Datum</th>
-                      <th className="pb-2 text-right">Belopp</th>
-                      <th className="pb-2">Verifikation</th>
-                      <th className="pb-2">Anteckning</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {payments.map((p) => (
-                      <tr key={p.id} className="border-b last:border-0">
-                        <td className="py-2">{p.payment_date}</td>
-                        <td className="py-2 text-right font-mono">{formatAmount(p.amount)} {p.currency}</td>
-                        <td className="py-2">
-                          {p.journal_entry_id ? (
-                            <Link href={`/bookkeeping/${p.journal_entry_id}`} className="text-primary hover:underline font-mono text-xs">
-                              {p.journal_entry_id.substring(0, 8)}...
-                            </Link>
-                          ) : '-'}
-                        </td>
-                        <td className="py-2 text-muted-foreground">{p.notes || '-'}</td>
+
+                {/* Desktop: table */}
+                <div className="hidden sm:block">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="pb-2">Datum</th>
+                        <th className="pb-2 text-right">Belopp</th>
+                        <th className="pb-2">Verifikation</th>
+                        <th className="pb-2">Anteckning</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {payments.map((p) => (
+                        <tr key={p.id} className="border-b last:border-0">
+                          <td className="py-2">{p.payment_date}</td>
+                          <td className="py-2 text-right font-mono">{formatAmount(p.amount)} {p.currency}</td>
+                          <td className="py-2">
+                            {p.journal_entry_id ? (
+                              <Link href={`/bookkeeping/${p.journal_entry_id}`} className="text-primary hover:underline font-mono text-xs">
+                                {p.journal_entry_id.substring(0, 8)}...
+                              </Link>
+                            ) : '-'}
+                          </td>
+                          <td className="py-2 text-muted-foreground">{p.notes || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile: stacked cards */}
+                <div className="sm:hidden space-y-3">
+                  {payments.map((p) => (
+                    <div key={p.id} className="border rounded-lg p-3 space-y-1 text-sm">
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">{p.payment_date}</span>
+                        <span className="font-mono font-medium">{formatAmount(p.amount)} {p.currency}</span>
+                      </div>
+                      {p.journal_entry_id && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Verifikation</span>
+                          <Link href={`/bookkeeping/${p.journal_entry_id}`} className="text-primary hover:underline font-mono text-xs">
+                            {p.journal_entry_id.substring(0, 8)}...
+                          </Link>
+                        </div>
+                      )}
+                      {p.notes && (
+                        <p className="text-muted-foreground text-xs pt-1">{p.notes}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

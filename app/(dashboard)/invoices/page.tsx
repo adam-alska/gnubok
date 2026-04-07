@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PageHeader } from '@/components/ui/page-header'
 import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -176,7 +177,23 @@ export default function InvoicesPage() {
             className="pl-10"
           />
         </div>
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        {/* Mobile: dropdown select */}
+        <Select value={activeTab} onValueChange={setActiveTab}>
+          <SelectTrigger className="sm:hidden w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alla</SelectItem>
+            <SelectItem value="unpaid">Obetalda</SelectItem>
+            <SelectItem value="paid">Betalda</SelectItem>
+            <SelectItem value="draft">Utkast</SelectItem>
+            <SelectItem value="proforma">Proforma</SelectItem>
+            <SelectItem value="delivery_note">Följesedel</SelectItem>
+            <SelectItem value="credit">Kredit</SelectItem>
+          </SelectContent>
+        </Select>
+        {/* Desktop: tab bar */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="hidden sm:block">
           <TabsList>
             <TabsTrigger value="all">Alla</TabsTrigger>
             <TabsTrigger value="unpaid">Obetalda</TabsTrigger>

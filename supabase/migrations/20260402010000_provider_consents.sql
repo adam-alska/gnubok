@@ -32,7 +32,6 @@ CREATE POLICY provider_consents_update ON provider_consents
 
 CREATE POLICY provider_consents_delete ON provider_consents
   FOR DELETE USING (company_id IN (SELECT public.user_company_ids()));
-  ));
 
 CREATE TRIGGER update_provider_consents_updated_at
   BEFORE UPDATE ON provider_consents

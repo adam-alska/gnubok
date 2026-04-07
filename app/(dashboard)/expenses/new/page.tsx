@@ -360,7 +360,7 @@ export default function NewExpensePage() {
             <CardTitle className="text-lg">Faktura</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Leverantör *</Label>
                 <Controller
@@ -400,7 +400,7 @@ export default function NewExpensePage() {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Fakturadatum *</Label>
                 <Input type="date" {...register('invoice_date')} />
@@ -422,12 +422,13 @@ export default function NewExpensePage() {
 
         {/* Section 2: Kontering */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <CardTitle className="text-lg">Kontering</CardTitle>
             <Button
               type="button"
               variant="outline"
               size="sm"
+              className="w-full sm:w-auto"
               onClick={() =>
                 append({ description: '', amount: 0, account_number: '', vat_rate: 0.25 })
               }
@@ -437,48 +438,143 @@ export default function NewExpensePage() {
             </Button>
           </CardHeader>
           <CardContent>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="pb-2 w-28">Konto</th>
-                  <th className="pb-2">Beskrivning</th>
-                  <th className="pb-2 w-32">Belopp (exkl.)</th>
-                  <th className="pb-2 w-24">Momssats</th>
-                  <th className="pb-2 w-24 text-right">Moms</th>
-                  <th className="pb-2 w-8"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {fields.map((field, index) => (
-                  <tr key={field.id} className="border-b last:border-0 align-top">
-                    <td className="py-2 pr-2">
-                      <Controller
-                        name={`items.${index}.account_number`}
-                        control={control}
-                        render={({ field: f }) => (
-                          <AccountCombobox
-                            value={f.value}
-                            accounts={accounts}
-                            onChange={(val) => handleAccountChange(index, val)}
-                          />
+            {/* Desktop: table layout */}
+            <div className="hidden sm:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="pb-2 w-28">Konto</th>
+                    <th className="pb-2">Beskrivning</th>
+                    <th className="pb-2 w-32">Belopp (exkl.)</th>
+                    <th className="pb-2 w-24">Momssats</th>
+                    <th className="pb-2 w-24 text-right">Moms</th>
+                    <th className="pb-2 w-8"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fields.map((field, index) => (
+                    <tr key={field.id} className="border-b last:border-0 align-top">
+                      <td className="py-2 pr-2">
+                        <Controller
+                          name={`items.${index}.account_number`}
+                          control={control}
+                          render={({ field: f }) => (
+                            <AccountCombobox
+                              value={f.value}
+                              accounts={accounts}
+                              onChange={(val) => handleAccountChange(index, val)}
+                            />
+                          )}
+                        />
+                      </td>
+                      <td className="py-2 pr-2">
+                        <Input
+                          placeholder="Beskrivning"
+                          {...register(`items.${index}.description`)}
+                        />
+                      </td>
+                      <td className="py-2 pr-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="0,00"
+                          {...register(`items.${index}.amount`, { valueAsNumber: true })}
+                        />
+                      </td>
+                      <td className="py-2 pr-2">
+                        <Controller
+                          name={`items.${index}.vat_rate`}
+                          control={control}
+                          render={({ field: f }) => (
+                            <Select
+                              value={String(f.value)}
+                              onValueChange={(v) => f.onChange(parseFloat(v))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="0.25">25%</SelectItem>
+                                <SelectItem value="0.12">12%</SelectItem>
+                                <SelectItem value="0.06">6%</SelectItem>
+                                <SelectItem value="0">0%</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                      </td>
+                      <td className="py-2 pr-2 text-right font-mono pt-4">
+                        {formatAmount(itemTotals[index]?.vatAmount || 0)}
+                      </td>
+                      <td className="py-2 pt-3">
+                        {fields.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => remove(index)}
+                          >
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
                         )}
-                      />
-                    </td>
-                    <td className="py-2 pr-2">
-                      <Input
-                        placeholder="Beskrivning"
-                        {...register(`items.${index}.description`)}
-                      />
-                    </td>
-                    <td className="py-2 pr-2">
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile: stacked card layout */}
+            <div className="sm:hidden space-y-4">
+              {fields.map((field, index) => (
+                <div key={field.id} className="border rounded-lg p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-muted-foreground">Rad {index + 1}</span>
+                    {fields.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => remove(index)}
+                      >
+                        <Trash2 className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Konto</Label>
+                    <Controller
+                      name={`items.${index}.account_number`}
+                      control={control}
+                      render={({ field: f }) => (
+                        <AccountCombobox
+                          value={f.value}
+                          accounts={accounts}
+                          onChange={(val) => handleAccountChange(index, val)}
+                        />
+                      )}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Beskrivning</Label>
+                    <Input
+                      placeholder="Beskrivning"
+                      {...register(`items.${index}.description`)}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Belopp (exkl.)</Label>
                       <Input
                         type="number"
                         step="0.01"
                         placeholder="0,00"
                         {...register(`items.${index}.amount`, { valueAsNumber: true })}
                       />
-                    </td>
-                    <td className="py-2 pr-2">
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Momssats</Label>
                       <Controller
                         name={`items.${index}.vat_rate`}
                         control={control}
@@ -499,40 +595,29 @@ export default function NewExpensePage() {
                           </Select>
                         )}
                       />
-                    </td>
-                    <td className="py-2 pr-2 text-right font-mono pt-4">
-                      {formatAmount(itemTotals[index]?.vatAmount || 0)}
-                    </td>
-                    <td className="py-2 pt-3">
-                      {fields.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => remove(index)}
-                        >
-                          <Trash2 className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center pt-1 border-t">
+                    <span className="text-xs text-muted-foreground">Moms</span>
+                    <span className="font-mono text-sm">{formatAmount(itemTotals[index]?.vatAmount || 0)} kr</span>
+                  </div>
+                </div>
+              ))}
+            </div>
 
             {/* Totals */}
-            <div className="mt-4 pt-4 border-t space-y-2 text-right">
-              <div className="flex justify-end gap-8">
+            <div className="mt-4 pt-4 border-t space-y-2">
+              <div className="flex justify-between sm:justify-end sm:gap-8">
                 <span className="text-muted-foreground">Netto (exkl. moms)</span>
-                <span className="font-mono w-32">{formatAmount(subtotal)} kr</span>
+                <span className="font-mono sm:w-32 text-right">{formatAmount(subtotal)} kr</span>
               </div>
-              <div className="flex justify-end gap-8">
+              <div className="flex justify-between sm:justify-end sm:gap-8">
                 <span className="text-muted-foreground">Moms</span>
-                <span className="font-mono w-32">{formatAmount(totalVat)} kr</span>
+                <span className="font-mono sm:w-32 text-right">{formatAmount(totalVat)} kr</span>
               </div>
-              <div className="flex justify-end gap-8 font-bold text-lg">
+              <div className="flex justify-between sm:justify-end sm:gap-8 font-bold text-lg">
                 <span>Totalt</span>
-                <span className="font-mono w-32">{formatAmount(total)} kr</span>
+                <span className="font-mono sm:w-32 text-right">{formatAmount(total)} kr</span>
               </div>
             </div>
           </CardContent>
@@ -551,7 +636,7 @@ export default function NewExpensePage() {
           </CardHeader>
           {advancedOpen && (
             <CardContent className="space-y-4 pt-0">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Valuta</Label>
                   <Controller
@@ -615,11 +700,11 @@ export default function NewExpensePage() {
         </Card>
 
         {/* Submit */}
-        <div className="flex justify-end gap-4">
-          <Button type="button" variant="outline" onClick={() => router.push('/expenses')}>
+        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 sm:gap-4">
+          <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => router.push('/expenses')}>
             Avbryt
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
