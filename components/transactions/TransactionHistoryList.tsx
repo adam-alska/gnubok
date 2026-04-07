@@ -138,7 +138,7 @@ export default function TransactionHistoryList({
                               Bokförd
                             </Badge>
                           </>
-                        ) : (transaction.is_business === null || !transaction.journal_entry_id) ? (
+                        ) : (
                           <>
                             <span>·</span>
                             <button

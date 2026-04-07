@@ -109,10 +109,14 @@ interface ApiKey {
 function CopyBlock({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
 
-  function handleCopy() {
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // clipboard unavailable (insecure context) — silently ignore
+    }
   }
 
   return (
@@ -284,7 +288,7 @@ export function ApiKeysPanel() {
                           {scopeCount === ALL_SCOPES.length
                             ? 'Alla behörigheter'
                             : scopeCount === 0
-                              ? 'Enbart läs'
+                              ? 'Inga behörigheter'
                               : `${scopeCount} behörigheter`}
                         </span>
                       </div>
