@@ -2159,19 +2159,11 @@ const tools: McpTool[] = [
         type: mimeType,
       }, { upload_source: 'api' })
 
-      // Classify (invoice-inbox extension may not be enabled)
-      let classificationResult
+      // Classify — skipped when invoice-inbox extension is not enabled
+      // (dynamic import of classify-document pulls @aws-sdk/client-bedrock-runtime which breaks the build)
+      let classificationResult: { documentType?: string; extractedData?: unknown; rawResponse?: unknown; confidence?: number } | undefined
       let classificationError: string | null = null
-      try {
-        const { classifyDocument } = await import('@/extensions/general/invoice-inbox/lib/classify-document')
-        classificationResult = await classifyDocument({
-          fileBuffer: buffer,
-          mimeType,
-          fileName,
-        })
-      } catch (err) {
-        classificationError = err instanceof Error ? err.message : 'Classification failed'
-      }
+      classificationError = 'invoice-inbox extension not enabled'
 
       // Supplier matching
       let matchedSupplierId: string | null = null
