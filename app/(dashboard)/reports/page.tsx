@@ -230,76 +230,74 @@ export default function ReportsPage() {
             </select>
           </div>
 
-          {/* Desktop: grid tab navigation */}
-          <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
-            {/* Bokslut (Financial Statements) */}
-            <div className="space-y-1">
-              <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-[0.08em] px-1">
-                Bokslut
-              </p>
-              <TabsList className="flex flex-col h-auto w-full gap-0.5 p-1">
-                <TabsTrigger value="trial-balance" className="w-full justify-start">
+          {/* Desktop: inline grouped tab navigation */}
+          <div className="hidden sm:grid sm:grid-cols-[auto_1px_auto_1px_auto_1px_auto] items-stretch mb-5 rounded-xl border border-border bg-card shadow-sm">
+            {/* Bokslut */}
+            <div className="flex flex-col gap-3 px-5 py-4">
+              <span className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-[0.1em]">Bokslut</span>
+              <TabsList className="flex flex-col h-auto bg-transparent p-0 gap-1 items-start">
+                <TabsTrigger value="trial-balance" className="w-full justify-start text-[13px]">
                   Saldobalans
                 </TabsTrigger>
-                <TabsTrigger value="income-statement" className="w-full justify-start">
+                <TabsTrigger value="income-statement" className="w-full justify-start text-[13px]">
                   Resultaträkning
                 </TabsTrigger>
-                <TabsTrigger value="balance-sheet" className="w-full justify-start">
+                <TabsTrigger value="balance-sheet" className="w-full justify-start text-[13px]">
                   Balansräkning
                 </TabsTrigger>
               </TabsList>
             </div>
 
-            {/* Skatt & moms (Tax & VAT) */}
-            <div className="space-y-1">
-              <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-[0.08em] px-1">
-                Skatt & moms
-              </p>
-              <TabsList className="flex flex-col h-auto w-full gap-0.5 p-1">
-                <TabsTrigger value="vat-declaration" className="w-full justify-start">
+            <div className="bg-border" />
+
+            {/* Skatt & moms */}
+            <div className="flex flex-col gap-3 px-5 py-4">
+              <span className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-[0.1em]">Skatt & moms</span>
+              <TabsList className="flex flex-col h-auto bg-transparent p-0 gap-1 items-start">
+                <TabsTrigger value="vat-declaration" className="w-full justify-start text-[13px]">
                   Momsdeklaration
                 </TabsTrigger>
                 {isEnskildFirma && (
-                  <TabsTrigger value="ne-declaration" className="w-full justify-start">
+                  <TabsTrigger value="ne-declaration" className="w-full justify-start text-[13px]">
                     NE-bilaga
                   </TabsTrigger>
                 )}
                 {isAktiebolag && (
-                  <TabsTrigger value="ink2-declaration" className="w-full justify-start">
+                  <TabsTrigger value="ink2-declaration" className="w-full justify-start text-[13px]">
                     INK2
                   </TabsTrigger>
                 )}
               </TabsList>
             </div>
 
-            {/* Huvudböcker (Ledgers) */}
-            <div className="space-y-1">
-              <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-[0.08em] px-1">
-                Huvudböcker
-              </p>
-              <TabsList className="flex flex-col h-auto w-full gap-0.5 p-1">
-                <TabsTrigger value="huvudbok" className="w-full justify-start">
+            <div className="bg-border" />
+
+            {/* Huvudböcker */}
+            <div className="flex flex-col gap-3 px-5 py-4">
+              <span className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-[0.1em]">Huvudböcker</span>
+              <TabsList className="flex flex-col h-auto bg-transparent p-0 gap-1 items-start">
+                <TabsTrigger value="huvudbok" className="w-full justify-start text-[13px]">
                   Huvudbok
                 </TabsTrigger>
-                <TabsTrigger value="grundbok" className="w-full justify-start">
+                <TabsTrigger value="grundbok" className="w-full justify-start text-[13px]">
                   Grundbok
                 </TabsTrigger>
-                <TabsTrigger value="kundreskontra" className="w-full justify-start">
+                <TabsTrigger value="kundreskontra" className="w-full justify-start text-[13px]">
                   Kundreskontra
                 </TabsTrigger>
-                <TabsTrigger value="supplier-ledger" className="w-full justify-start">
+                <TabsTrigger value="supplier-ledger" className="w-full justify-start text-[13px]">
                   Leverantörsreskontra
                 </TabsTrigger>
               </TabsList>
             </div>
 
-            {/* Avstämning (Reconciliation) */}
-            <div className="space-y-1">
-              <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-[0.08em] px-1">
-                Avstämning
-              </p>
-              <TabsList className="flex flex-col h-auto w-full gap-0.5 p-1">
-                <TabsTrigger value="bank-reconciliation" className="w-full justify-start">
+            <div className="bg-border" />
+
+            {/* Avstämning */}
+            <div className="flex flex-col gap-3 px-5 py-4">
+              <span className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-[0.1em]">Avstämning</span>
+              <TabsList className="flex flex-col h-auto bg-transparent p-0 gap-1 items-start">
+                <TabsTrigger value="bank-reconciliation" className="w-full justify-start text-[13px]">
                   Bankavstämning
                 </TabsTrigger>
               </TabsList>
