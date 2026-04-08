@@ -360,11 +360,32 @@ export const ticExtension: Extension = {
       method: 'POST',
       path: '/bankid/start',
       skipAuth: true,
-      handler: async (request: Request) => {
+      handler: (() => {
+        // Server-side per-IP rate limit (each start = billable TIC session)
+        const ipCooldowns = new Map<string, number>()
+        const COOLDOWN_MS = 5_000
+
+        return async (request: Request) => {
         try {
           const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
             || request.headers.get('x-real-ip')
             || '127.0.0.1'
+
+          const now = Date.now()
+          const lastStart = ipCooldowns.get(ip) ?? 0
+          if (now - lastStart < COOLDOWN_MS) {
+            return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+          }
+          ipCooldowns.set(ip, now)
+
+          // Prevent map from growing unbounded
+          if (ipCooldowns.size > 10_000) {
+            const cutoff = now - COOLDOWN_MS
+            for (const [k, v] of ipCooldowns) {
+              if (v < cutoff) ipCooldowns.delete(k)
+            }
+          }
+
           const userAgent = request.headers.get('user-agent') || undefined
 
           const session = await startBankIdAuth(ip, userAgent)
@@ -381,7 +402,8 @@ export const ticExtension: Extension = {
           console.error('[tic/bankid] start failed', error)
           return NextResponse.json({ error: 'Failed to start BankID session' }, { status: 500 })
         }
-      },
+      }
+      })(),
     },
 
     {
@@ -711,6 +733,42 @@ export const ticExtension: Extension = {
             { error: 'Failed to link BankID' },
             { status: 500 }
           )
+        }
+      },
+    },
+
+    {
+      method: 'POST',
+      path: '/bankid/unlink',
+      // skipAuth: false — requires existing Supabase session
+      handler: async (_request: Request, ctx?) => {
+        try {
+          if (!ctx?.userId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+          }
+
+          const supabase = createServiceClientNoCookies()
+
+          // Delete bankid_identities row
+          const { error: deleteError } = await supabase
+            .from('bankid_identities')
+            .delete()
+            .eq('user_id', ctx.userId)
+
+          if (deleteError) {
+            console.error('[tic/bankid] unlink delete failed', deleteError)
+            return NextResponse.json({ error: 'Failed to unlink BankID' }, { status: 500 })
+          }
+
+          // Clear app_metadata.bankid_linked so MFA enforcement resumes
+          await supabase.auth.admin.updateUserById(ctx.userId, {
+            app_metadata: { bankid_linked: false },
+          })
+
+          return NextResponse.json({ data: { unlinked: true } })
+        } catch (error) {
+          console.error('[tic/bankid] unlink failed', error)
+          return NextResponse.json({ error: 'Failed to unlink BankID' }, { status: 500 })
         }
       },
     },

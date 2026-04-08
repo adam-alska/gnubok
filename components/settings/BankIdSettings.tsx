@@ -61,16 +61,8 @@ export function BankIdSettings() {
 
     setIsUnlinking(true)
     try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const { error } = await supabase
-        .from('bankid_identities')
-        .delete()
-        .eq('user_id', user.id)
-
-      if (error) throw error
+      const res = await fetch('/api/extensions/ext/tic/bankid/unlink', { method: 'POST' })
+      if (!res.ok) throw new Error('Unlink failed')
 
       setIdentity(null)
       toast({ title: 'BankID bortkopplat' })
