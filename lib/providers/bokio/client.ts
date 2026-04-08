@@ -123,7 +123,7 @@ export class BokioClient {
 
     // Extra diagnostic: if no items found and response has unexpected keys, log them
     if (result.items.length === 0) {
-      const rawObj = response as Record<string, unknown>;
+      const rawObj = response as unknown as Record<string, unknown>;
       const keys = Object.keys(rawObj).filter(k => !['totalItems', 'totalPages', 'currentPage', 'items', 'data'].includes(k));
       if (keys.length > 0) {
         log.warn(
