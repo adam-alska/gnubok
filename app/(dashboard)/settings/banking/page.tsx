@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
-import { AlertTriangle, CreditCard, ExternalLink } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, CreditCard, ExternalLink, Loader2 } from 'lucide-react'
 import { getSettingsPanel } from '@/lib/extensions/settings-panel-registry'
 import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
 
@@ -17,38 +17,59 @@ export default function BankingSettingsPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [bankConnectionError, setBankConnectionError] = useState<string | null>(null)
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<{ imported: number } | null>(null)
+  const successTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
   const hasBankingExtension = ENABLED_EXTENSION_IDS.has('enable-banking')
+
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current) clearTimeout(successTimerRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     const bankConnected = searchParams.get('bank_connected')
     const bankError = searchParams.get('bank_error')
 
-    if (bankConnected === 'true') {
-      toast({
-        title: 'Bank ansluten!',
-        description: 'Din bank är nu kopplad. Transaktioner hämtas...',
-      })
-
+    if (bankConnected === 'true' && !isSyncing) {
       const connectionId = searchParams.get('connection_id')
-      if (connectionId) {
-        fetch('/api/extensions/ext/enable-banking/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ connection_id: connectionId, days_back: 120 }),
-        })
-          .then(res => res.json())
-          .then(data => {
-            if (data.imported > 0) {
-              toast({
-                title: 'Transaktioner hämtade',
-                description: `${data.imported} transaktioner importerade`,
-              })
-            }
-          })
-          .catch(() => {})
-      }
-
       router.replace('/settings/banking')
+
+      if (connectionId) {
+        setIsSyncing(true)
+        ;(async () => {
+          try {
+            const res = await fetch('/api/extensions/ext/enable-banking/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ connection_id: connectionId, days_back: 120 }),
+            })
+            const data = await res.json()
+            if (res.ok) {
+              setSyncResult({ imported: data.imported ?? 0 })
+              successTimerRef.current = setTimeout(() => {
+                setIsSyncing(false)
+                setSyncResult(null)
+              }, 3000)
+            } else {
+              throw new Error(data.error || 'Sync failed')
+            }
+          } catch (err) {
+            toast({
+              title: 'Synkronisering misslyckades',
+              description: err instanceof Error ? err.message : 'Kunde inte hämta transaktioner',
+              variant: 'destructive',
+            })
+            setIsSyncing(false)
+          }
+        })()
+      } else {
+        toast({
+          title: 'Bank ansluten!',
+          description: 'Din bank är nu kopplad.',
+        })
+      }
     }
 
     if (bankError) {
@@ -61,7 +82,37 @@ export default function BankingSettingsPage() {
       setBankConnectionError(errorMsg)
       router.replace('/settings/banking')
     }
-  }, [searchParams, router, toast])
+  }, [searchParams, router, toast, isSyncing])
+
+  if (isSyncing) {
+    return (
+      <div className="space-y-6">
+        <Card className="mx-auto max-w-md">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            {syncResult ? (
+              <>
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+                  <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
+                </div>
+                <p className="font-medium text-lg">Bank ansluten!</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {syncResult.imported} transaktioner importerade
+                </p>
+              </>
+            ) : (
+              <>
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
+                <p className="font-medium">Hämtar transaktioner från din bank...</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Detta kan ta upp till en minut
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
