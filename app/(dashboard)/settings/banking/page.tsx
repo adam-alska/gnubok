@@ -22,10 +22,12 @@ export default function BankingSettingsPage() {
   const successTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
   const syncInitiatedRef = useRef(false)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const unmountedRef = useRef(false)
   const hasBankingExtension = ENABLED_EXTENSION_IDS.has('enable-banking')
 
   useEffect(() => {
     return () => {
+      unmountedRef.current = true
       if (successTimerRef.current) clearTimeout(successTimerRef.current)
       if (abortControllerRef.current) abortControllerRef.current.abort()
     }
@@ -67,6 +69,7 @@ export default function BankingSettingsPage() {
             }
           } catch (err) {
             clearTimeout(syncTimeout)
+            if (unmountedRef.current) return
             if (controller.signal.aborted) {
               toast({
                 title: 'Synkronisering tog för lång tid',
