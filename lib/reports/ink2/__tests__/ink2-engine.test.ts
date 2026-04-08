@@ -280,8 +280,12 @@ describe('checkBalanceWarning', () => {
     expect(checkBalanceWarning(0, 0)).toBeNull()
   })
 
-  it('returns null when assets are zero (no data)', () => {
-    expect(checkBalanceWarning(0, 5)).toBeNull()
+  it('returns null when both totals are zero (no data)', () => {
+    expect(checkBalanceWarning(0, 0)).toBeNull()
+  })
+
+  it('returns warning when assets are zero but equity/liabilities exist', () => {
+    expect(checkBalanceWarning(0, 5)).not.toBeNull()
   })
 
   it('includes amounts in warning message', () => {

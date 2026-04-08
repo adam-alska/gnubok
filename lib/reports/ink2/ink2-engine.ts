@@ -202,7 +202,7 @@ function roundToKrona(value: number): number {
 export function checkBalanceWarning(totalAssets: number, totalEquityLiabilities: number): string | null {
   const balanceDiff = Math.abs(totalAssets - totalEquityLiabilities)
   const ROUNDING_TOLERANCE_KR = 2
-  if (balanceDiff > ROUNDING_TOLERANCE_KR && totalAssets > 0) {
+  if (balanceDiff > ROUNDING_TOLERANCE_KR && (totalAssets > 0 || totalEquityLiabilities > 0)) {
     return `Balansräkningen är inte i balans. Tillgångar: ${totalAssets} kr, Eget kapital och skulder: ${totalEquityLiabilities} kr (differens: ${balanceDiff} kr).`
   }
   return null
