@@ -88,10 +88,10 @@ export function BankIdAuth({ mode, onComplete }: BankIdAuthProps) {
       const newSession: BankIdSession = data
       setSession(newSession)
 
-      // On mobile, open BankID app
+      // On mobile, open BankID app — redirect=null so it doesn't open a new tab;
+      // the polling in this tab detects completion when the user switches back.
       if (isMobile()) {
-        const returnUrl = encodeURIComponent(window.location.href)
-        window.location.href = `bankid:///?autostarttoken=${newSession.autoStartToken}&redirect=${returnUrl}`
+        window.location.href = `bankid:///?autostarttoken=${newSession.autoStartToken}&redirect=null`
       }
 
       // Start polling
