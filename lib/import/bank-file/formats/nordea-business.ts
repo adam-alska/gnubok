@@ -12,7 +12,11 @@
  * Format C (simple): Semicolon-delimited
  *   Columns: Bokföringsdatum, Valutadatum, Text, Belopp, Saldo
  *
- * Date format: YYYY-MM-DD
+ * Format D (Datum variant): Semicolon-delimited, slash dates
+ *   Columns: Datum, Belopp, Avsändare, Mottagare, Namn, Ytterligare detaljer, Meddelande, Egna anteckningar, Saldo, Valuta
+ *   Date format: YYYY/MM/DD (normalized to YYYY-MM-DD)
+ *
+ * Date format: YYYY-MM-DD (YYYY/MM/DD also accepted and normalized)
  * Encoding: UTF-8 or Windows-1252
  */
 
@@ -43,7 +47,12 @@ export const nordeaBusinessFormat: BankFileFormat = {
       firstLine.includes('bokföringsdatum') ||
       firstLine.includes('bokforingsdatum')
 
-    if (!hasNordeaDateCol) return false
+    // Format D: standalone "Datum" column (not reskontradatum/transaktionsdatum)
+    // Check parsed headers for exact match to avoid false positives with Handelsbanken
+    const headers_detect = firstLine.split(';').map(h => h.replace(/"/g, '').trim().toLowerCase())
+    const hasStandaloneDatum = headers_detect.some(h => h === 'datum')
+
+    if (!hasNordeaDateCol && !hasStandaloneDatum) return false
 
     // Exclude SEB (which also has bokföringsdag/bokföringsdatum but adds valutadag/verifikationsnummer)
     if (firstLine.includes('valutadag') || firstLine.includes('verifikationsnummer')) return false
@@ -82,10 +91,11 @@ export const nordeaBusinessFormat: BankFileFormat = {
     const headerLine = lines[0] || ''
     const headers = headerLine.split(';').map((h) => h.trim().toLowerCase().replace(/"/g, ''))
 
-    // Date column: accept multiple Nordea naming patterns
+    // Date column: accept multiple Nordea naming patterns (including standalone "datum" for Format D)
     const dateIdx = headers.findIndex(
       (h) => h.includes('bokföringsdag') || h.includes('bokforingsdag') ||
-             h.includes('bokföringsdatum') || h.includes('bokforingsdatum')
+             h.includes('bokföringsdatum') || h.includes('bokforingsdatum') ||
+             h === 'datum'
     )
     const amountIdx = headers.findIndex((h) => h === 'belopp' || h.includes('belopp'))
     const senderIdx = headers.findIndex((h) => h.includes('avsändare') || h.includes('avsandare'))
@@ -103,6 +113,7 @@ export const nordeaBusinessFormat: BankFileFormat = {
     const textIdx = headers.findIndex(
       (h) => h === 'text' || h.includes('meddelande') || h.includes('beskrivning')
     )
+    const ytterligareDetaljerIdx = headers.findIndex((h) => h === 'ytterligare detaljer')
     const paymentTypeIdx = headers.findIndex((h) => h.includes('betalningstyp'))
     const balanceIdx = headers.findIndex((h) => h === 'saldo' || h.includes('saldo'))
     const currencyIdx = headers.findIndex((h) => h === 'valuta' || h.includes('valuta'))
@@ -110,7 +121,7 @@ export const nordeaBusinessFormat: BankFileFormat = {
     if (dateIdx === -1 || amountIdx === -1) {
       issues.push({
         row: 1,
-        message: 'Could not identify required columns (Bokföringsdag/Bokföringsdatum, Belopp)',
+        message: 'Could not identify required columns (Bokföringsdag/Bokföringsdatum/Datum, Belopp)',
         severity: 'error',
       })
       return {
@@ -146,8 +157,11 @@ export const nordeaBusinessFormat: BankFileFormat = {
         continue
       }
 
+      // Normalize YYYY/MM/DD → YYYY-MM-DD (Format D variant)
+      const normalizedDate = date.includes('/') ? date.replace(/\//g, '-') : date
+
       // Validate date format (YYYY-MM-DD)
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
         issues.push({ row: i + 1, message: `Invalid date: ${date}`, severity: 'warning' })
         skippedRows++
         continue
@@ -158,11 +172,15 @@ export const nordeaBusinessFormat: BankFileFormat = {
       const subject = subjectIdx >= 0 ? fields[subjectIdx]?.trim() : ''
       const text = textIdx >= 0 ? fields[textIdx]?.trim() : ''
       const paymentType = paymentTypeIdx >= 0 ? fields[paymentTypeIdx]?.trim() : ''
+      const ytterligareDetaljer = ytterligareDetaljerIdx >= 0 ? fields[ytterligareDetaljerIdx]?.trim() : ''
 
       let description: string
       if (name || subject) {
         // Classic format: Namn — Rubrik
         description = [name, subject].filter(Boolean).join(' — ') || 'Unknown'
+      } else if (ytterligareDetaljer) {
+        // Format D: "Ytterligare detaljer" has the full description
+        description = ytterligareDetaljer
       } else if (text) {
         // Alternate format: use Text/Meddelande column
         description = [paymentType, text].filter(Boolean).join(' — ') || text
@@ -184,7 +202,7 @@ export const nordeaBusinessFormat: BankFileFormat = {
       const currency = currencyIdx >= 0 && fields[currencyIdx] ? fields[currencyIdx].trim() : 'SEK'
 
       transactions.push({
-        date,
+        date: normalizedDate,
         description,
         amount,
         currency: currency || 'SEK',
