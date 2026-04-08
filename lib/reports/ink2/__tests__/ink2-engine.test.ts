@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { INK2_ACCOUNT_MAPPINGS, isAccountInMapping } from '../ink2-engine'
+import { INK2_ACCOUNT_MAPPINGS, isAccountInMapping, checkBalanceWarning } from '../ink2-engine'
 import type { INK2SRUCode } from '../types'
 
 /**
@@ -253,5 +253,41 @@ describe('INK2 Account Mappings', () => {
       expect(financial?.normalBalance).toBe('net')
       expect(extraordinary?.normalBalance).toBe('net')
     })
+  })
+})
+
+describe('checkBalanceWarning', () => {
+  it('returns null when perfectly balanced', () => {
+    expect(checkBalanceWarning(100000, 100000)).toBeNull()
+  })
+
+  it('returns null for 1 kr difference (within rounding tolerance)', () => {
+    expect(checkBalanceWarning(100000, 100001)).toBeNull()
+    expect(checkBalanceWarning(100001, 100000)).toBeNull()
+  })
+
+  it('returns null for 2 kr difference (within rounding tolerance)', () => {
+    expect(checkBalanceWarning(100000, 100002)).toBeNull()
+    expect(checkBalanceWarning(100002, 100000)).toBeNull()
+  })
+
+  it('returns warning for 3 kr difference (exceeds tolerance)', () => {
+    expect(checkBalanceWarning(100000, 100003)).not.toBeNull()
+    expect(checkBalanceWarning(100003, 100000)).not.toBeNull()
+  })
+
+  it('returns null when totals are zero', () => {
+    expect(checkBalanceWarning(0, 0)).toBeNull()
+  })
+
+  it('returns null when assets are zero (no data)', () => {
+    expect(checkBalanceWarning(0, 5)).toBeNull()
+  })
+
+  it('includes amounts in warning message', () => {
+    const warning = checkBalanceWarning(100000, 100005)
+    expect(warning).toContain('100000')
+    expect(warning).toContain('100005')
+    expect(warning).toContain('5')
   })
 })

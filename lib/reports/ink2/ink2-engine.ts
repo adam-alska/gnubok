@@ -195,6 +195,20 @@ function roundToKrona(value: number): number {
 }
 
 /**
+ * Check if the balance sheet totals differ beyond the expected rounding tolerance.
+ * Each ruta is independently rounded to whole kronor for SRU output, so with 11+
+ * rutor the accumulated rounding can produce a 1-2 kr difference.
+ */
+export function checkBalanceWarning(totalAssets: number, totalEquityLiabilities: number): string | null {
+  const balanceDiff = Math.abs(totalAssets - totalEquityLiabilities)
+  const ROUNDING_TOLERANCE_KR = 2
+  if (balanceDiff > ROUNDING_TOLERANCE_KR && totalAssets > 0) {
+    return `Balansräkningen är inte i balans. Tillgångar: ${totalAssets} kr, Eget kapital och skulder: ${totalEquityLiabilities} kr (differens: ${balanceDiff} kr).`
+  }
+  return null
+}
+
+/**
  * Generate INK2 declaration for a fiscal period
  */
 export async function generateINK2Declaration(
@@ -349,18 +363,16 @@ export async function generateINK2Declaration(
 
   // Add warnings
   if (!(period as FiscalPeriod).is_closed) {
-    warnings.push('Räkenskapsåret är inte stängt. Siffrorna kan ändras.')
+    warnings.push('Räkenskapsåret är inte stängt — deklarationen kan genereras, men siffrorna kan ändras om fler bokföringar görs.')
   }
 
   if (totalAssets === 0 && totalEquityLiabilities === 0 && rutor['7310'] === 0) {
     warnings.push('Inga bokförda transaktioner hittades för perioden.')
   }
 
-  const balanceDiff = Math.abs(totalAssets - totalEquityLiabilities)
-  if (balanceDiff > 0 && totalAssets > 0) {
-    warnings.push(
-      `Balansräkningen är inte i balans. Tillgångar: ${totalAssets} kr, Eget kapital och skulder: ${totalEquityLiabilities} kr (differens: ${balanceDiff} kr).`
-    )
+  const balanceWarning = checkBalanceWarning(totalAssets, totalEquityLiabilities)
+  if (balanceWarning) {
+    warnings.push(balanceWarning)
   }
 
   return {
