@@ -452,6 +452,13 @@ export const arcimMigrationExtension: Extension = {
             }
           }
 
+          // Check if the company already has completed SIE imports (from manual upload)
+          const { count: sieImportCount } = await supabase
+            .from('sie_imports')
+            .select('*', { count: 'exact', head: true })
+            .eq('company_id', companyId)
+            .eq('status', 'completed')
+
           return NextResponse.json({
             consent: {
               id: consent.id,
@@ -462,6 +469,7 @@ export const arcimMigrationExtension: Extension = {
             companyInfo: mapped,
             sieAvailable,
             sieStats,
+            hasSieData: (sieImportCount ?? 0) > 0,
           })
         } catch (error) {
           log.error('Preview error:', error)

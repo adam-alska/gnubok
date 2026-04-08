@@ -44,12 +44,19 @@ const ARCIM_PROVIDERS: { id: ArcimProvider; name: string; authType: 'oauth' | 't
   { id: 'briox', name: 'Briox', authType: 'token' },
 ]
 
+interface SkipReasons {
+  duplicate?: number
+  inactive?: number
+  failed?: number
+  noMatch?: number
+}
+
 interface MigrationResults {
   companyInfo?: { imported: boolean }
-  customers?: { total: number; imported: number; skipped: number }
-  suppliers?: { total: number; imported: number; skipped: number }
-  salesInvoices?: { total: number; imported: number; skipped: number }
-  supplierInvoices?: { total: number; imported: number; skipped: number }
+  customers?: { total: number; imported: number; skipped: number; skipReasons?: SkipReasons }
+  suppliers?: { total: number; imported: number; skipped: number; skipReasons?: SkipReasons }
+  salesInvoices?: { total: number; imported: number; skipped: number; skipReasons?: SkipReasons }
+  supplierInvoices?: { total: number; imported: number; skipped: number; skipReasons?: SkipReasons }
 }
 import AccountMappingStep from '@/components/import/AccountMappingStep'
 import type { AccountMapping, ImportResult, ParsedSIEFile } from '@/lib/import/types'
@@ -120,6 +127,7 @@ interface PreviewData {
     transactionCount: number
     fiscalYears: number[]
   } | null
+  hasSieData: boolean
 }
 
 interface SIEFileStatus {
@@ -476,6 +484,7 @@ function ConnectStep({
                     <Input
                       id="apiToken"
                       type="password"
+                      autoComplete="off"
                       placeholder={provider === 'briox' ? 'Klistra in din applikationstoken' : 'Klistra in din API-nyckel'}
                       value={apiToken}
                       onChange={(e) => setApiToken(e.target.value)}
@@ -489,6 +498,7 @@ function ConnectStep({
                     </label>
                     <Input
                       id="companyId"
+                      autoComplete="off"
                       placeholder={isClientCredentials ? 'GUID från företagsinställningar' : 'GUID från URL:en, t.ex. 14ccad83-67f6-49bd-...'}
                       value={companyId}
                       onChange={(e) => setCompanyId(e.target.value)}
@@ -584,14 +594,33 @@ function PreviewStep({
             </div>
           )}
 
-          {preview && !preview.sieAvailable && !isLoading && (
-            <div className="flex gap-3 rounded-lg border border-warning/30 bg-warning/10 p-4">
-              <Info className="mt-0.5 h-5 w-5 shrink-0 text-warning-foreground" />
+          {preview && !preview.sieAvailable && !isLoading && preview.hasSieData && (
+            <div className="flex gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
+              <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
               <div>
-                <p className="text-sm font-medium text-warning-foreground">SIE-hämtning inte tillgänglig</p>
+                <p className="text-sm font-medium">SIE-data redan importerad</p>
                 <p className="text-xs text-muted-foreground">
-                  SIE-hämtning är inte tillgänglig för denna leverantör ännu. Du kan importera SIE-filen manuellt via <Link href="/import?mode=sie" className="underline hover:text-foreground">SIE-importen</Link>.
+                  Bokföringsdata har redan importerats via SIE-fil. Du kan fortsätta med att importera kunder, leverantörer och fakturor.
                 </p>
+              </div>
+            </div>
+          )}
+
+          {preview && !preview.sieAvailable && !isLoading && !preview.hasSieData && (
+            <div className="flex gap-3 rounded-lg border border-destructive/20 bg-destructive/5 p-4">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+              <div>
+                <p className="text-sm font-medium text-destructive">SIE-import krävs</p>
+                <p className="text-xs text-muted-foreground">
+                  Bokföringsdata (kontoplan, verifikationer och balanser) måste importeras via SIE-fil innan kunder, leverantörer och fakturor kan hämtas. Exportera en SIE-fil från {ARCIM_PROVIDERS.find(p => p.id === preview.consent.provider)?.name ?? 'ditt bokföringssystem'} och ladda upp den i gnubok.
+                </p>
+                <Button asChild variant="outline" size="sm" className="mt-3">
+                  <Link href="/import?mode=sie">
+                    <BookOpen className="mr-2 h-4 w-4" />
+                    Gå till SIE-importen
+                    <ExternalLink className="ml-2 h-3.5 w-3.5" />
+                  </Link>
+                </Button>
               </div>
             </div>
           )}
@@ -603,7 +632,7 @@ function PreviewStep({
           <ArrowLeft className="mr-2 h-4 w-4" />
           Tillbaka
         </Button>
-        <Button className="min-h-11" onClick={onContinue} disabled={isLoading}>
+        <Button className="min-h-11" onClick={onContinue} disabled={isLoading || (!!preview && !preview.sieAvailable && !preview.hasSieData)}>
           Fortsätt
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
@@ -817,15 +846,15 @@ function OptionsStep({
           />
           <OptionRow
             icon={<FileText className="h-4 w-4" />}
-            label="Kundfakturor (öppna)"
-            description="Obetalda kundfakturor"
+            label="Kundfakturor"
+            description="Alla kundfakturor (betalda och obetalda)"
             checked={options.importSalesInvoices}
             onChange={() => toggleOption('importSalesInvoices')}
           />
           <OptionRow
             icon={<FileText className="h-4 w-4" />}
-            label="Leverantörsfakturor (öppna)"
-            description="Obetalda leverantörsfakturor"
+            label="Leverantörsfakturor"
+            description="Alla leverantörsfakturor (betalda och obetalda)"
             checked={options.importSupplierInvoices}
             onChange={() => toggleOption('importSupplierInvoices')}
           />
@@ -1292,7 +1321,7 @@ function ResultStep({
                   label="Kunder"
                   status="success"
                   statusText={`${results.customers!.imported} importerade`}
-                  detail={results.customers!.skipped > 0 ? `${results.customers!.skipped} fanns redan` : undefined}
+                  detail={results.customers!.skipped > 0 ? formatSkipReasons(results.customers!.skipReasons, 'customer') ?? `${results.customers!.skipped} hoppades över` : undefined}
                 />
               )}
               {hasSuppliers && (
@@ -1301,7 +1330,7 @@ function ResultStep({
                   label="Leverantörer"
                   status="success"
                   statusText={`${results.suppliers!.imported} importerade`}
-                  detail={results.suppliers!.skipped > 0 ? `${results.suppliers!.skipped} fanns redan` : undefined}
+                  detail={results.suppliers!.skipped > 0 ? formatSkipReasons(results.suppliers!.skipReasons, 'supplier') ?? `${results.suppliers!.skipped} hoppades över` : undefined}
                 />
               )}
               {hasSalesInvoices && (
@@ -1310,7 +1339,7 @@ function ResultStep({
                   label="Kundfakturor"
                   status="success"
                   statusText={`${results.salesInvoices!.imported} importerade`}
-                  detail={results.salesInvoices!.skipped > 0 ? `${results.salesInvoices!.skipped} hoppades över` : undefined}
+                  detail={results.salesInvoices!.skipped > 0 ? formatSkipReasons(results.salesInvoices!.skipReasons, 'invoice') ?? `${results.salesInvoices!.skipped} hoppades över` : undefined}
                 />
               )}
               {hasSupplierInvoices && (
@@ -1319,7 +1348,7 @@ function ResultStep({
                   label="Leverantörsfakturor"
                   status="success"
                   statusText={`${results.supplierInvoices!.imported} importerade`}
-                  detail={results.supplierInvoices!.skipped > 0 ? `${results.supplierInvoices!.skipped} hoppades över` : undefined}
+                  detail={results.supplierInvoices!.skipped > 0 ? formatSkipReasons(results.supplierInvoices!.skipReasons, 'invoice') ?? `${results.supplierInvoices!.skipped} hoppades över` : undefined}
                 />
               )}
             </div>
@@ -1385,6 +1414,19 @@ function ResultStep({
       </div>
     </div>
   )
+}
+
+function formatSkipReasons(reasons?: SkipReasons, entityType?: 'customer' | 'supplier' | 'invoice'): string | undefined {
+  if (!reasons) return undefined
+  const parts: string[] = []
+  if (reasons.duplicate) parts.push(`${reasons.duplicate} fanns redan`)
+  if (reasons.inactive) parts.push(`${reasons.inactive} inaktiv${reasons.inactive > 1 ? 'a' : ''}`)
+  if (reasons.noMatch) {
+    const matchLabel = entityType === 'invoice' ? 'utan matchning' : 'utan matchning'
+    parts.push(`${reasons.noMatch} ${matchLabel}`)
+  }
+  if (reasons.failed) parts.push(`${reasons.failed} misslyckades`)
+  return parts.length > 0 ? parts.join(', ') : undefined
 }
 
 /** Simple row for non-SIE entity results (customers, invoices, etc.) */

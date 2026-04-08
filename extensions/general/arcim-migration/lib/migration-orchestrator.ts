@@ -8,12 +8,12 @@
  *   1. Company info → pre-fill company_settings
  *   2. Customers → needed before sales invoices
  *   3. Suppliers → needed before supplier invoices
- *   4. Sales invoices (open only)
- *   5. Supplier invoices (open only)
+ *   4. Sales invoices (all statuses, duplicates skipped)
+ *   5. Supplier invoices (all statuses, duplicates skipped)
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { MigrationProgress, MigrationResults } from '../types'
+import type { MigrationProgress, MigrationResults, SkipReasons } from '../types'
 import type { ProviderName } from '@/lib/providers/types'
 import { resolveConsent } from '@/lib/providers/resolve-consent'
 import {
@@ -111,10 +111,12 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
         const customers = await fetchCustomersDirect(provider, accessToken, providerCompanyId)
         let imported = 0
         let skipped = 0
+        const skipReasons: SkipReasons = {}
 
         for (const customer of customers) {
           if (!customer.active) {
             console.log(`[migration] Customer skipped (inactive): ${customer.party.name}`)
+            skipReasons.inactive = (skipReasons.inactive ?? 0) + 1
             skipped++
             continue
           }
@@ -132,6 +134,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             if (existing && existing.length > 0) {
               console.log(`[migration] Customer skipped (duplicate org_number ${orgNumber}): ${customer.party.name}`)
               customerIdMap.set(customer.id, existing[0].id)
+              skipReasons.duplicate = (skipReasons.duplicate ?? 0) + 1
               skipped++
               continue
             }
@@ -146,6 +149,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
 
           if (error || !inserted) {
             console.error(`[migration] Customer insert failed: ${customer.party.name}`, error?.message)
+            skipReasons.failed = (skipReasons.failed ?? 0) + 1
             skipped++
           } else {
             customerIdMap.set(customer.id, inserted.id)
@@ -153,7 +157,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
           }
         }
 
-        results.customers = { total: customers.length, imported, skipped }
+        results.customers = { total: customers.length, imported, skipped, skipReasons }
       } catch (err) {
         console.error('Failed to import customers:', err)
       }
@@ -168,10 +172,12 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
         const suppliers = await fetchSuppliersDirect(provider, accessToken, providerCompanyId)
         let imported = 0
         let skipped = 0
+        const skipReasons: SkipReasons = {}
 
         for (const supplier of suppliers) {
           if (!supplier.active) {
             console.log(`[migration] Supplier skipped (inactive): ${supplier.party.name}`)
+            skipReasons.inactive = (skipReasons.inactive ?? 0) + 1
             skipped++
             continue
           }
@@ -189,6 +195,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
             if (existing && existing.length > 0) {
               console.log(`[migration] Supplier skipped (duplicate org_number ${orgNumber}): ${supplier.party.name}`)
               supplierIdMap.set(supplier.id, existing[0].id)
+              skipReasons.duplicate = (skipReasons.duplicate ?? 0) + 1
               skipped++
               continue
             }
@@ -203,6 +210,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
 
           if (error || !inserted) {
             console.error(`[migration] Supplier insert failed: ${supplier.party.name}`, error?.message)
+            skipReasons.failed = (skipReasons.failed ?? 0) + 1
             skipped++
           } else {
             supplierIdMap.set(supplier.id, inserted.id)
@@ -210,26 +218,24 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
           }
         }
 
-        results.suppliers = { total: suppliers.length, imported, skipped }
+        results.suppliers = { total: suppliers.length, imported, skipped, skipReasons }
       } catch (err) {
         console.error('Failed to import suppliers:', err)
       }
     }
 
-    // ── Step 4: Sales invoices (open/unpaid only) ─────────────────
+    // ── Step 4: Sales invoices ────────────────────────────────────
     if (options.importSalesInvoices !== false) {
       emitProgress(options, { status: 'importing', currentStep: 'Importerar kundfakturor...', progress: 60 })
       try {
         const invoices = await fetchSalesInvoicesDirect(provider, accessToken, providerCompanyId)
-        const openInvoices = invoices.filter(i =>
-          i.status === 'sent' || i.status === 'overdue' || i.status === 'booked'
-        )
-        console.log(`[migration] Sales invoices: ${invoices.length} total, ${openInvoices.length} open (filtered by status: sent/overdue/booked)`)
+        console.log(`[migration] Sales invoices: ${invoices.length} total`)
 
         let imported = 0
         let skipped = 0
+        const skipReasons: SkipReasons = {}
 
-        for (const inv of openInvoices) {
+        for (const inv of invoices) {
           const customerOrgNumber = inv.customer.legalEntity?.companyId ||
             inv.customer.identifications?.find(i => i.schemeId === 'SE:ORGNR')?.id
 
@@ -280,6 +286,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
 
           if (!customerId) {
             console.log(`[migration] Sales invoice ${inv.invoiceNumber} skipped — no customer match for "${inv.customer.name}" (org: ${customerOrgNumber || 'n/a'})`)
+            skipReasons.noMatch = (skipReasons.noMatch ?? 0) + 1
             skipped++
             continue
           }
@@ -293,6 +300,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
 
           if (existingInv && existingInv.length > 0) {
             console.log(`[migration] Sales invoice ${inv.invoiceNumber} skipped — already exists`)
+            skipReasons.duplicate = (skipReasons.duplicate ?? 0) + 1
             skipped++
             continue
           }
@@ -307,6 +315,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
 
           if (invError || !insertedInv) {
             console.error(`[migration] Sales invoice ${inv.invoiceNumber} insert failed:`, invError?.message)
+            skipReasons.failed = (skipReasons.failed ?? 0) + 1
             skipped++
             continue
           }
@@ -322,26 +331,24 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
           imported++
         }
 
-        results.salesInvoices = { total: openInvoices.length, imported, skipped }
+        results.salesInvoices = { total: invoices.length, imported, skipped, skipReasons }
       } catch (err) {
         console.error('Failed to import sales invoices:', err)
       }
     }
 
-    // ── Step 5: Supplier invoices (open/unpaid only) ──────────────
+    // ── Step 5: Supplier invoices ─────────────────────────────────
     if (options.importSupplierInvoices !== false) {
       emitProgress(options, { status: 'importing', currentStep: 'Importerar leverantörsfakturor...', progress: 80 })
       try {
         const invoices = await fetchSupplierInvoicesDirect(provider, accessToken, providerCompanyId)
-        const openInvoices = invoices.filter(i =>
-          i.status === 'sent' || i.status === 'overdue' || i.status === 'booked' || i.status === 'draft'
-        )
-        console.log(`[migration] Supplier invoices: ${invoices.length} total, ${openInvoices.length} open (filtered by status: sent/overdue/booked/draft)`)
+        console.log(`[migration] Supplier invoices: ${invoices.length} total`)
 
         let imported = 0
         let skipped = 0
+        const skipReasons: SkipReasons = {}
 
-        for (const inv of openInvoices) {
+        for (const inv of invoices) {
           const supplierOrgNumber = inv.supplier.legalEntity?.companyId ||
             inv.supplier.identifications?.find(i => i.schemeId === 'SE:ORGNR')?.id
 
@@ -392,6 +399,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
 
           if (!supplierId) {
             console.log(`[migration] Supplier invoice ${inv.invoiceNumber} skipped — no supplier match for "${inv.supplier.name}" (org: ${supplierOrgNumber || 'n/a'})`)
+            skipReasons.noMatch = (skipReasons.noMatch ?? 0) + 1
             skipped++
             continue
           }
@@ -406,6 +414,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
 
           if (existingInv && existingInv.length > 0) {
             console.log(`[migration] Supplier invoice ${inv.invoiceNumber} skipped — already exists for supplier "${inv.supplier.name}"`)
+            skipReasons.duplicate = (skipReasons.duplicate ?? 0) + 1
             skipped++
             continue
           }
@@ -418,6 +427,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
 
           if (arrivalError || arrivalNum == null) {
             console.error(`[migration] Supplier invoice ${inv.invoiceNumber} skipped — could not get arrival number:`, arrivalError?.message)
+            skipReasons.failed = (skipReasons.failed ?? 0) + 1
             skipped++
             continue
           }
@@ -432,6 +442,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
 
           if (invError || !insertedInv) {
             console.error(`[migration] Supplier invoice ${inv.invoiceNumber} insert failed for "${inv.supplier.name}":`, invError?.message, JSON.stringify(mappedInvoice, null, 2))
+            skipReasons.failed = (skipReasons.failed ?? 0) + 1
             skipped++
             continue
           }
@@ -447,7 +458,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
           imported++
         }
 
-        results.supplierInvoices = { total: openInvoices.length, imported, skipped }
+        results.supplierInvoices = { total: invoices.length, imported, skipped, skipReasons }
       } catch (err) {
         console.error('Failed to import supplier invoices:', err)
       }

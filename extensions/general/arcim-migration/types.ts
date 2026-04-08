@@ -52,12 +52,19 @@ export interface MigrationProgress {
   error?: string
 }
 
+export interface SkipReasons {
+  duplicate?: number
+  inactive?: number
+  failed?: number
+  noMatch?: number
+}
+
 export interface MigrationResults {
   companyInfo?: { imported: boolean }
-  customers?: { total: number; imported: number; skipped: number }
-  suppliers?: { total: number; imported: number; skipped: number }
-  salesInvoices?: { total: number; imported: number; skipped: number }
-  supplierInvoices?: { total: number; imported: number; skipped: number }
+  customers?: { total: number; imported: number; skipped: number; skipReasons?: SkipReasons }
+  suppliers?: { total: number; imported: number; skipped: number; skipReasons?: SkipReasons }
+  salesInvoices?: { total: number; imported: number; skipped: number; skipReasons?: SkipReasons }
+  supplierInvoices?: { total: number; imported: number; skipped: number; skipReasons?: SkipReasons }
 }
 
 // ── Consent flow ────────────────────────────────────────────────────
