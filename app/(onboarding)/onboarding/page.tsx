@@ -6,23 +6,19 @@ import Image from 'next/image'
 import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/use-toast'
-import { Loader2, ArrowRight } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { validatePeriodDuration } from '@/lib/bookkeeping/validate-period-duration'
 import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
 import type { CompanyLookupResult } from '@/lib/company-lookup/types'
 import type { CompanySettings, EntityType, MomsPeriod } from '@/types'
+import type { CompanyRole } from '@/extensions/general/tic/lib/bankid-types'
 
-import Step0RoleChoice from '@/components/onboarding/Step0RoleChoice'
 import Step1EntityType from '@/components/onboarding/Step1EntityType'
 import Step2CompanyDetails from '@/components/onboarding/Step2CompanyDetails'
 import Step3TaxRegistration from '@/components/onboarding/Step3TaxRegistration'
 import Step4VatAccounting from '@/components/onboarding/Step4VatAccounting'
-
-type OnboardingMode = 'choice' | 'self' | 'consultant'
 
 const STEP_INFO = [
   { title: 'Välkommen', subtitle: 'Välj din företagsform för att komma igång.', label: 'Företagsform' },
@@ -31,12 +27,13 @@ const STEP_INFO = [
   { title: 'Moms & bokföring', subtitle: 'Momsregistrering och bokföringsmetod.', label: 'Moms' },
 ]
 
-const STEP_INFO_CONSULTANT = [
-  { title: 'Kundföretag', subtitle: 'Välj din kunds företagsform.', label: 'Företagsform' },
-  { title: 'Kundföretag', subtitle: 'Uppgifterna visas på fakturor och dokument.', label: 'Uppgifter' },
-  { title: 'F-skatt & räkenskapsår', subtitle: 'Din kunds skatteregistrering och räkenskapsår.', label: 'Skatt' },
-  { title: 'Moms & bokföring', subtitle: 'Din kunds momsregistrering och bokföringsmetod.', label: 'Moms' },
-]
+/** Map TIC legalEntityType to gnubok EntityType */
+function mapEntityType(ticType: string): EntityType | null {
+  const lower = ticType.toLowerCase()
+  if (lower === 'ab' || lower.includes('aktiebolag')) return 'aktiebolag'
+  if (lower === 'ef' || lower.includes('enskild firma') || lower.includes('enskild')) return 'enskild_firma'
+  return null
+}
 
 function translatePeriodError(msg: string): string {
   if (msg.includes('end must be after')) return 'Slutdatumet måste vara efter startdatumet.'
@@ -89,9 +86,8 @@ function OnboardingPageContent() {
   const [companyId, setCompanyId] = useState<string | null>(null)
   const ticEnabled = ENABLED_EXTENSION_IDS.has('tic')
   const [ticLookup, setTicLookup] = useState<CompanyLookupResult | null>(null)
-  const [mode, setMode] = useState<OnboardingMode>('choice')
-  const [consultantLanding, setConsultantLanding] = useState(false)
-  const [teamName, setTeamName] = useState('')
+  const [enrichmentCompanies, setEnrichmentCompanies] = useState<CompanyRole[]>([])
+  const [orgNumberLocked, setOrgNumberLocked] = useState(false)
 
   const totalSteps = 4
 
@@ -196,7 +192,6 @@ function OnboardingPageContent() {
         }
 
         setCompanyId(membership.company_id)
-        setMode('self') // Resuming — skip role choice
 
         if (data) {
           const step = data.onboarding_step || 1
@@ -209,6 +204,48 @@ function OnboardingPageContent() {
           setSettings(data)
           setCurrentStep(clampedStep)
         }
+      }
+
+      // Load BankID enrichment data if available (one-time use)
+      try {
+        const { data: enrichmentRow } = await supabase
+          .from('extension_data')
+          .select('id, value')
+          .eq('user_id', user.id)
+          .eq('extension_id', 'tic')
+          .eq('key', 'bankid_enrichment')
+          .maybeSingle()
+
+        if (enrichmentRow?.value) {
+          const enrichment = enrichmentRow.value as { spar?: Record<string, string>; companyRoles?: CompanyRole[] }
+
+          // Extract active companies
+          const activeCompanies = (enrichment.companyRoles ?? []).filter(
+            (c: CompanyRole) => c.companyStatus === 'Aktivt' && c.positionEnd === null
+          )
+          if (activeCompanies.length > 0) {
+            setEnrichmentCompanies(activeCompanies)
+          }
+
+          // Pre-fill SPAR address if not already set
+          if (enrichment.spar && !settings.address_line1) {
+            const spar = enrichment.spar
+            setSettings((prev) => ({
+              ...prev,
+              address_line1: spar.Folkbokforingsadress_SvenskAdress_Utdelningsadress1 || prev.address_line1,
+              postal_code: spar.Folkbokforingsadress_SvenskAdress_PostNr || prev.postal_code,
+              city: spar.Folkbokforingsadress_SvenskAdress_Postort || prev.city,
+            }))
+          }
+
+          // Delete enrichment data (one-time use)
+          await supabase
+            .from('extension_data')
+            .delete()
+            .eq('id', enrichmentRow.id)
+        }
+      } catch (err) {
+        console.warn(LOG, 'enrichment loading failed (non-blocking)', err)
       }
 
       setIsLoading(false)
@@ -563,8 +600,6 @@ function OnboardingPageContent() {
   const handleBack = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1)
-    } else if (isConsultant) {
-      setConsultantLanding(true)
     }
   }
 
@@ -579,44 +614,20 @@ function OnboardingPageContent() {
     setCurrentStep(nextStep)
   }
 
-  const handleConsultantCreateTeam = async () => {
-    if (!teamName.trim()) {
-      toast({ title: 'Ange ett namn', description: 'Ditt team behöver ett namn.', variant: 'destructive' })
-      return
-    }
+  /** Handle selecting a company from BankID enrichment */
+  const handleEnrichmentSelect = (company: CompanyRole) => {
+    const entityType = mapEntityType(company.legalEntityType)
+    if (!entityType) return
 
-    setIsSaving(true)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
-
-      const { data: newTeamId, error: teamError } = await supabase.rpc('create_team_with_owner', {
-        p_name: teamName.trim(),
-      })
-
-      if (teamError || !newTeamId) {
-        logError('consultant team creation failed', { message: teamError?.message })
-        toast({ title: 'Fel', description: 'Kunde inte skapa team. Försök igen.', variant: 'destructive' })
-        return
-      }
-
-      console.log(LOG, 'created team', newTeamId)
-      toast({
-        title: 'Välkommen!',
-        description: 'Lägg till ditt första kundföretag för att komma igång.',
-      })
-      // Hard navigation to exit the (onboarding) route group and trigger middleware
-      window.location.href = '/'
-    } catch (err) {
-      logError('consultant team creation threw', { error: String(err) })
-      Sentry.captureException(err)
-      toast({ title: 'Fel', description: 'Ett oväntat fel uppstod. Försök igen.', variant: 'destructive' })
-    } finally {
-      setIsSaving(false)
-    }
+    // Auto-set entity type, org number, and company name
+    setSettings((prev) => ({
+      ...prev,
+      entity_type: entityType,
+      org_number: company.companyRegistrationNumber,
+      company_name: company.legalName,
+    }))
+    setOrgNumberLocked(true)
+    setEnrichmentCompanies([]) // Dismiss picker
   }
 
   if (isLoading) {
@@ -627,14 +638,39 @@ function OnboardingPageContent() {
     )
   }
 
-  const isConsultant = mode === 'consultant'
-  const stepInfoArr = isConsultant ? STEP_INFO_CONSULTANT : STEP_INFO
-  const stepInfo = stepInfoArr[currentStep - 1]
-  const showRoleChoice = mode === 'choice'
-  const showConsultantLanding = isConsultant && consultantLanding
+  const stepInfo = STEP_INFO[currentStep - 1]
 
   const renderSteps = () => (
     <>
+      {currentStep === 1 && enrichmentCompanies.length > 0 && (
+        <div className="mb-6 space-y-3">
+          <p className="text-sm font-medium">Vi hittade dessa foretag kopplade till ditt BankID:</p>
+          {enrichmentCompanies.map((company) => {
+            const entityType = mapEntityType(company.legalEntityType)
+            return (
+              <button
+                key={company.companyRegistrationNumber}
+                onClick={() => handleEnrichmentSelect(company)}
+                className="w-full rounded-lg border bg-card p-4 text-left transition-colors hover:border-primary/50 hover:bg-primary/[0.02]"
+              >
+                <p className="font-medium text-sm">{company.legalName}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {company.companyRegistrationNumber} · {entityType === 'aktiebolag' ? 'Aktiebolag' : entityType === 'enskild_firma' ? 'Enskild firma' : company.legalEntityType}
+                </p>
+              </button>
+            )
+          })}
+          <div className="relative py-2">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">eller valj foretagsform manuellt</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {currentStep === 1 && (
         <Step1EntityType
           initialData={{ entity_type: settings.entity_type as EntityType }}
@@ -659,6 +695,7 @@ function OnboardingPageContent() {
           onNext={(data) => handleNext(data)}
           onBack={handleBack}
           isSaving={isSaving}
+          orgNumberLocked={orgNumberLocked}
         />
       )}
 
@@ -693,147 +730,7 @@ function OnboardingPageContent() {
     </>
   )
 
-  // ── Role Choice Screen (Step 0) ──
-  if (showRoleChoice) {
-    return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <header className="relative bg-[#141414] text-white overflow-hidden">
-          <div className="absolute inset-0 pointer-events-none" aria-hidden>
-            <div
-              className="absolute inset-0"
-              style={{
-                background: 'radial-gradient(ellipse at 30% -20%, rgba(255,255,255,0.04) 0%, transparent 50%)',
-              }}
-            />
-          </div>
-          <div className="relative z-10 max-w-2xl mx-auto w-full px-6 md:px-10 pt-5 pb-6 md:pt-6 md:pb-8">
-            <div className="flex items-center gap-2.5 mb-5 md:mb-6">
-              <Image
-                src="/gnubokiceon-removebg-preview.png"
-                alt="Gnubok"
-                width={30}
-                height={30}
-                className="invert opacity-90"
-              />
-              <span className="font-display text-base tracking-tight">gnubok</span>
-            </div>
-            <div className="animate-fade-in">
-              <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight leading-[1.1]">
-                Välkommen till gnubok
-              </h1>
-              <p className="text-white/40 mt-1.5 text-sm max-w-sm leading-relaxed">
-                Hur vill du använda gnubok?
-              </p>
-            </div>
-          </div>
-        </header>
-        <main className="flex-1">
-          <div className="max-w-lg mx-auto px-6 md:px-10 py-6 md:py-8">
-            <div className="animate-slide-up">
-              <Step0RoleChoice
-                onChooseSelf={() => setMode('self')}
-                onChooseConsultant={() => {
-                  setMode('consultant')
-                  setConsultantLanding(true)
-                }}
-              />
-            </div>
-          </div>
-        </main>
-      </div>
-    )
-  }
-
-  // ── Consultant Landing Screen ──
-  if (showConsultantLanding) {
-    return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <header className="relative bg-[#141414] text-white overflow-hidden">
-          <div className="absolute inset-0 pointer-events-none" aria-hidden>
-            <div
-              className="absolute inset-0"
-              style={{
-                background: 'radial-gradient(ellipse at 30% -20%, rgba(255,255,255,0.04) 0%, transparent 50%)',
-              }}
-            />
-          </div>
-          <div className="relative z-10 max-w-2xl mx-auto w-full px-6 md:px-10 pt-5 pb-6 md:pt-6 md:pb-8">
-            <div className="flex items-center gap-2.5 mb-5 md:mb-6">
-              <Image
-                src="/gnubokiceon-removebg-preview.png"
-                alt="Gnubok"
-                width={30}
-                height={30}
-                className="invert opacity-90"
-              />
-              <span className="font-display text-base tracking-tight">gnubok</span>
-            </div>
-            <div className="animate-fade-in">
-              <h1 className="font-display text-2xl md:text-3xl font-medium tracking-tight leading-[1.1]">
-                Namnge ditt team
-              </h1>
-              <p className="text-white/40 mt-1.5 text-sm max-w-sm leading-relaxed">
-                Skapa ett team som samlar dig och dina kollegor.
-              </p>
-            </div>
-          </div>
-        </header>
-        <main className="flex-1">
-          <div className="max-w-lg mx-auto px-6 md:px-10 py-6 md:py-8">
-            <div className="animate-slide-up space-y-5">
-              <div className="rounded-xl border bg-card p-6 space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="team-name">Teamnamn</Label>
-                  <Input
-                    id="team-name"
-                    placeholder="T.ex. Redovisningsbyrån AB"
-                    value={teamName}
-                    onChange={(e) => setTeamName(e.target.value)}
-                    disabled={isSaving}
-                    className="h-11"
-                    autoFocus
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Du kan ändra namnet senare i inställningar.
-                  </p>
-                </div>
-              </div>
-
-              <Button
-                size="lg"
-                className="w-full"
-                onClick={handleConsultantCreateTeam}
-                disabled={isSaving || !teamName.trim()}
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Skapar team...
-                  </>
-                ) : (
-                  <>
-                    Skapa team
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </>
-                )}
-              </Button>
-              <button
-                onClick={() => {
-                  setMode('choice')
-                  setConsultantLanding(false)
-                }}
-                className="block mx-auto text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
-              >
-                Tillbaka
-              </button>
-            </div>
-          </div>
-        </main>
-      </div>
-    )
-  }
-
-  // ── Steps 1–4 (self or consultant adding company) ──
+  // ── Steps 1–4 ──
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* ── Branded Header ── */}
@@ -866,7 +763,7 @@ function OnboardingPageContent() {
             </div>
             {/* Step indicator — inline with logo row */}
             <div className="flex items-center gap-1.5">
-              {stepInfoArr.map((_, i) => {
+              {STEP_INFO.map((_, i) => {
                 const num = i + 1
                 return (
                   <div

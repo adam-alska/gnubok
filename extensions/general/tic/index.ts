@@ -9,9 +9,25 @@ import {
   getCompanyPurpose,
   getFinancialReportSummaries,
 } from './lib/tic-client'
+import {
+  startBankIdAuth,
+  pollBankIdSession,
+  collectBankIdResult,
+  cancelBankIdSession,
+  requestEnrichment,
+  fetchEnrichmentData,
+} from './lib/bankid-client'
 import { TICAPIError } from './lib/tic-types'
 import type { TICCompanyProfile } from './lib/tic-types'
+import type { BankIdCompleteRequest } from './lib/bankid-types'
 import type { CompanyLookupResult } from '@/lib/company-lookup/types'
+import { hashPersonalNumber, encryptPersonalNumber } from '@/lib/auth/bankid'
+import { createServiceClientNoCookies } from '@/lib/auth/api-keys'
+import crypto from 'crypto'
+
+// Server-side per-IP rate limit for /bankid/start (each call = billable TIC session)
+const bankIdStartCooldowns = new Map<string, number>()
+const BANKID_START_COOLDOWN_MS = 5_000
 
 /** Map TIC bankAccountType enum to human-readable string */
 function bankAccountTypeLabel(type?: number): string {
@@ -337,6 +353,421 @@ export const ticExtension: Extension = {
             { error: 'Failed to fetch company profile' },
             { status: 500 }
           )
+        }
+      },
+    },
+    // ── BankID Authentication ──────────────────────────────────────
+    // Routes for BankID login/signup via TIC Identity API.
+    // skipAuth: true on auth routes (user has no Supabase session yet).
+
+    {
+      method: 'POST',
+      path: '/bankid/start',
+      skipAuth: true,
+      handler: async (request: Request) => {
+        try {
+          const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+            || request.headers.get('x-real-ip')
+            || '127.0.0.1'
+
+          // Per-IP rate limit (each start = billable TIC session)
+          const now = Date.now()
+          const lastStart = bankIdStartCooldowns.get(ip) ?? 0
+          if (now - lastStart < BANKID_START_COOLDOWN_MS) {
+            return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+          }
+          bankIdStartCooldowns.set(ip, now)
+
+          // Prevent map from growing unbounded
+          if (bankIdStartCooldowns.size > 10_000) {
+            const cutoff = now - BANKID_START_COOLDOWN_MS
+            for (const [k, v] of bankIdStartCooldowns) {
+              if (v < cutoff) bankIdStartCooldowns.delete(k)
+            }
+          }
+
+          const userAgent = request.headers.get('user-agent') || undefined
+
+          const session = await startBankIdAuth(ip, userAgent)
+          return NextResponse.json({ data: session })
+        } catch (error) {
+          if (error instanceof TICAPIError) {
+            if (error.code === 'NOT_CONFIGURED') {
+              return NextResponse.json({ error: 'BankID is not configured' }, { status: 503 })
+            }
+            if (error.code === 'RATE_LIMIT_EXCEEDED') {
+              return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+            }
+          }
+          console.error('[tic/bankid] start failed', error)
+          return NextResponse.json({ error: 'Failed to start BankID session' }, { status: 500 })
+        }
+      },
+    },
+
+    {
+      method: 'POST',
+      path: '/bankid/poll',
+      skipAuth: true,
+      handler: async (request: Request) => {
+        try {
+          const body = await request.json()
+          const sessionId = body?.sessionId
+          if (!sessionId || typeof sessionId !== 'string') {
+            return NextResponse.json({ error: 'sessionId is required' }, { status: 400 })
+          }
+
+          const result = await pollBankIdSession(sessionId)
+          if (result.status !== 'pending') {
+            console.log('[tic/bankid] poll status:', result.status, result.hintCode, result.user?.personalNumber ? 'has-user' : 'no-user')
+          }
+          return NextResponse.json({ data: result })
+        } catch (error) {
+          if (error instanceof TICAPIError) {
+            if (error.code === 'RATE_LIMIT_EXCEEDED') {
+              return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+            }
+          }
+          console.error('[tic/bankid] poll failed', error)
+          return NextResponse.json({ error: 'Failed to poll BankID session' }, { status: 500 })
+        }
+      },
+    },
+
+    {
+      method: 'POST',
+      path: '/bankid/complete',
+      skipAuth: true,
+      handler: async (request: Request) => {
+        try {
+          const body: BankIdCompleteRequest = await request.json()
+          const { sessionId, mode, email } = body
+
+          if (!sessionId || !mode) {
+            return NextResponse.json(
+              { error: 'sessionId and mode are required' },
+              { status: 400 }
+            )
+          }
+
+          if (mode === 'signup' && !email) {
+            return NextResponse.json(
+              { error: 'email is required for signup' },
+              { status: 400 }
+            )
+          }
+
+          // Verify BankID session is complete
+          const session = await collectBankIdResult(sessionId)
+          if (session.status !== 'complete' || !session.user) {
+            return NextResponse.json(
+              { error: 'session_invalid', message: 'BankID session is not complete' },
+              { status: 400 }
+            )
+          }
+
+          const { personalNumber, givenName, surname, name } = session.user
+          const pnrHash = hashPersonalNumber(personalNumber)
+          const supabase = createServiceClientNoCookies()
+
+          // Look up existing BankID identity
+          const { data: existing } = await supabase
+            .from('bankid_identities')
+            .select('user_id')
+            .eq('personal_number_hash', pnrHash)
+            .single()
+
+          if (mode === 'login') {
+            if (!existing) {
+              return NextResponse.json({
+                error: 'no_account',
+                givenName,
+                surname,
+              }, { status: 404 })
+            }
+
+            // Returning user — generate magic link
+            const { data: userData } = await supabase.auth.admin.getUserById(existing.user_id)
+            if (!userData?.user?.email) {
+              return NextResponse.json(
+                { error: 'session_invalid', message: 'User account not found' },
+                { status: 500 }
+              )
+            }
+
+            const { data: link, error: linkError } = await supabase.auth.admin.generateLink({
+              type: 'magiclink',
+              email: userData.user.email,
+            })
+
+            if (linkError || !link?.properties?.hashed_token) {
+              console.error('[tic/bankid] generateLink failed', linkError)
+              return NextResponse.json(
+                { error: 'Failed to create session' },
+                { status: 500 }
+              )
+            }
+
+            return NextResponse.json({
+              data: {
+                tokenHash: link.properties.hashed_token,
+                type: 'magiclink',
+                isNewUser: false,
+              },
+            })
+          }
+
+          // mode === 'signup'
+          if (existing) {
+            return NextResponse.json(
+              { error: 'already_linked', message: 'This BankID is already linked to an account' },
+              { status: 409 }
+            )
+          }
+
+          // Create new Supabase user
+          const randomPassword = crypto.randomBytes(32).toString('base64url')
+          const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+            email: email!,
+            email_confirm: true,
+            password: randomPassword,
+            user_metadata: { full_name: name },
+          })
+
+          if (createError || !newUser?.user) {
+            console.error('[tic/bankid] createUser failed', createError)
+            return NextResponse.json(
+              { error: 'Failed to create account', message: createError?.message },
+              { status: 500 }
+            )
+          }
+
+          const userId = newUser.user.id
+
+          // Mark user as BankID-linked (skips TOTP MFA)
+          await supabase.auth.admin.updateUserById(userId, {
+            app_metadata: { bankid_linked: true },
+          })
+
+          // Store BankID identity
+          const { error: insertError } = await supabase
+            .from('bankid_identities')
+            .insert({
+              user_id: userId,
+              personal_number_hash: pnrHash,
+              personal_number_enc: encryptPersonalNumber(personalNumber),
+              given_name: givenName,
+              surname,
+            })
+
+          if (insertError) {
+            console.error('[tic/bankid] insert bankid_identities failed', insertError)
+            // Clean up the created user if identity linking fails
+            await supabase.auth.admin.deleteUser(userId)
+            return NextResponse.json(
+              { error: 'Failed to link BankID identity' },
+              { status: 500 }
+            )
+          }
+
+          // Generate magic link for session
+          const { data: link, error: linkError } = await supabase.auth.admin.generateLink({
+            type: 'magiclink',
+            email: email!,
+          })
+
+          if (linkError || !link?.properties?.hashed_token) {
+            console.error('[tic/bankid] generateLink failed for new user', linkError)
+            return NextResponse.json(
+              { error: 'Account created but failed to create session' },
+              { status: 500 }
+            )
+          }
+
+          // Attempt enrichment and store for onboarding pre-fill
+          try {
+            const enrichment = await requestEnrichment(sessionId, ['SPAR', 'CompanyRoles'])
+            if (enrichment.status === 'Completed' && enrichment.secureUrl) {
+              const enrichmentData = await fetchEnrichmentData(enrichment.secureUrl)
+              console.log('[tic/bankid] enrichment success', {
+                hasSpar: !!enrichmentData.spar,
+                companyCount: enrichmentData.companyRoles?.length ?? 0,
+              })
+
+              // Store enrichment data in extension_data for the onboarding page to read
+              await supabase
+                .from('extension_data')
+                .upsert({
+                  user_id: userId,
+                  extension_id: 'tic',
+                  key: 'bankid_enrichment',
+                  value: enrichmentData,
+                }, { onConflict: 'user_id,extension_id,key' })
+            }
+          } catch (enrichError) {
+            // Enrichment is optional — don't fail signup
+            console.warn('[tic/bankid] enrichment failed (non-blocking)', enrichError)
+          }
+
+          return NextResponse.json({
+            data: {
+              tokenHash: link.properties.hashed_token,
+              type: 'magiclink',
+              isNewUser: true,
+            },
+          })
+        } catch (error) {
+          if (error instanceof TICAPIError) {
+            console.error('[tic/bankid] complete TIC error', {
+              message: error.message,
+              code: error.code,
+            })
+            return NextResponse.json(
+              { error: 'BankID verification failed' },
+              { status: 502 }
+            )
+          }
+          console.error('[tic/bankid] complete unexpected error', error)
+          return NextResponse.json(
+            { error: 'Failed to complete BankID authentication' },
+            { status: 500 }
+          )
+        }
+      },
+    },
+
+    {
+      method: 'DELETE',
+      path: '/bankid/:sessionId',
+      skipAuth: true,
+      handler: async (request: Request) => {
+        try {
+          const url = new URL(request.url)
+          const sessionId = url.searchParams.get('_sessionId')
+          if (!sessionId) {
+            return NextResponse.json({ error: 'sessionId is required' }, { status: 400 })
+          }
+
+          await cancelBankIdSession(sessionId)
+          return NextResponse.json({ data: { cancelled: true } })
+        } catch (error) {
+          console.error('[tic/bankid] cancel failed', error)
+          return NextResponse.json({ error: 'Failed to cancel session' }, { status: 500 })
+        }
+      },
+    },
+
+    {
+      method: 'POST',
+      path: '/bankid/link',
+      // skipAuth: false — requires existing Supabase session
+      handler: async (request: Request, ctx?) => {
+        try {
+          const body = await request.json()
+          const { sessionId } = body
+
+          if (!sessionId || !ctx?.userId) {
+            return NextResponse.json({ error: 'sessionId is required' }, { status: 400 })
+          }
+
+          // Verify BankID session
+          const session = await collectBankIdResult(sessionId)
+          if (session.status !== 'complete' || !session.user) {
+            return NextResponse.json(
+              { error: 'session_invalid', message: 'BankID session is not complete' },
+              { status: 400 }
+            )
+          }
+
+          const { personalNumber, givenName, surname } = session.user
+          const pnrHash = hashPersonalNumber(personalNumber)
+          const supabase = createServiceClientNoCookies()
+
+          // Check personnummer not already linked to another user
+          const { data: existing } = await supabase
+            .from('bankid_identities')
+            .select('user_id')
+            .eq('personal_number_hash', pnrHash)
+            .single()
+
+          if (existing && existing.user_id !== ctx.userId) {
+            return NextResponse.json(
+              { error: 'already_linked', message: 'This BankID is already linked to another account' },
+              { status: 409 }
+            )
+          }
+
+          if (existing && existing.user_id === ctx.userId) {
+            return NextResponse.json({ data: { linked: true, alreadyLinked: true } })
+          }
+
+          // Link BankID to current user
+          const { error: insertError } = await supabase
+            .from('bankid_identities')
+            .insert({
+              user_id: ctx.userId,
+              personal_number_hash: pnrHash,
+              personal_number_enc: encryptPersonalNumber(personalNumber),
+              given_name: givenName,
+              surname,
+            })
+
+          if (insertError) {
+            console.error('[tic/bankid] link insert failed', insertError)
+            return NextResponse.json(
+              { error: 'Failed to link BankID' },
+              { status: 500 }
+            )
+          }
+
+          // Mark user as BankID-linked (skips TOTP MFA)
+          await supabase.auth.admin.updateUserById(ctx.userId, {
+            app_metadata: { bankid_linked: true },
+          })
+
+          return NextResponse.json({ data: { linked: true } })
+        } catch (error) {
+          console.error('[tic/bankid] link failed', error)
+          return NextResponse.json(
+            { error: 'Failed to link BankID' },
+            { status: 500 }
+          )
+        }
+      },
+    },
+
+    {
+      method: 'POST',
+      path: '/bankid/unlink',
+      // skipAuth: false — requires existing Supabase session
+      handler: async (_request: Request, ctx?) => {
+        try {
+          if (!ctx?.userId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+          }
+
+          const supabase = createServiceClientNoCookies()
+
+          // Delete bankid_identities row
+          const { error: deleteError } = await supabase
+            .from('bankid_identities')
+            .delete()
+            .eq('user_id', ctx.userId)
+
+          if (deleteError) {
+            console.error('[tic/bankid] unlink delete failed', deleteError)
+            return NextResponse.json({ error: 'Failed to unlink BankID' }, { status: 500 })
+          }
+
+          // Clear app_metadata.bankid_linked so MFA enforcement resumes
+          await supabase.auth.admin.updateUserById(ctx.userId, {
+            app_metadata: { bankid_linked: false },
+          })
+
+          return NextResponse.json({ data: { unlinked: true } })
+        } catch (error) {
+          console.error('[tic/bankid] unlink failed', error)
+          return NextResponse.json({ error: 'Failed to unlink BankID' }, { status: 500 })
         }
       },
     },

@@ -11,6 +11,9 @@ import { useToast } from '@/components/ui/use-toast'
 import { Loader2, Mail, ArrowLeft, KeyRound } from 'lucide-react'
 import Image from 'next/image'
 import { getErrorMessage } from '@/lib/errors/get-error-message'
+import { isBankIdEnabled } from '@/lib/auth/bankid'
+import { BankIdAuth } from '@/components/auth/BankIdAuth'
+import type { BankIdResult } from '@/components/auth/BankIdAuth'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -20,9 +23,11 @@ export default function LoginPage() {
   const [showResetPassword, setShowResetPassword] = useState(false)
   const [resetCooldownUntil, setResetCooldownUntil] = useState<number | null>(null)
   const [resetCooldownRemaining, setResetCooldownRemaining] = useState(0)
+  const [bankIdNoAccount, setBankIdNoAccount] = useState<{ givenName?: string; surname?: string } | null>(null)
   const { toast } = useToast()
   const router = useRouter()
   const supabase = createClient()
+  const bankIdEnabled = isBankIdEnabled()
 
   // Reset cooldown timer
   useEffect(() => {
@@ -36,6 +41,51 @@ export default function LoginPage() {
     const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
   }, [resetCooldownUntil])
+
+  const handleBankIdComplete = async (result: BankIdResult) => {
+    if (result.error === 'no_account') {
+      setBankIdNoAccount({ givenName: result.givenName, surname: result.surname })
+      return
+    }
+
+    if (result.error) {
+      toast({
+        title: 'Inloggning misslyckades',
+        description: 'Kunde inte slutfora BankID-inloggningen.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (result.tokenHash && result.type) {
+      try {
+        const { error } = await supabase.auth.verifyOtp({
+          token_hash: result.tokenHash,
+          type: result.type as 'magiclink',
+        })
+
+        if (error) {
+          console.error('[login] BankID verifyOtp failed', error)
+          toast({
+            title: 'Inloggning misslyckades',
+            description: 'Kunde inte slutfora BankID-inloggningen.',
+            variant: 'destructive',
+          })
+          return
+        }
+
+        router.push('/')
+        router.refresh()
+      } catch (error) {
+        console.error('[login] BankID complete error', error)
+        toast({
+          title: 'Inloggning misslyckades',
+          description: getErrorMessage(error, { context: 'auth' }),
+          variant: 'destructive',
+        })
+      }
+    }
+  }
 
   const handlePasswordLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -244,6 +294,41 @@ export default function LoginPage() {
         </div>
 
         <div className="rounded-xl border bg-card p-6" style={{ boxShadow: 'var(--shadow-md)' }}>
+          {bankIdEnabled && (
+            <>
+              {bankIdNoAccount ? (
+                <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    Hej {bankIdNoAccount.givenName}!
+                  </p>
+                  <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
+                    Vi hittade inget konto kopplat till ditt BankID. Logga in med e-post nedan och koppla sedan BankID i installningar.
+                  </p>
+                  <p className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setBankIdNoAccount(null)}
+                      className="text-xs text-amber-600 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400"
+                    >
+                      Eller skapa ett nytt konto
+                    </button>
+                  </p>
+                </div>
+              ) : (
+                <div className="mb-5">
+                  <BankIdAuth mode="login" onComplete={handleBankIdComplete} />
+                </div>
+              )}
+              <div className="relative mb-5">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">eller logga in med e-post</span>
+                </div>
+              </div>
+            </>
+          )}
           <form onSubmit={handlePasswordLogin} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="email">E-postadress</Label>

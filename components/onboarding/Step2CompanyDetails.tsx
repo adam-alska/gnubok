@@ -34,6 +34,7 @@ interface Step2Props {
   onNext: (data: FormData) => void
   onBack: () => void
   isSaving: boolean
+  orgNumberLocked?: boolean
 }
 
 export default function Step2CompanyDetails({
@@ -44,6 +45,7 @@ export default function Step2CompanyDetails({
   onNext,
   onBack,
   isSaving,
+  orgNumberLocked,
 }: Step2Props) {
   const {
     register,
@@ -167,6 +169,8 @@ export default function Step2CompanyDetails({
                 id="org_number"
                 placeholder={isAB ? 'XXXXXX-XXXX' : 'ÅÅMMDD-XXXX (ditt personnummer vid EF)'}
                 {...register('org_number')}
+                readOnly={orgNumberLocked}
+                className={orgNumberLocked ? 'bg-muted cursor-not-allowed' : undefined}
               />
               {errors.org_number && (
                 <p className="text-sm text-destructive">{errors.org_number.message}</p>
