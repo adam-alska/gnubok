@@ -147,6 +147,7 @@ const FETCH_TIMEOUT_MS = 15_000
 const MAX_RETRIES = 2
 const RETRY_DELAY_MS = 1000
 const MAX_PAGINATION_PAGES = 100
+const DEFAULT_PAGE_SIZE = 500
 
 // API Helper
 
@@ -467,6 +468,7 @@ export async function getAccountTransactions(
   if (dateFrom) params.set('date_from', dateFrom)
   if (dateTo) params.set('date_to', dateTo)
   if (continuationKey) params.set('continuation_key', continuationKey)
+  params.set('limit', String(DEFAULT_PAGE_SIZE))
 
   const queryString = params.toString()
   const endpoint = `/accounts/${accountUid}/transactions${queryString ? `?${queryString}` : ''}`
@@ -542,6 +544,7 @@ export async function getAllTransactionsWithRaw(
     if (dateFrom) params.set('date_from', dateFrom)
     if (dateTo) params.set('date_to', dateTo)
     if (continuationKey) params.set('continuation_key', continuationKey)
+    params.set('limit', String(DEFAULT_PAGE_SIZE))
 
     const queryString = params.toString()
     const endpoint = `/accounts/${accountUid}/transactions${queryString ? `?${queryString}` : ''}`
