@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
@@ -794,19 +795,19 @@ export default function ImportPage() {
     })
   }, [])
 
-  // Auto-detect OAuth callback or deep-link mode from query params (disabled in sandbox)
+  // Sync mode from URL search params (reacts to client-side navigation changes)
+  const searchParams = useSearchParams()
   useEffect(() => {
     if (isSandbox) return
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('migration')) {
+    if (searchParams.get('migration')) {
       setMode('migration')
     } else {
-      const modeParam = params.get('mode')
+      const modeParam = searchParams.get('mode')
       if (modeParam && ['psd2', 'bank', 'sie', 'migration'].includes(modeParam)) {
         setMode(modeParam as ImportMode)
       }
     }
-  }, [isSandbox])
+  }, [isSandbox, searchParams])
   // Extensions are active if compiled in — no runtime toggle check needed
   const hasBankingExtension = ENABLED_EXTENSION_IDS.has('enable-banking')
   const hasMigrationExtension = ENABLED_EXTENSION_IDS.has('arcim-migration')

@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/components/ui/use-toast'
@@ -483,8 +483,9 @@ function ConnectStep({
                     </label>
                     <Input
                       id="apiToken"
+                      name="apiToken_nocomplete"
                       type="password"
-                      autoComplete="off"
+                      autoComplete="new-password"
                       placeholder={provider === 'briox' ? 'Klistra in din applikationstoken' : 'Klistra in din API-nyckel'}
                       value={apiToken}
                       onChange={(e) => setApiToken(e.target.value)}
@@ -498,7 +499,8 @@ function ConnectStep({
                     </label>
                     <Input
                       id="companyId"
-                      autoComplete="off"
+                      name="companyId_nocomplete"
+                      autoComplete="new-password"
                       placeholder={isClientCredentials ? 'GUID från företagsinställningar' : 'GUID från URL:en, t.ex. 14ccad83-67f6-49bd-...'}
                       value={companyId}
                       onChange={(e) => setCompanyId(e.target.value)}
@@ -614,13 +616,14 @@ function PreviewStep({
                 <p className="text-xs text-muted-foreground">
                   Bokföringsdata (kontoplan, verifikationer och balanser) måste importeras via SIE-fil innan kunder, leverantörer och fakturor kan hämtas. Exportera en SIE-fil från {ARCIM_PROVIDERS.find(p => p.id === preview.consent.provider)?.name ?? 'ditt bokföringssystem'} och ladda upp den i gnubok.
                 </p>
-                <Button asChild variant="outline" size="sm" className="mt-3">
-                  <Link href="/import?mode=sie">
-                    <BookOpen className="mr-2 h-4 w-4" />
-                    Gå till SIE-importen
-                    <ExternalLink className="ml-2 h-3.5 w-3.5" />
-                  </Link>
-                </Button>
+                <Link
+                  href="/import?mode=sie"
+                  className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'mt-3')}
+                >
+                  <BookOpen className="mr-2 h-4 w-4" />
+                  Gå till SIE-importen
+                  <ExternalLink className="ml-2 h-3.5 w-3.5" />
+                </Link>
               </div>
             </div>
           )}
@@ -1853,6 +1856,15 @@ export default function ArcimMigrationWorkspace(_props: WorkspaceComponentProps)
 
         const data = await res.json()
         setMigrationResults(data.results)
+      }
+
+      // Mark consent as fully accepted now that import is complete
+      if (consentId) {
+        await fetch('/api/extensions/ext/arcim-migration/accept', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ consentId }),
+        }).catch(() => { /* best-effort */ })
       }
 
       setMigrationProgress(100)

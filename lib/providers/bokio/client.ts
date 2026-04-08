@@ -1,6 +1,9 @@
 import { TokenBucketRateLimiter } from '../rate-limiter';
 import { withRetry } from '../retry';
 import { BOKIO_BASE_URL, BOKIO_RATE_LIMIT } from './config';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('bokio-client');
 
 export class BokioApiError extends Error {
   constructor(
@@ -24,7 +27,8 @@ function isRetryableError(error: unknown): boolean {
 }
 
 interface BokioPaginatedResponse<T> {
-  items: T[];
+  items?: T[];
+  data?: T[];    // Some Bokio endpoints use 'data' instead of 'items'
   totalItems: number;
   totalPages: number;
   currentPage: number;
@@ -72,7 +76,8 @@ export class BokioClient {
 
   /**
    * Fetch a paginated list endpoint.
-   * Bokio returns `{ data: [...], pagination: { page, pageSize, totalPages, totalCount } }`.
+   * Bokio returns `{ items: [...], totalItems, totalPages, currentPage }`.
+   * Some endpoints may use `data` instead of `items`.
    */
   async getPage<T>(
     accessToken: string,
@@ -94,12 +99,41 @@ export class BokioClient {
     const path = `/companies/${companyId}${relativePath}?${params.toString()}`;
     const response = await this.get<BokioPaginatedResponse<T>>(accessToken, path);
 
-    return {
-      items: Array.isArray(response.items) ? response.items : [],
+    // Bokio uses 'items' for most endpoints but 'data' for some (e.g., credit notes)
+    const items = Array.isArray(response.items)
+      ? response.items
+      : Array.isArray(response.data)
+        ? response.data
+        : [];
+
+    const result = {
+      items,
       page: response.currentPage ?? (options?.page ?? 1),
       totalPages: response.totalPages ?? 1,
       totalCount: response.totalItems ?? 0,
     };
+
+    log.info(
+      `getPage ${relativePath} page=${result.page}/${result.totalPages}: ` +
+      `${result.items.length} items (totalCount=${result.totalCount})` +
+      (result.items.length === 0 && result.totalCount > 0
+        ? ` — WARNING: 0 items despite totalCount=${result.totalCount}, raw keys: ${Object.keys(response).join(', ')}`
+        : ''),
+    );
+
+    // Extra diagnostic: if no items found and response has unexpected keys, log them
+    if (result.items.length === 0) {
+      const rawObj = response as Record<string, unknown>;
+      const keys = Object.keys(rawObj).filter(k => !['totalItems', 'totalPages', 'currentPage', 'items', 'data'].includes(k));
+      if (keys.length > 0) {
+        log.warn(
+          `Unexpected response keys for ${relativePath}: ${keys.join(', ')}. ` +
+          `Values: ${keys.map(k => `${k}=${typeof rawObj[k] === 'object' ? JSON.stringify(rawObj[k]).slice(0, 200) : rawObj[k]}`).join(', ')}`,
+        );
+      }
+    }
+
+    return result;
   }
 
   /**

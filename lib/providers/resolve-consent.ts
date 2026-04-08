@@ -28,8 +28,9 @@ export async function resolveConsent(companyId: string, consentId: string): Prom
   }
 
   const consent = consentRows[0]!;
-  if (consent.status !== 1) {
-    throw { status: 403, message: 'Consent is not in Accepted status' };
+  // Accept status 0 (token submitted, migration pending) and 1 (fully accepted)
+  if (consent.status !== 0 && consent.status !== 1) {
+    throw { status: 403, message: 'Consent is not in a valid status' };
   }
 
   if (!consent.provider) {
