@@ -25,6 +25,10 @@ import { hashPersonalNumber, encryptPersonalNumber } from '@/lib/auth/bankid'
 import { createServiceClientNoCookies } from '@/lib/auth/api-keys'
 import crypto from 'crypto'
 
+// Server-side per-IP rate limit for /bankid/start (each call = billable TIC session)
+const bankIdStartCooldowns = new Map<string, number>()
+const BANKID_START_COOLDOWN_MS = 5_000
+
 /** Map TIC bankAccountType enum to human-readable string */
 function bankAccountTypeLabel(type?: number): string {
   switch (type) {
@@ -360,29 +364,25 @@ export const ticExtension: Extension = {
       method: 'POST',
       path: '/bankid/start',
       skipAuth: true,
-      handler: (() => {
-        // Server-side per-IP rate limit (each start = billable TIC session)
-        const ipCooldowns = new Map<string, number>()
-        const COOLDOWN_MS = 5_000
-
-        return async (request: Request) => {
+      handler: async (request: Request) => {
         try {
           const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
             || request.headers.get('x-real-ip')
             || '127.0.0.1'
 
+          // Per-IP rate limit (each start = billable TIC session)
           const now = Date.now()
-          const lastStart = ipCooldowns.get(ip) ?? 0
-          if (now - lastStart < COOLDOWN_MS) {
+          const lastStart = bankIdStartCooldowns.get(ip) ?? 0
+          if (now - lastStart < BANKID_START_COOLDOWN_MS) {
             return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
           }
-          ipCooldowns.set(ip, now)
+          bankIdStartCooldowns.set(ip, now)
 
           // Prevent map from growing unbounded
-          if (ipCooldowns.size > 10_000) {
-            const cutoff = now - COOLDOWN_MS
-            for (const [k, v] of ipCooldowns) {
-              if (v < cutoff) ipCooldowns.delete(k)
+          if (bankIdStartCooldowns.size > 10_000) {
+            const cutoff = now - BANKID_START_COOLDOWN_MS
+            for (const [k, v] of bankIdStartCooldowns) {
+              if (v < cutoff) bankIdStartCooldowns.delete(k)
             }
           }
 
@@ -402,8 +402,7 @@ export const ticExtension: Extension = {
           console.error('[tic/bankid] start failed', error)
           return NextResponse.json({ error: 'Failed to start BankID session' }, { status: 500 })
         }
-      }
-      })(),
+      },
     },
 
     {
