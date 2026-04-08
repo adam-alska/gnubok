@@ -36,14 +36,31 @@ export async function POST(request: Request) {
     const file = formData.get('file') as File | null
 
     if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+      return NextResponse.json({ error: 'parse', message: 'Ingen fil bifogad i förfrågan.' }, { status: 400 })
     }
 
     // Validate file type
     const filename = file.name.toLowerCase()
     if (!filename.endsWith('.sie') && !filename.endsWith('.se')) {
       return NextResponse.json(
-        { error: 'Invalid file type. Please upload a .sie file' },
+        { error: 'parse', message: 'Filtypen stöds inte. Ladda upp en fil med ändelsen .sie eller .se.' },
+        { status: 400 }
+      )
+    }
+
+    // Validate file size (max 50 MB)
+    const MAX_FILE_SIZE = 50 * 1024 * 1024
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: 'parse', message: `Filen är för stor (${(file.size / 1024 / 1024).toFixed(1)} MB). Maxstorlek är 50 MB.` },
+        { status: 400 }
+      )
+    }
+
+    // Validate file is not empty
+    if (file.size === 0) {
+      return NextResponse.json(
+        { error: 'parse', message: 'Filen är tom (0 bytes). Kontrollera att exporten från bokföringsprogrammet genomfördes korrekt.' },
         { status: 400 }
       )
     }
@@ -92,7 +109,7 @@ export async function POST(request: Request) {
     if (!validation.valid) {
       return NextResponse.json({
         error: 'validation',
-        message: 'SIE file has validation errors',
+        message: 'SIE-filen innehåller valideringsfel som måste åtgärdas innan import.',
         errors: validation.errors,
         warnings: validation.warnings,
       }, { status: 400 })
@@ -151,8 +168,12 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error('SIE parse error:', error)
+    const detail = error instanceof Error ? error.message : ''
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to parse SIE file' },
+      {
+        error: 'parse',
+        message: `Kunde inte tolka SIE-filen. Filen kan vara skadad eller i ett format som inte stöds.${detail ? ` (${detail})` : ''}`,
+      },
       { status: 500 }
     )
   }

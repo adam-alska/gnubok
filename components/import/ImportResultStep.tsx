@@ -49,8 +49,10 @@ export default function ImportResultStep({ result, onNewImport }: ImportResultSt
           </CardTitle>
           <CardDescription>
             {result.success
-              ? 'Din bokföring har importerats framgångsrikt.'
-              : 'Det uppstod fel under importen. Se detaljer nedan.'}
+              ? skipped && skipped.total > 0
+                ? `Din bokföring har importerats. ${result.journalEntriesCreated} verifikationer skapades, ${skipped.total} hoppades över — se detaljer nedan.`
+                : 'Din bokföring har importerats framgångsrikt.'
+              : 'Det uppstod fel under importen. Läs felmeddelanden nedan för att förstå vad som gick snett och hur du kan åtgärda det.'}
           </CardDescription>
         </CardHeader>
       </Card>
@@ -109,7 +111,7 @@ export default function ImportResultStep({ result, onNewImport }: ImportResultSt
               Fel ({result.errors.length})
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {result.errors.map((error, i) => (
                 <div key={i} className="text-sm flex gap-2">
@@ -118,6 +120,16 @@ export default function ImportResultStep({ result, onNewImport }: ImportResultSt
                 </div>
               ))}
             </div>
+            {!result.success && (
+              <div className="text-sm text-muted-foreground border-t pt-3 space-y-1">
+                <p className="font-medium">Vad kan du göra?</p>
+                <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+                  <li>Kontrollera att SIE-filen exporterades korrekt från källsystemet</li>
+                  <li>Prova att exportera filen igen och ladda upp på nytt</li>
+                  <li>Om felet kvarstår, kontakta support med felmeddelandet ovan</li>
+                </ul>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

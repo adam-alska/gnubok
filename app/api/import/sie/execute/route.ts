@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     const optionsJson = formData.get('options') as string | null
 
     if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+      return NextResponse.json({ error: 'Ingen fil bifogad. Gå tillbaka och ladda upp filen igen.' }, { status: 400 })
     }
 
     // Parse options
@@ -87,9 +87,11 @@ export async function POST(request: Request) {
     // Validate all accounts are mapped
     const unmapped = mappings.filter((m) => !m.targetAccount)
     if (unmapped.length > 0) {
+      const accountList = unmapped.slice(0, 5).map((m) => `${m.sourceAccount} (${m.sourceName})`).join(', ')
+      const remaining = unmapped.length > 5 ? ` och ${unmapped.length - 5} till` : ''
       return NextResponse.json({
         error: 'validation',
-        message: `${unmapped.length} account(s) are not mapped`,
+        message: `${unmapped.length} konto(n) saknar mappning: ${accountList}${remaining}. Gå tillbaka till kontomappningssteget och koppla alla konton.`,
         unmappedAccounts: unmapped.map((m) => ({
           account: m.sourceAccount,
           name: m.sourceName,
@@ -183,7 +185,7 @@ export async function POST(request: Request) {
 
       if (activateError) {
         return NextResponse.json({
-          error: `Failed to activate accounts: ${activateError.message}`,
+          error: `Kunde inte aktivera konton i kontoplanen: ${activateError.message}. Kontrollera att kontona inte redan finns med andra inställningar.`,
         }, { status: 500 })
       }
     }
@@ -208,7 +210,7 @@ export async function POST(request: Request) {
     if (!result.success) {
       return NextResponse.json({
         error: 'import',
-        message: 'Import completed with errors',
+        message: 'Importen slutfördes med fel. Se detaljerna nedan för att förstå vad som gick snett.',
         result,
       }, { status: 400 })
     }
@@ -219,8 +221,11 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error('SIE import error:', error)
+    const detail = error instanceof Error ? error.message : ''
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to import SIE file' },
+      {
+        error: `Importen avbröts oväntat. Ingen data har sparats.${detail ? ` (${detail})` : ''} Försök igen — om felet kvarstår, kontakta support.`,
+      },
       { status: 500 }
     )
   }

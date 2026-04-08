@@ -282,31 +282,55 @@ export default function SIEPreviewStep({
         </div>
       )}
 
-      {/* Issues */}
-      {(errors.length > 0 || warnings.length > 0) && (
-        <Card className={errors.length > 0 ? 'border-destructive/50' : 'border-warning/50'}>
+      {/* Errors */}
+      {errors.length > 0 && (
+        <Card className="border-destructive/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              {errors.length > 0 ? (
-                <XCircle className="h-5 w-5 text-destructive" />
-              ) : (
-                <AlertCircle className="h-5 w-5 text-warning" />
-              )}
-              {errors.length > 0 ? 'Fel' : 'Varningar'}
+              <XCircle className="h-5 w-5 text-destructive" />
+              Tolkningsfel ({errors.length})
             </CardTitle>
+            <CardDescription>
+              Dessa fel hittades under tolkningen av SIE-filen och kan påverka importresultatet.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {errors.map((issue, i) => (
                 <div key={`error-${i}`} className="text-sm flex gap-2 text-destructive">
                   <XCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                  <span>Rad {issue.line}: {issue.message}</span>
+                  <span>
+                    <span className="font-mono text-xs opacity-70">Rad {issue.line}</span>{' '}
+                    {issue.message}
+                  </span>
                 </div>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Warnings */}
+      {warnings.length > 0 && (
+        <Card className="border-warning/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-warning" />
+              Varningar ({warnings.length})
+            </CardTitle>
+            <CardDescription>
+              Dessa varningar blockerar inte importen men bör granskas.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
               {warnings.map((issue, i) => (
                 <div key={`warning-${i}`} className="text-sm flex gap-2 text-warning">
                   <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                  <span>Rad {issue.line}: {issue.message}</span>
+                  <span>
+                    <span className="font-mono text-xs opacity-70">Rad {issue.line}</span>{' '}
+                    {issue.message}
+                  </span>
                 </div>
               ))}
             </div>

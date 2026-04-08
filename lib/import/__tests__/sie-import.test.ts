@@ -210,7 +210,7 @@ describe('generateImportPreview', () => {
     it('passes parse issues to preview', () => {
       const parsed = makeParsedFile({
         issues: [
-          { severity: 'warning', line: 5, message: 'Unknown tag: #FOO', tag: 'FOO' },
+          { severity: 'warning', line: 5, message: 'Okänd tagg: #FOO — ignoreras', tag: 'FOO' },
           { severity: 'error', line: 10, message: 'Invalid voucher', tag: 'VER' },
         ],
       })

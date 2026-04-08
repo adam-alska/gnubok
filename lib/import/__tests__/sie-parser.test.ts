@@ -328,7 +328,7 @@ describe('parseSIEFile', () => {
 
       const errors = result.issues.filter((i) => i.severity === 'error')
       expect(errors.length).toBeGreaterThanOrEqual(1)
-      expect(errors.some((e) => e.message.includes('not balanced'))).toBe(true)
+      expect(errors.some((e) => e.message.includes('balanserar inte'))).toBe(true)
     })
   })
 
@@ -380,7 +380,7 @@ describe('validateSIEFile', () => {
     const validation = validateSIEFile(parsed)
 
     expect(validation.valid).toBe(false)
-    expect(validation.errors.some((e) => e.includes('not balanced'))).toBe(true)
+    expect(validation.errors.some((e) => e.includes('balanserar inte'))).toBe(true)
   })
 
   it('no longer warns about accounts referenced in #IB since parser auto-adds them', () => {
@@ -424,7 +424,7 @@ describe('validateSIEFile', () => {
     const parsed = parseSIEFile(content)
     const validation = validateSIEFile(parsed)
 
-    expect(validation.warnings.some((w) => w.includes('Opening balances not balanced'))).toBe(true)
+    expect(validation.warnings.some((w) => w.includes('Ingående balanser balanserar inte'))).toBe(true)
   })
 
   it('passes with balanced opening balances', () => {
@@ -432,7 +432,7 @@ describe('validateSIEFile', () => {
     const validation = validateSIEFile(parsed)
 
     // IB: 50000 + 100000 + (-150000) = 0 → balanced
-    const ibWarning = validation.warnings.find((w) => w.includes('Opening balances not balanced'))
+    const ibWarning = validation.warnings.find((w) => w.includes('Ingående balanser balanserar inte'))
     expect(ibWarning).toBeUndefined()
   })
 })
@@ -592,7 +592,7 @@ describe('parseSIEFile — invalid date handling', () => {
     const result = parseSIEFile(content)
     // Voucher should not be created because date is invalid
     expect(result.vouchers).toHaveLength(0)
-    expect(result.issues.some((i) => i.severity === 'error' && i.message.includes('Invalid voucher definition'))).toBe(true)
+    expect(result.issues.some((i) => i.severity === 'error' && i.message.includes('Ogiltig verifikationsdefinition'))).toBe(true)
   })
 
   it('accepts valid leap year date Feb 29', () => {
@@ -630,7 +630,7 @@ describe('parseSIEFile — invalid date handling', () => {
 
     const result = parseSIEFile(content)
     expect(result.vouchers).toHaveLength(0)
-    expect(result.issues.some((i) => i.message.includes('Invalid voucher definition'))).toBe(true)
+    expect(result.issues.some((i) => i.message.includes('Ogiltig verifikationsdefinition'))).toBe(true)
   })
 })
 
@@ -649,7 +649,7 @@ describe('parseSIEFile — missing amount handling', () => {
 
     const result = parseSIEFile(content)
     expect(result.openingBalances).toHaveLength(0)
-    expect(result.issues.some((i) => i.severity === 'warning' && i.message.includes('Missing amount in #IB'))).toBe(true)
+    expect(result.issues.some((i) => i.severity === 'warning' && i.message.includes('Belopp saknas i #IB'))).toBe(true)
   })
 
   it('skips #UB with missing amount and adds warning', () => {
@@ -664,7 +664,7 @@ describe('parseSIEFile — missing amount handling', () => {
 
     const result = parseSIEFile(content)
     expect(result.closingBalances).toHaveLength(0)
-    expect(result.issues.some((i) => i.severity === 'warning' && i.message.includes('Missing amount in #UB'))).toBe(true)
+    expect(result.issues.some((i) => i.severity === 'warning' && i.message.includes('Belopp saknas i #UB'))).toBe(true)
   })
 
   it('skips #RES with missing amount and adds warning', () => {
@@ -679,7 +679,7 @@ describe('parseSIEFile — missing amount handling', () => {
 
     const result = parseSIEFile(content)
     expect(result.resultBalances).toHaveLength(0)
-    expect(result.issues.some((i) => i.severity === 'warning' && i.message.includes('Missing amount in #RES'))).toBe(true)
+    expect(result.issues.some((i) => i.severity === 'warning' && i.message.includes('Belopp saknas i #RES'))).toBe(true)
   })
 
   it('skips #TRANS with missing amount and adds warning', () => {
@@ -698,7 +698,7 @@ describe('parseSIEFile — missing amount handling', () => {
     const result = parseSIEFile(content)
     expect(result.vouchers).toHaveLength(1)
     expect(result.vouchers[0].lines).toHaveLength(0)
-    expect(result.issues.some((i) => i.severity === 'warning' && i.message.includes('Missing amount in #TRANS'))).toBe(true)
+    expect(result.issues.some((i) => i.severity === 'warning' && i.message.includes('Belopp saknas i #TRANS'))).toBe(true)
   })
 
   it('still parses valid #IB lines alongside missing-amount ones', () => {

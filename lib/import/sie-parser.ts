@@ -388,7 +388,7 @@ export function parseSIEFile(content: string): ParsedSIEFile {
             issues,
             'error',
             lineNum,
-            `Voucher ${currentVoucher.series}${currentVoucher.number} is not balanced (diff: ${total.toFixed(2)})`,
+            `Verifikation ${currentVoucher.series}${currentVoucher.number} balanserar inte (differens: ${total.toFixed(2)} kr)`,
             'VER'
           )
         }
@@ -425,7 +425,7 @@ export function parseSIEFile(content: string): ParsedSIEFile {
         case 'SIETYP':
           header.sieType = parseInt(fields[1], 10) as SIEType
           if (![1, 2, 3, 4].includes(header.sieType)) {
-            addIssue(issues, 'warning', lineNum, `Unknown SIE type: ${fields[1]}`, tag)
+            addIssue(issues, 'warning', lineNum, `Okänd SIE-typ: ${fields[1]}. Filen tolkas som SIE4.`, tag)
             header.sieType = 4
           }
           break
@@ -520,7 +520,7 @@ export function parseSIEFile(content: string): ParsedSIEFile {
           const amountStr = fields[3]
 
           if (!amountStr || amountStr.trim() === '') {
-            addIssue(issues, 'warning', lineNum, 'Missing amount in #IB, skipping line', tag)
+            addIssue(issues, 'warning', lineNum, 'Belopp saknas i #IB — raden hoppas över', tag)
             break
           }
 
@@ -540,7 +540,7 @@ export function parseSIEFile(content: string): ParsedSIEFile {
           const amountStr = fields[3]
 
           if (!amountStr || amountStr.trim() === '') {
-            addIssue(issues, 'warning', lineNum, 'Missing amount in #UB, skipping line', tag)
+            addIssue(issues, 'warning', lineNum, 'Belopp saknas i #UB — raden hoppas över', tag)
             break
           }
 
@@ -560,7 +560,7 @@ export function parseSIEFile(content: string): ParsedSIEFile {
           const amountStr = fields[3]
 
           if (!amountStr || amountStr.trim() === '') {
-            addIssue(issues, 'warning', lineNum, 'Missing amount in #RES, skipping line', tag)
+            addIssue(issues, 'warning', lineNum, 'Belopp saknas i #RES — raden hoppas över', tag)
             break
           }
 
@@ -598,7 +598,7 @@ export function parseSIEFile(content: string): ParsedSIEFile {
               currentVoucher.signature = parseStringField(fields[6])
             }
           } else {
-            addIssue(issues, 'error', lineNum, 'Invalid voucher definition', tag)
+            addIssue(issues, 'error', lineNum, 'Ogiltig verifikationsdefinition — nummer eller datum kunde inte tolkas', tag)
           }
           break
         }
@@ -615,7 +615,7 @@ export function parseSIEFile(content: string): ParsedSIEFile {
           // supplementary history. We skip RTRANS/BTRANS to avoid double-counting
           // which would make balanced vouchers appear unbalanced.
           if (!currentVoucher) {
-            addIssue(issues, 'error', lineNum, `${tag} outside of VER block`, tag)
+            addIssue(issues, 'error', lineNum, `#${tag} utanför verifikationsblock (#VER) — filen kan vara skadad`, tag)
             break
           }
 
@@ -635,7 +635,7 @@ export function parseSIEFile(content: string): ParsedSIEFile {
 
           const transAmountStr = fields[fieldIndex]
           if (!transAmountStr || transAmountStr.trim() === '') {
-            addIssue(issues, 'warning', lineNum, `Missing amount in #${tag}, skipping line`, tag)
+            addIssue(issues, 'warning', lineNum, `Belopp saknas i #${tag} — raden hoppas över`, tag)
             break
           }
 
@@ -667,7 +667,7 @@ export function parseSIEFile(content: string): ParsedSIEFile {
         default:
           // Unknown tag - add info issue for notable ones
           if (!['KSUMMA', 'BKOD', 'TAXAR', 'OMFATTN', 'DIM', 'OBJEKT', 'OIB', 'OUB', 'PBUDGET', 'PSALDO'].includes(tag)) {
-            addIssue(issues, 'info', lineNum, `Unknown tag: #${tag}`, tag)
+            addIssue(issues, 'info', lineNum, `Okänd tagg: #${tag} — ignoreras`, tag)
           }
       }
     } catch (error) {
@@ -675,7 +675,7 @@ export function parseSIEFile(content: string): ParsedSIEFile {
         issues,
         'error',
         lineNum,
-        `Error parsing ${tag}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        `Fel vid tolkning av #${tag}: ${error instanceof Error ? error.message : 'Okänt fel'}`,
         tag
       )
     }
@@ -734,22 +734,22 @@ export function validateSIEFile(parsed: ParsedSIEFile): ValidationResult {
 
   // Check for SIE type
   if (!parsed.header.sieType) {
-    errors.push('Missing SIE type (#SIETYP)')
+    errors.push('SIE-typ saknas (#SIETYP). Filen kanske inte är en giltig SIE-fil — kontrollera att du exporterat i rätt format.')
   }
 
   // Check for company info
   if (!parsed.header.companyName) {
-    warnings.push('No company name found (#FNAMN)')
+    warnings.push('Företagsnamn saknas (#FNAMN) — vanligtvis ofarligt men bör kontrolleras')
   }
 
   // Check for fiscal year
   if (parsed.header.fiscalYears.length === 0) {
-    errors.push('No fiscal year defined (#RAR)')
+    errors.push('Inget räkenskapsår definierat (#RAR). Filen saknar information om vilken period bokföringen gäller — kontrollera att exporten inkluderar räkenskapsårsdata.')
   }
 
   // Check for accounts
   if (parsed.accounts.length === 0) {
-    warnings.push('No accounts found (#KONTO)')
+    warnings.push('Inga konton hittades (#KONTO). Om filen bara innehåller saldon (SIE1) är detta normalt.')
   }
 
   // Warn if non-BAS kontoplan declared — mapping logic assumes BAS number ranges
@@ -758,19 +758,27 @@ export function validateSIEFile(parsed: ParsedSIEFile): ValidationResult {
     const isBAS = planType.startsWith('BAS') || planType === 'EUBAS' || planType === 'EU-BAS'
     if (!isBAS) {
       warnings.push(
-        `Kontoplanstyp "${parsed.header.kontoPlanType}" är inte BAS-baserad. Alla kontomappningar bör granskas manuellt.`
+        `Kontoplanstyp "${parsed.header.kontoPlanType}" är inte BAS-baserad. Automatisk kontomappning kan bli felaktig — granska alla mappningar manuellt i nästa steg.`
       )
     }
   }
 
   // Check for unbalanced vouchers
+  const unbalancedVouchers: string[] = []
   for (const voucher of parsed.vouchers) {
     const total = voucher.lines.reduce((sum, l) => sum + l.amount, 0)
     if (Math.abs(total) > 0.01) {
-      errors.push(
-        `Voucher ${voucher.series}${voucher.number} on ${voucher.date.toISOString().split('T')[0]} is not balanced (diff: ${total.toFixed(2)})`
+      unbalancedVouchers.push(
+        `${voucher.series}${voucher.number} (${voucher.date.toISOString().split('T')[0]}, diff: ${total.toFixed(2)} kr)`
       )
     }
+  }
+  if (unbalancedVouchers.length > 0) {
+    const shown = unbalancedVouchers.slice(0, 5)
+    const remaining = unbalancedVouchers.length - shown.length
+    errors.push(
+      `${unbalancedVouchers.length} verifikation(er) balanserar inte (debet ≠ kredit): ${shown.join(', ')}${remaining > 0 ? ` och ${remaining} till` : ''}. Kontrollera att exporten från källsystemet är komplett.`
+    )
   }
 
   // Check for accounts referenced but not defined
@@ -787,10 +795,18 @@ export function validateSIEFile(parsed: ParsedSIEFile): ValidationResult {
     }
   }
 
+  const undefinedAccounts: string[] = []
   for (const account of referencedAccounts) {
     if (!definedAccounts.has(account)) {
-      warnings.push(`Account ${account} referenced but not defined in #KONTO`)
+      undefinedAccounts.push(account)
     }
+  }
+  if (undefinedAccounts.length > 0) {
+    const shown = undefinedAccounts.slice(0, 10)
+    const remaining = undefinedAccounts.length - shown.length
+    warnings.push(
+      `${undefinedAccounts.length} konto(n) används i verifikationer men definieras inte i #KONTO: ${shown.join(', ')}${remaining > 0 ? ` och ${remaining} till` : ''}. Kontona skapas automatiskt vid import.`
+    )
   }
 
   // Check opening balance is balanced (for balance sheet accounts)
@@ -799,7 +815,7 @@ export function validateSIEFile(parsed: ParsedSIEFile): ValidationResult {
     .reduce((sum, b) => sum + b.amount, 0)
 
   if (Math.abs(ibTotal) > 0.01) {
-    warnings.push(`Opening balances not balanced (diff: ${ibTotal.toFixed(2)})`)
+    warnings.push(`Ingående balanser balanserar inte (differens: ${ibTotal.toFixed(2)} kr). En automatisk justeringspost mot konto 2099 skapas vid import.`)
   }
 
   // Add parse issues as errors/warnings
