@@ -1160,7 +1160,7 @@ export async function saveMappings(
     await supabase
       .from('sie_account_mappings')
       .upsert(batch, {
-        onConflict: 'user_id,source_account',
+        onConflict: 'company_id,source_account',
       })
   }
 }

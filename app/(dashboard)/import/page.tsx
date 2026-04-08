@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
@@ -323,6 +324,8 @@ function SIEImportWizard() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [errorType, setErrorType] = useState<'duplicate' | 'duplicate_period' | 'validation' | 'parse' | undefined>()
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([])
 
   const [file, setFile] = useState<File | null>(null)
   const [, setParsed] = useState<ParsedSIEFile | null>(null)
@@ -347,6 +350,8 @@ function SIEImportWizard() {
     setFile(selectedFile)
     setError(null)
     setErrorType(undefined)
+    setValidationErrors([])
+    setValidationWarnings([])
     setIsLoading(true)
 
     try {
@@ -361,15 +366,21 @@ function SIEImportWizard() {
       const data = await res.json()
 
       if (!res.ok) {
-        if (data.error === 'duplicate' || data.error === 'duplicate_period') {
-          setErrorType(data.error)
+        const type = data.error as typeof errorType
+        if (type === 'duplicate' || type === 'duplicate_period') {
+          setErrorType(type)
           setError(data.message)
-        } else if (data.error === 'validation') {
+          toast({ title: type === 'duplicate' ? 'Filen har redan importerats' : 'Överlappande räkenskapsår', description: data.message, variant: 'destructive' })
+        } else if (type === 'validation') {
           setErrorType('validation')
-          setError(`${data.message}: ${data.errors?.join(', ') || 'Unknown validation error'}`)
+          setError(data.message || 'SIE-filen innehåller valideringsfel.')
+          setValidationErrors(data.errors || [])
+          setValidationWarnings(data.warnings || [])
+          toast({ title: 'Valideringsfel i SIE-filen', description: `${(data.errors || []).length} fel hittades som måste åtgärdas.`, variant: 'destructive' })
         } else {
           setErrorType('parse')
-          setError(data.error || 'Failed to parse file')
+          setError(data.message || data.error || 'Kunde inte tolka filen.')
+          toast({ title: 'Kunde inte läsa filen', description: data.message || data.error || 'Kontrollera att filen är en giltig SIE-fil.', variant: 'destructive' })
         }
         return
       }
@@ -402,7 +413,13 @@ function SIEImportWizard() {
         description: `${data.parsed.stats.totalAccounts} konton och ${data.parsed.stats.totalVouchers} verifikationer hittades`,
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to parse file')
+      const isNetworkError = err instanceof TypeError && (err.message === 'Failed to fetch' || err.message.includes('NetworkError'))
+      const message = isNetworkError
+        ? 'Kunde inte nå servern. Kontrollera din internetanslutning och försök igen.'
+        : err instanceof Error ? err.message : 'Ett oväntat fel uppstod.'
+      setErrorType('parse')
+      setError(message)
+      toast({ title: 'Anslutningsfel', description: message, variant: 'destructive' })
     } finally {
       setIsLoading(false)
     }
@@ -506,9 +523,17 @@ function SIEImportWizard() {
       if (!res.ok) {
         if (data.error === 'duplicate') {
           setError(data.message || 'Denna fil har redan importerats')
+          toast({ title: 'Filen har redan importerats', description: data.message, variant: 'destructive' })
           return
         }
-        if (data.result) { setImportResult(data.result) } else { setError(data.error || 'Import failed'); return }
+        if (data.result) {
+          setImportResult(data.result)
+        } else {
+          const msg = data.message || data.error || 'Importen misslyckades.'
+          setError(msg)
+          toast({ title: 'Import misslyckades', description: msg, variant: 'destructive' })
+          return
+        }
       } else {
         setImportResult(data.result)
       }
@@ -516,21 +541,38 @@ function SIEImportWizard() {
       setStep('result')
 
       if (data.result?.success) {
-        toast({ title: 'Import genomförd', description: `${data.result.journalEntriesCreated} verifikationer skapades` })
+        const created = data.result.journalEntriesCreated
+        const skipped = data.result.details?.skippedVouchers?.total || 0
+        toast({
+          title: 'Import genomförd',
+          description: `${created} verifikationer skapades${skipped > 0 ? ` (${skipped} hoppades över)` : ''}`,
+        })
+      } else if (data.result && !data.result.success) {
+        toast({
+          title: 'Import slutförd med problem',
+          description: `${data.result.errors?.length || 0} fel uppstod under importen. Se resultatet för detaljer.`,
+          variant: 'destructive',
+        })
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Import failed')
+      const isNetworkError = err instanceof TypeError && (err.message === 'Failed to fetch' || err.message.includes('NetworkError'))
+      const msg = isNetworkError
+        ? 'Tappade anslutningen till servern under importen. Kontrollera din internetanslutning och se om importen genomfördes under Bokföring.'
+        : err instanceof Error ? err.message : 'Ett oväntat fel uppstod.'
+      setError(msg)
+      toast({ title: 'Import avbröts', description: msg, variant: 'destructive' })
     } finally {
       setIsLoading(false)
     }
   }, [file, mappings, toast])
 
-  const goToStep = (targetStep: ImportWizardStep) => { setStep(targetStep); setError(null) }
+  const goToStep = (targetStep: ImportWizardStep) => { setStep(targetStep); setError(null); setValidationErrors([]); setValidationWarnings([]) }
   const goBack = () => { const i = sieSteps.indexOf(step); if (i > 0) setStep(sieSteps[i - 1]) }
 
   const handleNewImport = () => {
     setStep('upload'); setFile(null); setParsed(null); setMappings([])
     setPreview(null); setIssues([]); setImportResult(null); setError(null); setErrorType(undefined)
+    setValidationErrors([]); setValidationWarnings([])
     setSieAccounts([]); setIsCreatingAccounts(false)
   }
 
@@ -557,7 +599,7 @@ function SIEImportWizard() {
         </CardContent>
       </Card>
 
-      {step === 'upload' && <SIEUploadStep onFileSelect={handleFileSelect} isLoading={isLoading} error={error} errorType={errorType} />}
+      {step === 'upload' && <SIEUploadStep onFileSelect={handleFileSelect} isLoading={isLoading} error={error} errorType={errorType} validationErrors={validationErrors} validationWarnings={validationWarnings} />}
       {step === 'preview' && preview && (
         <SIEPreviewStep preview={preview} issues={issues} missingAccounts={missingAccounts}
           onCreateAccounts={handleCreateAccounts} isCreatingAccounts={isCreatingAccounts}
@@ -794,19 +836,19 @@ export default function ImportPage() {
     })
   }, [])
 
-  // Auto-detect OAuth callback or deep-link mode from query params (disabled in sandbox)
+  // Sync mode from URL search params (reacts to client-side navigation changes)
+  const searchParams = useSearchParams()
   useEffect(() => {
     if (isSandbox) return
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('migration')) {
+    if (searchParams.get('migration')) {
       setMode('migration')
     } else {
-      const modeParam = params.get('mode')
+      const modeParam = searchParams.get('mode')
       if (modeParam && ['psd2', 'bank', 'sie', 'migration'].includes(modeParam)) {
         setMode(modeParam as ImportMode)
       }
     }
-  }, [isSandbox])
+  }, [isSandbox, searchParams])
   // Extensions are active if compiled in — no runtime toggle check needed
   const hasBankingExtension = ENABLED_EXTENSION_IDS.has('enable-banking')
   const hasMigrationExtension = ENABLED_EXTENSION_IDS.has('arcim-migration')

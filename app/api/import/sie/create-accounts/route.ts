@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     const accounts: SIEAccount[] = body.accounts
 
     if (!accounts || !Array.isArray(accounts) || accounts.length === 0) {
-      return NextResponse.json({ error: 'No accounts provided' }, { status: 400 })
+      return NextResponse.json({ error: 'Inga konton att skapa.' }, { status: 400 })
     }
 
     // Prepare accounts for upsert (idempotent — safe to retry)
@@ -117,7 +117,7 @@ export async function POST(request: Request) {
       if (error) {
         console.error('Error upserting accounts batch:', error)
         return NextResponse.json({
-          error: `Failed to create accounts: ${error.message}`,
+          error: `Kunde inte skapa konton (batch ${Math.floor(i / batchSize) + 1}): ${error.message}. ${totalCreated} konton skapades innan felet.`,
           created: totalCreated,
         }, { status: 500 })
       }
@@ -134,7 +134,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Create accounts error:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to create accounts' },
+      { error: `Kunde inte skapa konton: ${error instanceof Error ? error.message : 'Okänt fel'}. Försök igen.` },
       { status: 500 }
     )
   }

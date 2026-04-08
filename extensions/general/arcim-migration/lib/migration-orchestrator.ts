@@ -61,6 +61,8 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
   const accessToken = resolved.accessToken
   const providerCompanyId = resolved.providerCompanyId
 
+  
+
   try {
     // ── Step 1: Company information ───────────────────────────────
     if (options.importCompanyInfo !== false) {

@@ -8,6 +8,7 @@ import {
   getAuthUrl,
   exchangeAuthToken,
   submitProviderToken,
+  acceptConsent,
   deleteConsent,
   resolveConsent,
   fetchCompanyInfoDirect,
@@ -148,28 +149,53 @@ export const arcimMigrationExtension: Extension = {
         }
 
         try {
+          const { createServiceClient: createSvc } = await import('@/lib/supabase/server')
+
           // Reuse existing accepted consent if one exists for this provider
           const existingConsents = await listConsents(companyId)
-          const existing = existingConsents.find(c => c.provider === provider && c.status === 1)
+          const accepted = existingConsents.find(c => c.provider === provider && c.status === 1)
 
-          if (existing) {
+          if (accepted) {
             // Already connected — skip OAuth, go straight to preview
             if (ctx?.settings) {
-              await ctx.settings.set('consent_id', existing.id)
+              await ctx.settings.set('consent_id', accepted.id)
               await ctx.settings.set('provider', provider)
             }
 
             return NextResponse.json({
-              consentId: existing.id,
+              consentId: accepted.id,
               authType: providerInfo.authType,
               alreadyConnected: true,
             })
           }
 
-          // Clean up abandoned consents (status 0 = Created but never completed OAuth)
-          const abandoned = existingConsents.filter(c => c.provider === provider && c.status === 0)
-          for (const a of abandoned) {
-            await deleteConsent(a.id)
+          // Check for status 0 consents that already have tokens stored (credentials submitted but migration not completed)
+          const pending = existingConsents.filter(c => c.provider === provider && c.status === 0)
+          if (pending.length > 0) {
+            const svc = createSvc()
+            for (const p of pending) {
+              const { data: tokens } = await svc
+                .from('provider_consent_tokens')
+                .select('id')
+                .eq('consent_id', p.id)
+                .limit(1)
+              if (tokens && tokens.length > 0) {
+                // Tokens exist — reuse this consent, skip credential entry
+                if (ctx?.settings) {
+                  await ctx.settings.set('consent_id', p.id)
+                  await ctx.settings.set('provider', provider)
+                }
+                return NextResponse.json({
+                  consentId: p.id,
+                  authType: providerInfo.authType,
+                  alreadyConnected: true,
+                })
+              }
+            }
+            // No tokens found — clean up abandoned consents
+            for (const p of pending) {
+              await deleteConsent(p.id)
+            }
           }
 
           // Create new consent
@@ -385,9 +411,9 @@ export const arcimMigrationExtension: Extension = {
 
         try {
           const consent = await getConsent(consentId)
-          if (consent.status !== 1) {
+          if (consent.status !== 0 && consent.status !== 1) {
             return NextResponse.json(
-              { error: 'Consent is not accepted. Complete OAuth first.' },
+              { error: 'Consent is not ready. Complete authentication first.' },
               { status: 400 }
             )
           }
@@ -859,9 +885,9 @@ export const arcimMigrationExtension: Extension = {
 
         try {
           const consent = await getConsent(consentId)
-          if (consent.status !== 1) {
+          if (consent.status !== 0 && consent.status !== 1) {
             return NextResponse.json(
-              { error: 'Consent is not accepted' },
+              { error: 'Consent is not ready' },
               { status: 400 }
             )
           }
@@ -882,11 +908,56 @@ export const arcimMigrationExtension: Extension = {
 
           log.info('Migration completed:', results)
 
+          // Mark consent as fully accepted now that data has been imported
+          await acceptConsent(consentId)
+
           return NextResponse.json({ success: true, results })
         } catch (error) {
           log.error('Migration failed:', error)
           return NextResponse.json(
             { error: error instanceof Error ? error.message : 'Migration failed' },
+            { status: 500 }
+          )
+        }
+      },
+    },
+
+    // ── Accept consent (mark as fully connected after import) ─────
+    {
+      method: 'POST',
+      path: '/accept',
+      handler: async (request: Request, ctx?: ExtensionContext) => {
+        const supabase = ctx?.supabase ?? await (await import('@/lib/supabase/server')).createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (!user) {
+          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        const companyId = ctx?.companyId ?? user.id
+        const { consentId } = await request.json() as { consentId: string }
+        if (!consentId) {
+          return NextResponse.json({ error: 'consentId is required' }, { status: 400 })
+        }
+
+        // Verify consent belongs to this company before mutating
+        const { data: consent } = await supabase
+          .from('provider_consents')
+          .select('id')
+          .eq('id', consentId)
+          .eq('company_id', companyId)
+          .single()
+
+        if (!consent) {
+          return NextResponse.json({ error: 'Not found' }, { status: 404 })
+        }
+
+        try {
+          await acceptConsent(consentId)
+          return NextResponse.json({ success: true })
+        } catch (error) {
+          return NextResponse.json(
+            { error: error instanceof Error ? error.message : 'Failed to accept consent' },
             { status: 500 }
           )
         }
@@ -906,10 +977,23 @@ export const arcimMigrationExtension: Extension = {
           return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        const companyId = ctx?.companyId ?? user.id
         const { consentId } = await request.json() as { consentId: string }
 
         if (!consentId) {
           return NextResponse.json({ error: 'consentId is required' }, { status: 400 })
+        }
+
+        // Verify consent belongs to this company before mutating
+        const { data: consent } = await supabase
+          .from('provider_consents')
+          .select('id')
+          .eq('id', consentId)
+          .eq('company_id', companyId)
+          .single()
+
+        if (!consent) {
+          return NextResponse.json({ error: 'Not found' }, { status: 404 })
         }
 
         try {

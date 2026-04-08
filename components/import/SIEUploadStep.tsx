@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { Upload, FileText, AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
+import { Upload, FileText, AlertCircle, CheckCircle, Loader2, XCircle } from 'lucide-react'
 
 const LOADING_PHASES = [
   { message: 'Läser fil...', progress: 10 },
@@ -17,9 +17,11 @@ interface SIEUploadStepProps {
   isLoading: boolean
   error: string | null
   errorType?: 'duplicate' | 'duplicate_period' | 'validation' | 'parse'
+  validationErrors?: string[]
+  validationWarnings?: string[]
 }
 
-export default function SIEUploadStep({ onFileSelect, isLoading, error, errorType }: SIEUploadStepProps) {
+export default function SIEUploadStep({ onFileSelect, isLoading, error, errorType, validationErrors, validationWarnings }: SIEUploadStepProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [loadingPhase, setLoadingPhase] = useState(0)
@@ -159,16 +161,78 @@ export default function SIEUploadStep({ onFileSelect, isLoading, error, errorTyp
 
           {/* Error display */}
           {error && (
-            <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex gap-3">
-              <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-destructive">
-                  {errorType === 'duplicate' || errorType === 'duplicate_period'
-                    ? 'Filen har redan importerats'
-                    : 'Kunde inte läsa filen'}
-                </p>
-                <p className="text-sm text-muted-foreground">{error}</p>
+            <div className="mt-4 space-y-3">
+              <div className={`p-4 rounded-lg flex gap-3 ${
+                errorType === 'duplicate' || errorType === 'duplicate_period'
+                  ? 'bg-warning/10 border border-warning/20'
+                  : 'bg-destructive/10 border border-destructive/20'
+              }`}>
+                <AlertCircle className={`h-5 w-5 flex-shrink-0 mt-0.5 ${
+                  errorType === 'duplicate' || errorType === 'duplicate_period'
+                    ? 'text-warning'
+                    : 'text-destructive'
+                }`} />
+                <div className="space-y-1.5 min-w-0">
+                  <p className={`font-medium ${
+                    errorType === 'duplicate' || errorType === 'duplicate_period'
+                      ? 'text-warning'
+                      : 'text-destructive'
+                  }`}>
+                    {errorType === 'duplicate' && 'Filen har redan importerats'}
+                    {errorType === 'duplicate_period' && 'Överlappande räkenskapsår'}
+                    {errorType === 'validation' && 'Filen innehåller valideringsfel'}
+                    {errorType === 'parse' && 'Kunde inte tolka filen'}
+                    {!errorType && 'Ett fel uppstod'}
+                  </p>
+                  <p className="text-sm text-muted-foreground">{error}</p>
+
+                  {/* Actionable guidance */}
+                  <div className="text-sm text-muted-foreground pt-1 border-t border-border/50 mt-2">
+                    {errorType === 'duplicate' && (
+                      <p>Om du vill importera om filen, ta först bort den tidigare importen under Bokföring.</p>
+                    )}
+                    {errorType === 'duplicate_period' && (
+                      <p>Varje räkenskapsår kan bara importeras en gång. Ta bort den befintliga importen först om du vill ersätta den.</p>
+                    )}
+                    {errorType === 'validation' && (
+                      <p>Prova att exportera filen igen från ditt bokföringsprogram. Om felet kvarstår, kontrollera att alla verifikationer är korrekt bokförda i källsystemet.</p>
+                    )}
+                    {errorType === 'parse' && (
+                      <p>Kontrollera att filen är en SIE4-fil exporterad från ett bokföringsprogram (Fortnox, Visma, Bokio etc). Filen kan vara skadad om den redigerats manuellt.</p>
+                    )}
+                  </div>
+                </div>
               </div>
+
+              {/* Validation errors list */}
+              {validationErrors && validationErrors.length > 0 && (
+                <div className="p-4 bg-destructive/5 border border-destructive/15 rounded-lg space-y-2">
+                  <p className="text-sm font-medium text-destructive">Fel som blockerar import ({validationErrors.length})</p>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {validationErrors.map((err, i) => (
+                      <div key={i} className="text-sm flex gap-2">
+                        <XCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                        <span className="text-muted-foreground">{err}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Validation warnings list */}
+              {validationWarnings && validationWarnings.length > 0 && (
+                <div className="p-4 bg-warning/5 border border-warning/15 rounded-lg space-y-2">
+                  <p className="text-sm font-medium text-warning">Varningar ({validationWarnings.length})</p>
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                    {validationWarnings.map((warn, i) => (
+                      <div key={i} className="text-sm flex gap-2">
+                        <AlertCircle className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
+                        <span className="text-muted-foreground">{warn}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

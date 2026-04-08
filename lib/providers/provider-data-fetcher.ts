@@ -13,7 +13,7 @@ import { VismaClient } from './visma/client';
 import { VISMA_RESOURCE_CONFIGS } from './visma/config';
 import { BrioxClient } from './briox/client';
 import { BRIOX_RESOURCE_CONFIGS } from './briox/config';
-import { BokioClient } from './bokio/client';
+import { BokioClient, BokioApiError } from './bokio/client';
 import { BOKIO_RESOURCE_CONFIGS } from './bokio/config';
 import { BjornLundenClient } from './bjornlunden/client';
 import { BL_RESOURCE_CONFIGS } from './bjornlunden/config';
@@ -44,6 +44,7 @@ async function bokioPaginate<T>(
     page++;
   } while (page <= totalPages);
 
+  console.log(`[bokio-paginate] ${path}: fetched ${allItems.length} total items across ${totalPages} page(s)`);
   return allItems;
 }
 
@@ -143,8 +144,14 @@ export async function fetchCustomersDirect(
 
   if (provider === 'bokio') {
     const config = BOKIO_RESOURCE_CONFIGS[ResourceType.Customers];
-    if (!config || !providerCompanyId) return [];
+    if (!config || !providerCompanyId) {
+      console.warn(`[provider-data-fetcher] Bokio customers: skipped — config=${!!config}, providerCompanyId=${providerCompanyId ?? 'undefined'}`);
+      return [];
+    }
     const items = await bokioPaginate<Record<string, unknown>>(accessToken, providerCompanyId, config.listEndpoint);
+    if (items.length > 0) {
+      console.log(`[provider-data-fetcher] Bokio customers: first item keys: ${Object.keys(items[0]).join(', ')}`);
+    }
     return items.map((item) => config.mapper(item) as CustomerDto);
   }
 
@@ -186,8 +193,16 @@ export async function fetchSuppliersDirect(
   if (provider === 'bokio') {
     const config = BOKIO_RESOURCE_CONFIGS[ResourceType.Suppliers];
     if (!config || !providerCompanyId) return [];
-    const items = await bokioPaginate<Record<string, unknown>>(accessToken, providerCompanyId, config.listEndpoint);
-    return items.map((item) => config.mapper(item) as SupplierDto);
+    try {
+      const items = await bokioPaginate<Record<string, unknown>>(accessToken, providerCompanyId, config.listEndpoint);
+      return items.map((item) => config.mapper(item) as SupplierDto);
+    } catch (err) {
+      if (err instanceof BokioApiError && err.statusCode === 404) {
+        console.log('[provider-data-fetcher] Bokio suppliers endpoint not available (404) — skipping');
+        return [];
+      }
+      throw err;
+    }
   }
 
   if (provider === 'bjornlunden') {
@@ -227,8 +242,14 @@ export async function fetchSalesInvoicesDirect(
 
   if (provider === 'bokio') {
     const config = BOKIO_RESOURCE_CONFIGS[ResourceType.SalesInvoices];
-    if (!config || !providerCompanyId) return [];
+    if (!config || !providerCompanyId) {
+      console.warn(`[provider-data-fetcher] Bokio invoices: skipped — config=${!!config}, providerCompanyId=${providerCompanyId ?? 'undefined'}`);
+      return [];
+    }
     const items = await bokioPaginate<Record<string, unknown>>(accessToken, providerCompanyId, config.listEndpoint);
+    if (items.length > 0) {
+      console.log(`[provider-data-fetcher] Bokio invoices: first item keys: ${Object.keys(items[0]).join(', ')}`);
+    }
     return items.map((item) => config.mapper(item) as SalesInvoiceDto);
   }
 
@@ -270,8 +291,16 @@ export async function fetchSupplierInvoicesDirect(
   if (provider === 'bokio') {
     const config = BOKIO_RESOURCE_CONFIGS[ResourceType.SupplierInvoices];
     if (!config || !providerCompanyId) return [];
-    const items = await bokioPaginate<Record<string, unknown>>(accessToken, providerCompanyId, config.listEndpoint);
-    return items.map((item) => config.mapper(item) as SupplierInvoiceDto);
+    try {
+      const items = await bokioPaginate<Record<string, unknown>>(accessToken, providerCompanyId, config.listEndpoint);
+      return items.map((item) => config.mapper(item) as SupplierInvoiceDto);
+    } catch (err) {
+      if (err instanceof BokioApiError && err.statusCode === 404) {
+        console.log('[provider-data-fetcher] Bokio supplier-invoices endpoint not available (404) — skipping');
+        return [];
+      }
+      throw err;
+    }
   }
 
   if (provider === 'bjornlunden') {

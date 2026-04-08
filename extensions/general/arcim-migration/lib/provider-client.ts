@@ -240,7 +240,7 @@ export async function submitProviderToken(
     tokenExpiresAt = new Date(Date.now() + tokenResponse.expires_in * 1000).toISOString()
   }
 
-  // Store tokens
+  // Store tokens — consent stays at status 0 until migration/SIE import completes
   await supabase
     .from('provider_consent_tokens')
     .upsert({
@@ -252,11 +252,14 @@ export async function submitProviderToken(
       provider_company_id: companyId,
     })
 
-  // Mark consent as accepted
+  return { success: true, consentId }
+}
+
+/** Mark a consent as accepted (status 1) — call after migration or SIE import succeeds */
+export async function acceptConsent(consentId: string): Promise<void> {
+  const supabase = createServiceClient()
   await supabase
     .from('provider_consents')
     .update({ status: 1 })
     .eq('id', consentId)
-
-  return { success: true, consentId }
 }

@@ -133,11 +133,13 @@ export function mapBokioToCustomer(raw: Record<string, unknown>): CustomerDto {
   return {
     id: String(raw['id'] ?? ''),
     customerNumber: String(raw['id'] ?? ''),
-    type: raw['type'] === 'individual' ? 'private' : 'company',
+    type: (raw['type'] === 'individual' || raw['type'] === 'person') ? 'private' : 'company',
     party,
     active: true,
     vatNumber: raw['vatNumber'] as string | undefined,
-    defaultPaymentTermsDays: raw['paymentTerms'] != null ? Number(raw['paymentTerms']) : undefined,
+    defaultPaymentTermsDays: raw['paymentTerms'] != null && !isNaN(Number(raw['paymentTerms']))
+      ? Number(raw['paymentTerms'])
+      : undefined,
     _raw: raw,
   };
 }
@@ -231,7 +233,9 @@ export function mapBokioToSupplier(raw: Record<string, unknown>): SupplierDto {
     bankAccount: raw['bankAccount'] as string | undefined,
     bankGiro: raw['bankgiro'] as string | undefined,
     plusGiro: raw['plusgiro'] as string | undefined,
-    defaultPaymentTermsDays: raw['paymentTerms'] != null ? Number(raw['paymentTerms']) : undefined,
+    defaultPaymentTermsDays: raw['paymentTerms'] != null && !isNaN(Number(raw['paymentTerms']))
+      ? Number(raw['paymentTerms'])
+      : undefined,
     _raw: raw,
   };
 }
