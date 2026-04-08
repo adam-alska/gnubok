@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
@@ -19,7 +19,14 @@ export default function BankingSettingsPage() {
   const [bankConnectionError, setBankConnectionError] = useState<string | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<{ imported: number } | null>(null)
+  const successTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
   const hasBankingExtension = ENABLED_EXTENSION_IDS.has('enable-banking')
+
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current) clearTimeout(successTimerRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     const bankConnected = searchParams.get('bank_connected')
@@ -41,7 +48,7 @@ export default function BankingSettingsPage() {
             const data = await res.json()
             if (res.ok) {
               setSyncResult({ imported: data.imported ?? 0 })
-              setTimeout(() => {
+              successTimerRef.current = setTimeout(() => {
                 setIsSyncing(false)
                 setSyncResult(null)
               }, 3000)
@@ -75,7 +82,7 @@ export default function BankingSettingsPage() {
       setBankConnectionError(errorMsg)
       router.replace('/settings/banking')
     }
-  }, [searchParams, router, toast])
+  }, [searchParams, router, toast, isSyncing])
 
   if (isSyncing) {
     return (

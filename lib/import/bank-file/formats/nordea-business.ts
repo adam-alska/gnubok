@@ -49,8 +49,9 @@ export const nordeaBusinessFormat: BankFileFormat = {
 
     // Format D: standalone "Datum" column (not reskontradatum/transaktionsdatum)
     // Check parsed headers for exact match to avoid false positives with Handelsbanken
-    const headers_detect = firstLine.split(';').map(h => h.replace(/"/g, '').trim().toLowerCase())
-    const hasStandaloneDatum = headers_detect.some(h => h === 'datum')
+    // Note: firstLine is already lowercased, so no need for additional toLowerCase()
+    const headersDetect = firstLine.split(';').map(h => h.replace(/"/g, '').trim())
+    const hasStandaloneDatum = headersDetect.some(h => h === 'datum')
 
     if (!hasNordeaDateCol && !hasStandaloneDatum) return false
 
