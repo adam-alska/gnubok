@@ -61,7 +61,7 @@ export async function executeMigration(options: MigrationOptions): Promise<Migra
   const accessToken = resolved.accessToken
   const providerCompanyId = resolved.providerCompanyId
 
-  console.log(`[migration] Provider: ${provider}, providerCompanyId: ${providerCompanyId ?? 'NOT SET'}, accessToken: ${accessToken ? `${accessToken.slice(0, 8)}...` : 'MISSING'}`)
+  
 
   try {
     // ── Step 1: Company information ───────────────────────────────

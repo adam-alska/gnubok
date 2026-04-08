@@ -12,9 +12,10 @@ VALUES (
   'sie-files',
   'sie-files',
   false,
-  10485760, -- 10 MB (SIE files are text, typically small)
+  52428800, -- 50 MB, matches MAX_FILE_SIZE in the parse route
   ARRAY['text/plain']
 )
+ON CONFLICT (id) DO NOTHING;
 ON CONFLICT (id) DO NOTHING;
 
 -- =============================================================================
