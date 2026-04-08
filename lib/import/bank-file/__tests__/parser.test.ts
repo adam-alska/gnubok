@@ -203,6 +203,14 @@ const NORDEA_BUSINESS_CSV_VARIANT_B = [
   '2024-01-13;2024-01-13;LÖNEUTBETALNING;25 000,00;12 877,17',
 ].join('\n')
 
+const NORDEA_BUSINESS_CSV_VARIANT_C = [
+  'Datum;Belopp;Avsändare;Mottagare;Namn;Ytterligare detaljer;Meddelande;Egna anteckningar;Saldo;Valuta;',
+  '2026/03/02;-18,84;;;;Kortköp 260301 Google Workspace_elv;Google Workspac 7028;;10686,66;SEK;',
+  '2026/02/04;-1,85;;;;AVGIFTER NORDEA;;;10705,50;SEK;',
+  '2026/02/02;-87,14;;;;Kortköp 260201 Google Workspace_elv;Google Workspac 7028;;10707,35;SEK;',
+  '2026/01/15;15000,00;KUNDFÖRETAG AB;;;;Inbetalning;;25707,35;SEK;',
+].join('\n')
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -235,6 +243,18 @@ describe('detectFileFormat', () => {
   it('detects Nordea Business CSV variant with Bokföringsdatum header', () => {
     const format = detectFileFormat(NORDEA_BUSINESS_CSV_VARIANT_B, 'nordea_ftg.csv')
     expect(format).not.toBeNull()
+    expect(format!.id).toBe('nordea_business')
+  })
+
+  it('detects Nordea Business CSV variant with standalone Datum header and YYYY/MM/DD dates', () => {
+    const format = detectFileFormat(NORDEA_BUSINESS_CSV_VARIANT_C, 'nordea_ftg.csv')
+    expect(format).not.toBeNull()
+    expect(format!.id).toBe('nordea_business')
+  })
+
+  it('does not confuse Nordea Datum variant with Länsförsäkringar (which has Datum + Typ)', () => {
+    // Nordea Format D has Datum without Typ — must not be mistaken for LF
+    const format = detectFileFormat(NORDEA_BUSINESS_CSV_VARIANT_C, 'export.csv')
     expect(format!.id).toBe('nordea_business')
   })
 
@@ -593,6 +613,62 @@ describe('parseBankFile — Nordea Business variant B (Bokföringsdatum)', () =>
     expect(result.stats.total_income).toBe(25000)
     expect(result.stats.total_expenses).toBe(-531.5)
     expect(result.stats.parsed_rows).toBe(3)
+  })
+})
+
+describe('parseBankFile — Nordea Business variant C (Datum + YYYY/MM/DD)', () => {
+  it('parses the Nordea format with Datum header and slash dates', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV_VARIANT_C, 'nordea_ftg.csv')
+
+    expect(result.format).toBe('nordea_business')
+    expect(result.transactions).toHaveLength(4)
+    expect(result.issues).toHaveLength(0)
+    expect(result.stats.skipped_rows).toBe(0)
+  })
+
+  it('normalizes YYYY/MM/DD dates to YYYY-MM-DD', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV_VARIANT_C, 'nordea_ftg.csv')
+
+    expect(result.transactions[0].date).toBe('2026-03-02')
+    expect(result.transactions[1].date).toBe('2026-02-04')
+    expect(result.transactions[3].date).toBe('2026-01-15')
+  })
+
+  it('builds description from Ytterligare detaljer column', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV_VARIANT_C, 'nordea_ftg.csv')
+
+    expect(result.transactions[0].description).toBe('Kortköp 260301 Google Workspace_elv')
+    expect(result.transactions[1].description).toBe('AVGIFTER NORDEA')
+  })
+
+  it('extracts counterparty from Avsändare for income', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV_VARIANT_C, 'nordea_ftg.csv')
+
+    expect(result.transactions[3].counterparty).toBe('KUNDFÖRETAG AB')
+    expect(result.transactions[3].amount).toBe(15000)
+  })
+
+  it('parses amounts and balance correctly with comma decimals', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV_VARIANT_C, 'nordea_ftg.csv')
+
+    expect(result.transactions[0].amount).toBe(-18.84)
+    expect(result.transactions[0].balance).toBe(10686.66)
+    expect(result.transactions[0].currency).toBe('SEK')
+  })
+
+  it('handles trailing semicolons in header and data rows', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV_VARIANT_C, 'nordea_ftg.csv')
+
+    expect(result.stats.parsed_rows).toBe(4)
+    expect(result.stats.total_income).toBe(15000)
+    expect(result.stats.total_expenses).toBe(-107.83)
+  })
+
+  it('calculates correct date range', () => {
+    const result = parseBankFile(NORDEA_BUSINESS_CSV_VARIANT_C, 'nordea_ftg.csv')
+
+    expect(result.date_from).toBe('2026-01-15')
+    expect(result.date_to).toBe('2026-03-02')
   })
 })
 

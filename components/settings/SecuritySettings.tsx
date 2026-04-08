@@ -10,9 +10,12 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { Loader2, ShieldCheck, ShieldOff, KeyRound } from 'lucide-react'
 import { isMfaRequired } from '@/lib/auth/mfa'
+import { isBankIdEnabled } from '@/lib/auth/bankid'
+import { BankIdSettings } from '@/components/settings/BankIdSettings'
 
 const isSelfHosted = process.env.NEXT_PUBLIC_SELF_HOSTED === 'true'
 const mfaRequired = isMfaRequired()
+const bankIdEnabled = isBankIdEnabled()
 
 export function SecuritySettings() {
   const [newPassword, setNewPassword] = useState('')
@@ -132,6 +135,7 @@ export function SecuritySettings() {
 
   return (
     <div className="space-y-6">
+      {bankIdEnabled && <BankIdSettings />}
       {/* Change password */}
       <Card>
         <CardHeader>

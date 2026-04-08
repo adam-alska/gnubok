@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { isMfaRequired } from './mfa'
+import { shouldEnforceMfa } from './mfa'
 import type { User, SupabaseClient } from '@supabase/supabase-js'
 
 type AuthResult =
@@ -25,7 +25,7 @@ export async function requireAuth(): Promise<AuthResult> {
     }
   }
 
-  if (isMfaRequired()) {
+  if (shouldEnforceMfa(user)) {
     const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
     if (aal?.nextLevel === 'aal2' && aal?.currentLevel !== 'aal2') {
       return {
