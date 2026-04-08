@@ -934,9 +934,22 @@ export const arcimMigrationExtension: Extension = {
           return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        const companyId = ctx?.companyId ?? user.id
         const { consentId } = await request.json() as { consentId: string }
         if (!consentId) {
           return NextResponse.json({ error: 'consentId is required' }, { status: 400 })
+        }
+
+        // Verify consent belongs to this company before mutating
+        const { data: consent } = await supabase
+          .from('provider_consents')
+          .select('id')
+          .eq('id', consentId)
+          .eq('company_id', companyId)
+          .single()
+
+        if (!consent) {
+          return NextResponse.json({ error: 'Not found' }, { status: 404 })
         }
 
         try {
@@ -964,10 +977,23 @@ export const arcimMigrationExtension: Extension = {
           return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        const companyId = ctx?.companyId ?? user.id
         const { consentId } = await request.json() as { consentId: string }
 
         if (!consentId) {
           return NextResponse.json({ error: 'consentId is required' }, { status: 400 })
+        }
+
+        // Verify consent belongs to this company before mutating
+        const { data: consent } = await supabase
+          .from('provider_consents')
+          .select('id')
+          .eq('id', consentId)
+          .eq('company_id', companyId)
+          .single()
+
+        if (!consent) {
+          return NextResponse.json({ error: 'Not found' }, { status: 404 })
         }
 
         try {
