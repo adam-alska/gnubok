@@ -174,14 +174,18 @@ export async function DELETE(
 
   const companyId = await requireCompanyId(supabase, user.id)
 
-  const { error } = await supabase
+  const { error, count } = await supabase
     .from('customers')
-    .delete()
+    .delete({ count: 'exact' })
     .eq('id', id)
     .eq('company_id', companyId)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  if (count === 0) {
+    return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
   }
 
   return NextResponse.json({ success: true })

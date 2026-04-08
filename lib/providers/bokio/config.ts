@@ -3,6 +3,8 @@ import type { BokioResourceConfig, RateLimitConfig } from '../types';
 import {
   mapBokioToSalesInvoice,
   mapBokioToCustomer,
+  mapBokioToSupplier,
+  mapBokioToSupplierInvoice,
   mapBokioToJournal,
   mapBokioToAccountingAccount,
   mapBokioToCompanyInformation,
@@ -24,6 +26,20 @@ export const BOKIO_RESOURCE_CONFIGS: Partial<Record<ResourceType, BokioResourceC
     detailEndpoint: '/customers/{id}',
     idField: 'id',
     mapper: mapBokioToCustomer,
+    paginated: true,
+  },
+  [ResourceType.Suppliers]: {
+    listEndpoint: '/suppliers',
+    detailEndpoint: '/suppliers/{id}',
+    idField: 'id',
+    mapper: mapBokioToSupplier,
+    paginated: true,
+  },
+  [ResourceType.SupplierInvoices]: {
+    listEndpoint: '/supplier-invoices',
+    detailEndpoint: '/supplier-invoices/{id}',
+    idField: 'id',
+    mapper: mapBokioToSupplierInvoice,
     paginated: true,
   },
   [ResourceType.Journals]: {

@@ -141,14 +141,18 @@ export async function DELETE(
     )
   }
 
-  const { error } = await supabase
+  const { error, count: deleteCount } = await supabase
     .from('suppliers')
-    .delete()
+    .delete({ count: 'exact' })
     .eq('id', id)
     .eq('company_id', companyId)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  if (deleteCount === 0) {
+    return NextResponse.json({ error: 'Supplier not found' }, { status: 404 })
   }
 
   return NextResponse.json({ success: true })
