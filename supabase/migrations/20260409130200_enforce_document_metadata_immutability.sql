@@ -39,7 +39,6 @@ BEGIN
      OR NEW.uploaded_by IS DISTINCT FROM OLD.uploaded_by
      OR NEW.version IS DISTINCT FROM OLD.version
      OR NEW.original_id IS DISTINCT FROM OLD.original_id
-     OR NEW.is_current_version IS DISTINCT FROM OLD.is_current_version
   THEN
     -- Log the blocked attempt
     INSERT INTO public.audit_log (user_id, company_id, action, table_name, record_id, description)

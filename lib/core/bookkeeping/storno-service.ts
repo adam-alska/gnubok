@@ -23,14 +23,20 @@ import { validateBalance, getNextVoucherNumber, getSwedishLocalDate } from '@/li
  * Works for both draft→cancelled and posted→cancelled transitions.
  */
 async function cancelEntry(supabase: SupabaseClient, entryId: string): Promise<void> {
-  await supabase
+  const { error: statusErr } = await supabase
     .from('journal_entries')
     .update({ status: 'cancelled' })
     .eq('id', entryId)
-  await supabase
+  if (statusErr) {
+    console.error(`[storno] cancelEntry: failed to cancel ${entryId}:`, statusErr.message)
+  }
+  const { error: linesErr } = await supabase
     .from('journal_entry_lines')
     .delete()
     .eq('journal_entry_id', entryId)
+  if (linesErr) {
+    console.error(`[storno] cancelEntry: failed to delete lines for ${entryId}:`, linesErr.message)
+  }
 }
 
 /**
