@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { ensureInitialized } from '@/lib/init'
 import { requireCompanyId } from '@/lib/company/context'
+import { eventBus } from '@/lib/events'
 
 ensureInitialized()
 
@@ -48,6 +49,15 @@ export async function GET(
       { status: 500 }
     )
   }
+
+  await eventBus.emit({
+    type: 'document.accessed',
+    payload: {
+      document: { id: doc.id, file_name: doc.file_name },
+      userId: user.id,
+      companyId,
+    },
+  })
 
   return NextResponse.json({
     data: {

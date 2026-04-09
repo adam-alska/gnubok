@@ -16,8 +16,16 @@ export interface FullArchiveOptions {
 }
 
 interface DocumentManifestEntry {
+  document_id: string
   file_name: string
   storage_path: string
+  sha256_hash: string
+  journal_entry_id: string | null
+  version: number
+  digitization_date: string | null
+  upload_source: string | null
+  mime_type: string | null
+  file_size_bytes: number | null
   status: 'downloaded' | 'missing' | 'error'
   error?: string
 }
@@ -110,7 +118,7 @@ export async function generateFullArchive(
     // Fetch document attachments linked to journal entries in this period
     const { data: documents } = await supabase
       .from('document_attachments')
-      .select('id, file_name, storage_path, journal_entry_id')
+      .select('id, file_name, storage_path, journal_entry_id, sha256_hash, version, digitization_date, upload_source, mime_type, file_size_bytes')
       .eq('company_id', companyId)
       .not('journal_entry_id', 'is', null)
 
@@ -129,6 +137,19 @@ export async function generateFullArchive(
       )
 
       for (const doc of periodDocuments) {
+        const baseManifest = {
+          document_id: doc.id,
+          file_name: doc.file_name,
+          storage_path: doc.storage_path,
+          sha256_hash: doc.sha256_hash,
+          journal_entry_id: doc.journal_entry_id,
+          version: doc.version,
+          digitization_date: doc.digitization_date,
+          upload_source: doc.upload_source,
+          mime_type: doc.mime_type,
+          file_size_bytes: doc.file_size_bytes,
+        }
+
         try {
           const { data: fileData, error } = await supabase.storage
             .from('documents')
@@ -136,8 +157,7 @@ export async function generateFullArchive(
 
           if (error || !fileData) {
             manifest.push({
-              file_name: doc.file_name,
-              storage_path: doc.storage_path,
+              ...baseManifest,
               status: 'error',
               error: error?.message || 'Download returned no data',
             })
@@ -145,16 +165,16 @@ export async function generateFullArchive(
           }
 
           const buffer = await fileData.arrayBuffer()
-          dokument.file(doc.file_name, buffer)
+          // Prefix with document ID to prevent duplicate filename collisions
+          const zipFileName = `${doc.id}_${doc.file_name}`
+          dokument.file(zipFileName, buffer)
           manifest.push({
-            file_name: doc.file_name,
-            storage_path: doc.storage_path,
+            ...baseManifest,
             status: 'downloaded',
           })
         } catch (err) {
           manifest.push({
-            file_name: doc.file_name,
-            storage_path: doc.storage_path,
+            ...baseManifest,
             status: 'error',
             error: err instanceof Error ? err.message : 'Unknown error',
           })
@@ -186,6 +206,60 @@ export async function generateFullArchive(
   }
 
   revision.file('behandlingshistorik.json', JSON.stringify(allAuditEntries, null, 2))
+
+  // 5. Systemdokumentation (BFNAR 2013:2 kap 8)
+  const [accountsResult, voucherSeriesResult] = await Promise.all([
+    supabase
+      .from('chart_of_accounts')
+      .select('account_number, account_name, account_type, is_active')
+      .eq('company_id', companyId)
+      .order('account_number'),
+    supabase
+      .from('voucher_sequences')
+      .select('voucher_series, last_number')
+      .eq('company_id', companyId)
+      .eq('fiscal_period_id', period_id),
+  ])
+
+  const systemdokumentation = {
+    system: {
+      name: 'gnubok',
+      description: 'Bokforingssystem for enskild firma och aktiebolag',
+      url: process.env.NEXT_PUBLIC_APP_URL || '',
+    },
+    kontoplan: {
+      standard: 'BAS 2026',
+      accounts: accountsResult.data || [],
+    },
+    verifikationsserier: (voucherSeriesResult.data || []).map((vs: { voucher_series: string; last_number: number }) => ({
+      serie: vs.voucher_series,
+      senaste_nummer: vs.last_number,
+    })),
+    behorighetskontroll: {
+      description: 'Rollbaserad atkomstkontroll med owner/admin/member/viewer',
+      mfa_stod: true,
+      rls_aktiv: true,
+    },
+    arkivering: {
+      lagringstid_ar: 7,
+      format: 'WORM (Write Once, Read Many)',
+      integritetskontroll: 'SHA-256 hashning vid uppladdning, regelbunden verifiering',
+      lagringsplats: 'Supabase Storage (krypterad)',
+    },
+    integrationer: {
+      bank: 'Enable Banking (PSD2)',
+      email: 'Resend',
+      export_format: 'SIE4',
+    },
+    generated_at: new Date().toISOString(),
+    fiscal_period: {
+      id: period.id,
+      start: period.period_start,
+      end: period.period_end,
+    },
+  }
+
+  revision.file('systemdokumentation.json', JSON.stringify(systemdokumentation, null, 2))
 
   return zip.generateAsync({ type: 'arraybuffer' })
 }
