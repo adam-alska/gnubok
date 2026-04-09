@@ -32,6 +32,8 @@ function computePeriodSuffix(fiscalYearEnd: string): string {
   if (endMonth >= 1 && endMonth <= 4) return 'P1'
   if (endMonth >= 5 && endMonth <= 8) return 'P2'
   // P4 covers Sep-Dec (most common: calendar year companies)
+  // NOTE: P3 (first/short fiscal year) cannot be derived from end month alone.
+  // Callers must handle P3 manually for brutet räkenskapsår.
   return 'P4'
 }
 
@@ -209,7 +211,7 @@ function generateBlanketterSru(declaration: INK2Declaration, now: Date): string 
  * Sanitize string for SRU: remove # characters (reserved), limit to 250 chars
  */
 function sanitizeString(str: string): string {
-  return str.replace(/#/g, '').substring(0, 250)
+  return str.replace(/#/g, '').replace(/[\r\n]/g, ' ').substring(0, 250)
 }
 
 /**

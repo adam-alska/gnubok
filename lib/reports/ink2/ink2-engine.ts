@@ -466,7 +466,11 @@ export const INK2R_ACCOUNT_MAPPINGS: INK2AccountMapping[] = [
     description: 'Handelsvaror',
     section: 'income_statement',
     normalBalance: 'debit',
-    accountRanges: [{ start: '4600', end: '4699' }],
+    accountRanges: [
+      { start: '4500', end: '4599' },
+      { start: '4600', end: '4699' },
+      { start: '4700', end: '4899' },
+    ],
   },
   // CRITICAL: BAS 5000-6999 ALL map to SRU 7513
   {
