@@ -52,6 +52,12 @@ export default function InvitePage() {
     router.push(`/register?invite=${encodeURIComponent(token)}`)
   }
 
+  const handleAcceptExistingUser = () => {
+    // Store invite token in cookie before redirecting to login
+    document.cookie = `gnubok-invite-token=${token}; path=/; max-age=3600; samesite=lax`
+    router.push('/login')
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -124,24 +130,29 @@ export default function InvitePage() {
                 </div>
               </Card>
             ) : invite?.alreadyHasAccount ? (
-              <Card className="p-6">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium">E-postadressen har redan ett konto</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      <strong>{invite.email}</strong> är redan registrerad på gnubok.
-                      Kontot måste tas bort innan du kan acceptera inbjudan.
-                    </p>
-                    <Link
-                      href="/login"
-                      className="text-sm text-primary hover:underline mt-3 inline-block"
-                    >
-                      Gå till inloggning
-                    </Link>
+              <div className="space-y-6">
+                <Card className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="p-2.5 rounded-lg bg-muted/50">
+                      <Building2 className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{invite.companyName}</p>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        Du har bjudits in som medlem till detta företag.
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        <strong>{invite.email}</strong> har redan ett konto på gnubok.
+                        Logga in för att gå med.
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </Card>
+                </Card>
+
+                <Button size="lg" className="w-full" onClick={handleAcceptExistingUser}>
+                  Logga in och gå med
+                </Button>
+              </div>
             ) : invite ? (
               <div className="space-y-6">
                 <Card className="p-6">

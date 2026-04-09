@@ -74,6 +74,29 @@ export default function LoginPage() {
           return
         }
 
+        // Check for pending invite token
+        const bankIdCookieMatch = document.cookie.match(/gnubok-invite-token=([^;]+)/)
+        const bankIdInviteToken = bankIdCookieMatch?.[1]
+
+        if (bankIdInviteToken) {
+          try {
+            const res = await fetch('/api/team/accept', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: bankIdInviteToken }),
+            })
+
+            if (res.ok) {
+              document.cookie = 'gnubok-invite-token=; path=/; max-age=0'
+              window.location.href = '/'
+              return
+            }
+          } catch (err) {
+            console.error('[login] invite acceptance failed:', err)
+          }
+          document.cookie = 'gnubok-invite-token=; path=/; max-age=0'
+        }
+
         router.push('/')
         router.refresh()
       } catch (error) {
@@ -118,6 +141,30 @@ export default function LoginPage() {
       if (aal?.nextLevel === 'aal2' && aal?.currentLevel === 'aal1') {
         router.push('/mfa/verify')
         return
+      }
+
+      // Check for pending invite token
+      const cookieMatch = document.cookie.match(/gnubok-invite-token=([^;]+)/)
+      const inviteToken = cookieMatch?.[1]
+
+      if (inviteToken) {
+        try {
+          const res = await fetch('/api/team/accept', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: inviteToken }),
+          })
+
+          if (res.ok) {
+            document.cookie = 'gnubok-invite-token=; path=/; max-age=0'
+            window.location.href = '/'
+            return
+          }
+        } catch (err) {
+          console.error('[login] invite acceptance failed:', err)
+        }
+        // Clear cookie even on failure to avoid retrying stale tokens
+        document.cookie = 'gnubok-invite-token=; path=/; max-age=0'
       }
 
       router.push('/')
