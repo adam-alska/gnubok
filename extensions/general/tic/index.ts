@@ -22,7 +22,7 @@ import type { TICCompanyProfile } from './lib/tic-types'
 import type { BankIdCompleteRequest } from './lib/bankid-types'
 import type { CompanyLookupResult } from '@/lib/company-lookup/types'
 import { hashPersonalNumber, encryptPersonalNumber } from '@/lib/auth/bankid'
-import { createServiceClientNoCookies } from '@/lib/auth/api-keys'
+import { createServiceClient } from '@/lib/supabase/server'
 import crypto from 'crypto'
 
 // Server-side per-IP rate limit for /bankid/start (each call = billable TIC session)
@@ -450,7 +450,9 @@ export const ticExtension: Extension = {
             )
           }
 
-          if (mode === 'signup' && !email) {
+          const trimmedEmail = email?.trim().toLowerCase()
+
+          if (mode === 'signup' && !trimmedEmail) {
             return NextResponse.json(
               { error: 'email is required for signup' },
               { status: 400 }
@@ -468,7 +470,7 @@ export const ticExtension: Extension = {
 
           const { personalNumber, givenName, surname, name } = session.user
           const pnrHash = hashPersonalNumber(personalNumber)
-          const supabase = createServiceClientNoCookies()
+          const supabase = createServiceClient()
 
           // Look up existing BankID identity
           const { data: existing } = await supabase
@@ -525,29 +527,50 @@ export const ticExtension: Extension = {
             )
           }
 
-          // Create new Supabase user
-          const randomPassword = crypto.randomBytes(32).toString('base64url')
-          const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
-            email: email!,
-            email_confirm: true,
-            password: randomPassword,
-            user_metadata: { full_name: name },
-          })
+          // Check if email is already taken by a non-BankID user
+          const { data: existingByEmail } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('email', trimmedEmail!)
+            .single()
 
-          if (createError || !newUser?.user) {
-            console.error('[tic/bankid] createUser failed', createError)
-            return NextResponse.json(
-              { error: 'Failed to create account', message: createError?.message },
-              { status: 500 }
-            )
+          let userId: string
+          let isNewUser = true
+
+          if (existingByEmail) {
+            // Email already exists — link BankID to existing account
+            userId = existingByEmail.id
+            isNewUser = false
+
+            await supabase.auth.admin.updateUserById(userId, {
+              app_metadata: { bankid_linked: true },
+              user_metadata: { full_name: name },
+            })
+          } else {
+            // Create new Supabase user
+            const randomPassword = crypto.randomBytes(32).toString('base64url')
+            const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+              email: trimmedEmail!,
+              email_confirm: true,
+              password: randomPassword,
+              user_metadata: { full_name: name },
+            })
+
+            if (createError || !newUser?.user) {
+              console.error('[tic/bankid] createUser failed', { email: trimmedEmail, status: createError?.status, code: (createError as any)?.code, message: createError?.message })
+              return NextResponse.json(
+                { error: 'Failed to create account', message: createError?.message },
+                { status: 500 }
+              )
+            }
+
+            userId = newUser.user.id
+
+            // Mark user as BankID-linked (skips TOTP MFA)
+            await supabase.auth.admin.updateUserById(userId, {
+              app_metadata: { bankid_linked: true },
+            })
           }
-
-          const userId = newUser.user.id
-
-          // Mark user as BankID-linked (skips TOTP MFA)
-          await supabase.auth.admin.updateUserById(userId, {
-            app_metadata: { bankid_linked: true },
-          })
 
           // Store BankID identity
           const { error: insertError } = await supabase
@@ -562,8 +585,6 @@ export const ticExtension: Extension = {
 
           if (insertError) {
             console.error('[tic/bankid] insert bankid_identities failed', insertError)
-            // Clean up the created user if identity linking fails
-            await supabase.auth.admin.deleteUser(userId)
             return NextResponse.json(
               { error: 'Failed to link BankID identity' },
               { status: 500 }
@@ -573,7 +594,7 @@ export const ticExtension: Extension = {
           // Generate magic link for session
           const { data: link, error: linkError } = await supabase.auth.admin.generateLink({
             type: 'magiclink',
-            email: email!,
+            email: trimmedEmail!,
           })
 
           if (linkError || !link?.properties?.hashed_token) {
@@ -613,7 +634,7 @@ export const ticExtension: Extension = {
             data: {
               tokenHash: link.properties.hashed_token,
               type: 'magiclink',
-              isNewUser: true,
+              isNewUser,
             },
           })
         } catch (error) {
@@ -681,7 +702,7 @@ export const ticExtension: Extension = {
 
           const { personalNumber, givenName, surname } = session.user
           const pnrHash = hashPersonalNumber(personalNumber)
-          const supabase = createServiceClientNoCookies()
+          const supabase = createServiceClient()
 
           // Check personnummer not already linked to another user
           const { data: existing } = await supabase
@@ -746,7 +767,7 @@ export const ticExtension: Extension = {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
           }
 
-          const supabase = createServiceClientNoCookies()
+          const supabase = createServiceClient()
 
           // Delete bankid_identities row
           const { error: deleteError } = await supabase
