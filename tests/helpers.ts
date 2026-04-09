@@ -488,6 +488,7 @@ export function makeCompanySettings(
     company_id: 'company-1',
     entity_type: 'enskild_firma',
     company_name: 'Test Firma',
+    trade_name: null,
     org_number: '199001011234',
     address_line1: 'Testgatan 1',
     address_line2: null,

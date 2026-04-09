@@ -29,6 +29,18 @@ export function CompanyInfoForm({ settings }: CompanyInfoFormProps) {
           )}
         </div>
         <div className="space-y-2">
+          <Label htmlFor="trade_name">Handelsnamn</Label>
+          <Input
+            id="trade_name"
+            name="trade_name"
+            defaultValue={settings.trade_name || ''}
+            placeholder="Visas på fakturor istället för företagsnamnet"
+          />
+          <p className="text-xs text-muted-foreground">
+            Valfritt. Visas som huvudnamn på fakturor och e-post, med det juridiska namnet i parentes.
+          </p>
+        </div>
+        <div className="space-y-2">
           <Label htmlFor="org_number">Organisationsnummer</Label>
           <Input
             id="org_number"

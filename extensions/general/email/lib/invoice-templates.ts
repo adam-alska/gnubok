@@ -1,5 +1,5 @@
 import type { Invoice, Customer, CompanySettings, InvoiceDocumentType } from '@/types'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, getCompanyDisplayName, getCompanyPrimaryName } from '@/lib/utils'
 
 function getDocumentLabel(invoice: Invoice): string {
   if (invoice.credited_invoice_id) return 'Kreditfaktura'
@@ -41,7 +41,7 @@ export function generateInvoiceEmailHtml(data: InvoiceEmailData): string {
     <!-- Header -->
     <div style="margin-bottom: 30px;">
       <h1 style="margin: 0 0 10px 0; font-size: 24px; font-weight: 600; color: #111;">
-        ${documentType} från ${company.company_name}
+        ${documentType} från ${getCompanyPrimaryName(company)}
       </h1>
       <p style="margin: 0; color: #666; font-size: 14px;">
         ${documentType}nummer: ${invoice.invoice_number}
@@ -136,7 +136,8 @@ export function generateInvoiceEmailHtml(data: InvoiceEmailData): string {
       </p>
       <p style="margin: 0; color: #666; font-size: 14px;">
         Med vänliga hälsningar,<br>
-        <strong>${company.company_name}</strong>
+        <strong>${getCompanyPrimaryName(company)}</strong>
+        ${company.trade_name && company.company_name ? `<br><span style="font-weight: normal; font-size: 12px; color: #999;">(${company.company_name})</span>` : ''}
       </p>
       ${company.org_number ? `
       <p style="margin: 10px 0 0 0; color: #999; font-size: 12px;">
@@ -165,7 +166,7 @@ export function generateInvoiceEmailText(data: InvoiceEmailData): string {
   const isProforma = docType === 'proforma'
   const hidePayment = isCreditNote || isDeliveryNote || isProforma
 
-  let text = `${documentType} från ${company.company_name}\n`
+  let text = `${documentType} från ${getCompanyPrimaryName(company)}\n`
   text += `${documentType}nummer: ${invoice.invoice_number}\n\n`
 
   text += `Hej${customer.name ? ` ${customer.name.split(' ')[0]}` : ''},\n\n`
@@ -197,7 +198,7 @@ export function generateInvoiceEmailText(data: InvoiceEmailData): string {
 
   text += `Har du frågor om fakturan? Svara direkt på detta mejl så hjälper vi dig.\n\n`
   text += `Med vänliga hälsningar,\n`
-  text += `${company.company_name}\n`
+  text += `${getCompanyDisplayName(company)}\n`
 
   if (company.org_number) {
     text += `\nOrg.nr: ${company.org_number}`
@@ -216,5 +217,5 @@ export function generateInvoiceEmailSubject(data: InvoiceEmailData): string {
   const { invoice, company } = data
   const documentType = getDocumentLabel(invoice)
 
-  return `${documentType} ${invoice.invoice_number} från ${company.company_name}`
+  return `${documentType} ${invoice.invoice_number} från ${getCompanyPrimaryName(company)}`
 }

@@ -136,6 +136,7 @@ export interface CompanySettings {
   // Entity info
   entity_type: EntityType
   company_name: string | null
+  trade_name: string | null
   org_number: string | null
 
   // Address
@@ -1119,6 +1120,7 @@ export interface BalanceSheetReport {
 export interface SIEExportOptions {
   fiscal_period_id: string
   company_name: string
+  trade_name?: string | null
   org_number: string | null
   program_name?: string
 }

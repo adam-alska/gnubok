@@ -317,7 +317,10 @@ export function InvoicePDF({ invoice, customer, items, company, originalInvoiceN
             {company.logo_url && (
               <Image src={company.logo_url} style={{ maxHeight: 40, maxWidth: 150, marginBottom: 6, alignSelf: 'flex-end' }} />
             )}
-            <Text style={styles.companyName}>{company.company_name}</Text>
+            <Text style={styles.companyName}>{company.trade_name || company.company_name}</Text>
+            {company.trade_name && company.company_name && (
+              <Text style={{ fontSize: 8, color: '#666' }}>({company.company_name})</Text>
+            )}
             {company.address_line1 && <Text>{company.address_line1}</Text>}
             {(company.postal_code || company.city) && (
               <Text>{company.postal_code} {company.city}</Text>
@@ -604,7 +607,8 @@ export function InvoicePDF({ invoice, customer, items, company, originalInvoiceN
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            {company.company_name}
+            {company.trade_name || company.company_name}
+            {company.trade_name && company.company_name ? ` (${company.company_name})` : ''}
             {company.org_number ? ` | Org.nr: ${formatOrgNumber(company.org_number)}` : ''}
             {company.f_skatt ? ' | Godkänd för F-skatt' : ''}
             {company.vat_number ? ` | Momsreg.nr: ${company.vat_number}` : ''}

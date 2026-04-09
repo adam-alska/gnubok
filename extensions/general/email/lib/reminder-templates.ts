@@ -1,5 +1,5 @@
 import type { Invoice, Customer, CompanySettings } from '@/types'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, getCompanyDisplayName, getCompanyPrimaryName } from '@/lib/utils'
 
 export interface ReminderEmailData {
   invoice: Invoice
@@ -179,7 +179,8 @@ export function generateReminderEmailHtml(data: ReminderEmailData): string {
         </p>
         <p style="margin: 0; color: #666; font-size: 14px;">
           Med vänliga hälsningar,<br>
-          <strong>${company.company_name}</strong>
+          <strong>${getCompanyPrimaryName(company)}</strong>
+          ${company.trade_name && company.company_name ? `<br><span style="font-weight: normal; font-size: 12px; color: #999;">(${company.company_name})</span>` : ''}
         </p>
         ${company.org_number ? `
         <p style="margin: 10px 0 0 0; color: #999; font-size: 12px;">
@@ -247,7 +248,7 @@ export function generateReminderEmailText(data: ReminderEmailData): string {
 
   text += `Har du frågor? Svara direkt på detta mejl så hjälper vi dig.\n\n`
   text += `Med vänliga hälsningar,\n`
-  text += `${company.company_name}\n`
+  text += `${getCompanyDisplayName(company)}\n`
 
   if (company.org_number) {
     text += `\nOrg.nr: ${company.org_number}`

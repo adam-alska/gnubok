@@ -78,7 +78,7 @@ export async function generateSIEExport(
     lines.push(`#ORGNR ${options.org_number}`)
   }
 
-  lines.push(`#FNAMN "${escapeQuotes(options.company_name)}"`)
+  lines.push(`#FNAMN "${escapeQuotes(options.trade_name || options.company_name)}"`)
 
   // === Fiscal year ===
   // #RAR 0 start end (current year)

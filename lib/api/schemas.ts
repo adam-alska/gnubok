@@ -349,6 +349,7 @@ export const MatchSupplierInvoiceSchema = z.object({
 export const UpdateSettingsSchema = z.object({
   entity_type: EntityTypeSchema.optional(),
   company_name: z.string().optional(),
+  trade_name: z.string().nullable().optional(),
   org_number: z.string().optional(),
   address_line1: z.string().optional(),
   address_line2: z.string().optional(),

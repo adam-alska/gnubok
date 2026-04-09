@@ -29,6 +29,27 @@ export function formatOrgNumber(orgNumber: string): string {
   return orgNumber
 }
 
+/**
+ * Returns the display name for a company, using trade name as primary
+ * with legal name in parentheses if both exist.
+ */
+export function getCompanyDisplayName(settings: { trade_name?: string | null; company_name?: string | null }): string {
+  const tradeName = settings.trade_name?.trim()
+  const legalName = settings.company_name?.trim()
+  if (tradeName && legalName) {
+    return `${tradeName} (${legalName})`
+  }
+  return legalName || tradeName || ''
+}
+
+/**
+ * Returns just the primary name for contexts where a short name is needed
+ * (e.g. email from name). Uses trade name if set, otherwise legal name.
+ */
+export function getCompanyPrimaryName(settings: { trade_name?: string | null; company_name?: string | null }): string {
+  return settings.trade_name?.trim() || settings.company_name?.trim() || ''
+}
+
 export function generateInvoiceNumber(): string {
   const year = new Date().getFullYear()
   const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0')

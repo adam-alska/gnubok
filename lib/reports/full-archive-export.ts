@@ -50,7 +50,7 @@ export async function generateFullArchive(
   // Fetch company settings
   const { data: company } = await supabase
     .from('company_settings')
-    .select('company_name, org_number, moms_period')
+    .select('company_name, trade_name, org_number, moms_period')
     .eq('company_id', companyId)
     .single()
 
@@ -64,6 +64,7 @@ export async function generateFullArchive(
   const sieContent = await generateSIEExport(supabase, companyId, {
     fiscal_period_id: period_id,
     company_name: company.company_name || 'Unknown',
+    trade_name: company.trade_name,
     org_number: company.org_number,
     program_name: 'ERPBase',
   })
