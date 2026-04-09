@@ -20,11 +20,16 @@ export default function BankingSettingsPage() {
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<{ imported: number } | null>(null)
   const successTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
+  const syncInitiatedRef = useRef(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const unmountedRef = useRef(false)
   const hasBankingExtension = ENABLED_EXTENSION_IDS.has('enable-banking')
 
   useEffect(() => {
     return () => {
+      unmountedRef.current = true
       if (successTimerRef.current) clearTimeout(successTimerRef.current)
+      if (abortControllerRef.current) abortControllerRef.current.abort()
     }
   }, [])
 
@@ -32,19 +37,26 @@ export default function BankingSettingsPage() {
     const bankConnected = searchParams.get('bank_connected')
     const bankError = searchParams.get('bank_error')
 
-    if (bankConnected === 'true' && !isSyncing) {
+    if (bankConnected === 'true' && !syncInitiatedRef.current) {
+      syncInitiatedRef.current = true
       const connectionId = searchParams.get('connection_id')
       router.replace('/settings/banking')
 
       if (connectionId) {
         setIsSyncing(true)
+        const controller = new AbortController()
+        abortControllerRef.current = controller
+        const syncTimeout = setTimeout(() => controller.abort(), 120_000)
+
         ;(async () => {
           try {
             const res = await fetch('/api/extensions/ext/enable-banking/sync', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ connection_id: connectionId, days_back: 120 }),
+              signal: controller.signal,
             })
+            clearTimeout(syncTimeout)
             const data = await res.json()
             if (res.ok) {
               setSyncResult({ imported: data.imported ?? 0 })
@@ -56,11 +68,20 @@ export default function BankingSettingsPage() {
               throw new Error(data.error || 'Sync failed')
             }
           } catch (err) {
-            toast({
-              title: 'Synkronisering misslyckades',
-              description: err instanceof Error ? err.message : 'Kunde inte hämta transaktioner',
-              variant: 'destructive',
-            })
+            clearTimeout(syncTimeout)
+            if (unmountedRef.current) return
+            if (controller.signal.aborted) {
+              toast({
+                title: 'Synkronisering tog för lång tid',
+                description: 'Transaktionerna hämtas i bakgrunden. Ladda om sidan om en stund.',
+              })
+            } else {
+              toast({
+                title: 'Synkronisering misslyckades',
+                description: err instanceof Error ? err.message : 'Kunde inte hämta transaktioner',
+                variant: 'destructive',
+              })
+            }
             setIsSyncing(false)
           }
         })()
@@ -82,7 +103,7 @@ export default function BankingSettingsPage() {
       setBankConnectionError(errorMsg)
       router.replace('/settings/banking')
     }
-  }, [searchParams, router, toast, isSyncing])
+  }, [searchParams, router, toast])
 
   if (isSyncing) {
     return (

@@ -3,6 +3,9 @@ import { NextResponse } from 'next/server'
 import { getEmailService } from '@/lib/email/service'
 import { SUPPORT_RECIPIENT_EMAIL } from '@/lib/support'
 import { requireCompanyId } from '@/lib/company/context'
+import { ensureInitialized } from '@/lib/init'
+
+ensureInitialized()
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
