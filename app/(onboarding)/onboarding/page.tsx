@@ -42,5 +42,5 @@ export default async function OnboardingPage() {
 
   const firstName = profile?.full_name?.split(' ')[0] || null
 
-  return <WelcomeOnboarding firstName={firstName} teamId={teamId} skipWelcome />
+  return <WelcomeOnboarding firstName={firstName} teamId={teamId} skipWelcome hasExistingCompanies={hasCompanies} />
 }

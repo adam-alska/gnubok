@@ -60,9 +60,10 @@ interface WelcomeOnboardingProps {
   firstName?: string | null
   teamId: string
   skipWelcome?: boolean
+  hasExistingCompanies?: boolean
 }
 
-export default function WelcomeOnboarding({ firstName, teamId, skipWelcome }: WelcomeOnboardingProps) {
+export default function WelcomeOnboarding({ firstName, teamId, skipWelcome, hasExistingCompanies }: WelcomeOnboardingProps) {
   const router = useRouter()
   const { toast } = useToast()
   const supabase = createClient()
@@ -468,7 +469,7 @@ export default function WelcomeOnboarding({ firstName, teamId, skipWelcome }: We
           onClick={() => setStarted(true)}
           className="px-5 py-2.5 rounded-lg bg-foreground text-background text-sm font-medium hover:bg-foreground/85 transition-colors duration-150 active:scale-[0.98]"
         >
-          Lägg till ditt första företag
+          {hasExistingCompanies ? 'Lägg till ett företag' : 'Lägg till ditt första företag'}
         </button>
       </div>
     )
@@ -482,7 +483,7 @@ export default function WelcomeOnboarding({ firstName, teamId, skipWelcome }: We
           {greeting}{firstName ? `, ${firstName}` : ''}
         </h1>
         <p className="text-muted-foreground text-sm mt-1.5">
-          Lägg till ditt första företag för att komma igång.
+          {hasExistingCompanies ? 'Lägg till ett företag.' : 'Lägg till ditt första företag för att komma igång.'}
         </p>
       </header>
 
