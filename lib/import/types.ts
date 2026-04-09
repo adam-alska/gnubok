@@ -26,6 +26,7 @@ export type ParseIssueSeverity = 'error' | 'warning' | 'info'
 export interface SIEHeader {
   // File metadata
   sieType: SIEType
+  flagga: number | null            // #FLAGGA (0 = not imported, 1 = already imported)
   program: string | null           // #PROGRAM
   programVersion: string | null
   generatedDate: string | null     // #GEN — "YYYY-MM-DD"

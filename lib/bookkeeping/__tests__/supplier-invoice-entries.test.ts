@@ -39,17 +39,19 @@ vi.mock('../currency-utils', () => ({
 // Mock vat-entries with real reverse charge logic
 vi.mock('../vat-entries', () => ({
   generateReverseChargeLines: vi.fn().mockImplementation(
-    (baseAmount: number, vatRate: number = 0.25) => {
+    (baseAmount: number, vatRate: number = 0.25, isDomestic: boolean = false) => {
       const vatAmount = Math.round(baseAmount * vatRate * 100) / 100
+      const inputAccount = isDomestic ? '2647' : '2645'
       let outputAccount: string
       switch (vatRate) {
         case 0.12: outputAccount = '2624'; break
         case 0.06: outputAccount = '2634'; break
         default: outputAccount = '2614'; break
       }
+      const context = isDomestic ? 'omvänd skattskyldighet i Sverige' : 'omvänd skattskyldighet'
       return [
-        { account_number: '2645', debit_amount: vatAmount, credit_amount: 0, line_description: `Fiktiv ingående moms ${vatRate * 100}% (omvänd skattskyldighet)` },
-        { account_number: outputAccount, debit_amount: 0, credit_amount: vatAmount, line_description: `Fiktiv utgående moms ${vatRate * 100}% (omvänd skattskyldighet)` },
+        { account_number: inputAccount, debit_amount: vatAmount, credit_amount: 0, line_description: `Fiktiv ingående moms ${vatRate * 100}% (${context})` },
+        { account_number: outputAccount, debit_amount: 0, credit_amount: vatAmount, line_description: `Fiktiv utgående moms ${vatRate * 100}% (${context})` },
       ]
     }
   ),
@@ -416,6 +418,66 @@ describe('createSupplierInvoiceRegistrationEntry', () => {
     expect(findByAccount(input.lines, '2645')).toHaveLength(1)
     expect(findByAccount(input.lines, '2614')).toHaveLength(1)
     expect(findByAccount(input.lines, '2641')).toHaveLength(0)
+
+    assertBalanced(input)
+  })
+
+  it('creates domestic reverse charge entry using 2647 (byggtjänster etc.)', async () => {
+    const invoice = makeSupplierInvoice({
+      subtotal: 20000,
+      vat_amount: 0,
+      total: 20000,
+      reverse_charge: true,
+    })
+    const items = [makeItem({ line_total: 20000, vat_rate: 0.25, account_number: '4425' })]
+
+    await createSupplierInvoiceRegistrationEntry(
+      null as never, 'company-1', 'user-1', invoice, items, 'swedish_business'
+    )
+
+    const input = mockedCreateEntry.mock.calls[0][3]
+
+    // Domestic RC uses 2647 (not 2645) for input VAT
+    const debit2647 = findByAccount(input.lines, '2647')
+    expect(debit2647).toHaveLength(1)
+    expect(debit2647[0].debit_amount).toBe(5000) // 20000 * 0.25
+
+    const credit2614 = findByAccount(input.lines, '2614')
+    expect(credit2614).toHaveLength(1)
+    expect(credit2614[0].credit_amount).toBe(5000)
+
+    // No EU reverse charge account used
+    expect(findByAccount(input.lines, '2645')).toHaveLength(0)
+    // No regular input VAT
+    expect(findByAccount(input.lines, '2641')).toHaveLength(0)
+
+    // 2440 = expense only (RC is offsetting)
+    const credit2440 = findByAccount(input.lines, '2440')
+    expect(credit2440[0].credit_amount).toBe(20000)
+
+    assertBalanced(input)
+  })
+
+  it('does NOT create RC entry for swedish_business when reverse_charge is false', async () => {
+    const invoice = makeSupplierInvoice({
+      subtotal: 8000,
+      vat_amount: 2000,
+      total: 10000,
+      reverse_charge: false,
+    })
+    const items = [makeItem({ line_total: 8000, vat_rate: 0.25, account_number: '4010' })]
+
+    await createSupplierInvoiceRegistrationEntry(
+      null as never, 'company-1', 'user-1', invoice, items, 'swedish_business'
+    )
+
+    const input = mockedCreateEntry.mock.calls[0][3]
+
+    // Should use standard domestic path with 2641
+    expect(findByAccount(input.lines, '2641')).toHaveLength(1)
+    expect(findByAccount(input.lines, '2647')).toHaveLength(0)
+    expect(findByAccount(input.lines, '2645')).toHaveLength(0)
+    expect(findByAccount(input.lines, '2614')).toHaveLength(0)
 
     assertBalanced(input)
   })

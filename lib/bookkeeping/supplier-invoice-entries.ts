@@ -82,19 +82,21 @@ export async function createSupplierInvoiceRegistrationEntry(
   }
   lines.push(...debitLines)
 
-  const isReverseCharge = (supplierType === 'eu_business' || supplierType === 'non_eu_business') && invoice.reverse_charge
+  const isReverseCharge = (supplierType === 'eu_business' || supplierType === 'non_eu_business' || supplierType === 'swedish_business') && invoice.reverse_charge
+  const isDomesticRC = supplierType === 'swedish_business' && invoice.reverse_charge
 
   if (isReverseCharge) {
-    // EU/non-EU reverse charge: fiktiv moms entries per rate group
+    // Reverse charge: fiktiv moms entries per rate group
+    // Domestic (byggtjänster etc.): 2647/26x4, EU/non-EU: 2645/26x4
     const vatByRate = groupVatByRate(items, invoice.currency, invoice.exchange_rate)
     for (const [rate, amount] of vatByRate) {
       if (rate > 0 && amount > 0) {
-        const rcLines = generateReverseChargeLines(amount / rate, rate)
+        const rcLines = generateReverseChargeLines(amount / rate, rate, isDomesticRC)
         lines.push(...rcLines)
       }
     }
   } else if (invoice.vat_amount > 0) {
-    // Domestic: Debit ingående moms per rate group
+    // Domestic standard: Debit ingående moms per rate group
     const vatByRate = groupVatByRate(items, invoice.currency, invoice.exchange_rate)
     for (const [rate, amount] of vatByRate) {
       if (amount > 0) {
@@ -275,19 +277,21 @@ export async function createSupplierInvoiceCashEntry(
     })
   }
 
-  const isReverseCharge = (supplierType === 'eu_business' || supplierType === 'non_eu_business') && invoice.reverse_charge
+  const isReverseCharge = (supplierType === 'eu_business' || supplierType === 'non_eu_business' || supplierType === 'swedish_business') && invoice.reverse_charge
+  const isDomesticRC = supplierType === 'swedish_business' && invoice.reverse_charge
 
   if (isReverseCharge) {
-    // EU/non-EU reverse charge: fiktiv moms entries per rate group
+    // Reverse charge: fiktiv moms entries per rate group
+    // Domestic (byggtjänster etc.): 2647/26x4, EU/non-EU: 2645/26x4
     const vatByRate = groupVatByRate(items, invoice.currency, invoice.exchange_rate)
     for (const [rate, amount] of vatByRate) {
       if (rate > 0 && amount > 0) {
-        const rcLines = generateReverseChargeLines(amount / rate, rate)
+        const rcLines = generateReverseChargeLines(amount / rate, rate, isDomesticRC)
         lines.push(...rcLines)
       }
     }
   } else if (invoice.vat_amount > 0) {
-    // Domestic: Debit ingående moms per rate group
+    // Domestic standard: Debit ingående moms per rate group
     const vatByRate = groupVatByRate(items, invoice.currency, invoice.exchange_rate)
     for (const [rate, amount] of vatByRate) {
       if (amount > 0) {
@@ -367,10 +371,13 @@ export async function createSupplierCreditNoteEntry(
     })
   }
 
-  const isReverseCharge = (supplierType === 'eu_business' || supplierType === 'non_eu_business') && creditNote.reverse_charge
+  const isReverseCharge = (supplierType === 'eu_business' || supplierType === 'non_eu_business' || supplierType === 'swedish_business') && creditNote.reverse_charge
+  const isDomesticRC = supplierType === 'swedish_business' && creditNote.reverse_charge
 
   if (isReverseCharge) {
     // Reverse the fiktiv moms per rate group (swap debit/credit from registration)
+    // Input VAT account: 2647 for domestic RC, 2645 for EU/non-EU
+    const inputAccount = isDomesticRC ? '2647' : '2645'
     const vatByRate = groupVatByRate(items, creditNote.currency, creditNote.exchange_rate, true)
     for (const [rate, amount] of vatByRate) {
       if (rate > 0 && amount > 0) {
@@ -382,7 +389,7 @@ export async function createSupplierCreditNoteEntry(
           default: outputAccount = '2614'; break
         }
         creditLines.push({
-          account_number: '2645',
+          account_number: inputAccount,
           debit_amount: 0,
           credit_amount: amount,
           line_description: `Omvänd fiktiv ingående moms ${Math.round(rate * 100)}% ${desc}`,

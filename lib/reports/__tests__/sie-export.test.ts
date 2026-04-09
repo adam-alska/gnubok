@@ -9,7 +9,7 @@ let results: Array<{ data?: unknown; error?: unknown }>
 
 function makeBuilder() {
   const b: Record<string, unknown> = {}
-  for (const m of ['select', 'eq', 'in', 'order', 'range']) {
+  for (const m of ['select', 'eq', 'in', 'order', 'range', 'lt', 'lte', 'gte', 'gt', 'limit']) {
     b[m] = vi.fn().mockReturnValue(b)
   }
   b.single = vi.fn().mockImplementation(async () => results[resultIdx++] ?? { data: null, error: null })
@@ -57,13 +57,15 @@ describe('generateSIEExport', () => {
     results = [
       // 0: fiscal_periods
       { data: { id: 'period-1', period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
-      // 1: chart_of_accounts (empty)
+      // 1: previous fiscal period (#RAR -1)
+      { data: null, error: null },
+      // 2: chart_of_accounts (empty)
       { data: [], error: null },
-      // 2: journal_entries (empty)
+      // 3: journal_entries (empty)
       { data: [], error: null },
-      // 3: cost_centers (empty)
+      // 4: cost_centers (empty)
       { data: [], error: null },
-      // 4: projects (empty)
+      // 5: projects (empty)
       { data: [], error: null },
     ]
 
@@ -83,6 +85,7 @@ describe('generateSIEExport', () => {
   it('omits #ORGNR when org_number is null', async () => {
     results = [
       { data: { id: 'period-1', period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
+      { data: null, error: null }, // prevPeriod
       { data: [], error: null },
       { data: [], error: null },
       { data: [], error: null },
@@ -100,7 +103,7 @@ describe('generateSIEExport', () => {
   it('generates #KONTO and #SRU for accounts', async () => {
     results = [
       { data: { id: 'period-1', period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
-      // 1: chart_of_accounts
+      { data: null, error: null }, // prevPeriod
       {
         data: [
           { account_number: '1930', account_name: 'Företagskonto', sru_code: '7301', is_active: true },
@@ -108,11 +111,8 @@ describe('generateSIEExport', () => {
         ],
         error: null,
       },
-      // 2: journal_entries (empty)
       { data: [], error: null },
-      // 3: cost_centers
       { data: [], error: null },
-      // 4: projects
       { data: [], error: null },
     ]
 
@@ -128,9 +128,8 @@ describe('generateSIEExport', () => {
   it('generates #VER and #TRANS for journal entries', async () => {
     results = [
       { data: { id: 'period-1', period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
-      // 1: accounts
-      { data: [], error: null },
-      // 2: journal_entries with lines
+      { data: null, error: null }, // prevPeriod
+      { data: [], error: null }, // accounts
       {
         data: [
           {
@@ -149,10 +148,8 @@ describe('generateSIEExport', () => {
         ],
         error: null,
       },
-      // 3: cost_centers
-      { data: [], error: null },
-      // 4: projects
-      { data: [], error: null },
+      { data: [], error: null }, // cost_centers
+      { data: [], error: null }, // projects
     ]
 
     const output = await generateSIEExport(supabase, 'company-1', baseOptions)
@@ -168,16 +165,15 @@ describe('generateSIEExport', () => {
   it('generates #DIM and #OBJEKT for dimensions', async () => {
     results = [
       { data: { id: 'period-1', period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
+      { data: null, error: null }, // prevPeriod
       { data: [], error: null },
       { data: [], error: null },
-      // 3: cost_centers
       {
         data: [
           { code: 'CC1', name: 'Avdelning 1', is_active: true },
         ],
         error: null,
       },
-      // 4: projects
       {
         data: [
           { code: 'P001', name: 'Projekt Alpha', is_active: true },
@@ -197,6 +193,7 @@ describe('generateSIEExport', () => {
   it('includes dimension objects in #TRANS lines', async () => {
     results = [
       { data: { id: 'period-1', period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
+      { data: null, error: null }, // prevPeriod
       { data: [], error: null },
       {
         data: [
@@ -228,6 +225,7 @@ describe('generateSIEExport', () => {
   it('generates #UB for class 1-2 and #RES for class 3-8', async () => {
     results = [
       { data: { id: 'period-1', period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
+      { data: null, error: null }, // prevPeriod
       { data: [], error: null },
       {
         data: [
@@ -264,6 +262,7 @@ describe('generateSIEExport', () => {
   it('escapes quotes in descriptions', async () => {
     results = [
       { data: { id: 'period-1', period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
+      { data: null, error: null }, // prevPeriod
       { data: [], error: null },
       {
         data: [
@@ -294,6 +293,7 @@ describe('generateSIEExport', () => {
   it('uses \\r\\n line endings', async () => {
     results = [
       { data: { id: 'period-1', period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
+      { data: null, error: null }, // prevPeriod
       { data: [], error: null },
       { data: [], error: null },
       { data: [], error: null },
@@ -316,6 +316,7 @@ describe('generateSIEExport', () => {
   it('produces no #VER lines when no entries exist', async () => {
     results = [
       { data: { id: 'period-1', period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
+      { data: null, error: null }, // prevPeriod
       { data: [], error: null },
       { data: [], error: null },
       { data: [], error: null },
@@ -331,6 +332,7 @@ describe('generateSIEExport', () => {
   it('produces no #DIM lines when no dimensions exist', async () => {
     results = [
       { data: { id: 'period-1', period_start: '2024-01-01', period_end: '2024-12-31' }, error: null },
+      { data: null, error: null }, // prevPeriod
       { data: [], error: null },
       { data: [], error: null },
       { data: [], error: null },

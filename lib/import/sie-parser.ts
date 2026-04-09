@@ -94,24 +94,13 @@ export function detectEncoding(buffer: ArrayBuffer): SIEEncoding {
     return 'utf8'
   }
 
-  // Check for #FORMAT PC8 in the first 500 bytes (ASCII-safe, works regardless of encoding)
-  const headerSize = Math.min(bytes.length, 500)
-  const FORMAT_PC8 = [0x23, 0x46, 0x4f, 0x52, 0x4d, 0x41, 0x54, 0x20, 0x50, 0x43, 0x38]
-  for (let i = 0; i <= headerSize - FORMAT_PC8.length; i++) {
-    let match = true
-    for (let j = 0; j < FORMAT_PC8.length; j++) {
-      if (bytes[i + j] !== FORMAT_PC8[j]) {
-        match = false
-        break
-      }
-    }
-    if (match) {
-      return 'cp437'
-    }
-  }
+  // NOTE: #FORMAT PC8 is NOT used for encoding detection.
+  // Almost all SIE files declare #FORMAT PC8 regardless of actual encoding
+  // (Fortnox, Bokio, Dooer etc. export UTF-8 with #FORMAT PC8).
+  // Instead, we detect encoding from actual byte patterns.
 
   // Scan sample for encoding-specific byte ranges
-  const sampleSize = Math.min(bytes.length, 2000)
+  const sampleSize = Math.min(bytes.length, 4000)
   let cp437Count = 0   // Swedish chars in 0x80-0x9F (CP437 range)
   let utf8Count = 0     // Valid UTF-8 multi-byte Swedish sequences
   let win1252Count = 0  // Swedish chars in 0xC0-0xFF (Win-1252 range)
@@ -119,33 +108,35 @@ export function detectEncoding(buffer: ArrayBuffer): SIEEncoding {
   for (let i = 0; i < sampleSize; i++) {
     const byte = bytes[i]
 
-    // Check for CP437 Swedish characters
-    if (CP437_MAP[byte]) {
-      cp437Count++
-    }
-
-    // Check for Windows-1252 Swedish characters
-    if (WIN1252_SWEDISH_BYTES.has(byte)) {
-      win1252Count++
-    }
-
-    // Check for UTF-8 multi-byte sequences for Swedish chars
-    // Ä = C3 84, Å = C3 85, Ö = C3 96, ä = C3 A4, å = C3 A5, ö = C3 B6
+    // Check for UTF-8 multi-byte sequences for Swedish chars FIRST
+    // to avoid false CP437/Win-1252 counts from continuation bytes.
+    // Ä = C3 84, Å = C3 85, Ö = C3 96, ä = C3 A4, å = C3 A5, ö = C3 B6, é = C3 A9
     if (byte === 0xc3 && i + 1 < sampleSize) {
       const nextByte = bytes[i + 1]
-      if ([0x84, 0x85, 0x96, 0xa4, 0xa5, 0xb6].includes(nextByte)) {
+      if ([0x84, 0x85, 0x96, 0xa4, 0xa5, 0xb6, 0xa9].includes(nextByte)) {
         utf8Count++
         i++ // Skip continuation byte to avoid false CP437 count (e.g. 0x84 = ä in CP437)
         continue
       }
     }
 
+    // Check for CP437 Swedish characters (0x80-0x9F range)
+    if (CP437_MAP[byte]) {
+      cp437Count++
+    }
+
+    // Check for Windows-1252 Swedish characters (0xC0-0xFF range)
+    if (WIN1252_SWEDISH_BYTES.has(byte)) {
+      win1252Count++
+    }
   }
 
   if (utf8Count > cp437Count && utf8Count > win1252Count) return 'utf8'
   if (cp437Count > win1252Count) return 'cp437'
   if (win1252Count > 0) return 'windows1252'
-  return 'cp437'
+
+  // Pure ASCII (no high bytes) — UTF-8 is a superset of ASCII
+  return 'utf8'
 }
 
 /**
@@ -348,8 +339,10 @@ export function parseSIEFile(content: string): ParsedSIEFile {
   const issues: ParseIssue[] = []
 
   // Initialize header with defaults
+  // Per SIE spec: if #SIETYP is absent, assume type 1 (closing balances only)
   const header: SIEHeader = {
-    sieType: 4,
+    sieType: 1,
+    flagga: null,
     program: null,
     programVersion: null,
     generatedDate: null,
@@ -415,7 +408,7 @@ export function parseSIEFile(content: string): ParsedSIEFile {
     try {
       switch (tag) {
         case 'FLAGGA':
-          // Flag for file handling - ignore
+          header.flagga = parseInt(fields[1], 10) || 0
           break
 
         case 'FORMAT':
@@ -607,8 +600,8 @@ export function parseSIEFile(content: string): ParsedSIEFile {
         case 'RTRANS':
         case 'BTRANS': {
           // #TRANS = final transaction lines (the current state of the voucher)
-          // #RTRANS = removed lines (correction audit trail — original lines that were undone)
-          // #BTRANS = added lines (correction audit trail — new lines that replaced removed ones)
+          // #RTRANS = supplementary/corrected transaction (must be followed by identical #TRANS for backward compat)
+          // #BTRANS = removed/cancelled transaction (programs not understanding BTRANS simply ignore it)
           //
           // When a voucher has been corrected, Fortnox/Visma emit all three types.
           // Only #TRANS represents the final voucher state; #RTRANS and #BTRANS are
@@ -731,6 +724,11 @@ export function parseSIEFile(content: string): ParsedSIEFile {
 export function validateSIEFile(parsed: ParsedSIEFile): ValidationResult {
   const errors: string[] = []
   const warnings: string[] = []
+
+  // Check #FLAGGA for already-imported files
+  if (parsed.header.flagga === 1) {
+    warnings.push('Filen är markerad som redan importerad (#FLAGGA 1). Kontrollera att den inte redan har importerats i ett annat system.')
+  }
 
   // Check for SIE type
   if (!parsed.header.sieType) {
