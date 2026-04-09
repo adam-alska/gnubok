@@ -18,6 +18,22 @@ import { validateBalance, getNextVoucherNumber, getSwedishLocalDate } from '@/li
  */
 
 /**
+ * Cancel a journal entry and delete its lines.
+ * Uses status='cancelled' instead of DELETE (DB trigger blocks all DELETEs).
+ * Works for both draft→cancelled and posted→cancelled transitions.
+ */
+async function cancelEntry(supabase: SupabaseClient, entryId: string): Promise<void> {
+  await supabase
+    .from('journal_entries')
+    .update({ status: 'cancelled' })
+    .eq('id', entryId)
+  await supabase
+    .from('journal_entry_lines')
+    .delete()
+    .eq('journal_entry_id', entryId)
+}
+
+/**
  * Correct an existing posted journal entry using the storno method.
  *
  * Returns: { reversal, corrected } - the two new entries created
@@ -106,7 +122,7 @@ export async function correctEntry(
     .insert(reversalLineInserts)
 
   if (reversalLinesError) {
-    await supabase.from('journal_entries').delete().eq('id', reversalEntry.id)
+    await cancelEntry(supabase, reversalEntry.id)
     throw new Error(`Failed to create reversal lines: ${reversalLinesError.message}`)
   }
 
@@ -117,32 +133,17 @@ export async function correctEntry(
     .eq('id', reversalEntry.id)
 
   if (postReversalError) {
+    await cancelEntry(supabase, reversalEntry.id)
     throw new Error(`Failed to post reversal entry: ${postReversalError.message}`)
   }
 
-  // Mark original as reversed
-  await supabase
-    .from('journal_entries')
-    .update({
-      status: 'reversed',
-      reversed_by_id: reversalEntry.id,
-    })
-    .eq('id', originalEntryId)
+  // NOTE: Original entry is NOT marked as 'reversed' here. We defer that
+  // until both the reversal and corrected entries are successfully posted.
+  // This avoids the impossible reversed→posted rollback if step 2 fails.
 
   // ===== Step 2: Create corrected entry =====
-  // If anything in this step fails, we must roll back the reversal from step 1
-  // to avoid leaving the ledger in an inconsistent state.
-  async function rollbackReversal() {
-    // Restore original entry to 'posted' status
-    await supabase
-      .from('journal_entries')
-      .update({ status: 'posted', reversed_by_id: null })
-      .eq('id', originalEntryId)
-    // Delete the reversal entry (it was just created, safe to remove since
-    // the DB trigger allows deleting draft entries and we need to clean up)
-    await supabase.from('journal_entry_lines').delete().eq('journal_entry_id', reversalEntry.id)
-    await supabase.from('journal_entries').delete().eq('id', reversalEntry.id)
-  }
+  // If anything in this step fails, cancel the reversal entry.
+  // The original entry was never modified, so no rollback needed.
 
   let correctedEntry: typeof reversalEntry
 
@@ -214,7 +215,7 @@ export async function correctEntry(
       .insert(correctedLineInserts)
 
     if (correctedLinesError) {
-      await supabase.from('journal_entries').delete().eq('id', correctedEntry.id)
+      await cancelEntry(supabase, correctedEntry.id)
       throw new Error(`Failed to create corrected lines: ${correctedLinesError.message}`)
     }
 
@@ -225,12 +226,32 @@ export async function correctEntry(
       .eq('id', correctedEntry.id)
 
     if (postCorrectedError) {
+      await cancelEntry(supabase, correctedEntry.id)
       throw new Error(`Failed to post corrected entry: ${postCorrectedError.message}`)
     }
   } catch (err) {
-    // Roll back the reversal to restore ledger consistency
-    await rollbackReversal()
+    // Cancel the reversal entry (posted → cancelled). Original was never
+    // modified so no rollback needed — it's still 'posted'.
+    await cancelEntry(supabase, reversalEntry.id)
     throw err
+  }
+
+  // ===== Mark original as reversed (CAS guard: only if still 'posted') =====
+  const { data: updatedOriginal, error: casError } = await supabase
+    .from('journal_entries')
+    .update({
+      status: 'reversed',
+      reversed_by_id: reversalEntry.id,
+    })
+    .eq('id', originalEntryId)
+    .eq('status', 'posted')
+    .select('id')
+
+  if (casError || !updatedOriginal || updatedOriginal.length === 0) {
+    // Concurrent reversal beat us — cancel both our entries
+    await cancelEntry(supabase, reversalEntry.id)
+    await cancelEntry(supabase, correctedEntry!.id)
+    throw new Error('Entry was already reversed by a concurrent operation')
   }
 
   // ===== Step 3: Fetch complete entries =====

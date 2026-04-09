@@ -31,10 +31,10 @@ export async function GET(request: Request) {
   // Fetch up to 100 current-version documents, prioritizing unchecked/oldest
   const { data: documents, error: fetchError } = await supabase
     .from('document_attachments')
-    .select('id, user_id, storage_path, sha256_hash, file_name')
+    .select('id, user_id, company_id, storage_path, sha256_hash, file_name')
     .eq('is_current_version', true)
     .order('last_integrity_check_at', { ascending: true, nullsFirst: true })
-    .limit(100)
+    .limit(parseInt(process.env.DOCUMENT_VERIFY_BATCH_SIZE || '500', 10))
 
   if (fetchError) {
     console.error('[doc-verify-cron] Failed to fetch documents:', fetchError)
@@ -80,6 +80,7 @@ export async function GET(request: Request) {
         // Log integrity failure to audit_log
         await supabase.from('audit_log').insert({
           user_id: doc.user_id,
+          company_id: doc.company_id,
           action: 'INTEGRITY_FAILURE',
           table_name: 'document_attachments',
           record_id: doc.id,
