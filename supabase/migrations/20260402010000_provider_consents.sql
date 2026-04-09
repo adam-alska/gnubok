@@ -73,6 +73,13 @@ CREATE POLICY provider_consent_tokens_update ON provider_consent_tokens
     )
   ));
 
+CREATE POLICY provider_consent_tokens_delete ON provider_consent_tokens
+  FOR DELETE USING (consent_id IN (
+    SELECT id FROM provider_consents WHERE company_id IN (
+      SELECT company_id FROM team_members WHERE user_id = auth.uid()
+    )
+  ));
+
 CREATE TRIGGER update_provider_consent_tokens_updated_at
   BEFORE UPDATE ON provider_consent_tokens
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -105,6 +112,13 @@ CREATE POLICY provider_otc_insert ON provider_otc
 
 CREATE POLICY provider_otc_update ON provider_otc
   FOR UPDATE USING (consent_id IN (
+    SELECT id FROM provider_consents WHERE company_id IN (
+      SELECT company_id FROM team_members WHERE user_id = auth.uid()
+    )
+  ));
+
+CREATE POLICY provider_otc_delete ON provider_otc
+  FOR DELETE USING (consent_id IN (
     SELECT id FROM provider_consents WHERE company_id IN (
       SELECT company_id FROM team_members WHERE user_id = auth.uid()
     )
