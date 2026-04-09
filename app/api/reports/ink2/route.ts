@@ -2,11 +2,11 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { generateINK2Declaration } from '@/lib/reports/ink2/ink2-engine'
 import {
-  generateSRUFile,
-  sruFileToString,
-  getSRUFilename,
+  generateSRUSubmission,
+  getZipFilename,
 } from '@/lib/reports/ink2/sru-generator'
 import { requireCompanyId } from '@/lib/company/context'
+import JSZip from 'jszip'
 
 /**
  * GET /api/reports/ink2
@@ -15,7 +15,7 @@ import { requireCompanyId } from '@/lib/company/context'
  *
  * Query parameters:
  * - period_id: Fiscal period ID (required)
- * - format: 'json' (default) or 'sru' for SRU file download
+ * - format: 'json' (default) or 'sru' for SRU file download (ZIP with INFO.SRU + BLANKETTER.SRU)
  */
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -42,14 +42,24 @@ export async function GET(request: Request) {
     const declaration = await generateINK2Declaration(supabase, companyId, periodId)
 
     if (format === 'sru') {
-      const sruFile = generateSRUFile(declaration)
-      const sruContent = sruFileToString(sruFile)
-      const filename = getSRUFilename(declaration)
+      const submission = generateSRUSubmission(declaration)
 
-      return new NextResponse(sruContent, {
+      // Encode both files as ISO 8859-1 (Latin-1) — required by Skatteverket
+      const infoBytes = encodeISO88591(submission.infoSru)
+      const blanketterBytes = encodeISO88591(submission.blanketterSru)
+
+      // Create ZIP with both files
+      const zip = new JSZip()
+      zip.file('INFO.SRU', infoBytes)
+      zip.file('BLANKETTER.SRU', blanketterBytes)
+
+      const zipArrayBuffer = await zip.generateAsync({ type: 'arraybuffer' })
+      const filename = getZipFilename(declaration)
+
+      return new NextResponse(zipArrayBuffer, {
         status: 200,
         headers: {
-          'Content-Type': 'text/plain; charset=utf-8',
+          'Content-Type': 'application/zip',
           'Content-Disposition': `attachment; filename="${filename}"`,
         },
       })
@@ -63,4 +73,17 @@ export async function GET(request: Request) {
       { status: 500 }
     )
   }
+}
+
+/**
+ * Encode a string as ISO 8859-1 (Latin-1) bytes.
+ * Characters outside the Latin-1 range are replaced with '?'.
+ */
+function encodeISO88591(str: string): Uint8Array {
+  const bytes = new Uint8Array(str.length)
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i)
+    bytes[i] = code <= 0xFF ? code : 0x3F // '?' for unmappable chars
+  }
+  return bytes
 }

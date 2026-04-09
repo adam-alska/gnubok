@@ -40,6 +40,7 @@ const schema = z.object({
   customer_id: z.string().min(1, 'Välj en kund'),
   invoice_date: z.string().min(1, 'Fakturadatum krävs'),
   due_date: z.string().min(1, 'Förfallodatum krävs'),
+  delivery_date: z.string().optional(),
   currency: z.enum(['SEK', 'EUR', 'USD', 'GBP', 'NOK', 'DKK']),
   document_type: z.enum(['invoice', 'proforma', 'delivery_note']),
   your_reference: z.string().optional(),
@@ -678,6 +679,13 @@ export default function NewInvoicePage() {
                   <Input type="date" {...register('due_date')} />
                 </div>
 
+                {watchDocumentType === 'invoice' && (
+                  <div className="space-y-2">
+                    <Label>Leveransdatum</Label>
+                    <Input type="date" {...register('delivery_date')} placeholder="Om det skiljer sig från fakturadatum" />
+                  </div>
+                )}
+
                 <Separator />
 
                 <div className="space-y-2">
@@ -723,12 +731,21 @@ export default function NewInvoicePage() {
                   <span>{formatCurrency(subtotal, watchCurrency)}</span>
                 </div>
                 {Array.from(vatByRate.entries())
-                  .filter(([, group]) => group.vat > 0)
                   .sort(([a], [b]) => b - a)
                   .map(([rate, group]) => (
-                    <div key={rate} className="flex justify-between">
-                      <span className="text-muted-foreground">Moms {rate}%</span>
-                      <span>{formatCurrency(group.vat, watchCurrency)}</span>
+                    <div key={rate}>
+                      {vatByRate.size > 1 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Netto {rate}%</span>
+                          <span>{formatCurrency(group.base, watchCurrency)}</span>
+                        </div>
+                      )}
+                      {group.vat > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Moms {rate}%</span>
+                          <span>{formatCurrency(group.vat, watchCurrency)}</span>
+                        </div>
+                      )}
                     </div>
                   ))}
                 {vatByRate.size === 0 && (
