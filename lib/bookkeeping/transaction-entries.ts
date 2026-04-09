@@ -196,6 +196,7 @@ export async function createTransactionJournalEntry(
         debit_amount: absAmount,
         credit_amount: 0,
         line_description: transaction.description,
+        ...(debitAccount === '1930' ? currencyMeta : {}),
       })
       // Credit revenue for net amount
       lines.push({
@@ -221,6 +222,7 @@ export async function createTransactionJournalEntry(
           debit_amount: absAmount,
           credit_amount: 0,
           line_description: transaction.description,
+          ...(debitAccount === '1930' ? currencyMeta : {}),
         },
         {
           account_number: creditAccount,
