@@ -16,7 +16,6 @@ VALUES (
   ARRAY['text/plain']
 )
 ON CONFLICT (id) DO NOTHING;
-ON CONFLICT (id) DO NOTHING;
 
 -- =============================================================================
 -- 2. INSERT policy: Users can upload to companies they belong to

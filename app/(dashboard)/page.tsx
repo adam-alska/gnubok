@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import DashboardContent from '@/components/dashboard/DashboardContent'
-import ConsultantEmptyState from '@/components/dashboard/ConsultantEmptyState'
 import { getActiveCompanyId } from '@/lib/company/context'
 import type { Deadline, ReceiptQueueSummary, OnboardingProgress } from '@/types'
 
@@ -34,24 +33,6 @@ export default async function DashboardPage() {
   }
 
   if (!companyId) {
-    // Consultants (team members) see an empty state; solo users go to onboarding
-    const { data: teamMembership } = await supabase
-      .from('team_members')
-      .select('team_id')
-      .eq('user_id', user.id)
-      .limit(1)
-      .maybeSingle()
-
-    if (teamMembership) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', user.id)
-        .single()
-      const firstName = profile?.full_name?.split(' ')[0] || null
-      return <ConsultantEmptyState firstName={firstName} />
-    }
-
     redirect('/onboarding')
   }
 
@@ -121,6 +102,11 @@ export default async function DashboardPage() {
   ])
 
   const firstName = profile?.full_name?.split(' ')[0] || null
+
+  // If onboarding is not complete, redirect to onboarding
+  if (!settings?.onboarding_complete) {
+    redirect('/onboarding')
+  }
 
   const onboardingProgress: OnboardingProgress = {
     hasCustomers: (customerCount || 0) > 0,

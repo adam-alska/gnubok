@@ -1,4 +1,22 @@
 /**
+ * A person's role/position in a Swedish company, from BankID enrichment.
+ * Defined in core so onboarding components can import it without
+ * violating the CI constraint (no core → @/extensions/ imports).
+ */
+export interface EnrichmentCompanyRole {
+  companyId: number
+  companyRegistrationNumber: string
+  legalName: string
+  legalEntityType: string
+  positionTypes: string[]
+  positionDescriptions: string[]
+  positionStart: string
+  positionEnd: string | null
+  companyStatus: string
+  signatureDescription?: string
+}
+
+/**
  * Generic company lookup result — provider-agnostic.
  * Defined in core so onboarding components can import it without
  * violating the CI constraint (no core → @/extensions/ imports).

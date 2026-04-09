@@ -58,23 +58,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith('/sandbox') ||
     pathname.startsWith('/invite')
   ) {
-    // If user is logged in and trying to access auth pages, redirect to dashboard or onboarding
+    // If user is logged in and trying to access auth pages, redirect to dashboard
     if (user) {
-      const companyId = await resolveCompanyForMiddleware(supabase, user.id, request)
-      if (!companyId) {
-        return NextResponse.redirect(new URL('/onboarding', request.url))
-      }
-
-      const { data: settings } = await supabase
-        .from('company_settings')
-        .select('onboarding_complete')
-        .eq('company_id', companyId)
-        .single()
-
-      if (!settings?.onboarding_complete) {
-        return NextResponse.redirect(new URL('/onboarding', request.url))
-      }
-
       return NextResponse.redirect(new URL('/', request.url))
     }
     return supabaseResponse
@@ -102,8 +87,9 @@ export async function updateSession(request: NextRequest) {
     }
 
     // MFA required but user has no factor enrolled yet → force enrollment
-    // (skip during onboarding — let them finish setup first)
-    if (!pathname.startsWith('/onboarding')) {
+    // Skip for users with no companies (still setting up)
+    const companyIdForMfa = await resolveCompanyForMiddleware(supabase, user.id, request)
+    if (companyIdForMfa) {
       const { data: factors } = await supabase.auth.mfa.listFactors()
       const hasVerifiedFactor = factors?.totp?.some(f => f.status === 'verified')
 
@@ -116,27 +102,8 @@ export async function updateSession(request: NextRequest) {
   // Company context resolution
   const companyId = await resolveCompanyForMiddleware(supabase, user.id, request)
 
-  // No companies at all
+  // No companies — only allow /onboarding, redirect everything else there
   if (!companyId) {
-    // Check if user is in a team (consultant without companies yet).
-    // Team members should reach the dashboard (which shows an empty state)
-    // rather than being forced through company onboarding.
-    const { data: teamMember } = await supabase
-      .from('team_members')
-      .select('id')
-      .eq('user_id', user.id)
-      .limit(1)
-      .maybeSingle()
-
-    if (teamMember) {
-      // Consultant with a team but no companies — allow dashboard access
-      if (pathname.startsWith('/onboarding')) {
-        return NextResponse.redirect(new URL('/', request.url))
-      }
-      return supabaseResponse
-    }
-
-    // No team, no companies → redirect to onboarding
     if (pathname.startsWith('/onboarding')) {
       return supabaseResponse
     }
@@ -152,35 +119,9 @@ export async function updateSession(request: NextRequest) {
     maxAge: 60 * 60 * 24 * 365,
   })
 
-  // Select-company page — allow access (for switching companies)
-  if (pathname.startsWith('/select-company') || pathname.startsWith('/companies/new')) {
+  // Allow access to onboarding (for adding new companies), select-company, and companies/new
+  if (pathname.startsWith('/select-company') || pathname.startsWith('/companies/new') || pathname.startsWith('/onboarding')) {
     return supabaseResponse
-  }
-
-  // Onboarding route - only accessible if not complete
-  if (pathname.startsWith('/onboarding')) {
-    const { data: settings } = await supabase
-      .from('company_settings')
-      .select('onboarding_complete')
-      .eq('company_id', companyId)
-      .single()
-
-    if (settings?.onboarding_complete) {
-      return NextResponse.redirect(new URL('/', request.url))
-    }
-
-    return supabaseResponse
-  }
-
-  // Dashboard routes - require completed onboarding for active company
-  const { data: settings } = await supabase
-    .from('company_settings')
-    .select('onboarding_complete')
-    .eq('company_id', companyId)
-    .single()
-
-  if (!settings?.onboarding_complete) {
-    return NextResponse.redirect(new URL('/onboarding', request.url))
   }
 
   return supabaseResponse

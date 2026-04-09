@@ -8,11 +8,13 @@ import { ToastAction } from '@/components/ui/toast'
 import { DeadlineList } from '@/components/deadlines/DeadlineList'
 import { PageHeader } from '@/components/ui/page-header'
 import { AlertTriangle, ArrowRight } from 'lucide-react'
+import { useCompany } from '@/contexts/CompanyContext'
 import type { Deadline } from '@/types'
 
 const supabase = createClient()
 
 export default function DeadlinesPage() {
+  const { company } = useCompany()
   const [deadlines, setDeadlines] = useState<Deadline[]>([])
   const [customers, setCustomers] = useState<{ id: string; name: string }[]>([])
   const [overdueInvoices, setOverdueInvoices] = useState<{ count: number; total: number }>({ count: 0, total: 0 })
@@ -20,15 +22,16 @@ export default function DeadlinesPage() {
   const { toast } = useToast()
 
   const fetchData = useCallback(async () => {
+    if (!company) return
     setIsLoading(true)
 
     try {
       const today = new Date().toISOString().split('T')[0]
 
       const [deadlinesRes, customersRes, overdueRes] = await Promise.all([
-        supabase.from('deadlines').select('*, customer:customers(name)').order('due_date', { ascending: true }),
-        supabase.from('customers').select('id, name').order('name', { ascending: true }),
-        supabase.from('invoices').select('total_sek, total').in('status', ['sent', 'unpaid']).lt('due_date', today),
+        supabase.from('deadlines').select('*, customer:customers(name)').eq('company_id', company.id).order('due_date', { ascending: true }),
+        supabase.from('customers').select('id, name').eq('company_id', company.id).order('name', { ascending: true }),
+        supabase.from('invoices').select('total_sek, total').eq('company_id', company.id).in('status', ['sent', 'unpaid']).lt('due_date', today),
       ])
 
       if (deadlinesRes.error) throw deadlinesRes.error

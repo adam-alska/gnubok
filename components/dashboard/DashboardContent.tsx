@@ -21,7 +21,6 @@ import {
 } from 'lucide-react'
 import { getAllExtensions } from '@/lib/extensions/sectors'
 import { resolveIcon } from '@/lib/extensions/icon-resolver'
-import { useCompany } from '@/contexts/CompanyContext'
 import type { QuickActionDefinition } from '@/lib/extensions/types'
 import type { CompanySettings, Deadline, ReceiptQueueSummary, OnboardingProgress } from '@/types'
 
@@ -51,14 +50,18 @@ interface DashboardContentProps {
 }
 
 export default function DashboardContent({ firstName, settings, summary, onboardingProgress }: DashboardContentProps) {
-  const { isTeamMember } = useCompany()
   const [showAllAlerts, setShowAllAlerts] = useState(false)
   const [showMore, setShowMore] = useState(false)
+  const [greeting, setGreeting] = useState('Hej')
 
   // Setup gate — blocks dashboard until user imports data or chooses fresh start
-  // Consultants (team members) skip this — they go straight to the dashboard
-  const needsSetup = !isTeamMember && onboardingProgress && !onboardingProgress.hasBankConnected && !onboardingProgress.hasSIEImport
+  const needsSetup = onboardingProgress && !onboardingProgress.hasBankConnected && !onboardingProgress.hasSIEImport
   const [setupGateActive, setSetupGateActive] = useState(!!needsSetup)
+
+  useEffect(() => {
+    const hour = new Date().getHours()
+    setGreeting(hour < 5 ? 'God natt' : hour < 10 ? 'Godmorgon' : hour < 14 ? 'Hej' : hour < 18 ? 'God eftermiddag' : 'God kväll')
+  }, [])
 
   useEffect(() => {
     if (!needsSetup) {
@@ -251,9 +254,6 @@ export default function DashboardContent({ firstName, settings, summary, onboard
     { href: '/customers', icon: Users, label: 'Ny kund', desc: 'Lägg till kunduppgifter' },
     { href: '/transactions', icon: ArrowLeftRight, label: 'Transaktioner', desc: 'Bokför' },
   ]
-
-  const hour = new Date().getHours()
-  const greeting = hour < 5 ? 'God natt' : hour < 10 ? 'Godmorgon' : hour < 14 ? 'Hej' : hour < 18 ? 'God eftermiddag' : 'God kväll'
 
   const passedDeadlinesCount = summary.deadlines.filter(d => !d.is_completed && new Date(d.due_date) <= new Date()).length
   const pendingReceiptsCount = summary.receiptQueue

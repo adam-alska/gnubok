@@ -170,9 +170,7 @@ export async function GET(request: Request) {
       .eq('company_id', companyId)
       .single()
 
-    const redirectTarget = userSettings?.onboarding_complete
-      ? `/settings/banking?bank_connected=true&connection_id=${connectionId}`
-      : `/onboarding?bank_connected=true&connection_id=${connectionId}`
+    const redirectTarget = `/settings/banking?bank_connected=true&connection_id=${connectionId}`
 
     return NextResponse.redirect(`${baseUrl}${redirectTarget}`)
   } catch (error) {

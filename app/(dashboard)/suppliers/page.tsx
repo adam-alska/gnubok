@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { Plus, Search, Building2, Globe } from 'lucide-react'
 import SupplierForm from '@/components/suppliers/SupplierForm'
 import Link from 'next/link'
+import { useCompany } from '@/contexts/CompanyContext'
 import type { Supplier, SupplierType, CreateSupplierInput } from '@/types'
 
 const supplierTypeLabels: Record<SupplierType, string> = {
@@ -26,6 +27,7 @@ const supplierTypeIcons: Record<SupplierType, React.ElementType> = {
 }
 
 export default function SuppliersPage() {
+  const { company } = useCompany()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -35,10 +37,12 @@ export default function SuppliersPage() {
   const supabase = createClient()
 
   async function fetchSuppliers() {
+    if (!company) return
     setIsLoading(true)
     const { data, error } = await supabase
       .from('suppliers')
       .select('*')
+      .eq('company_id', company.id)
       .order('name', { ascending: true })
 
     if (error) {
