@@ -99,17 +99,15 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // Redirect /onboarding to / — onboarding now happens inline on the dashboard
-  if (pathname.startsWith('/onboarding')) {
-    return NextResponse.redirect(new URL('/', request.url))
-  }
-
   // Company context resolution
   const companyId = await resolveCompanyForMiddleware(supabase, user.id, request)
 
-  // No companies — allow dashboard access (dashboard shows welcome/onboarding card)
+  // No companies — only allow /onboarding, redirect everything else there
   if (!companyId) {
-    return supabaseResponse
+    if (pathname.startsWith('/onboarding')) {
+      return supabaseResponse
+    }
+    return NextResponse.redirect(new URL('/onboarding', request.url))
   }
 
   // Set company cookie on the response so downstream requests have it
@@ -121,13 +119,11 @@ export async function updateSession(request: NextRequest) {
     maxAge: 60 * 60 * 24 * 365,
   })
 
-  // Select-company page — allow access (for switching companies)
-  if (pathname.startsWith('/select-company') || pathname.startsWith('/companies/new')) {
+  // Allow access to onboarding (for adding new companies), select-company, and companies/new
+  if (pathname.startsWith('/select-company') || pathname.startsWith('/companies/new') || pathname.startsWith('/onboarding')) {
     return supabaseResponse
   }
 
-  // Dashboard routes — allow access even if onboarding incomplete
-  // (dashboard handles incomplete state with inline onboarding card)
   return supabaseResponse
 }
 

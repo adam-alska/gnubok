@@ -47,42 +47,9 @@ export default async function DashboardLayout({
 
   const isTeamMember = !!teamMembership
 
-  // No companies — show dashboard with empty state (welcome onboarding card)
+  // No companies — redirect to onboarding
   if (!companyId) {
-    const companyContextValue = {
-      company: null,
-      role: null,
-      companies: [],
-      isTeamMember,
-      team,
-    }
-
-    return (
-      <CompanyProvider value={companyContextValue}>
-        <div className="min-h-screen bg-background">
-          <a
-            href="#main-content"
-            className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg focus:text-sm focus:font-medium"
-          >
-            Hoppa till innehåll
-          </a>
-          <DashboardNav
-            companyName="gnubok"
-            entityType="enskild_firma"
-            uncategorizedTransactionCount={0}
-            pendingOperationsCount={0}
-            isSandbox={false}
-            extensionNavItems={getExtensionNavItems()}
-          />
-          <main id="main-content" className="safe-area-main-padding md:!pb-0 md:pl-[232px]" role="main">
-            <div className="max-w-5xl mx-auto px-5 py-8 md:px-8 md:py-10">
-              {children}
-            </div>
-          </main>
-          <SentryIdentify userId={user.id} email={user.email} />
-        </div>
-      </CompanyProvider>
-    )
+    redirect('/onboarding')
   }
 
   // Fetch company + membership for context provider

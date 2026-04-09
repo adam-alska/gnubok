@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import DashboardContent from '@/components/dashboard/DashboardContent'
-import WelcomeOnboarding from '@/components/dashboard/WelcomeOnboarding'
 import { getActiveCompanyId } from '@/lib/company/context'
 import type { Deadline, ReceiptQueueSummary, OnboardingProgress } from '@/types'
 
@@ -34,27 +33,7 @@ export default async function DashboardPage() {
   }
 
   if (!companyId) {
-    // No companies — show welcome onboarding card
-    const [{ data: profile }, { data: teamMembership }] = await Promise.all([
-      supabase.from('profiles').select('full_name').eq('id', user.id).single(),
-      supabase.from('team_members').select('team_id').eq('user_id', user.id).limit(1).maybeSingle(),
-    ])
-
-    let teamId = teamMembership?.team_id
-
-    // Ensure user has a team (fallback for edge cases)
-    if (!teamId) {
-      const { data: newTeamId } = await supabase.rpc('ensure_user_team')
-      teamId = newTeamId
-    }
-
-    if (!teamId) {
-      // Should never happen, but handle gracefully
-      redirect('/login')
-    }
-
-    const firstName = profile?.full_name?.split(' ')[0] || null
-    return <WelcomeOnboarding firstName={firstName} teamId={teamId} />
+    redirect('/onboarding')
   }
 
   // Fetch current year date boundaries
@@ -124,26 +103,9 @@ export default async function DashboardPage() {
 
   const firstName = profile?.full_name?.split(' ')[0] || null
 
-  // If onboarding is not complete, show the inline onboarding card
+  // If onboarding is not complete, redirect to onboarding
   if (!settings?.onboarding_complete) {
-    const { data: teamMembership } = await supabase
-      .from('team_members')
-      .select('team_id')
-      .eq('user_id', user.id)
-      .limit(1)
-      .maybeSingle()
-
-    let teamId = teamMembership?.team_id
-    if (!teamId) {
-      const { data: newTeamId } = await supabase.rpc('ensure_user_team')
-      teamId = newTeamId
-    }
-
-    if (!teamId) {
-      redirect('/login')
-    }
-
-    return <WelcomeOnboarding firstName={firstName} teamId={teamId} />
+    redirect('/onboarding')
   }
 
   const onboardingProgress: OnboardingProgress = {

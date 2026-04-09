@@ -60,14 +60,15 @@ function logError(message: string, extra?: Record<string, unknown>) {
 interface WelcomeOnboardingProps {
   firstName?: string | null
   teamId: string
+  skipWelcome?: boolean
 }
 
-export default function WelcomeOnboarding({ firstName, teamId }: WelcomeOnboardingProps) {
+export default function WelcomeOnboarding({ firstName, teamId, skipWelcome }: WelcomeOnboardingProps) {
   const router = useRouter()
   const { toast } = useToast()
   const supabase = createClient()
 
-  const [started, setStarted] = useState(false)
+  const [started, setStarted] = useState(skipWelcome ?? false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
@@ -419,7 +420,7 @@ export default function WelcomeOnboarding({ firstName, teamId }: WelcomeOnboardi
         title: 'Välkommen!',
         description: 'Ditt företag är nu redo.',
       })
-      router.refresh()
+      router.push('/')
     } else {
       setCurrentStep(nextStep)
     }
