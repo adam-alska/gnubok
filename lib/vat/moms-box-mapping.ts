@@ -42,7 +42,7 @@ export type MomsBox =
   | '61'  // Importmoms 12%
   | '62'  // Importmoms 6%
 
-/** Map BAS revenue account to momsdeklaration box */
+/** Map BAS account to momsdeklaration box */
 export const ACCOUNT_TO_BOX: Record<string, MomsBox> = {
   // Domestic revenue (taxable) → Box 05
   '3001': '05',  // Försäljning varor/tjänster 25%
@@ -66,14 +66,43 @@ export const ACCOUNT_TO_BOX: Record<string, MomsBox> = {
   // Non-EU services → Box 40
   '3305': '40',  // Försäljning tjänster export utanför EU
 
-  // Output VAT → Boxes 10, 11, 12
-  '2611': '10',  // Utgående moms 25%
-  '2621': '11',  // Utgående moms 12%
-  '2631': '12',  // Utgående moms 6%
+  // VAT-exempt sales → Box 42
+  '3004': '42',  // Momsfri försäljning (AB)
+  '3100': '42',  // Momsfria intäkter (EF)
+
+  // Output VAT 25% → Box 10
+  '2611': '10',  // Försäljning inom Sverige
+  '2612': '10',  // Egna uttag
+  '2613': '10',  // Uthyrning (frivillig skattskyldighet)
+  '2616': '10',  // Vinstmarginalbeskattning
+  // Output VAT 12% → Box 11
+  '2621': '11',
+  '2622': '11',  // Egna uttag
+  '2623': '11',  // Uthyrning
+  '2626': '11',  // VMB
+  // Output VAT 6% → Box 12
+  '2631': '12',
+  '2632': '12',  // Egna uttag
+  '2633': '12',  // Uthyrning
+  '2636': '12',  // VMB
+
+  // Reverse charge output VAT → Boxes 30, 31, 32
+  '2614': '30',
+  '2624': '31',
+  '2634': '32',
+
+  // Import VAT (since 2015, via momsdeklaration) → Boxes 60, 61, 62
+  '2615': '60',  // Import 25%
+  '2625': '61',  // Import 12%
+  '2635': '62',  // Import 6%
 
   // Input VAT → Box 48
-  '2641': '48',  // Ingående moms
-  '2645': '48',  // Beräknad ingående moms (EU förvärv)
+  '2641': '48',  // Debiterad ingående moms
+  '2642': '48',  // Frivillig skattskyldighet
+  '2645': '48',  // Beräknad ingående moms (EU/non-EU förvärv)
+  '2646': '48',  // Uthyrning
+  '2647': '48',  // Omvänd skattskyldighet i Sverige
+  '2649': '48',  // Blandad verksamhet
 }
 
 /** Swedish labels for each momsdeklaration box */

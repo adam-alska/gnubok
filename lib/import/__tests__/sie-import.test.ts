@@ -8,6 +8,7 @@ function makeParsedFile(overrides?: Partial<ParsedSIEFile>): ParsedSIEFile {
   return {
     header: {
       sieType: 4,
+      flagga: 0,
       program: 'TestProg',
       programVersion: '1.0',
       generatedDate: '2024-01-01',

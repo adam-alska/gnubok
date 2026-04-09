@@ -66,6 +66,38 @@ const CONTEXT_FALLBACKS: Record<ErrorContext, string> = {
 
 const GENERIC_FALLBACK = 'Något gick fel. Försök igen.'
 
+// Known error patterns → user-friendly Swedish messages
+const ERROR_PATTERN_MAP: [RegExp, string | null][] = [
+  [
+    /locked\/closed fiscal period/i,
+    'Perioden är låst. Verifikationen kan inte skapas i en stängd eller låst period.',
+  ],
+  [
+    /Bokföringen är låst t\.o\.m\./,
+    null, // null = extract the Swedish message directly from the raw error text
+  ],
+  [
+    /Cannot attach documents to entries in a locked/i,
+    'Kan inte bifoga dokument till verifikationer i en låst period.',
+  ],
+]
+
+/**
+ * Check if a message matches a known error pattern and return the Swedish translation.
+ * Returns null if no pattern matches.
+ */
+function tryMatchKnownError(message: string): string | null {
+  for (const [pattern, translation] of ERROR_PATTERN_MAP) {
+    if (pattern.test(message)) {
+      if (translation !== null) return translation
+      // Extract the Swedish part from the message
+      const match = message.match(/Bokföringen är låst t\.o\.m\. [^.]+\./)
+      return match ? match[0] : 'Bokföringen är låst för denna period.'
+    }
+  }
+  return null
+}
+
 /**
  * Simple heuristic to detect already-translated Swedish messages.
  * If the message contains common Swedish words/patterns, pass it through.
@@ -83,6 +115,7 @@ function isSwedishUserMessage(message: string): boolean {
     /session/i,
     /förfrågan/i,
     /obligatorisk/i,
+    /bokföringen är låst/i,
   ]
   return swedishPatterns.some((p) => p.test(message))
 }
@@ -155,6 +188,14 @@ export function getErrorMessage(
       return POSTGRES_ERROR_MAP[obj.code]
     }
 
+    // Try known error patterns (e.g. locked period triggers)
+    for (const field of ['error', 'message'] as const) {
+      if (typeof obj[field] === 'string' && obj[field].trim()) {
+        const knownError = tryMatchKnownError(obj[field])
+        if (knownError) return knownError
+      }
+    }
+
     // Try error.message if it's already a good Swedish message
     if (typeof obj.error === 'string' && obj.error.trim()) {
       if (isSwedishUserMessage(obj.error)) return obj.error
@@ -167,6 +208,8 @@ export function getErrorMessage(
 
   // 3. Error instance
   if (error instanceof Error && error.message.trim()) {
+    const knownError = tryMatchKnownError(error.message)
+    if (knownError) return knownError
     if (isSwedishUserMessage(error.message)) return error.message
   }
 
