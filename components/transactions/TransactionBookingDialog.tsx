@@ -11,6 +11,7 @@ import JournalEntryForm from '@/components/bookkeeping/JournalEntryForm'
 import DocumentUploadZone from '@/components/bookkeeping/DocumentUploadZone'
 import type { UploadedFile } from '@/components/bookkeeping/DocumentUploadZone'
 import type { FormLine } from '@/components/bookkeeping/JournalEntryForm'
+import { resolveSekAmount, buildCurrencyMetadata } from '@/lib/bookkeeping/currency-utils'
 import type { TransactionWithInvoice } from './transaction-types'
 
 interface TransactionBookingDialogProps {
@@ -21,21 +22,40 @@ interface TransactionBookingDialogProps {
 }
 
 function buildInitialLines(transaction: TransactionWithInvoice): FormLine[] {
-  const amount = Math.round(Math.abs(transaction.amount_sek ?? transaction.amount) * 100) / 100
-  const amountStr = amount.toFixed(2)
+  const sekAmount = Math.round(Math.abs(resolveSekAmount(
+    transaction.amount,
+    transaction.amount_sek,
+    transaction.currency,
+    transaction.exchange_rate
+  )) * 100) / 100
+  const amountStr = sekAmount.toFixed(2)
   const isExpense = transaction.amount < 0
 
-  if (isExpense) {
-    return [
-      { account_number: '1930', debit_amount: '', credit_amount: amountStr, line_description: 'Företagskonto' },
-      { account_number: '', debit_amount: amountStr, credit_amount: '', line_description: '' },
-    ]
+  const isForeign = !!transaction.currency && transaction.currency !== 'SEK'
+  const currencyMeta = isForeign
+    ? buildCurrencyMetadata(
+        transaction.currency,
+        Math.abs(transaction.amount),
+        transaction.exchange_rate
+      )
+    : {}
+
+  const bankLine: FormLine = {
+    account_number: '1930',
+    debit_amount: isExpense ? '' : amountStr,
+    credit_amount: isExpense ? amountStr : '',
+    line_description: 'Företagskonto',
+    ...currencyMeta,
   }
 
-  return [
-    { account_number: '1930', debit_amount: amountStr, credit_amount: '', line_description: 'Företagskonto' },
-    { account_number: '', debit_amount: '', credit_amount: amountStr, line_description: '' },
-  ]
+  const counterLine: FormLine = {
+    account_number: '',
+    debit_amount: isExpense ? amountStr : '',
+    credit_amount: isExpense ? '' : amountStr,
+    line_description: '',
+  }
+
+  return isExpense ? [bankLine, counterLine] : [bankLine, counterLine]
 }
 
 export default function TransactionBookingDialog({

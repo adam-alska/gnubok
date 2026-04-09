@@ -23,6 +23,9 @@ export interface FormLine {
   debit_amount: string
   credit_amount: string
   line_description: string
+  currency?: string
+  amount_in_currency?: number
+  exchange_rate?: number
 }
 
 interface Props {
@@ -159,6 +162,9 @@ export default function JournalEntryForm({
         debit_amount: parseFloat(l.debit_amount) || 0,
         credit_amount: parseFloat(l.credit_amount) || 0,
         line_description: l.line_description || undefined,
+        ...(l.currency ? { currency: l.currency } : {}),
+        ...(l.amount_in_currency != null ? { amount_in_currency: l.amount_in_currency } : {}),
+        ...(l.exchange_rate != null ? { exchange_rate: l.exchange_rate } : {}),
       }))
 
     const url = submitUrl ?? '/api/bookkeeping/journal-entries'
