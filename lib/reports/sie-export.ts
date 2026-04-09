@@ -29,6 +29,16 @@ export async function generateSIEExport(
     throw new Error('Fiscal period not found')
   }
 
+  // Fetch previous fiscal year for #RAR -1 (per SIE spec, both years should be present)
+  const { data: prevPeriod } = await supabase
+    .from('fiscal_periods')
+    .select('period_start, period_end')
+    .eq('company_id', companyId)
+    .lt('period_end', period.period_start)
+    .order('period_end', { ascending: false })
+    .limit(1)
+    .single()
+
   // Fetch all accounts
   const accounts = await fetchAllRows(({ from, to }) =>
     supabase
@@ -81,9 +91,13 @@ export async function generateSIEExport(
   lines.push(`#FNAMN "${escapeQuotes(options.trade_name || options.company_name)}"`)
 
   // === Fiscal year ===
-  // #RAR 0 start end (current year)
+  // #RAR 0 = current year, #RAR -1 = previous year (both should be present per spec)
   // Use date strings directly to avoid timezone conversion issues
   lines.push(`#RAR 0 ${dateStringToSIE(period.period_start)} ${dateStringToSIE(period.period_end)}`)
+
+  if (prevPeriod) {
+    lines.push(`#RAR -1 ${dateStringToSIE(prevPeriod.period_start)} ${dateStringToSIE(prevPeriod.period_end)}`)
+  }
 
   // === Dimension definitions ===
   // SIE standard: dimension 1 = kostnadsställe, dimension 6 = projekt
@@ -116,6 +130,9 @@ export async function generateSIEExport(
   }
 
   // === Opening balances (IB) ===
+  // Collect IB per account for UB calculation (UB = IB + movements)
+  const openingBalancesByAccount = new Map<string, number>()
+
   if (period.opening_balance_entry_id) {
     const { data: obEntry } = await supabase
       .from('journal_entries')
@@ -128,6 +145,10 @@ export async function generateSIEExport(
       for (const line of (obEntry.lines as JournalEntryLine[])) {
         const amount = (Number(line.debit_amount) || 0) - (Number(line.credit_amount) || 0)
         lines.push(`#IB 0 ${line.account_number} ${formatAmount(amount)}`)
+        openingBalancesByAccount.set(
+          line.account_number,
+          (openingBalancesByAccount.get(line.account_number) || 0) + amount
+        )
       }
     }
   }
@@ -169,17 +190,27 @@ export async function generateSIEExport(
   }
 
   // === Closing balances (UB for balance sheet, RES for income statement) ===
-  // Calculate balances from journal entries
-  const accountBalances = calculateBalances(entries as JournalEntry[])
+  // Movement balances from journal entries
+  const movementBalances = calculateBalances(entries as JournalEntry[])
 
-  for (const [accountNumber, balance] of accountBalances) {
+  // Merge all accounts that have either IB or movements
+  const allAccountNumbers = new Set([
+    ...openingBalancesByAccount.keys(),
+    ...movementBalances.keys(),
+  ])
+
+  for (const accountNumber of [...allAccountNumbers].sort()) {
     const accountClass = parseInt(accountNumber[0])
+    const ib = openingBalancesByAccount.get(accountNumber) || 0
+    const movement = movementBalances.get(accountNumber) || 0
+
     if (accountClass <= 2) {
-      // Balance sheet account: #UB
-      lines.push(`#UB 0 ${accountNumber} ${formatAmount(balance)}`)
+      // Balance sheet: UB = IB + movements during period
+      const ub = Math.round((ib + movement) * 100) / 100
+      lines.push(`#UB 0 ${accountNumber} ${formatAmount(ub)}`)
     } else {
-      // Income statement account: #RES
-      lines.push(`#RES 0 ${accountNumber} ${formatAmount(balance)}`)
+      // Income statement: RES = movements only (IB should be zero)
+      lines.push(`#RES 0 ${accountNumber} ${formatAmount(movement)}`)
     }
   }
 

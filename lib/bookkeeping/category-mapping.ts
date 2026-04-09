@@ -132,13 +132,13 @@ export function getCategoryAccountMapping(
   if (category.startsWith('expense_')) {
     const expenseAccount = getExpenseAccount(category, entityType)
 
-    // Bank fees, card fees, currency exchange, and representation are VAT-exempt in Sweden
-    // Representation has zero input VAT deduction since 2017-01-01 (ML 8:9)
-    const vatExemptCategories = ['expense_bank_fees', 'expense_card_fees', 'expense_currency_exchange', 'expense_representation']
+    // Bank fees, card fees, and currency exchange are VAT-exempt in Sweden
+    const vatExemptCategories = ['expense_bank_fees', 'expense_card_fees', 'expense_currency_exchange']
     const isVatExempt = vatExemptCategories.includes(category)
 
-    // Use provided vatTreatment, or default based on category
-    const resolvedVat = vatTreatment ?? (isVatExempt ? null : 'standard_25')
+    // Representation defaults to reduced_12 (ML 13 kap 24-25 §§, max 300 SEK/person).
+    // Note: income tax deduction was abolished 2017 (IL 16 kap 2 §), but VAT deduction remains.
+    const resolvedVat = vatTreatment ?? (isVatExempt ? null : category === 'expense_representation' ? 'reduced_12' : 'standard_25')
 
     return {
       debitAccount: expenseAccount,
@@ -345,10 +345,15 @@ export function getDefaultVatTreatmentForCategory(
     return null
   }
 
-  // Representation has zero input VAT deduction since 2017-01-01 (ML 8:9)
-  const vatExemptCategories = ['expense_bank_fees', 'expense_card_fees', 'expense_currency_exchange', 'expense_representation']
+  const vatExemptCategories = ['expense_bank_fees', 'expense_card_fees', 'expense_currency_exchange']
   if (vatExemptCategories.includes(category)) {
     return null
+  }
+
+  // Representation defaults to reduced_12 (ML 13 kap 24-25 §§, max 300 SEK/person).
+  // Note: income tax deduction was abolished 2017 (IL 16 kap 2 §), but VAT deduction remains.
+  if (category === 'expense_representation') {
+    return 'reduced_12'
   }
 
   return 'standard_25'

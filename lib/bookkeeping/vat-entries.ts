@@ -79,16 +79,18 @@ export function generateSalesVatLines(config: VatEntryConfig): CreateJournalEntr
 }
 
 /**
- * Generate EU reverse charge lines (fiktiv moms)
- * For purchases from EU: Debit 2645 + Credit 2614 (offsetting entries)
+ * Generate reverse charge lines (fiktiv moms)
+ * For EU/non-EU purchases: Debit 2645 + Credit 26x4 (offsetting entries)
+ * For domestic reverse charge: Debit 2647 + Credit 26x4 (offsetting entries)
  */
 export function generateReverseChargeLines(
   baseAmount: number,
-  vatRate: number = 0.25
+  vatRate: number = 0.25,
+  isDomestic: boolean = false
 ): CreateJournalEntryLineInput[] {
   const vatAmount = Math.round(baseAmount * vatRate * 100) / 100
 
-  // Determine accounts based on rate
+  // Determine output account based on rate
   let outputAccount: string
   switch (vatRate) {
     case 0.25:
@@ -104,18 +106,22 @@ export function generateReverseChargeLines(
       outputAccount = '2614'
   }
 
+  // Input VAT account: 2647 for domestic RC (ML 16 kap), 2645 for EU/non-EU
+  const inputAccount = isDomestic ? '2647' : '2645'
+  const context = isDomestic ? 'omvänd skattskyldighet i Sverige' : 'omvänd skattskyldighet'
+
   return [
     {
-      account_number: '2645', // Beräknad ingående moms förvärv utlandet
+      account_number: inputAccount,
       debit_amount: vatAmount,
       credit_amount: 0,
-      line_description: `Fiktiv ingående moms ${vatRate * 100}% (omvänd skattskyldighet)`,
+      line_description: `Fiktiv ingående moms ${vatRate * 100}% (${context})`,
     },
     {
       account_number: outputAccount,
       debit_amount: 0,
       credit_amount: vatAmount,
-      line_description: `Fiktiv utgående moms ${vatRate * 100}% (omvänd skattskyldighet)`,
+      line_description: `Fiktiv utgående moms ${vatRate * 100}% (${context})`,
     },
   ]
 }

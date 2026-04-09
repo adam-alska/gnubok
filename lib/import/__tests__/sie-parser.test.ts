@@ -440,16 +440,19 @@ describe('validateSIEFile', () => {
 // --- Fix 2: Windows-1252 encoding detection and decoding ---
 
 describe('detectEncoding — #FORMAT PC8 detection', () => {
-  it('returns cp437 when #FORMAT PC8 is present in the first 500 bytes', () => {
-    const text = '#FLAGGA 0\n#FORMAT PC8\n#SIETYP 4\n'
-    const encoder = new TextEncoder()
+  it('ignores #FORMAT PC8 and detects UTF-8 from byte patterns', () => {
+    // #FORMAT PC8 is unreliable — most cloud software (Fortnox, Bokio etc.)
+    // exports UTF-8 but still declares #FORMAT PC8.
+    // UTF-8 encoded: "Företagskonto" → 0xC3 0xB6 for ö
+    const text = '#FLAGGA 0\n#FORMAT PC8\n#FNAMN "Företagskonto"\n'
+    const encoder = new TextEncoder() // TextEncoder outputs UTF-8
     const buf = encoder.encode(text)
     const encoding = detectEncoding(buf.buffer)
-    expect(encoding).toBe('cp437')
+    expect(encoding).toBe('utf8')
   })
 
-  it('returns cp437 even when Win-1252 bytes follow #FORMAT PC8', () => {
-    // #FORMAT PC8 header should take priority over any byte analysis
+  it('detects Win-1252 when actual byte values are in Win-1252 range', () => {
+    // Win-1252 bytes for Swedish chars: ö=0xF6, ä=0xE4, å=0xE5
     const prefix = new TextEncoder().encode('#FORMAT PC8\n#FNAMN F')
     const buf = new Uint8Array(prefix.length + 3)
     buf.set(prefix)
@@ -457,7 +460,15 @@ describe('detectEncoding — #FORMAT PC8 detection', () => {
     buf[prefix.length + 1] = 0xe4 // ä in Win-1252
     buf[prefix.length + 2] = 0xe5 // å in Win-1252
     const encoding = detectEncoding(buf.buffer)
-    expect(encoding).toBe('cp437')
+    expect(encoding).toBe('windows1252')
+  })
+
+  it('returns utf8 for pure ASCII files (no high bytes)', () => {
+    const text = '#FLAGGA 0\n#FORMAT PC8\n#SIETYP 4\n'
+    const encoder = new TextEncoder()
+    const buf = encoder.encode(text)
+    const encoding = detectEncoding(buf.buffer)
+    expect(encoding).toBe('utf8')
   })
 })
 

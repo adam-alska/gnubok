@@ -23,6 +23,7 @@ export type CoreEvent =
   | { type: 'journal_entry.corrected'; payload: { original: JournalEntry; storno: JournalEntry; corrected: JournalEntry; userId: string; companyId: string } }
   // Documents
   | { type: 'document.uploaded'; payload: { document: DocumentAttachment; userId: string; companyId: string } }
+  | { type: 'document.accessed'; payload: { document: { id: string; file_name: string }; userId: string; companyId: string } }
   // Invoicing
   | { type: 'invoice.created'; payload: { invoice: Invoice; userId: string; companyId: string } }
   | { type: 'invoice.sent'; payload: { invoice: Invoice; userId: string; companyId: string } }

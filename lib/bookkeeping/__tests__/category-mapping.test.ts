@@ -182,7 +182,6 @@ describe('getDefaultVatTreatmentForCategory', () => {
     expect(getDefaultVatTreatmentForCategory('expense_bank_fees')).toBeNull()
     expect(getDefaultVatTreatmentForCategory('expense_card_fees')).toBeNull()
     expect(getDefaultVatTreatmentForCategory('expense_currency_exchange')).toBeNull()
-    expect(getDefaultVatTreatmentForCategory('expense_representation')).toBeNull()
   })
 
   it('returns null for private transactions', () => {
@@ -194,21 +193,22 @@ describe('getDefaultVatTreatmentForCategory', () => {
   })
 })
 
-describe('representation VAT (ML 8:9 — illegal since 2017)', () => {
-  it('getDefaultVatTreatmentForCategory returns null for representation', () => {
-    expect(getDefaultVatTreatmentForCategory('expense_representation')).toBeNull()
+describe('representation VAT (reduced 12%, ML 13 kap 24-25 §§)', () => {
+  it('getDefaultVatTreatmentForCategory returns reduced_12 for representation', () => {
+    expect(getDefaultVatTreatmentForCategory('expense_representation')).toBe('reduced_12')
   })
 
-  it('getCategoryAccountMapping has vatTreatment: null for representation', () => {
+  it('getCategoryAccountMapping has vatTreatment: reduced_12 for representation', () => {
     const result = getCategoryAccountMapping('expense_representation', -500, true)
-    expect(result.vatTreatment).toBeNull()
-    expect(result.vatDebitAccount).toBeNull()
+    expect(result.vatTreatment).toBe('reduced_12')
+    expect(result.vatDebitAccount).toBe('2641')
   })
 
-  it('buildMappingResultFromCategory generates no VAT lines for representation', () => {
+  it('buildMappingResultFromCategory generates 12% VAT line for representation', () => {
     const tx = makeTransaction({ amount: -500 })
     const result = buildMappingResultFromCategory('expense_representation', tx, true)
-    expect(result.vat_lines).toHaveLength(0)
+    expect(result.vat_lines).toHaveLength(1)
+    expect(result.vat_lines[0].account_number).toBe('2641')
   })
 })
 
