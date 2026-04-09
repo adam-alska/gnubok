@@ -211,22 +211,39 @@ export default function JournalEntryDetailPage({ params }: { params: Promise<{ i
                 </tr>
               </thead>
               <tbody>
-                {lines.map((line) => (
-                  <tr key={line.id} className="border-b last:border-0">
-                    <td className="py-2"><AccountNumber number={line.account_number} showName /></td>
-                    <td className="py-2 text-muted-foreground">{line.line_description || ''}</td>
-                    <td className="py-2 text-right tabular-nums">
-                      {Number(line.debit_amount) > 0
-                        ? Number(line.debit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })
-                        : ''}
-                    </td>
-                    <td className="py-2 text-right tabular-nums">
-                      {Number(line.credit_amount) > 0
-                        ? Number(line.credit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })
-                        : ''}
-                    </td>
-                  </tr>
-                ))}
+                {lines.map((line) => {
+                  const hasForeignCurrency = line.currency && line.currency !== 'SEK' && line.amount_in_currency != null
+                  return (
+                    <tr key={line.id} className="border-b last:border-0">
+                      <td className="py-2"><AccountNumber number={line.account_number} showName /></td>
+                      <td className="py-2 text-muted-foreground">{line.line_description || ''}</td>
+                      <td className="py-2 text-right tabular-nums">
+                        {Number(line.debit_amount) > 0 && (
+                          <>
+                            {Number(line.debit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
+                            {hasForeignCurrency && Number(line.debit_amount) > 0 && (
+                              <span className="block text-xs text-muted-foreground">
+                                {Number(line.amount_in_currency).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} {line.currency}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </td>
+                      <td className="py-2 text-right tabular-nums">
+                        {Number(line.credit_amount) > 0 && (
+                          <>
+                            {Number(line.credit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
+                            {hasForeignCurrency && Number(line.credit_amount) > 0 && (
+                              <span className="block text-xs text-muted-foreground">
+                                {Number(line.amount_in_currency).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} {line.currency}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
               <tfoot>
                 <tr className="font-semibold">
@@ -244,24 +261,41 @@ export default function JournalEntryDetailPage({ params }: { params: Promise<{ i
 
           {/* Mobile cards */}
           <div className="sm:hidden space-y-2">
-            {lines.map((line) => (
-              <div key={line.id} className="flex items-center justify-between py-2 border-b last:border-0 gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm"><AccountNumber number={line.account_number} showName /></div>
-                  {line.line_description && (
-                    <p className="text-xs text-muted-foreground truncate">{line.line_description}</p>
-                  )}
+            {lines.map((line) => {
+              const hasForeignCurrency = line.currency && line.currency !== 'SEK' && line.amount_in_currency != null
+              return (
+                <div key={line.id} className="flex items-center justify-between py-2 border-b last:border-0 gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm"><AccountNumber number={line.account_number} showName /></div>
+                    {line.line_description && (
+                      <p className="text-xs text-muted-foreground truncate">{line.line_description}</p>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0 text-sm tabular-nums">
+                    {Number(line.debit_amount) > 0 && (
+                      <p>
+                        {Number(line.debit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} D
+                        {hasForeignCurrency && (
+                          <span className="block text-xs text-muted-foreground">
+                            {Number(line.amount_in_currency).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} {line.currency}
+                          </span>
+                        )}
+                      </p>
+                    )}
+                    {Number(line.credit_amount) > 0 && (
+                      <p>
+                        {Number(line.credit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} K
+                        {hasForeignCurrency && (
+                          <span className="block text-xs text-muted-foreground">
+                            {Number(line.amount_in_currency).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} {line.currency}
+                          </span>
+                        )}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div className="text-right shrink-0 text-sm tabular-nums">
-                  {Number(line.debit_amount) > 0 && (
-                    <p>{Number(line.debit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} D</p>
-                  )}
-                  {Number(line.credit_amount) > 0 && (
-                    <p>{Number(line.credit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} K</p>
-                  )}
-                </div>
-              </div>
-            ))}
+              )
+            })}
             <div className="flex justify-between font-semibold text-sm pt-1">
               <span>Summa</span>
               <div className="flex gap-3 tabular-nums">

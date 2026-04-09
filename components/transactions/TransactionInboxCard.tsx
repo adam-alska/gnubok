@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
-import { ArrowUpRight, ArrowDownRight, FileText, Loader2, Paperclip } from 'lucide-react'
+import { ArrowUpRight, ArrowDownRight, FileText, Loader2, Paperclip, Trash2 } from 'lucide-react'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/info-tooltip'
 import { getAccountName, formatAccountWithName } from '@/lib/bookkeeping/client-account-names'
 import { getTemplateById } from '@/lib/bookkeeping/booking-templates'
@@ -26,7 +26,7 @@ interface TransactionInboxCardProps {
   onMarkPrivate: (id: string) => void
   onOpenMatchDialog: (transaction: TransactionWithInvoice) => void
   onOpenCategoryDialog: (transaction: TransactionWithInvoice) => void
-
+  onDelete?: (id: string) => void
   onOpenQuickReview?: (transaction: TransactionWithInvoice, suggestion: SuggestedCategory) => void
   onOpenTemplateReview?: (transaction: TransactionWithInvoice, templateId: string) => void
   onToggleSelect: (id: string) => void
@@ -45,7 +45,7 @@ export default function TransactionInboxCard({
   onMarkPrivate,
   onOpenMatchDialog,
   onOpenCategoryDialog,
-
+  onDelete,
   onOpenQuickReview,
   onOpenTemplateReview,
   onToggleSelect,
@@ -60,6 +60,7 @@ export default function TransactionInboxCard({
   const isUncategorized = transaction.is_business === null && !transaction.journal_entry_id
   const showCheckbox = isBatchMode && isUncategorized
   const hasDocumentMatch = !!transaction.matched_inbox_item
+  const isManualTransaction = !transaction.bank_connection_id && !transaction.import_source && !transaction.journal_entry_id
 
   function handleSuggestionClick(suggestion: SuggestedCategory) {
     if (onOpenQuickReview) {
@@ -249,6 +250,20 @@ export default function TransactionInboxCard({
               >
                 Välj mall...
               </Button>
+
+              {/* Delete button — only for manually added, unbooked transactions */}
+              {isManualTransaction && onDelete && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-9 w-9 p-0 ml-auto text-muted-foreground hover:text-destructive"
+                  onClick={() => onDelete(transaction.id)}
+                  disabled={isProcessing || isDisabled}
+                  aria-label="Ta bort transaktion"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           )}
         </CardContent>

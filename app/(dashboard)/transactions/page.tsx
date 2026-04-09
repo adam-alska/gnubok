@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
 import { ToastAction } from '@/components/ui/toast'
+import { DestructiveConfirmDialog, useDestructiveConfirm } from '@/components/ui/destructive-confirm-dialog'
 import { X } from 'lucide-react'
 import TransactionForm from '@/components/transactions/TransactionForm'
 import SwipeCategorizationView from '@/components/transactions/SwipeCategorizationView'
@@ -88,6 +89,7 @@ export default function TransactionsPage() {
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set())
 
   const { toast } = useToast()
+  const { dialogProps: deleteDialogProps, confirm: confirmDelete } = useDestructiveConfirm()
   const supabase = createClient()
 
   // Computed lists
@@ -508,6 +510,40 @@ export default function TransactionsPage() {
     setIsCreating(false)
   }
 
+  async function handleDeleteTransaction(id: string) {
+    const transaction = transactions.find((t) => t.id === id)
+    if (!transaction) return
+
+    const ok = await confirmDelete({
+      title: 'Ta bort transaktion',
+      description: `Är du säker på att du vill ta bort "${transaction.description}"? Åtgärden kan inte ångras.`,
+      confirmLabel: 'Ta bort',
+      variant: 'destructive',
+    })
+    if (!ok) return
+
+    try {
+      const response = await fetch(`/api/transactions/${id}`, { method: 'DELETE' })
+      if (!response.ok) {
+        const result = await response.json()
+        toast({
+          title: 'Kunde inte ta bort',
+          description: result.error || 'Försök igen.',
+          variant: 'destructive',
+        })
+        return
+      }
+      setTransactions((prev) => prev.filter((t) => t.id !== id))
+      toast({ title: 'Borttagen', description: 'Transaktionen har tagits bort' })
+    } catch {
+      toast({
+        title: 'Kunde inte ta bort',
+        description: 'Transaktionen kunde inte tas bort. Försök igen.',
+        variant: 'destructive',
+      })
+    }
+  }
+
   function handleTransactionBooked(transactionId: string, journalEntryId: string) {
     setExitingIds((prev) => new Set(prev).add(transactionId))
     setTimeout(() => {
@@ -786,7 +822,7 @@ export default function TransactionsPage() {
                   onMarkPrivate={handleMarkPrivate}
                   onOpenMatchDialog={openMatchDialog}
                   onOpenCategoryDialog={openCategoryDialog}
-
+                  onDelete={handleDeleteTransaction}
                   onOpenQuickReview={handleOpenQuickReview}
                   onOpenTemplateReview={handleOpenTemplateReview}
                   onToggleSelect={toggleBatchSelect}
@@ -917,6 +953,8 @@ export default function TransactionsPage() {
           <TransactionForm onSubmit={handleCreateTransaction} isLoading={isCreating} />
         </DialogContent>
       </Dialog>
+
+      <DestructiveConfirmDialog {...deleteDialogProps} />
     </div>
   )
 }

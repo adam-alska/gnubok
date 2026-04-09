@@ -390,11 +390,18 @@ export default function JournalEntryList({ periodId }: Props) {
                               <span className="text-muted-foreground">
                                 {Number(line.debit_amount) > 0 ? 'Debet' : 'Kredit'}
                               </span>
-                              <span className="font-mono tabular-nums font-medium">
-                                {Number(line.debit_amount) > 0
-                                  ? Number(line.debit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })
-                                  : Number(line.credit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
-                              </span>
+                              <div className="text-right">
+                                <span className="font-mono tabular-nums font-medium">
+                                  {Number(line.debit_amount) > 0
+                                    ? Number(line.debit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })
+                                    : Number(line.credit_amount).toLocaleString('sv-SE', { minimumFractionDigits: 2 })}
+                                </span>
+                                {line.currency && line.currency !== 'SEK' && line.amount_in_currency != null && (
+                                  <span className="block text-xs text-muted-foreground font-mono tabular-nums">
+                                    {Number(line.amount_in_currency).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} {line.currency}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                           )

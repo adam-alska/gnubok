@@ -153,11 +153,13 @@ export const CreateInvoiceItemSchema = z.object({
   vat_rate: z.number().min(0).max(100).optional(),
 })
 
+const optionalIsoDate = isoDate.or(z.literal('')).transform(v => v || undefined).optional()
+
 export const CreateInvoiceSchema = z.object({
   customer_id: uuid,
   invoice_date: isoDate,
   due_date: isoDate,
-  delivery_date: isoDate.optional(),
+  delivery_date: optionalIsoDate,
   currency: CurrencySchema,
   document_type: InvoiceDocumentTypeSchema.optional(),
   your_reference: z.string().optional(),
@@ -254,7 +256,7 @@ export const CreateSupplierInvoiceSchema = z.object({
   supplier_invoice_number: z.string().min(1, 'Supplier invoice number is required'),
   invoice_date: isoDate,
   due_date: isoDate,
-  delivery_date: isoDate.optional(),
+  delivery_date: optionalIsoDate,
   currency: CurrencySchema.optional(),
   exchange_rate: z.number().positive().optional(),
   vat_treatment: VatTreatmentSchema.optional(),
@@ -275,7 +277,7 @@ export const UpdateSupplierInvoiceSchema = z.object({
   supplier_invoice_number: z.string().min(1).optional(),
   invoice_date: isoDate.optional(),
   due_date: isoDate.optional(),
-  delivery_date: isoDate.optional(),
+  delivery_date: optionalIsoDate,
   payment_reference: z.string().optional(),
   notes: z.string().optional(),
 })
@@ -349,6 +351,7 @@ export const MatchSupplierInvoiceSchema = z.object({
 export const UpdateSettingsSchema = z.object({
   entity_type: EntityTypeSchema.optional(),
   company_name: z.string().optional(),
+  trade_name: z.string().nullable().optional(),
   org_number: z.string().optional(),
   address_line1: z.string().optional(),
   address_line2: z.string().optional(),

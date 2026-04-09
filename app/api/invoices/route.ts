@@ -211,6 +211,7 @@ export async function POST(request: Request) {
     .single()
 
   if (invoiceError) {
+    console.error('Invoice insert error:', invoiceError)
     return NextResponse.json({ error: invoiceError.message }, { status: 500 })
   }
 
