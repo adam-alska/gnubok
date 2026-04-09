@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import DashboardContent from '@/components/dashboard/DashboardContent'
-import ConsultantEmptyState from '@/components/dashboard/ConsultantEmptyState'
+import WelcomeOnboarding from '@/components/dashboard/WelcomeOnboarding'
 import { getActiveCompanyId } from '@/lib/company/context'
 import type { Deadline, ReceiptQueueSummary, OnboardingProgress } from '@/types'
 
@@ -34,25 +34,27 @@ export default async function DashboardPage() {
   }
 
   if (!companyId) {
-    // Consultants (team members) see an empty state; solo users go to onboarding
-    const { data: teamMembership } = await supabase
-      .from('team_members')
-      .select('team_id')
-      .eq('user_id', user.id)
-      .limit(1)
-      .maybeSingle()
+    // No companies — show welcome onboarding card
+    const [{ data: profile }, { data: teamMembership }] = await Promise.all([
+      supabase.from('profiles').select('full_name').eq('id', user.id).single(),
+      supabase.from('team_members').select('team_id').eq('user_id', user.id).limit(1).maybeSingle(),
+    ])
 
-    if (teamMembership) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', user.id)
-        .single()
-      const firstName = profile?.full_name?.split(' ')[0] || null
-      return <ConsultantEmptyState firstName={firstName} />
+    let teamId = teamMembership?.team_id
+
+    // Ensure user has a team (fallback for edge cases)
+    if (!teamId) {
+      const { data: newTeamId } = await supabase.rpc('ensure_user_team')
+      teamId = newTeamId
     }
 
-    redirect('/onboarding')
+    if (!teamId) {
+      // Should never happen, but handle gracefully
+      redirect('/login')
+    }
+
+    const firstName = profile?.full_name?.split(' ')[0] || null
+    return <WelcomeOnboarding firstName={firstName} teamId={teamId} />
   }
 
   // Fetch current year date boundaries
@@ -121,6 +123,28 @@ export default async function DashboardPage() {
   ])
 
   const firstName = profile?.full_name?.split(' ')[0] || null
+
+  // If onboarding is not complete, show the inline onboarding card
+  if (!settings?.onboarding_complete) {
+    const { data: teamMembership } = await supabase
+      .from('team_members')
+      .select('team_id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .maybeSingle()
+
+    let teamId = teamMembership?.team_id
+    if (!teamId) {
+      const { data: newTeamId } = await supabase.rpc('ensure_user_team')
+      teamId = newTeamId
+    }
+
+    if (!teamId) {
+      redirect('/login')
+    }
+
+    return <WelcomeOnboarding firstName={firstName} teamId={teamId} />
+  }
 
   const onboardingProgress: OnboardingProgress = {
     hasCustomers: (customerCount || 0) > 0,

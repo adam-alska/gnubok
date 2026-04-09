@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency } from '@/lib/utils'
 import { Plus, Search, Wallet, Clock, AlertCircle } from 'lucide-react'
+import { useCompany } from '@/contexts/CompanyContext'
 import type { SupplierInvoice } from '@/types'
 
 type ExpenseInvoice = SupplierInvoice & { supplier?: { id: string; name: string } }
@@ -60,6 +61,7 @@ function getRelativeTimeLabel(dueDateStr: string, status: string): { text: strin
 }
 
 export default function ExpensesPage() {
+  const { company } = useCompany()
   const [invoices, setInvoices] = useState<ExpenseInvoice[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -68,10 +70,12 @@ export default function ExpensesPage() {
   const supabase = createClient()
 
   async function fetchExpenses() {
+    if (!company) return
     setIsLoading(true)
     const { data, error } = await supabase
       .from('supplier_invoices')
       .select('*, supplier:suppliers(id, name)')
+      .eq('company_id', company.id)
       .order('due_date', { ascending: true })
 
     if (error) {

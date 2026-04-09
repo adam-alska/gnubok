@@ -77,7 +77,9 @@ function NewCompanyContent() {
 
   const totalSteps = 4
 
-  // Just verify auth on mount
+  const [teamId, setTeamId] = useState<string | null>(null)
+
+  // Verify auth and fetch team_id on mount
   useEffect(() => {
     async function checkAuth() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -85,6 +87,23 @@ function NewCompanyContent() {
         router.push('/login')
         return
       }
+
+      // Fetch user's team_id
+      const { data: teamMembership } = await supabase
+        .from('team_members')
+        .select('team_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle()
+
+      if (teamMembership?.team_id) {
+        setTeamId(teamMembership.team_id)
+      } else {
+        // Ensure user has a team (fallback)
+        const { data: newTeamId } = await supabase.rpc('ensure_user_team')
+        setTeamId(newTeamId)
+      }
+
       setIsLoading(false)
     }
     checkAuth()
@@ -162,6 +181,7 @@ function NewCompanyContent() {
         const { data: newCompanyId, error: companyError } = await supabase.rpc('create_company_with_owner', {
           p_name: 'Nytt företag',
           p_entity_type: stepData.entity_type,
+          p_team_id: teamId,
         })
 
         if (companyError || !newCompanyId) {

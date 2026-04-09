@@ -47,46 +47,42 @@ export default async function DashboardLayout({
 
   const isTeamMember = !!teamMembership
 
-  // Consultant with team but no companies — show dashboard with empty state
+  // No companies — show dashboard with empty state (welcome onboarding card)
   if (!companyId) {
-    if (isTeamMember) {
-      const companyContextValue = {
-        company: null,
-        role: null,
-        companies: [],
-        isTeamMember: true,
-        team,
-      }
-
-      return (
-        <CompanyProvider value={companyContextValue}>
-          <div className="min-h-screen bg-background">
-            <a
-              href="#main-content"
-              className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg focus:text-sm focus:font-medium"
-            >
-              Hoppa till innehåll
-            </a>
-            <DashboardNav
-              companyName={team?.name || 'Mitt team'}
-              entityType="enskild_firma"
-              uncategorizedTransactionCount={0}
-              pendingOperationsCount={0}
-              isSandbox={false}
-              extensionNavItems={getExtensionNavItems()}
-            />
-            <main id="main-content" className="safe-area-main-padding md:!pb-0 md:pl-[232px]" role="main">
-              <div className="max-w-5xl mx-auto px-5 py-8 md:px-8 md:py-10">
-                {children}
-              </div>
-            </main>
-            <SentryIdentify userId={user.id} email={user.email} />
-          </div>
-        </CompanyProvider>
-      )
+    const companyContextValue = {
+      company: null,
+      role: null,
+      companies: [],
+      isTeamMember,
+      team,
     }
 
-    redirect('/onboarding')
+    return (
+      <CompanyProvider value={companyContextValue}>
+        <div className="min-h-screen bg-background">
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg focus:text-sm focus:font-medium"
+          >
+            Hoppa till innehåll
+          </a>
+          <DashboardNav
+            companyName="gnubok"
+            entityType="enskild_firma"
+            uncategorizedTransactionCount={0}
+            pendingOperationsCount={0}
+            isSandbox={false}
+            extensionNavItems={getExtensionNavItems()}
+          />
+          <main id="main-content" className="safe-area-main-padding md:!pb-0 md:pl-[232px]" role="main">
+            <div className="max-w-5xl mx-auto px-5 py-8 md:px-8 md:py-10">
+              {children}
+            </div>
+          </main>
+          <SentryIdentify userId={user.id} email={user.email} />
+        </div>
+      </CompanyProvider>
+    )
   }
 
   // Fetch company + membership for context provider
@@ -102,42 +98,38 @@ export default async function DashboardLayout({
 
   if (!companyRow || !memberRow) {
     // Stale cookie pointing to a deleted/inaccessible company.
-    // If the user is a team member, render the empty-state dashboard
-    // instead of redirecting to onboarding (which would cause a loop).
-    if (isTeamMember) {
-      const companyContextValue = {
-        company: null,
-        role: null,
-        companies: (allMemberships || []).filter(m => m.companies).map((m) => ({
-          company: m.companies as unknown as import('@/types').Company,
-          role: m.role as CompanyRole,
-        })),
-        isTeamMember: true,
-        team,
-      }
-
-      return (
-        <CompanyProvider value={companyContextValue}>
-          <div className="min-h-screen bg-background">
-            <DashboardNav
-              companyName={team?.name || 'Mitt team'}
-              entityType="enskild_firma"
-              uncategorizedTransactionCount={0}
-              pendingOperationsCount={0}
-              isSandbox={false}
-              extensionNavItems={getExtensionNavItems()}
-            />
-            <main id="main-content" className="safe-area-main-padding md:!pb-0 md:pl-[232px]" role="main">
-              <div className="max-w-5xl mx-auto px-5 py-8 md:px-8 md:py-10">
-                {children}
-              </div>
-            </main>
-            <SentryIdentify userId={user.id} email={user.email} />
-          </div>
-        </CompanyProvider>
-      )
+    // Render the empty-state dashboard so user can switch or create a company.
+    const companyContextValue = {
+      company: null,
+      role: null,
+      companies: (allMemberships || []).filter(m => m.companies).map((m) => ({
+        company: m.companies as unknown as import('@/types').Company,
+        role: m.role as CompanyRole,
+      })),
+      isTeamMember,
+      team,
     }
-    redirect('/onboarding')
+
+    return (
+      <CompanyProvider value={companyContextValue}>
+        <div className="min-h-screen bg-background">
+          <DashboardNav
+            companyName="gnubok"
+            entityType="enskild_firma"
+            uncategorizedTransactionCount={0}
+            pendingOperationsCount={0}
+            isSandbox={false}
+            extensionNavItems={getExtensionNavItems()}
+          />
+          <main id="main-content" className="safe-area-main-padding md:!pb-0 md:pl-[232px]" role="main">
+            <div className="max-w-5xl mx-auto px-5 py-8 md:px-8 md:py-10">
+              {children}
+            </div>
+          </main>
+          <SentryIdentify userId={user.id} email={user.email} />
+        </div>
+      </CompanyProvider>
+    )
   }
 
   const [{ data: settings }, { count: uncategorizedCount }, { count: pendingOpsCount }] = await Promise.all([
@@ -158,12 +150,11 @@ export default async function DashboardLayout({
       .eq('status', 'pending'),
   ])
 
-  if (!settings?.onboarding_complete) {
-    redirect('/onboarding')
-  }
+  // If onboarding incomplete, still render the dashboard — the page component
+  // will show the inline onboarding card instead of the normal dashboard content.
 
   // Use company_name from settings as the display name (companies.name may be stale)
-  const displayName = settings.company_name || companyRow.name
+  const displayName = settings?.company_name || companyRow.name
   const companyWithName = { ...companyRow, name: displayName }
 
   const companyContextValue = {
@@ -181,9 +172,9 @@ export default async function DashboardLayout({
     team,
   }
 
-  const entityType = (settings.entity_type as EntityType) || 'enskild_firma'
+  const entityType = (settings?.entity_type as EntityType) || 'enskild_firma'
 
-  const isSandbox = settings.is_sandbox === true
+  const isSandbox = settings?.is_sandbox === true
 
   return (
     <CompanyProvider value={companyContextValue}>
@@ -197,7 +188,7 @@ export default async function DashboardLayout({
         </a>
         {isSandbox && <SandboxBanner />}
         <DashboardNav
-          companyName={settings.company_name || 'Min verksamhet'}
+          companyName={settings?.company_name || 'Min verksamhet'}
           entityType={entityType}
           uncategorizedTransactionCount={uncategorizedCount ?? 0}
           pendingOperationsCount={pendingOpsCount ?? 0}
@@ -214,7 +205,7 @@ export default async function DashboardLayout({
           <RecaptIdentify
             userId={user.id}
             email={user.email}
-            displayName={settings.company_name || undefined}
+            displayName={settings?.company_name || undefined}
           />
         )}
       </div>

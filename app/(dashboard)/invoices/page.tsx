@@ -15,6 +15,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { Plus, Search, Receipt } from 'lucide-react'
 import { EmptyInvoices } from '@/components/ui/empty-state'
+import { useCompany } from '@/contexts/CompanyContext'
 import type { Invoice, InvoiceStatus } from '@/types'
 
 const statusConfig: Record<InvoiceStatus, { label: string; variant: 'default' | 'secondary' | 'success' | 'warning' | 'destructive'; borderColor: string }> = {
@@ -49,6 +50,7 @@ function getRelativeTimeLabel(dueDateStr: string, status: InvoiceStatus): { text
 }
 
 export default function InvoicesPage() {
+  const { company } = useCompany()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -57,10 +59,12 @@ export default function InvoicesPage() {
   const supabase = createClient()
 
   async function fetchInvoices() {
+    if (!company) return
     setIsLoading(true)
     const { data, error } = await supabase
       .from('invoices')
       .select('*, customer:customers(name)')
+      .eq('company_id', company.id)
       .order('invoice_date', { ascending: false })
 
     if (error) {

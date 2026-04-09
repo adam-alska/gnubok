@@ -136,27 +136,37 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Check if user has completed onboarding (for any company they belong to)
-      const { data: membership } = await supabase
-        .from('company_members')
-        .select('company_id')
+      // Ensure user has a silent team (for new signups and existing users without one)
+      const { data: teamMembership } = await supabase
+        .from('team_members')
+        .select('team_id')
         .eq('user_id', user.id)
         .limit(1)
-        .single()
+        .maybeSingle()
 
-      if (membership?.company_id) {
-        const { data: settings } = await supabase
-          .from('company_settings')
-          .select('onboarding_complete')
-          .eq('company_id', membership.company_id)
-          .single()
+      if (!teamMembership) {
+        // Create team via service client (RPC requires auth.uid() which isn't available here)
+        const serviceClient = createServerClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!,
+          { cookies: { getAll: () => [], setAll: () => {} } }
+        )
 
-        if (!settings?.onboarding_complete) {
-          redirectPath = '/onboarding'
-        }
-      } else {
-        redirectPath = '/onboarding'
+        const teamId = crypto.randomUUID()
+        await serviceClient.from('teams').insert({
+          id: teamId,
+          name: 'Personal',
+          created_by: user.id,
+        })
+        await serviceClient.from('team_members').insert({
+          team_id: teamId,
+          user_id: user.id,
+          role: 'owner',
+        })
       }
+
+      // Always redirect to dashboard — it handles zero-company and incomplete states
+      redirectPath = '/'
     }
 
     // Create redirect and explicitly set auth cookies on the response

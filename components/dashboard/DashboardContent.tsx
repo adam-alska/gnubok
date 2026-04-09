@@ -21,7 +21,6 @@ import {
 } from 'lucide-react'
 import { getAllExtensions } from '@/lib/extensions/sectors'
 import { resolveIcon } from '@/lib/extensions/icon-resolver'
-import { useCompany } from '@/contexts/CompanyContext'
 import type { QuickActionDefinition } from '@/lib/extensions/types'
 import type { CompanySettings, Deadline, ReceiptQueueSummary, OnboardingProgress } from '@/types'
 
@@ -51,13 +50,11 @@ interface DashboardContentProps {
 }
 
 export default function DashboardContent({ firstName, settings, summary, onboardingProgress }: DashboardContentProps) {
-  const { isTeamMember } = useCompany()
   const [showAllAlerts, setShowAllAlerts] = useState(false)
   const [showMore, setShowMore] = useState(false)
 
   // Setup gate — blocks dashboard until user imports data or chooses fresh start
-  // Consultants (team members) skip this — they go straight to the dashboard
-  const needsSetup = !isTeamMember && onboardingProgress && !onboardingProgress.hasBankConnected && !onboardingProgress.hasSIEImport
+  const needsSetup = onboardingProgress && !onboardingProgress.hasBankConnected && !onboardingProgress.hasSIEImport
   const [setupGateActive, setSetupGateActive] = useState(!!needsSetup)
 
   useEffect(() => {

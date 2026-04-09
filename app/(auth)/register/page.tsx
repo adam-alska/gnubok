@@ -127,7 +127,7 @@ function RegisterPageContent() {
         return
       }
 
-      router.push('/onboarding')
+      router.push('/')
       router.refresh()
     } catch (error) {
       console.error('[register] BankID signup error', error)

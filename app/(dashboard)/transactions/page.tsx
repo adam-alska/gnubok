@@ -104,10 +104,12 @@ export default function TransactionsPage() {
   const PAGE_SIZE = 200
 
   async function fetchTransactions() {
+    if (!company) return
     setIsLoading(true)
     const { data: txData, error: txError } = await supabase
       .from('transactions')
       .select('*')
+      .eq('company_id', company.id)
       .order('date', { ascending: false })
       .limit(PAGE_SIZE)
 
@@ -165,11 +167,13 @@ export default function TransactionsPage() {
   }
 
   async function loadMoreTransactions() {
+    if (!company) return
     setIsLoadingMore(true)
     const offset = transactions.length
     const { data: txData, error: txError } = await supabase
       .from('transactions')
       .select('*')
+      .eq('company_id', company.id)
       .order('date', { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1)
 

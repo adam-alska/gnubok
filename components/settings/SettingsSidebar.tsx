@@ -16,7 +16,7 @@ interface NavItem {
 export function SettingsNav({ isSandbox }: { isSandbox?: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { company, isTeamMember } = useCompany()
+  const { company } = useCompany()
 
   const hasCompany = !!company
   const hasBankingExtension = ENABLED_EXTENSION_IDS.has('enable-banking')
@@ -27,7 +27,7 @@ export function SettingsNav({ isSandbox }: { isSandbox?: boolean }) {
     { href: '/settings/invoicing', label: 'Fakturering', show: hasCompany },
     { href: '/settings/bookkeeping', label: 'Bokföring', show: hasCompany },
     { href: '/settings/tax', label: 'Skatt', show: hasCompany },
-    { href: '/settings/team', label: 'Lag', show: isTeamMember },
+    { href: '/settings/team', label: 'Lag', show: false },
     { href: '/settings/banking', label: 'Bank (PSD2)', show: hasCompany && !isSandbox && hasBankingExtension },
     { href: '/settings/templates', label: 'Mallar', show: hasCompany },
     { href: '/settings/account', label: 'Konto', show: true },

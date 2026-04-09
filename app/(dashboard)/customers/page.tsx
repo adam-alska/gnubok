@@ -12,6 +12,7 @@ import { Plus, Search, Users } from 'lucide-react'
 import CustomerForm from '@/components/customers/CustomerForm'
 import { EmptyCustomers } from '@/components/ui/empty-state'
 import Link from 'next/link'
+import { useCompany } from '@/contexts/CompanyContext'
 import type { Customer, CustomerType, CreateCustomerInput } from '@/types'
 
 const customerTypeLabels: Record<CustomerType, string> = {
@@ -31,6 +32,7 @@ function getInitials(name: string): string {
 }
 
 export default function CustomersPage() {
+  const { company } = useCompany()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -40,10 +42,12 @@ export default function CustomersPage() {
   const supabase = createClient()
 
   async function fetchCustomers() {
+    if (!company) return
     setIsLoading(true)
     const { data, error } = await supabase
       .from('customers')
       .select('*')
+      .eq('company_id', company.id)
       .order('name', { ascending: true })
 
     if (error) {
