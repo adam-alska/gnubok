@@ -46,15 +46,17 @@ export default function InvitePage() {
     loadInvite()
   }, [token])
 
+  const secureCookieFlag = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; secure' : ''
+
   const handleAccept = () => {
     // Store invite token in cookie before redirecting to register
-    document.cookie = `gnubok-invite-token=${token}; path=/; max-age=3600; samesite=lax`
+    document.cookie = `gnubok-invite-token=${token}; path=/; max-age=3600; samesite=lax${secureCookieFlag}`
     router.push(`/register?invite=${encodeURIComponent(token)}`)
   }
 
   const handleAcceptExistingUser = () => {
     // Store invite token in cookie before redirecting to login
-    document.cookie = `gnubok-invite-token=${token}; path=/; max-age=3600; samesite=lax`
+    document.cookie = `gnubok-invite-token=${token}; path=/; max-age=3600; samesite=lax${secureCookieFlag}`
     router.push('/login')
   }
 
