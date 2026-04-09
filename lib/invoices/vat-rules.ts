@@ -103,6 +103,7 @@ export function getVatRules(
         treatment: 'export',
         rate: 0,
         momsRuta: '40',
+        reverseChargeText: 'Omsättning utanför EU, ML 10 kap.',
       }
 
     default:

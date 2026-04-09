@@ -328,6 +328,7 @@ export function makeInvoice(overrides: Partial<Invoice> = {}): Invoice {
     invoice_number: 'F-2024001',
     invoice_date: '2024-06-15',
     due_date: '2024-07-15',
+    delivery_date: null,
     status: 'draft',
     currency: 'SEK',
     exchange_rate: null,

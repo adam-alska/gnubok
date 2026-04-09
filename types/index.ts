@@ -546,6 +546,7 @@ export interface Invoice {
   // Dates
   invoice_date: string
   due_date: string
+  delivery_date: string | null
 
   // Status
   status: InvoiceStatus

@@ -157,6 +157,7 @@ export const CreateInvoiceSchema = z.object({
   customer_id: uuid,
   invoice_date: isoDate,
   due_date: isoDate,
+  delivery_date: isoDate.optional(),
   currency: CurrencySchema,
   document_type: InvoiceDocumentTypeSchema.optional(),
   your_reference: z.string().optional(),

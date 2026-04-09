@@ -351,6 +351,12 @@ export function InvoicePDF({ invoice, customer, items, company, originalInvoiceN
               <Text style={styles.label}>Förfallodatum:</Text>
               <Text style={styles.value}>{formatDate(invoice.due_date)}</Text>
             </View>
+            {invoice.delivery_date && invoice.delivery_date !== invoice.invoice_date && (
+              <View style={styles.row}>
+                <Text style={styles.label}>Leveransdatum:</Text>
+                <Text style={styles.value}>{formatDate(invoice.delivery_date)}</Text>
+              </View>
+            )}
             {invoice.your_reference && (
               <View style={{ marginBottom: 4 }}>
                 <Text style={styles.label}>Er referens:</Text>
@@ -447,12 +453,19 @@ export function InvoicePDF({ invoice, customer, items, company, originalInvoiceN
             </View>
             {vatByRate.size > 1 ? (
               Array.from(vatByRate.entries())
-                .filter(([, group]) => group.vat > 0)
                 .sort(([a], [b]) => b - a)
                 .map(([rate, group]) => (
-                  <View key={rate} style={styles.totalRow}>
-                    <Text style={styles.totalLabel}>Moms {rate}%:</Text>
-                    <Text style={styles.totalValue}>{formatCurrency(group.vat, invoice.currency)}</Text>
+                  <View key={rate}>
+                    <View style={styles.totalRow}>
+                      <Text style={styles.totalLabel}>Netto {rate}%:</Text>
+                      <Text style={styles.totalValue}>{formatCurrency(group.base, invoice.currency)}</Text>
+                    </View>
+                    {group.vat > 0 && (
+                      <View style={styles.totalRow}>
+                        <Text style={styles.totalLabel}>Moms {rate}%:</Text>
+                        <Text style={styles.totalValue}>{formatCurrency(group.vat, invoice.currency)}</Text>
+                      </View>
+                    )}
                   </View>
                 ))
             ) : (
@@ -477,9 +490,17 @@ export function InvoicePDF({ invoice, customer, items, company, originalInvoiceN
               </View>
             )}
             {invoice.currency !== 'SEK' && invoice.total_sek && (
-              <View style={[styles.totalRow, { marginTop: 8 }]}>
-                <Text style={[styles.totalLabel, { fontSize: 9 }]}>I SEK (kurs {invoice.exchange_rate}):</Text>
-                <Text style={[styles.totalValue, { fontSize: 9 }]}>{formatCurrency(invoice.total_sek, 'SEK')}</Text>
+              <View style={{ marginTop: 8 }}>
+                {invoice.vat_amount_sek != null && invoice.vat_amount_sek !== 0 && (
+                  <View style={styles.totalRow}>
+                    <Text style={[styles.totalLabel, { fontSize: 9 }]}>Moms i SEK (kurs {invoice.exchange_rate}):</Text>
+                    <Text style={[styles.totalValue, { fontSize: 9 }]}>{formatCurrency(invoice.vat_amount_sek, 'SEK')}</Text>
+                  </View>
+                )}
+                <View style={styles.totalRow}>
+                  <Text style={[styles.totalLabel, { fontSize: 9 }]}>Totalt i SEK:</Text>
+                  <Text style={[styles.totalValue, { fontSize: 9 }]}>{formatCurrency(invoice.total_sek, 'SEK')}</Text>
+                </View>
               </View>
             )}
           </View>
@@ -549,10 +570,15 @@ export function InvoicePDF({ invoice, customer, items, company, originalInvoiceN
           </View>
         )}
 
-        {/* Reverse charge notice */}
+        {/* Reverse charge / export / exempt notice */}
         {invoice.reverse_charge_text && (
           <View style={styles.reverseChargeBox}>
             <Text style={styles.reverseChargeText}>{invoice.reverse_charge_text}</Text>
+          </View>
+        )}
+        {invoice.vat_treatment === 'exempt' && !invoice.reverse_charge_text && (
+          <View style={styles.reverseChargeBox}>
+            <Text style={styles.reverseChargeText}>Undantag från skatteplikt, ML 3 kap.</Text>
           </View>
         )}
 
