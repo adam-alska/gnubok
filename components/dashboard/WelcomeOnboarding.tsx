@@ -10,9 +10,8 @@ import { Loader2, Building2, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { validatePeriodDuration } from '@/lib/bookkeeping/validate-period-duration'
 import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
-import type { CompanyLookupResult } from '@/lib/company-lookup/types'
+import type { CompanyLookupResult, EnrichmentCompanyRole } from '@/lib/company-lookup/types'
 import type { CompanySettings, EntityType, MomsPeriod } from '@/types'
-import type { CompanyRole } from '@/extensions/general/tic/lib/bankid-types'
 
 import Step1EntityType from '@/components/onboarding/Step1EntityType'
 import Step2CompanyDetails from '@/components/onboarding/Step2CompanyDetails'
@@ -76,7 +75,7 @@ export default function WelcomeOnboarding({ firstName, teamId, skipWelcome }: We
   const [companyId, setCompanyId] = useState<string | null>(null)
   const ticEnabled = ENABLED_EXTENSION_IDS.has('tic')
   const [ticLookup, setTicLookup] = useState<CompanyLookupResult | null>(null)
-  const [enrichmentCompanies, setEnrichmentCompanies] = useState<CompanyRole[]>([])
+  const [enrichmentCompanies, setEnrichmentCompanies] = useState<EnrichmentCompanyRole[]>([])
   const [orgNumberLocked, setOrgNumberLocked] = useState(false)
 
   const totalSteps = 4
@@ -103,10 +102,10 @@ export default function WelcomeOnboarding({ firstName, teamId, skipWelcome }: We
           .maybeSingle()
 
         if (enrichmentRow?.value) {
-          const enrichment = enrichmentRow.value as { spar?: Record<string, string>; companyRoles?: CompanyRole[] }
+          const enrichment = enrichmentRow.value as { spar?: Record<string, string>; companyRoles?: EnrichmentCompanyRole[] }
 
           const activeCompanies = (enrichment.companyRoles ?? []).filter(
-            (c: CompanyRole) => c.companyStatus === 'Aktivt' && c.positionEnd === null
+            (c: EnrichmentCompanyRole) => c.companyStatus === 'Aktivt' && c.positionEnd === null
           )
           if (activeCompanies.length > 0) {
             setEnrichmentCompanies(activeCompanies)
@@ -433,7 +432,7 @@ export default function WelcomeOnboarding({ firstName, teamId, skipWelcome }: We
   }
 
   /** Handle selecting a company from BankID enrichment */
-  const handleEnrichmentSelect = (company: CompanyRole) => {
+  const handleEnrichmentSelect = (company: EnrichmentCompanyRole) => {
     const entityType = mapEntityType(company.legalEntityType)
     if (!entityType) return
 
