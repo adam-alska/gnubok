@@ -67,14 +67,14 @@ const CONTEXT_FALLBACKS: Record<ErrorContext, string> = {
 const GENERIC_FALLBACK = 'Något gick fel. Försök igen.'
 
 // Known error patterns → user-friendly Swedish messages
-const ERROR_PATTERN_MAP: [RegExp, string][] = [
+const ERROR_PATTERN_MAP: [RegExp, string | null][] = [
   [
     /locked\/closed fiscal period/i,
     'Perioden är låst. Verifikationen kan inte skapas i en stängd eller låst period.',
   ],
   [
     /Bokföringen är låst t\.o\.m\./,
-    '', // Empty = extract the Swedish message directly from the match
+    null, // null = extract the Swedish message directly from the raw error text
   ],
   [
     /Cannot attach documents to entries in a locked/i,
@@ -89,7 +89,7 @@ const ERROR_PATTERN_MAP: [RegExp, string][] = [
 function tryMatchKnownError(message: string): string | null {
   for (const [pattern, translation] of ERROR_PATTERN_MAP) {
     if (pattern.test(message)) {
-      if (translation) return translation
+      if (translation !== null) return translation
       // Extract the Swedish part from the message
       const match = message.match(/Bokföringen är låst t\.o\.m\. [^.]+\./)
       return match ? match[0] : 'Bokföringen är låst för denna period.'

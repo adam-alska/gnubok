@@ -142,12 +142,8 @@ function round(value: number): number {
 /**
  * Calculate VAT declaration from the general ledger.
  *
- * Sums posted journal entry lines on 26xx and 3xxx accounts:
- *   - 3001/3002/3003 credit balance -> ruta 05 (total domestic taxable sales)
- *   - 2611/2621/2631 credit balance -> ruta 10/11/12 (output VAT per rate)
- *   - 2641/2645 debit balance -> ruta 48 (input VAT)
- *   - 3308/3305 credit balance -> ruta 39/40 (EU/export)
- *   - ruta 49 = (10 + 11 + 12) - 48
+ * Sums posted journal entry lines on 26xx and 3xxx accounts per ACCOUNT_RUTA mapping.
+ *   - ruta 49 = (10 + 11 + 12 + 30 + 31 + 32 + 60 + 61 + 62) - 48
  *
  * The accounting method parameter is accepted for backward compatibility
  * but not used — the method is already baked into journal entry timing.
