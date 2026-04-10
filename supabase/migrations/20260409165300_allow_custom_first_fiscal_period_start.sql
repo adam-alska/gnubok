@@ -28,6 +28,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS enforce_period_start_day ON public.fiscal_periods;
+
 CREATE TRIGGER enforce_period_start_day
   BEFORE INSERT OR UPDATE ON public.fiscal_periods
   FOR EACH ROW
