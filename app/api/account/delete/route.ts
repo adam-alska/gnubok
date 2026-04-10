@@ -86,14 +86,33 @@ export async function POST(request: Request) {
     )
   }
 
-  // Ban the auth.users tombstone via the admin API and sign out all sessions.
+  // Wipe PII in auth.users metadata and ban the tombstone row ~100 years.
   // DB functions can't reach supabase.auth.admin, so we do it here.
+  //
+  // Note: auth.users.email is intentionally NOT scrubbed. The original
+  // address is retained as a legitimate-interest tombstone so that:
+  //   (1) re-signup with the same email is blocked by Supabase's unique
+  //       constraint — deletion must feel permanent, not trivially
+  //       reversible by re-registering
+  //   (2) support can verify identity when a former user asks to recover
+  //       BFL-retained räkenskapsinformation
+  // This must be documented in the privacy policy under legitimate
+  // interest (GDPR Art. 6(1)(f)). The email is never read by the app
+  // after this point — login is impossible (row is banned) and the
+  // profile is anonymized, so no UI ever surfaces it.
+  //
+  // user_metadata / app_metadata ARE wiped — they may contain display
+  // name, avatar, or provider info that isn't needed for recovery.
+  // The admin API replaces (not merges) these, so passing {} clears them.
   const service = createServiceClient()
   try {
-    // ~100 years. Supabase accepts an "hours" string on ban_duration.
-    await service.auth.admin.updateUserById(user.id, { ban_duration: '876000h' })
+    await service.auth.admin.updateUserById(user.id, {
+      user_metadata: {},
+      app_metadata: {},
+      ban_duration: '876000h',
+    })
   } catch (err) {
-    log.error('Failed to ban anonymized user', { userId: user.id, err })
+    log.error('Failed to wipe metadata and ban anonymized user', { userId: user.id, err })
   }
 
   try {

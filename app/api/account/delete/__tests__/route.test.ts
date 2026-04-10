@@ -137,8 +137,16 @@ describe('POST /api/account/delete', () => {
     })
     expect(updateUserById).toHaveBeenCalledWith(
       'user-1',
-      expect.objectContaining({ ban_duration: expect.any(String) })
+      expect.objectContaining({
+        user_metadata: {},
+        app_metadata: {},
+        ban_duration: expect.any(String),
+      })
     )
+    // Email must NOT be scrubbed — retaining it is what blocks re-signup
+    // with the same address. Recovery goes through support instead.
+    const updatePayload = updateUserById.mock.calls[0][1]
+    expect(updatePayload).not.toHaveProperty('email')
     expect(adminSignOut).toHaveBeenCalledWith('user-1', 'global')
     expect(emitted).toHaveLength(1)
     expect(emitted[0]).toMatchObject({ userId: 'user-1' })

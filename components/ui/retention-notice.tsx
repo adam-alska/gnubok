@@ -29,11 +29,12 @@ export function RetentionNotice({ variant, className }: RetentionNoticeProps) {
             'bokföring behålls säkert tills lagkravet löpt ut.',
         }
       : {
-          title: 'Ditt konto avidentifieras',
+          title: 'Kontoraderingen är permanent',
           body:
             'Ditt konto avidentifieras och du loggas ut från alla enheter. Räkenskaps­information ' +
-            'från företag du ägt behålls säkert i 7 år enligt BFL 7 kap. 2§. Ladda gärna ner ett ' +
-            'fullständigt arkiv innan du fortsätter.',
+            'från företag du ägt behålls säkert i 7 år enligt BFL 7 kap. 2§. Du kan inte skapa ett ' +
+            'nytt konto med samma e-postadress — kontakta support om du vill återaktivera kontot ' +
+            'i framtiden. Ladda gärna ner ett fullständigt arkiv innan du fortsätter.',
         }
 
   return (

@@ -169,10 +169,11 @@ export function AccountDangerZone() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Radera konto</DialogTitle>
+            <DialogTitle>Radera konto permanent</DialogTitle>
             <DialogDescription>
               Ditt konto avidentifieras och du loggas ut från alla enheter.
-              Räkenskapsinformation från företag du ägt behålls säkert i 7 år enligt BFL.
+              Du kan inte skapa ett nytt konto med samma e-postadress — kontakta support
+              om du vill återaktivera kontot i framtiden.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
