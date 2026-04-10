@@ -158,14 +158,9 @@ export function CompanyMembersSection() {
 
   return (
     <div className="space-y-6">
-      {/* Invite form — disabled, coming soon */}
+      {/* Invite form */}
       {canInvite && (
-        <Card className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-background/60 backdrop-blur-[1px] z-10 flex items-center justify-center">
-            <Badge variant="secondary" className="text-xs font-medium">
-              Kommer snart
-            </Badge>
-          </div>
+        <Card>
           <CardHeader>
             <CardTitle className="text-base">Bjud in till {company?.name}</CardTitle>
             <CardDescription>
@@ -173,21 +168,40 @@ export function CompanyMembersSection() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-3 pointer-events-none">
+            <form onSubmit={handleInvite} className="flex gap-3">
               <div className="flex-1">
                 <Label htmlFor="company-invite-email" className="sr-only">E-postadress</Label>
                 <Input
                   id="company-invite-email"
                   type="email"
                   placeholder="namn@example.com"
-                  disabled
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  disabled={isSending}
+                  required
                 />
               </div>
-              <Button disabled>
-                <Plus className="h-4 w-4 mr-1.5" />
-                Bjud in
+              <Select value={inviteRole} onValueChange={setInviteRole}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="viewer">Läsbehörighet</SelectItem>
+                  <SelectItem value="member">Medlem</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button type="submit" disabled={isSending || !inviteEmail.trim()}>
+                {isSending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-1.5" />
+                    Bjud in
+                  </>
+                )}
               </Button>
-            </div>
+            </form>
           </CardContent>
         </Card>
       )}
@@ -253,8 +267,8 @@ export function CompanyMembersSection() {
         </CardContent>
       </Card>
 
-      {/* Pending invitations — hidden while invites are disabled */}
-      {false && invitations.length > 0 && (
+      {/* Pending invitations */}
+      {invitations.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Väntande inbjudningar</CardTitle>

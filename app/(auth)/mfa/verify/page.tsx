@@ -100,6 +100,29 @@ export default function MfaVerifyPage() {
         return
       }
 
+      // Check for pending invite token
+      const cookieMatch = document.cookie.match(/gnubok-invite-token=([^;]+)/)
+      const inviteToken = cookieMatch?.[1]
+
+      if (inviteToken) {
+        try {
+          const res = await fetch('/api/team/accept', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: inviteToken }),
+          })
+
+          if (res.ok) {
+            document.cookie = 'gnubok-invite-token=; path=/; max-age=0'
+            window.location.href = '/'
+            return
+          }
+        } catch (err) {
+          console.error('[mfa/verify] invite acceptance failed:', err)
+        }
+        document.cookie = 'gnubok-invite-token=; path=/; max-age=0'
+      }
+
       router.push('/')
       router.refresh()
     } catch {
