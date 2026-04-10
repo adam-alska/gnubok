@@ -42,12 +42,6 @@ export async function POST(request: Request) {
   if (!validation.success) return validation.response
   const body = validation.data
 
-  // Validate period duration (max 18 months per BFL 3 kap.)
-  const durationError = validatePeriodDuration(body.period_start, body.period_end)
-  if (durationError) {
-    return NextResponse.json({ error: durationError }, { status: 400 })
-  }
-
   // Enforce continuity: new period must chain from the latest existing period (BFL 3:1)
   const { data: latest } = await supabase
     .from('fiscal_periods')
@@ -56,6 +50,15 @@ export async function POST(request: Request) {
     .order('period_end', { ascending: false })
     .limit(1)
     .maybeSingle()
+
+  // First period for this company may start on any day (BFL 3 kap.)
+  const isFirstPeriod = !latest
+
+  // Validate period duration (max 18 months per BFL 3 kap.)
+  const durationError = validatePeriodDuration(body.period_start, body.period_end, { isFirstPeriod })
+  if (durationError) {
+    return NextResponse.json({ error: durationError }, { status: 400 })
+  }
 
   if (latest) {
     const prev = new Date(latest.period_end + 'T00:00:00')

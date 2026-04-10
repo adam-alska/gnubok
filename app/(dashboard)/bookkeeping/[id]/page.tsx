@@ -80,6 +80,13 @@ export default function JournalEntryDetailPage({ params }: { params: Promise<{ i
   const totalDebit = lines.reduce((sum, l) => sum + (Number(l.debit_amount) || 0), 0)
   const totalCredit = lines.reduce((sum, l) => sum + (Number(l.credit_amount) || 0), 0)
 
+  const foreignLines = lines.filter(l => l.currency && l.currency !== 'SEK' && l.amount_in_currency != null)
+  const hasForeignCurrency = foreignLines.length > 0
+  // For the summary: use the first foreign line's data (the settlement line)
+  const foreignCurrency = hasForeignCurrency ? foreignLines[0].currency! : null
+  const foreignTotal = hasForeignCurrency ? Math.abs(Number(foreignLines[0].amount_in_currency) || 0) : 0
+  const foreignExchangeRate = hasForeignCurrency ? (Number(foreignLines[0].exchange_rate) || null) : null
+
   const canCorrect =
     entry.status === 'posted' &&
     entry.source_type !== 'storno' &&
@@ -168,6 +175,24 @@ export default function JournalEntryDetailPage({ params }: { params: Promise<{ i
               <span className="text-muted-foreground">Antal rader</span>
               <span>{lines.length}</span>
             </div>
+            {hasForeignCurrency && (
+              <>
+                <div className="border-t pt-2 mt-2 flex justify-between">
+                  <span className="text-muted-foreground">Belopp i utländsk valuta</span>
+                  <span className="tabular-nums font-medium">
+                    {foreignTotal.toLocaleString('sv-SE', { minimumFractionDigits: 2 })} {foreignCurrency}
+                  </span>
+                </div>
+                {foreignExchangeRate && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Omräkningskurs</span>
+                    <span className="tabular-nums">
+                      1 {foreignCurrency} = {foreignExchangeRate.toLocaleString('sv-SE', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} SEK
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
 

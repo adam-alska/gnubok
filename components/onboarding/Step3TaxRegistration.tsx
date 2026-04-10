@@ -174,7 +174,12 @@ export default function Step3TaxRegistration({
   const firstYearEnd = watch('first_year_end')
   const fiscalYearEndMonth = watch('fiscal_year_end_month')
 
-  // State for first-year start date selectors (month/year)
+  // State for first-year start date selectors (day/month/year)
+  const [startDay, setStartDay] = useState<number>(
+    initialData.first_year_start
+      ? parseDateParts(initialData.first_year_start).day
+      : 1
+  )
   const [startMonth, setStartMonth] = useState<number>(
     initialData.first_year_start
       ? parseDateParts(initialData.first_year_start).month
@@ -377,22 +382,53 @@ export default function Step3TaxRegistration({
                         const currentYear = new Date().getFullYear()
                         const years = Array.from({ length: 7 }, (_, i) => currentYear - 5 + i)
 
-                        const handleMonthChange = (month: number) => {
-                          setStartMonth(month)
-                          if (month && startYear) {
-                            field.onChange(`${startYear}-${String(month).padStart(2, '0')}-01`)
+                        const updateField = (day: number, month: number, year: number) => {
+                          if (month && year) {
+                            const maxDay = lastDayOfMonth(year, month)
+                            const clampedDay = Math.min(day, maxDay)
+                            field.onChange(`${year}-${String(month).padStart(2, '0')}-${String(clampedDay).padStart(2, '0')}`)
                           }
                         }
 
                         const handleYearChange = (year: number) => {
                           setStartYear(year)
-                          if (startMonth && year) {
-                            field.onChange(`${year}-${String(startMonth).padStart(2, '0')}-01`)
-                          }
+                          updateField(startDay, startMonth, year)
                         }
 
+                        const handleMonthChange = (month: number) => {
+                          setStartMonth(month)
+                          // Clamp day if needed when month changes
+                          if (startYear) {
+                            const maxDay = lastDayOfMonth(startYear, month)
+                            if (startDay > maxDay) setStartDay(maxDay)
+                          }
+                          updateField(startDay, month, startYear)
+                        }
+
+                        const handleDayChange = (day: number) => {
+                          setStartDay(day)
+                          updateField(day, startMonth, startYear)
+                        }
+
+                        const maxDays = startMonth && startYear
+                          ? lastDayOfMonth(startYear, startMonth)
+                          : 31
+
                         return (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div className="grid grid-cols-3 gap-2">
+                            <Select
+                              value={startYear ? startYear.toString() : ''}
+                              onValueChange={(v) => { if (v) handleYearChange(parseInt(v)) }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="År" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {years.map((y) => (
+                                  <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                             <Select
                               value={startMonth ? startMonth.toString() : ''}
                               onValueChange={(v) => { if (v) handleMonthChange(parseInt(v)) }}
@@ -407,15 +443,15 @@ export default function Step3TaxRegistration({
                               </SelectContent>
                             </Select>
                             <Select
-                              value={startYear ? startYear.toString() : ''}
-                              onValueChange={(v) => { if (v) handleYearChange(parseInt(v)) }}
+                              value={startDay.toString()}
+                              onValueChange={(v) => { if (v) handleDayChange(parseInt(v)) }}
                             >
                               <SelectTrigger>
-                                <SelectValue placeholder="År" />
+                                <SelectValue placeholder="Dag" />
                               </SelectTrigger>
                               <SelectContent>
-                                {years.map((y) => (
-                                  <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                                {Array.from({ length: maxDays }, (_, i) => i + 1).map((d) => (
+                                  <SelectItem key={d} value={d.toString()}>{d}</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
@@ -424,7 +460,7 @@ export default function Step3TaxRegistration({
                       }}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Månaden verksamheten startade. Räkenskapsåret börjar alltid den 1:a.
+                      Datumet företaget registrerades. Första räkenskapsåret kan börja valfri dag.
                     </p>
                     {errors.first_year_start && (
                       <p className="text-xs text-destructive">{errors.first_year_start.message}</p>

@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
-import { Plus, Trash2, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, AlertTriangle, Loader2 } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { JournalEntryReviewContent } from '@/components/bookkeeping/JournalEntryReviewContent'
 import DocumentUploadZone from '@/components/bookkeeping/DocumentUploadZone'
@@ -16,7 +16,16 @@ import { getErrorMessage } from '@/lib/errors/get-error-message'
 import { formatCurrency } from '@/lib/utils'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import type { UploadedFile } from '@/components/bookkeeping/DocumentUploadZone'
-import type { CreateJournalEntryLineInput, FiscalPeriod, BASAccount, JournalEntrySourceType } from '@/types'
+import type { CreateJournalEntryLineInput, FiscalPeriod, BASAccount, JournalEntrySourceType, Currency } from '@/types'
+
+const CURRENCIES: { value: Currency; label: string }[] = [
+  { value: 'SEK', label: 'SEK' },
+  { value: 'EUR', label: 'EUR' },
+  { value: 'USD', label: 'USD' },
+  { value: 'GBP', label: 'GBP' },
+  { value: 'NOK', label: 'NOK' },
+  { value: 'DKK', label: 'DKK' },
+]
 
 export interface FormLine {
   account_number: string
@@ -66,6 +75,12 @@ export default function JournalEntryForm({
   const [showNoDocWarning, setShowNoDocWarning] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [accounts, setAccounts] = useState<BASAccount[]>([])
+  const [entryCurrency, setEntryCurrency] = useState<Currency>('SEK')
+  const [exchangeRate, setExchangeRate] = useState('')
+  const [isFetchingRate, setIsFetchingRate] = useState(false)
+  const [foreignAmount, setForeignAmount] = useState('')
+
+  const isForeign = entryCurrency !== 'SEK'
 
   const isUploading = uploadedFiles.some((f) => f.status === 'uploading')
 
@@ -93,6 +108,31 @@ export default function JournalEntryForm({
     fetchPeriods()
     fetchAccounts()
   }, [])
+
+  // Fetch exchange rate from Riksbanken when currency changes
+  const fetchRate = useCallback(async (currency: Currency) => {
+    if (currency === 'SEK') return
+    setIsFetchingRate(true)
+    try {
+      const res = await fetch(`/api/currency/rate?currency=${currency}&date=${entryDate}`)
+      if (res.ok) {
+        const { data } = await res.json()
+        if (data?.rate) {
+          setExchangeRate(String(data.rate))
+        }
+      }
+    } catch {
+      // Non-critical — user can enter rate manually
+    } finally {
+      setIsFetchingRate(false)
+    }
+  }, [entryDate])
+
+  useEffect(() => {
+    if (entryCurrency !== 'SEK') {
+      fetchRate(entryCurrency)
+    }
+  }, [entryCurrency, fetchRate])
 
   const addLine = () => {
     setLines([...lines, { ...BLANK_LINE }])
@@ -142,6 +182,19 @@ export default function JournalEntryForm({
   const totalCredit = lines.reduce((sum, l) => sum + (parseFloat(l.credit_amount) || 0), 0)
   const isBalanced = Math.round((totalDebit - totalCredit) * 100) === 0 && totalDebit > 0
 
+  const rate = parseFloat(exchangeRate) || 0
+  // If user has manually entered a foreign amount, use that; otherwise derive from SEK total
+  const parsedForeignInput = parseFloat(foreignAmount) || 0
+  const computedForeignAmount = isForeign && rate > 0
+    ? (parsedForeignInput > 0
+      ? parsedForeignInput
+      : (totalDebit > 0 ? Math.round(totalDebit / rate * 100) / 100 : 0))
+    : 0
+  // The expected SEK equivalent based on foreign amount × rate
+  const computedSekAmount = isForeign && rate > 0 && computedForeignAmount > 0
+    ? Math.round(computedForeignAmount * rate * 100) / 100
+    : 0
+
   const handleReview = () => {
     if (!selectedPeriod || !description || !isBalanced) return
     const hasDocuments = uploadedFiles.some((f) => f.status === 'uploaded')
@@ -155,34 +208,55 @@ export default function JournalEntryForm({
   const handleConfirm = async () => {
     setIsSubmitting(true)
 
+    let currencyMetaApplied = false
     const entryLines: CreateJournalEntryLineInput[] = lines
       .filter((l) => l.account_number && (l.debit_amount || l.credit_amount))
-      .map((l) => ({
-        account_number: l.account_number,
-        debit_amount: parseFloat(l.debit_amount) || 0,
-        credit_amount: parseFloat(l.credit_amount) || 0,
-        line_description: l.line_description || undefined,
-        ...(l.currency ? { currency: l.currency } : {}),
-        ...(l.amount_in_currency != null ? { amount_in_currency: l.amount_in_currency } : {}),
-        ...(l.exchange_rate != null ? { exchange_rate: l.exchange_rate } : {}),
-      }))
+      .map((l) => {
+        const base: CreateJournalEntryLineInput = {
+          account_number: l.account_number,
+          debit_amount: parseFloat(l.debit_amount) || 0,
+          credit_amount: parseFloat(l.credit_amount) || 0,
+          line_description: l.line_description || undefined,
+        }
+
+        // Attach currency metadata from pre-populated data (e.g. transaction flow)
+        if (l.currency) {
+          base.currency = l.currency
+          if (l.amount_in_currency != null) base.amount_in_currency = l.amount_in_currency
+          if (l.exchange_rate != null) base.exchange_rate = l.exchange_rate
+        }
+        // Attach currency metadata from the entry-level currency selector (manual flow)
+        // Applied to the first bank/cash account (class 19xx) only
+        else if (isForeign && rate > 0 && l.account_number.startsWith('19') && !currencyMetaApplied) {
+          base.currency = entryCurrency
+          base.amount_in_currency = computedForeignAmount
+          base.exchange_rate = rate
+          currencyMetaApplied = true
+        }
+
+        return base
+      })
 
     const url = submitUrl ?? '/api/bookkeeping/journal-entries'
+
+    const payload = {
+      fiscal_period_id: selectedPeriod,
+      entry_date: entryDate,
+      description,
+      source_type: sourceType ?? 'manual',
+      source_id: sourceId,
+      lines: entryLines,
+    }
+    console.log('[JournalEntryForm] submitting:', JSON.stringify(payload, null, 2))
 
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fiscal_period_id: selectedPeriod,
-        entry_date: entryDate,
-        description,
-        source_type: sourceType ?? 'manual',
-        source_id: sourceId,
-        lines: entryLines,
-      }),
+      body: JSON.stringify(payload),
     })
 
     const result = await res.json()
+    console.log('[JournalEntryForm] response:', res.status, JSON.stringify(result, null, 2))
 
     if (result.error) {
       toast({
@@ -225,6 +299,9 @@ export default function JournalEntryForm({
       setDescription('')
       setUploadedFiles([])
       setLines([{ ...BLANK_LINE }, { ...BLANK_LINE }])
+      setEntryCurrency('SEK')
+      setExchangeRate('')
+      setForeignAmount('')
       onCreated?.()
       if (journalEntryId) {
         onEntryCreated?.(journalEntryId)
@@ -270,6 +347,71 @@ export default function JournalEntryForm({
             placeholder="Verifikationstext..."
           />
         </div>
+      </div>
+
+      {/* Currency section */}
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="w-24">
+          <Label className="text-xs text-muted-foreground">Valuta</Label>
+          <Select value={entryCurrency} onValueChange={(v) => {
+            setEntryCurrency(v as Currency)
+            if (v === 'SEK') {
+              setExchangeRate('')
+              setForeignAmount('')
+            }
+          }}>
+            <SelectTrigger className="mt-1 h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CURRENCIES.map((c) => (
+                <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {isForeign && (
+          <>
+            <div className="w-40">
+              <Label className="text-xs text-muted-foreground">
+                Omräkningskurs (1 {entryCurrency} = ? SEK)
+              </Label>
+              <div className="relative mt-1">
+                <Input
+                  type="number"
+                  value={exchangeRate}
+                  onChange={(e) => setExchangeRate(e.target.value)}
+                  placeholder="0,0000"
+                  className="h-8 pr-8"
+                  step="0.0001"
+                  min="0"
+                />
+                {isFetchingRate && (
+                  <Loader2 className="absolute right-2 top-1.5 h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+              </div>
+            </div>
+            <div className="w-40">
+              <Label className="text-xs text-muted-foreground">
+                Belopp i {entryCurrency}
+              </Label>
+              <Input
+                type="number"
+                value={foreignAmount || (computedForeignAmount > 0 && !parsedForeignInput ? computedForeignAmount.toFixed(2) : '')}
+                onChange={(e) => setForeignAmount(e.target.value)}
+                placeholder="0,00"
+                className="mt-1 h-8"
+                step="0.01"
+                min="0"
+              />
+            </div>
+            {rate > 0 && computedForeignAmount > 0 && (
+              <p className="text-xs text-muted-foreground pb-1">
+                {computedForeignAmount.toLocaleString('sv-SE', { minimumFractionDigits: 2 })} {entryCurrency} × {rate.toLocaleString('sv-SE', { minimumFractionDigits: 4 })} = {computedSekAmount.toLocaleString('sv-SE', { minimumFractionDigits: 2 })} SEK
+              </p>
+            )}
+          </>
+        )}
       </div>
 
       {/* Entry lines — mobile cards */}

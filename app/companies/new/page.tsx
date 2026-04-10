@@ -6,7 +6,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/lib/supabase/client'
-import { switchCompany } from '@/lib/company/actions'
+import { createCompanyFromOnboarding } from '@/lib/company/actions'
 import { useToast } from '@/components/ui/use-toast'
 import { Loader2, ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -33,6 +33,54 @@ function translatePeriodError(msg: string): string {
   if (msg.includes('end must be the last day')) return 'Slutdatumet måste vara sista dagen i en månad.'
   if (msg.includes('exceeds maximum 18 months')) return 'Räkenskapsåret får inte överstiga 18 månader (BFL 3 kap.).'
   return 'Ogiltigt räkenskapsår. Kontrollera datumen och försök igen.'
+}
+
+function computeFiscalPeriod(s: Partial<CompanySettings> & Record<string, unknown>) {
+  const isFirstYear = s.is_first_fiscal_year as boolean | undefined
+  const firstYearStart = s.first_year_start as string | undefined
+  const firstYearEnd = s.first_year_end as string | undefined
+
+  let startStr: string
+  let endStr: string
+  let periodName: string
+
+  if (isFirstYear && firstYearStart && firstYearEnd) {
+    startStr = firstYearStart
+    endStr = firstYearEnd
+    const startYear = new Date(firstYearStart).getFullYear()
+    const endYear = new Date(firstYearEnd).getFullYear()
+    periodName = startYear === endYear
+      ? `Första räkenskapsåret ${startYear}`
+      : `Första räkenskapsåret ${startYear}/${endYear}`
+  } else {
+    let startMonth = (s.fiscal_year_start_month as number) || 1
+    if (s.entity_type === 'enskild_firma') startMonth = 1
+    const currentYear = new Date().getFullYear()
+    startStr = `${currentYear}-${String(startMonth).padStart(2, '0')}-01`
+
+    let endYear: number
+    let endMonth: number
+    if (startMonth === 1) {
+      endYear = currentYear
+      endMonth = 12
+    } else {
+      endYear = currentYear + 1
+      endMonth = startMonth - 1
+    }
+    const lastDay = new Date(endYear, endMonth, 0).getDate()
+    endStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+
+    periodName = startMonth === 1
+      ? `Räkenskapsår ${currentYear}`
+      : `Räkenskapsår ${currentYear}/${currentYear + 1}`
+  }
+
+  const validationError = validatePeriodDuration(startStr, endStr, { isFirstPeriod: !!isFirstYear })
+  if (validationError) {
+    return { error: validationError, startStr: '', endStr: '', periodName: '' }
+  }
+
+  return { error: null, startStr, endStr, periodName }
 }
 
 export default function NewCompanyPage() {
@@ -71,7 +119,6 @@ function NewCompanyContent() {
   const [isSaving, setIsSaving] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
   const [settings, setSettings] = useState<Partial<CompanySettings>>({})
-  const [companyId, setCompanyId] = useState<string | null>(null)
   const ticEnabled = ENABLED_EXTENSION_IDS.has('tic')
   const [ticLookup, setTicLookup] = useState<CompanyLookupResult | null>(null)
 
@@ -109,274 +156,88 @@ function NewCompanyContent() {
     checkAuth()
   }, [supabase, router])
 
-  const saveSettings = async (updates: Partial<CompanySettings>, nextStep?: number) => {
-    const targetStep = nextStep ?? currentStep
-    setIsSaving(true)
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return false
-      }
-
-      const updatedSettings = {
-        ...settings,
-        ...updates,
-        onboarding_step: targetStep,
-      }
-
-      if (!companyId) {
-        logError('save aborted: no companyId', { step: targetStep })
-        return false
-      }
-
-      const {
-        id: _id, user_id: _uid, company_id: _cid, created_at: _ca, updated_at: _ua,
-        is_first_fiscal_year: _ify, first_year_start: _fys, first_year_end: _fye,
-        ...settingsToSave
-      } = updatedSettings as Record<string, unknown>
-
-      const { error } = await supabase
-        .from('company_settings')
-        .upsert({ ...settingsToSave, company_id: companyId }, { onConflict: 'company_id' })
-
-      if (error) {
-        logError('save failed', { message: error.message, step: targetStep, code: error.code })
-        toast({ title: 'Fel', description: error.message || 'Kunde inte spara. Försök igen.', variant: 'destructive' })
-        return false
-      }
-
-      setSettings(updatedSettings)
-      return true
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      logError('saveSettings threw', { message, step: targetStep })
-      Sentry.captureException(err)
-      toast({ title: 'Fel', description: 'Ett oväntat fel uppstod. Försök igen.', variant: 'destructive' })
-      return false
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
   const handleNext = async (stepData: Partial<CompanySettings>) => {
     if (currentStep === 1 && stepData.entity_type && stepData.entity_type !== settings.entity_type) {
       stepData = { ...stepData, org_number: '', company_name: '' }
       setTicLookup(null)
     }
 
-    // Step 1: Create the new company
-    let activeCompanyId = companyId
+    const mergedSettings = { ...settings, ...stepData }
 
-    if (currentStep === 1 && !activeCompanyId) {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-          router.push('/login')
-          return
-        }
-
-        // Atomically create company + owner membership + set active
-        const { data: newCompanyId, error: companyError } = await supabase.rpc('create_company_with_owner', {
-          p_name: 'Nytt företag',
-          p_entity_type: stepData.entity_type,
-          p_team_id: teamId,
+    // Validate fiscal period at step 3 before advancing
+    if (currentStep === 3) {
+      const periodResult = computeFiscalPeriod(mergedSettings)
+      if (periodResult.error) {
+        toast({
+          title: 'Ogiltigt räkenskapsår',
+          description: translatePeriodError(periodResult.error),
+          variant: 'destructive',
         })
-
-        if (companyError || !newCompanyId) {
-          logError('company creation failed', { message: companyError?.message })
-          toast({ title: 'Fel', description: 'Kunde inte skapa företag. Försök igen.', variant: 'destructive' })
-          return
-        }
-
-        activeCompanyId = newCompanyId
-        setCompanyId(activeCompanyId)
-        console.log(LOG, 'created company', activeCompanyId)
-      } catch (err) {
-        logError('company creation threw', { error: String(err) })
-        Sentry.captureException(err)
-        toast({ title: 'Fel', description: 'Kunde inte skapa företag. Försök igen.', variant: 'destructive' })
         return
       }
     }
 
-    if (!activeCompanyId) {
-      logError('handleNext aborted: no companyId', { step: currentStep })
+    // Steps 1-3: collect data client-side only, advance step
+    if (currentStep < totalSteps) {
+      setSettings(mergedSettings)
+      setCurrentStep(currentStep + 1)
       return
     }
 
-    const nextStep = currentStep + 1
+    // Step 4 (final): create everything via server action.
+    // Going through a server action ensures that if the Next.js server is
+    // unreachable, nothing touches Supabase — no ghost companies.
+    const periodResult = computeFiscalPeriod(mergedSettings)
+    if (periodResult.error) {
+      toast({
+        title: 'Ogiltigt räkenskapsår',
+        description: translatePeriodError(periodResult.error),
+        variant: 'destructive',
+      })
+      return
+    }
 
-    // Direct save for step 1 (React batching: companyId state not yet updated)
-    const needsDirectSave = currentStep === 1 && !companyId
-    const success = needsDirectSave
-      ? await (async () => {
-          setIsSaving(true)
-          try {
-            const updatedSettings = { ...settings, ...stepData, onboarding_step: nextStep }
-            const {
-              id: _id, user_id: _uid, company_id: _cid, created_at: _ca, updated_at: _ua,
-              is_first_fiscal_year: _ify, first_year_start: _fys, first_year_end: _fye,
-              ...settingsToSave
-            } = updatedSettings as Record<string, unknown>
+    if (!teamId) {
+      logError('handleNext aborted: no teamId')
+      toast({ title: 'Fel', description: 'Kunde inte hitta team. Ladda om sidan.', variant: 'destructive' })
+      return
+    }
 
-            const { error } = await supabase
-              .from('company_settings')
-              .upsert({ ...settingsToSave, company_id: activeCompanyId }, { onConflict: 'company_id' })
+    setIsSaving(true)
+    try {
+      const result = await createCompanyFromOnboarding({
+        teamId,
+        settings: mergedSettings as Record<string, unknown>,
+        fiscalPeriod: {
+          startDate: periodResult.startStr,
+          endDate: periodResult.endStr,
+          name: periodResult.periodName,
+        },
+      })
 
-            if (error) {
-              logError('save failed', { message: error.message, step: nextStep })
-              toast({ title: 'Fel', description: error.message || 'Kunde inte spara. Försök igen.', variant: 'destructive' })
-              return false
-            }
-
-            setSettings(updatedSettings)
-            return true
-          } catch (err) {
-            logError('saveSettings threw', { message: String(err), step: nextStep })
-            Sentry.captureException(err)
-            return false
-          } finally {
-            setIsSaving(false)
-          }
-        })()
-      : await saveSettings(stepData, nextStep)
-
-    if (!success) return
-
-    // Seed chart of accounts after step 1
-    if (currentStep === 1 && stepData.entity_type) {
-      try {
-        const { error: rpcError } = await supabase.rpc('seed_chart_of_accounts', {
-          p_company_id: activeCompanyId,
-          p_entity_type: stepData.entity_type,
+      if (result.error || !result.companyId) {
+        logError('create company action failed', { error: result.error })
+        toast({
+          title: 'Fel',
+          description: result.error || 'Kunde inte skapa företag. Försök igen.',
+          variant: 'destructive',
         })
-        if (rpcError) {
-          logError('COA seeding failed', { entity_type: stepData.entity_type, message: rpcError.message })
-        }
-      } catch (err) {
-        logError('COA seeding threw', { error: String(err) })
-        Sentry.captureException(err)
-      }
-    }
-
-    // Create fiscal period after step 3
-    if (currentStep === 3 && activeCompanyId) {
-      try {
-        const isFirstYear = stepData.is_first_fiscal_year as boolean | undefined
-        const firstYearStart = stepData.first_year_start as string | undefined
-        const firstYearEnd = stepData.first_year_end as string | undefined
-
-        let startStr: string
-        let endStr: string
-        let periodName: string
-
-        if (isFirstYear && firstYearStart && firstYearEnd) {
-          startStr = firstYearStart
-          endStr = firstYearEnd
-          const startYear = new Date(firstYearStart).getFullYear()
-          const endYear = new Date(firstYearEnd).getFullYear()
-          periodName = startYear === endYear
-            ? `Första räkenskapsåret ${startYear}`
-            : `Första räkenskapsåret ${startYear}/${endYear}`
-        } else {
-          let startMonth = stepData.fiscal_year_start_month || settings.fiscal_year_start_month || 1
-          if (settings.entity_type === 'enskild_firma') startMonth = 1
-
-          const currentYear = new Date().getFullYear()
-          startStr = `${currentYear}-${String(startMonth).padStart(2, '0')}-01`
-
-          let endYear: number
-          let endMonth: number
-          if (startMonth === 1) {
-            endYear = currentYear
-            endMonth = 12
-          } else {
-            endYear = currentYear + 1
-            endMonth = startMonth - 1
-          }
-          const lastDay = new Date(endYear, endMonth, 0).getDate()
-          endStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-
-          periodName = startMonth === 1
-            ? `Räkenskapsår ${currentYear}`
-            : `Räkenskapsår ${currentYear}/${currentYear + 1}`
-        }
-
-        const validationError = validatePeriodDuration(startStr, endStr)
-        if (validationError) {
-          logError('fiscal period validation failed', { validationError, startStr, endStr })
-          toast({
-            title: 'Ogiltigt räkenskapsår',
-            description: translatePeriodError(validationError),
-            variant: 'destructive',
-          })
-          setCurrentStep(3)
-          return
-        }
-
-        // Clean up empty fiscal periods
-        const { data: existingPeriods } = await supabase
-          .from('fiscal_periods')
-          .select('id')
-          .eq('company_id', activeCompanyId)
-
-        if (existingPeriods && existingPeriods.length > 0) {
-          for (const ep of existingPeriods) {
-            const { count } = await supabase
-              .from('journal_entries')
-              .select('id', { count: 'exact', head: true })
-              .eq('fiscal_period_id', ep.id)
-
-            if (count === 0) {
-              await supabase.from('fiscal_periods').delete().eq('id', ep.id)
-            }
-          }
-        }
-
-        const { error: upsertError } = await supabase.from('fiscal_periods').upsert({
-          company_id: activeCompanyId,
-          name: periodName,
-          period_start: startStr,
-          period_end: endStr,
-        }, { onConflict: 'company_id,period_start,period_end' })
-
-        if (upsertError) {
-          logError('fiscal period upsert failed', { message: upsertError.message, startStr, endStr })
-        }
-      } catch (err) {
-        logError('fiscal period creation threw', { error: String(err) })
-        Sentry.captureException(err)
-      }
-    }
-
-    // Final step: mark complete, switch to new company, redirect
-    if (nextStep > totalSteps) {
-      const finalSuccess = await saveSettings({ onboarding_complete: true }, totalSteps)
-      if (!finalSuccess) {
-        logError('failed to set onboarding_complete')
         return
       }
 
-      // Update company name from settings
-      if (settings.company_name || stepData.company_name) {
-        await supabase
-          .from('companies')
-          .update({ name: settings.company_name || stepData.company_name })
-          .eq('id', activeCompanyId)
-      }
-
-      // Switch active company to the new one
-      await switchCompany(activeCompanyId)
-
+      console.log(LOG, 'created company', result.companyId)
       toast({
         title: 'Företag skapat!',
         description: 'Du har nu bytt till det nya företaget.',
       })
       router.push('/')
-    } else {
-      setCurrentStep(nextStep)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      logError('create company action threw', { error: message })
+      Sentry.captureException(err)
+      toast({ title: 'Fel', description: 'Ett oväntat fel uppstod. Försök igen.', variant: 'destructive' })
+    } finally {
+      setIsSaving(false)
     }
   }
 
