@@ -1,4 +1,4 @@
-import { validatePeriodDuration } from '@/lib/bookkeeping/validate-period-duration'
+import { parseDateParts, validatePeriodDuration } from '@/lib/bookkeeping/validate-period-duration'
 import type { CompanySettings } from '@/types'
 
 export interface ComputedFiscalPeriod {
@@ -31,8 +31,8 @@ export function computeFiscalPeriod(
   if (isFirstYear && firstYearStart && firstYearEnd) {
     startStr = firstYearStart
     endStr = firstYearEnd
-    const startYear = new Date(firstYearStart).getFullYear()
-    const endYear = new Date(firstYearEnd).getFullYear()
+    const startYear = parseDateParts(firstYearStart).year
+    const endYear = parseDateParts(firstYearEnd).year
     periodName = startYear === endYear
       ? `Första räkenskapsåret ${startYear}`
       : `Första räkenskapsåret ${startYear}/${endYear}`
