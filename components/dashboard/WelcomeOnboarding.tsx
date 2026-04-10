@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/lib/supabase/client'
 import { createCompanyFromOnboarding } from '@/lib/company/actions'
+import { computeFiscalPeriod } from '@/lib/company/compute-fiscal-period'
 import { useToast } from '@/components/ui/use-toast'
 import { Loader2, Building2, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { validatePeriodDuration } from '@/lib/bookkeeping/validate-period-duration'
 import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
 import type { CompanyLookupResult, EnrichmentCompanyRole } from '@/lib/company-lookup/types'
 import type { CompanySettings, EntityType, MomsPeriod } from '@/types'
@@ -39,54 +39,6 @@ function translatePeriodError(msg: string): string {
   if (msg.includes('end must be the last day')) return 'Slutdatumet måste vara sista dagen i en månad.'
   if (msg.includes('exceeds maximum 18 months')) return 'Räkenskapsåret får inte överstiga 18 månader (BFL 3 kap.).'
   return 'Ogiltigt räkenskapsår. Kontrollera datumen och försök igen.'
-}
-
-function computeFiscalPeriod(s: Partial<CompanySettings> & Record<string, unknown>) {
-  const isFirstYear = s.is_first_fiscal_year as boolean | undefined
-  const firstYearStart = s.first_year_start as string | undefined
-  const firstYearEnd = s.first_year_end as string | undefined
-
-  let startStr: string
-  let endStr: string
-  let periodName: string
-
-  if (isFirstYear && firstYearStart && firstYearEnd) {
-    startStr = firstYearStart
-    endStr = firstYearEnd
-    const startYear = new Date(firstYearStart).getFullYear()
-    const endYear = new Date(firstYearEnd).getFullYear()
-    periodName = startYear === endYear
-      ? `Första räkenskapsåret ${startYear}`
-      : `Första räkenskapsåret ${startYear}/${endYear}`
-  } else {
-    let startMonth = (s.fiscal_year_start_month as number) || 1
-    if (s.entity_type === 'enskild_firma') startMonth = 1
-    const currentYear = new Date().getFullYear()
-    startStr = `${currentYear}-${String(startMonth).padStart(2, '0')}-01`
-
-    let endYear: number
-    let endMonth: number
-    if (startMonth === 1) {
-      endYear = currentYear
-      endMonth = 12
-    } else {
-      endYear = currentYear + 1
-      endMonth = startMonth - 1
-    }
-    const lastDay = new Date(endYear, endMonth, 0).getDate()
-    endStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-
-    periodName = startMonth === 1
-      ? `Räkenskapsår ${currentYear}`
-      : `Räkenskapsår ${currentYear}/${currentYear + 1}`
-  }
-
-  const validationError = validatePeriodDuration(startStr, endStr, { isFirstPeriod: !!isFirstYear })
-  if (validationError) {
-    return { error: validationError, startStr: '', endStr: '', periodName: '' }
-  }
-
-  return { error: null, startStr, endStr, periodName }
 }
 
 const LOG = '[welcome-onboarding]'

@@ -239,24 +239,20 @@ export default function JournalEntryForm({
 
     const url = submitUrl ?? '/api/bookkeeping/journal-entries'
 
-    const payload = {
-      fiscal_period_id: selectedPeriod,
-      entry_date: entryDate,
-      description,
-      source_type: sourceType ?? 'manual',
-      source_id: sourceId,
-      lines: entryLines,
-    }
-    console.log('[JournalEntryForm] submitting:', JSON.stringify(payload, null, 2))
-
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        fiscal_period_id: selectedPeriod,
+        entry_date: entryDate,
+        description,
+        source_type: sourceType ?? 'manual',
+        source_id: sourceId,
+        lines: entryLines,
+      }),
     })
 
     const result = await res.json()
-    console.log('[JournalEntryForm] response:', res.status, JSON.stringify(result, null, 2))
 
     if (result.error) {
       toast({
