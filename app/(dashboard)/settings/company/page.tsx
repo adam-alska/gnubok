@@ -1,5 +1,6 @@
 'use client'
 
+import { CompanyDangerZone } from '@/components/settings/CompanyDangerZone'
 import { CompanyInfoForm } from '@/components/settings/CompanyInfoForm'
 import { CompanyMembersSection } from '@/components/settings/CompanyMembersSection'
 import { LogoUpload } from '@/components/settings/LogoUpload'
@@ -49,6 +50,8 @@ export default function CompanySettingsPage() {
       <div className="border-t border-border/8 pt-8">
         <CompanyMembersSection />
       </div>
+
+      <CompanyDangerZone />
     </div>
   )
 }

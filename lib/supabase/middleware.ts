@@ -99,12 +99,32 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
+  // Forward the pathname so server layouts can branch on it (e.g. render a
+  // no-company shell for /settings/account).
+  supabaseResponse.headers.set('x-pathname', pathname)
+
   // Company context resolution
+  const cookieCompanyId = request.cookies.get('gnubok-company-id')?.value
   const companyId = await resolveCompanyForMiddleware(supabase, user.id, request)
 
-  // No companies — only allow /onboarding, redirect everything else there
+  // If the cookie pointed at a company we can no longer resolve (e.g.
+  // archived), clear it so the browser stops sending it.
+  if (cookieCompanyId && cookieCompanyId !== companyId) {
+    supabaseResponse.cookies.set('gnubok-company-id', '', { path: '/', maxAge: 0 })
+  }
+
+  // Routes that stay accessible when the user has no active company.
+  // Needed so a user who archived their last company can still delete
+  // their account without being trapped on /onboarding forever.
+  const isNoCompanyAllowed =
+    pathname.startsWith('/onboarding') ||
+    pathname.startsWith('/settings/account') ||
+    pathname.startsWith('/api/account/') ||
+    pathname.startsWith('/api/company')
+
+  // No companies — redirect to onboarding, but allow the escape-hatch routes
   if (!companyId) {
-    if (pathname.startsWith('/onboarding')) {
+    if (isNoCompanyAllowed) {
       return supabaseResponse
     }
     return NextResponse.redirect(new URL('/onboarding', request.url))
@@ -131,6 +151,11 @@ export async function updateSession(request: NextRequest) {
  * Resolve the active company for the authenticated user.
  * Uses cookie → user_preferences → first membership as fallback.
  * Cannot use lib/company/context.ts because middleware runs on Edge.
+ *
+ * All three lookups filter out archived (soft-deleted) companies via an
+ * inner join on companies + archived_at IS NULL — otherwise deleted
+ * companies would reappear any time the cookie or user_preferences still
+ * pointed at them.
  */
 async function resolveCompanyForMiddleware(
   supabase: ReturnType<typeof createServerClient>,
@@ -142,9 +167,10 @@ async function resolveCompanyForMiddleware(
   if (cookieCompanyId) {
     const { data: membership } = await supabase
       .from('company_members')
-      .select('company_id')
+      .select('company_id, companies!inner(archived_at)')
       .eq('company_id', cookieCompanyId)
       .eq('user_id', userId)
+      .is('companies.archived_at', null)
       .single()
 
     if (membership) return membership.company_id
@@ -160,19 +186,21 @@ async function resolveCompanyForMiddleware(
   if (prefs?.active_company_id) {
     const { data: membership } = await supabase
       .from('company_members')
-      .select('company_id')
+      .select('company_id, companies!inner(archived_at)')
       .eq('company_id', prefs.active_company_id)
       .eq('user_id', userId)
+      .is('companies.archived_at', null)
       .single()
 
     if (membership) return membership.company_id
   }
 
-  // 3. Fallback: first company membership
+  // 3. Fallback: first non-archived membership by created_at
   const { data: firstCompany } = await supabase
     .from('company_members')
-    .select('company_id')
+    .select('company_id, companies!inner(archived_at)')
     .eq('user_id', userId)
+    .is('companies.archived_at', null)
     .order('created_at', { ascending: true })
     .limit(1)
     .single()

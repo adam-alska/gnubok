@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,36 +15,88 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { AlertTriangle, ExternalLink, Loader2 } from 'lucide-react'
+import { RetentionNotice } from '@/components/ui/retention-notice'
+import { ExternalLink, Loader2 } from 'lucide-react'
 import { SupportLink } from '@/components/ui/support-link'
+
+interface Blocker {
+  id: string
+  name: string
+}
 
 export function AccountDangerZone() {
   const router = useRouter()
+  const [email, setEmail] = useState<string | null>(null)
+  const [blockers, setBlockers] = useState<Blocker[]>([])
+  const [blockersLoading, setBlockersLoading] = useState(true)
   const [showDialog, setShowDialog] = useState(false)
   const [confirmText, setConfirmText] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!cancelled) setEmail(user?.email ?? null)
+
+      try {
+        const res = await fetch('/api/company?owned=true&archived=false')
+        if (res.ok) {
+          const body = await res.json()
+          if (!cancelled) setBlockers(body.data ?? [])
+        }
+      } finally {
+        if (!cancelled) setBlockersLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   async function handleDelete() {
-    if (confirmText !== 'RADERA') return
+    if (!email) return
+    if (confirmText.trim().toLowerCase() !== email.toLowerCase()) return
+
     setIsDeleting(true)
+    setError(null)
 
     try {
       const response = await fetch('/api/account/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirm: 'RADERA' }),
+        body: JSON.stringify({ confirm_email: email }),
       })
 
+      if (response.status === 409) {
+        const body = await response.json()
+        // Precondition tripped mid-flow — refresh the list and show inline.
+        setBlockers(body.blockers ?? [])
+        setError(body.error || 'Du måste radera eller överlåta dina företag först.')
+        setIsDeleting(false)
+        setShowDialog(false)
+        return
+      }
+
       if (!response.ok) {
-        const result = await response.json()
-        throw new Error(result.error || 'Kunde inte radera kontot')
+        const body = await response.json().catch(() => ({}))
+        throw new Error(body.error || 'Kunde inte radera kontot')
       }
 
       router.push('/login')
-    } catch {
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Kunde inte radera kontot')
       setIsDeleting(false)
     }
   }
+
+  const hasBlockers = blockers.length > 0
+  const canDelete = !hasBlockers && !blockersLoading
 
   return (
     <>
@@ -52,25 +105,38 @@ export function AccountDangerZone() {
           Radera konto
         </h2>
 
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-          <div className="flex gap-3">
-            <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-            <div className="space-y-2 text-sm">
-              <p className="font-medium text-destructive">Denna åtgärd kan inte ångras</p>
-              <p className="text-muted-foreground">
-                All din data raderas permanent — bokföring, fakturor, verifikationer, dokument och inställningar.
-              </p>
-              <p className="text-muted-foreground">
-                Enligt bokföringslagen (BFL 7 kap. 2§) ska räkenskapsinformation bevaras i 7 år.
-                Du ansvarar själv för att exportera och arkivera din bokföringsdata.
-              </p>
-              <p className="text-muted-foreground">
-                Har du frågor?{' '}
-                <SupportLink variant="inline" subject="Fråga om kontoradering" />
-              </p>
-            </div>
+        {hasBlockers && (
+          <div className="rounded-lg border border-border/60 bg-muted/30 p-4 space-y-3">
+            <p className="text-sm font-medium">Företag du äger</p>
+            <p className="text-sm text-muted-foreground">
+              Radera eller överlåt alla företag innan du raderar kontot.
+            </p>
+            <ul className="space-y-2">
+              {blockers.map((b) => (
+                <li
+                  key={b.id}
+                  className="flex items-center justify-between rounded-md border border-border/40 bg-background px-3 py-2"
+                >
+                  <span className="text-sm font-medium">{b.name}</span>
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link href="/settings/company">Hantera</Link>
+                  </Button>
+                </li>
+              ))}
+            </ul>
           </div>
-        </div>
+        )}
+
+        <RetentionNotice variant="account" />
+
+        <p className="text-sm text-muted-foreground">
+          Har du frågor?{' '}
+          <SupportLink variant="inline" subject="Fråga om kontoradering" />
+        </p>
+
+        {error && !showDialog && (
+          <p className="text-sm text-destructive">{error}</p>
+        )}
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Button variant="outline" className="w-full sm:w-auto" asChild>
@@ -83,37 +149,54 @@ export function AccountDangerZone() {
             variant="destructive"
             className="w-full sm:w-auto"
             onClick={() => setShowDialog(true)}
+            disabled={!canDelete}
           >
             Radera mitt konto
           </Button>
         </div>
       </section>
 
-      <Dialog open={showDialog} onOpenChange={(open) => {
-        setShowDialog(open)
-        if (!open) setConfirmText('')
-      }}>
+      <Dialog
+        open={showDialog}
+        onOpenChange={(open) => {
+          if (isDeleting) return
+          setShowDialog(open)
+          if (!open) {
+            setConfirmText('')
+            setError(null)
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Radera konto permanent</DialogTitle>
+            <DialogTitle>Radera konto</DialogTitle>
             <DialogDescription>
-              All din data raderas permanent. Skriv <strong>RADERA</strong> nedan för att bekräfta.
+              Ditt konto avidentifieras och du loggas ut från alla enheter.
+              Räkenskapsinformation från företag du ägt behålls säkert i 7 år enligt BFL.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <Label htmlFor="delete-confirm">Bekräfta genom att skriva RADERA</Label>
+            <Label htmlFor="delete-confirm">
+              Skriv din e-postadress (<strong>{email}</strong>) för att bekräfta
+            </Label>
             <Input
               id="delete-confirm"
+              type="email"
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}
-              placeholder="RADERA"
+              placeholder={email ?? ''}
               autoComplete="off"
             />
+            {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => { setShowDialog(false); setConfirmText('') }}
+              onClick={() => {
+                setShowDialog(false)
+                setConfirmText('')
+                setError(null)
+              }}
               disabled={isDeleting}
             >
               Avbryt
@@ -121,7 +204,11 @@ export function AccountDangerZone() {
             <Button
               variant="destructive"
               onClick={handleDelete}
-              disabled={confirmText !== 'RADERA' || isDeleting}
+              disabled={
+                !email ||
+                confirmText.trim().toLowerCase() !== email.toLowerCase() ||
+                isDeleting
+              }
             >
               {isDeleting ? (
                 <>
@@ -129,7 +216,7 @@ export function AccountDangerZone() {
                   Raderar...
                 </>
               ) : (
-                'Radera permanent'
+                'Radera konto'
               )}
             </Button>
           </DialogFooter>

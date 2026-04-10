@@ -89,11 +89,19 @@ export default function CompanySwitcher() {
 
   // Always allow opening the dropdown (to show "Lägg till företag")
   const hasMultiple = companies.length > 1
-  const canOpen = companies.length > 0
 
-  // No companies yet — hide the switcher entirely
+  // No companies yet — show a direct "Lägg till företag" link instead of
+  // the switcher so the user can still create one.
   if (!company && companies.length === 0) {
-    return null
+    return (
+      <Link
+        href="/onboarding"
+        className="flex items-center gap-2 w-full text-left rounded-lg border border-dashed border-border/60 hover:border-foreground/30 hover:bg-muted/40 -mx-1 px-2 py-1.5 transition-all duration-150"
+      >
+        <Plus className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+        <span className="text-[13px] text-muted-foreground truncate">Lägg till företag</span>
+      </Link>
+    )
   }
 
   return (

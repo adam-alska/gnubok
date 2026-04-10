@@ -30,6 +30,7 @@ import {
 import { resolveIcon } from '@/lib/extensions/icon-resolver'
 import { SupportLink } from '@/components/ui/support-link'
 import CompanySwitcher from '@/components/dashboard/CompanySwitcher'
+import { useCompany } from '@/contexts/CompanyContext'
 import type { EntityType } from '@/types'
 
 interface ExtensionNavItem {
@@ -87,13 +88,23 @@ const groupLabels: Record<string, string> = {
   övrigt: 'Övrigt',
 }
 
-export default function DashboardNav({ companyName, entityType, uncategorizedTransactionCount = 0, pendingOperationsCount = 0, isSandbox = false, extensionNavItems = [] }: DashboardNavProps) {
+export default function DashboardNav({ companyName: _companyName, entityType, uncategorizedTransactionCount = 0, pendingOperationsCount = 0, isSandbox = false, extensionNavItems = [] }: DashboardNavProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+  const { company } = useCompany()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isClosing, setIsClosing] = useState(false)
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // When the user has no active company (e.g. just archived their last
+  // one), every company-scoped route is unreachable. We keep them visible
+  // so the sidebar doesn't collapse, but render them as disabled.
+  // Only /settings remains navigable — from there the user can either
+  // create a new company or delete their account.
+  const hasCompany = !!company
+  const ALWAYS_ENABLED = new Set(['/settings'])
+  const isItemEnabled = (href: string) => hasCompany || ALWAYS_ENABLED.has(href)
   // Auto-expand Övrigt when the user is on one of its pages, or when manually toggled
   const isOnOvrigtPage = ['/help', '/settings', '/e/'].some(p => pathname.startsWith(p))
   const [manualOvrigtExpanded, setManualOvrigtExpanded] = useState(false)
@@ -175,23 +186,40 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                   {mainItems.map((item) => {
                     const Icon = item.icon
                     const active = isActive(item.href)
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={cn(
-                          'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
-                          active
-                            ? 'bg-primary/12 text-foreground font-medium'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-                        )}
-                      >
+                    const enabled = isItemEnabled(item.href)
+                    const content = (
+                      <>
                         <Icon className={cn(
                           "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
                           active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
                         )} />
                         {item.label}
+                      </>
+                    )
+                    const baseClass = cn(
+                      'group flex items-center px-3 py-[7px] text-[13px] rounded-lg',
+                      enabled
+                        ? cn(
+                            'transition-colors duration-150',
+                            active
+                              ? 'bg-primary/12 text-foreground font-medium'
+                              : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                          )
+                        : 'text-muted-foreground/40 cursor-not-allowed'
+                    )
+                    return enabled ? (
+                      <Link key={item.href} href={item.href} className={baseClass}>
+                        {content}
                       </Link>
+                    ) : (
+                      <div
+                        key={item.href}
+                        className={baseClass}
+                        aria-disabled="true"
+                        title="Lägg till ett företag för att aktivera"
+                      >
+                        {content}
+                      </div>
                     )
                   })}
                 </div>
@@ -207,22 +235,14 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                     {items.map((item) => {
                       const Icon = item.icon
                       const active = isActive(item.href)
+                      const enabled = isItemEnabled(item.href)
                       const badge = item.href === '/transactions' && uncategorizedTransactionCount > 0
                         ? uncategorizedTransactionCount
                         : item.href === '/pending' && pendingOperationsCount > 0
                           ? pendingOperationsCount
                           : null
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className={cn(
-                            'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
-                            active
-                              ? 'bg-primary/12 text-foreground font-medium'
-                              : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-                          )}
-                        >
+                      const content = (
+                        <>
                           <Icon className={cn(
                             "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
                             active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
@@ -233,7 +253,32 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                               {badge > 99 ? '99+' : badge}
                             </span>
                           )}
+                        </>
+                      )
+                      const baseClass = cn(
+                        'group flex items-center px-3 py-[7px] text-[13px] rounded-lg',
+                        enabled
+                          ? cn(
+                              'transition-colors duration-150',
+                              active
+                                ? 'bg-primary/12 text-foreground font-medium'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                            )
+                          : 'text-muted-foreground/40 cursor-not-allowed'
+                      )
+                      return enabled ? (
+                        <Link key={item.href} href={item.href} className={baseClass}>
+                          {content}
                         </Link>
+                      ) : (
+                        <div
+                          key={item.href}
+                          className={baseClass}
+                          aria-disabled="true"
+                          title="Lägg till ett företag för att aktivera"
+                        >
+                          {content}
+                        </div>
                       )
                     })}
                   </div>
@@ -257,45 +302,80 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                     {extensionNavItems.map((item) => {
                       const Icon = resolveIcon(item.icon)
                       const active = isActive(item.href)
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className={cn(
-                            'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
-                            active
-                              ? 'bg-primary/12 text-foreground font-medium'
-                              : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-                          )}
-                        >
+                      // Extension nav items are always company-scoped.
+                      const enabled = hasCompany
+                      const content = (
+                        <>
                           <Icon className={cn(
                             "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
                             active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
                           )} />
                           {item.label}
+                        </>
+                      )
+                      const baseClass = cn(
+                        'group flex items-center px-3 py-[7px] text-[13px] rounded-lg',
+                        enabled
+                          ? cn(
+                              'transition-colors duration-150',
+                              active
+                                ? 'bg-primary/12 text-foreground font-medium'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                            )
+                          : 'text-muted-foreground/40 cursor-not-allowed'
+                      )
+                      return enabled ? (
+                        <Link key={item.href} href={item.href} className={baseClass}>
+                          {content}
                         </Link>
+                      ) : (
+                        <div
+                          key={item.href}
+                          className={baseClass}
+                          aria-disabled="true"
+                          title="Lägg till ett företag för att aktivera"
+                        >
+                          {content}
+                        </div>
                       )
                     })}
                     {övrigtItems.map((item) => {
                       const Icon = item.icon
                       const active = isActive(item.href)
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className={cn(
-                            'group flex items-center px-3 py-[7px] text-[13px] transition-colors duration-150 rounded-lg',
-                            active
-                              ? 'bg-primary/12 text-foreground font-medium'
-                              : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-                          )}
-                        >
+                      const enabled = isItemEnabled(item.href)
+                      const content = (
+                        <>
                           <Icon className={cn(
                             "mr-2.5 h-[15px] w-[15px] flex-shrink-0",
                             active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
                           )} />
                           {item.label}
+                        </>
+                      )
+                      const baseClass = cn(
+                        'group flex items-center px-3 py-[7px] text-[13px] rounded-lg',
+                        enabled
+                          ? cn(
+                              'transition-colors duration-150',
+                              active
+                                ? 'bg-primary/12 text-foreground font-medium'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                            )
+                          : 'text-muted-foreground/40 cursor-not-allowed'
+                      )
+                      return enabled ? (
+                        <Link key={item.href} href={item.href} className={baseClass}>
+                          {content}
                         </Link>
+                      ) : (
+                        <div
+                          key={item.href}
+                          className={baseClass}
+                          aria-disabled="true"
+                          title="Lägg till ett företag för att aktivera"
+                        >
+                          {content}
+                        </div>
                       )
                     })}
                   </div>
@@ -327,21 +407,13 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
           {mobileNavItems.map((item) => {
             const Icon = item.icon
             const active = isActive(item.href)
+            const enabled = isItemEnabled(item.href)
             const badge = item.href === '/transactions' && uncategorizedTransactionCount > 0
               ? uncategorizedTransactionCount
               : null
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'relative flex flex-col items-center justify-center flex-1 h-full text-xs transition-colors duration-200',
-                  active
-                    ? 'text-primary'
-                    : 'text-muted-foreground'
-                )}
-              >
+            const content = (
+              <>
                 <div className="relative">
                   <Icon className={cn(
                     "h-5 w-5 mb-1",
@@ -357,7 +429,26 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                   "truncate",
                   active && "font-medium"
                 )}>{item.label}</span>
+              </>
+            )
+            const baseClass = cn(
+              'relative flex flex-col items-center justify-center flex-1 h-full text-xs',
+              enabled
+                ? cn(
+                    'transition-colors duration-200',
+                    active ? 'text-primary' : 'text-muted-foreground'
+                  )
+                : 'text-muted-foreground/40'
+            )
+
+            return enabled ? (
+              <Link key={item.href} href={item.href} className={baseClass}>
+                {content}
               </Link>
+            ) : (
+              <div key={item.href} className={baseClass} aria-disabled="true">
+                {content}
+              </div>
             )
           })}
           {/* Menu button */}
@@ -424,21 +515,37 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                 {mainItems.map((item) => {
                   const Icon = item.icon
                   const active = isActive(item.href)
-                  return (
+                  const enabled = isItemEnabled(item.href)
+                  const content = (
+                    <>
+                      <Icon className={cn("h-[18px] w-[18px] flex-shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+                      <span className="text-sm">{item.label}</span>
+                    </>
+                  )
+                  const baseClass = cn(
+                    'flex items-center gap-3 px-3 min-h-[44px] rounded-lg',
+                    enabled
+                      ? cn(
+                          'transition-colors',
+                          active
+                            ? 'bg-primary/10 text-primary font-medium'
+                            : 'text-foreground active:bg-muted/60'
+                        )
+                      : 'text-muted-foreground/40'
+                  )
+                  return enabled ? (
                     <Link
                       key={item.href}
                       href={item.href}
                       onClick={closeMobileMenu}
-                      className={cn(
-                        'flex items-center gap-3 px-3 min-h-[44px] rounded-lg transition-colors',
-                        active
-                          ? 'bg-primary/10 text-primary font-medium'
-                          : 'text-foreground active:bg-muted/60'
-                      )}
+                      className={baseClass}
                     >
-                      <Icon className={cn("h-[18px] w-[18px] flex-shrink-0", active ? "text-primary" : "text-muted-foreground")} />
-                      <span className="text-sm">{item.label}</span>
+                      {content}
                     </Link>
+                  ) : (
+                    <div key={item.href} className={baseClass} aria-disabled="true">
+                      {content}
+                    </div>
                   )
                 })}
               </div>
@@ -454,23 +561,14 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                     {items.map((item) => {
                       const Icon = item.icon
                       const active = isActive(item.href)
+                      const enabled = isItemEnabled(item.href)
                       const badge = item.href === '/transactions' && uncategorizedTransactionCount > 0
                         ? uncategorizedTransactionCount
                         : item.href === '/pending' && pendingOperationsCount > 0
                           ? pendingOperationsCount
                           : null
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          onClick={closeMobileMenu}
-                          className={cn(
-                            'flex items-center gap-3 px-3 min-h-[44px] rounded-lg transition-colors',
-                            active
-                              ? 'bg-primary/10 text-primary font-medium'
-                              : 'text-foreground active:bg-muted/60'
-                          )}
-                        >
+                      const content = (
+                        <>
                           <Icon className={cn("h-[18px] w-[18px] flex-shrink-0", active ? "text-primary" : "text-muted-foreground")} />
                           <span className="text-sm flex-1">{item.label}</span>
                           {badge !== null && (
@@ -478,7 +576,32 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                               {badge > 99 ? '99+' : badge}
                             </span>
                           )}
+                        </>
+                      )
+                      const baseClass = cn(
+                        'flex items-center gap-3 px-3 min-h-[44px] rounded-lg',
+                        enabled
+                          ? cn(
+                              'transition-colors',
+                              active
+                                ? 'bg-primary/10 text-primary font-medium'
+                                : 'text-foreground active:bg-muted/60'
+                            )
+                          : 'text-muted-foreground/40'
+                      )
+                      return enabled ? (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={closeMobileMenu}
+                          className={baseClass}
+                        >
+                          {content}
                         </Link>
+                      ) : (
+                        <div key={item.href} className={baseClass} aria-disabled="true">
+                          {content}
+                        </div>
                       )
                     })}
                   </div>
@@ -496,41 +619,73 @@ export default function DashboardNav({ companyName, entityType, uncategorizedTra
                 {extensionNavItems.map((item) => {
                   const Icon = resolveIcon(item.icon)
                   const active = isActive(item.href)
-                  return (
+                  const enabled = hasCompany
+                  const content = (
+                    <>
+                      <Icon className={cn("h-[18px] w-[18px] flex-shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+                      <span className="text-sm">{item.label}</span>
+                    </>
+                  )
+                  const baseClass = cn(
+                    'flex items-center gap-3 px-3 min-h-[44px] rounded-lg',
+                    enabled
+                      ? cn(
+                          'transition-colors',
+                          active
+                            ? 'bg-primary/10 text-primary font-medium'
+                            : 'text-foreground active:bg-muted/60'
+                        )
+                      : 'text-muted-foreground/40'
+                  )
+                  return enabled ? (
                     <Link
                       key={item.href}
                       href={item.href}
                       onClick={closeMobileMenu}
-                      className={cn(
-                        'flex items-center gap-3 px-3 min-h-[44px] rounded-lg transition-colors',
-                        active
-                          ? 'bg-primary/10 text-primary font-medium'
-                          : 'text-foreground active:bg-muted/60'
-                      )}
+                      className={baseClass}
                     >
-                      <Icon className={cn("h-[18px] w-[18px] flex-shrink-0", active ? "text-primary" : "text-muted-foreground")} />
-                      <span className="text-sm">{item.label}</span>
+                      {content}
                     </Link>
+                  ) : (
+                    <div key={item.href} className={baseClass} aria-disabled="true">
+                      {content}
+                    </div>
                   )
                 })}
                 {övrigtItems.map((item) => {
                   const Icon = item.icon
                   const active = isActive(item.href)
-                  return (
+                  const enabled = isItemEnabled(item.href)
+                  const content = (
+                    <>
+                      <Icon className={cn("h-[18px] w-[18px] flex-shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+                      <span className="text-sm">{item.label}</span>
+                    </>
+                  )
+                  const baseClass = cn(
+                    'flex items-center gap-3 px-3 min-h-[44px] rounded-lg',
+                    enabled
+                      ? cn(
+                          'transition-colors',
+                          active
+                            ? 'bg-primary/10 text-primary font-medium'
+                            : 'text-foreground active:bg-muted/60'
+                        )
+                      : 'text-muted-foreground/40'
+                  )
+                  return enabled ? (
                     <Link
                       key={item.href}
                       href={item.href}
                       onClick={closeMobileMenu}
-                      className={cn(
-                        'flex items-center gap-3 px-3 min-h-[44px] rounded-lg transition-colors',
-                        active
-                          ? 'bg-primary/10 text-primary font-medium'
-                          : 'text-foreground active:bg-muted/60'
-                      )}
+                      className={baseClass}
                     >
-                      <Icon className={cn("h-[18px] w-[18px] flex-shrink-0", active ? "text-primary" : "text-muted-foreground")} />
-                      <span className="text-sm">{item.label}</span>
+                      {content}
                     </Link>
+                  ) : (
+                    <div key={item.href} className={baseClass} aria-disabled="true">
+                      {content}
+                    </div>
                   )
                 })}
               </div>

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import DashboardNav from '@/components/dashboard/DashboardNav'
 import { RecaptIdentify } from '@/components/RecaptIdentify'
 import { SentryIdentify } from '@/components/SentryIdentify'
@@ -9,6 +9,13 @@ import { getExtensionNavItems } from '@/lib/extensions/sectors'
 import { CompanyProvider } from '@/contexts/CompanyContext'
 import { getActiveCompanyId } from '@/lib/company/context'
 import type { EntityType, CompanyRole, Team } from '@/types'
+
+/**
+ * Routes inside the dashboard group that must remain reachable when the
+ * user has no active company. Keep in sync with the middleware's
+ * no-company allowlist.
+ */
+const NO_COMPANY_ALLOWED_PATHS = ['/settings/account']
 
 export default async function DashboardLayout({
   children,
@@ -26,6 +33,13 @@ export default async function DashboardLayout({
   const cookieStore = await cookies()
   const companyId = cookieStore.get('gnubok-company-id')?.value
     ?? await getActiveCompanyId(supabase, user.id)
+
+  // Read the pathname forwarded by middleware so we can branch on it.
+  const headerStore = await headers()
+  const pathname = headerStore.get('x-pathname') ?? ''
+  const isNoCompanyAllowed = NO_COMPANY_ALLOWED_PATHS.some((p) =>
+    pathname.startsWith(p)
+  )
 
   // Fetch team membership + team info
   const { data: teamMembership } = await supabase
@@ -47,9 +61,46 @@ export default async function DashboardLayout({
 
   const isTeamMember = !!teamMembership
 
-  // No companies — redirect to onboarding
+  // No companies — redirect to onboarding, except for allowed escape-hatch
+  // routes (so the user can still reach /settings/account to delete their
+  // account after archiving their last company).
   if (!companyId) {
-    redirect('/onboarding')
+    if (!isNoCompanyAllowed) {
+      redirect('/onboarding')
+    }
+
+    return (
+      <CompanyProvider
+        value={{
+          company: null,
+          role: null,
+          companies: [],
+          isTeamMember,
+          team,
+        }}
+      >
+        <div className="min-h-screen bg-background">
+          <DashboardNav
+            companyName="gnubok"
+            entityType="enskild_firma"
+            uncategorizedTransactionCount={0}
+            pendingOperationsCount={0}
+            isSandbox={false}
+            extensionNavItems={getExtensionNavItems()}
+          />
+          <main
+            id="main-content"
+            className="safe-area-main-padding md:!pb-0 md:pl-[232px]"
+            role="main"
+          >
+            <div className="max-w-5xl mx-auto px-5 py-8 md:px-8 md:py-10">
+              {children}
+            </div>
+          </main>
+          <SentryIdentify userId={user.id} email={user.email} />
+        </div>
+      </CompanyProvider>
+    )
   }
 
   // Fetch company + membership for context provider
