@@ -68,8 +68,18 @@ export async function PATCH(
     const newStart = body.period_start || period.period_start
     const newEnd = body.period_end || period.period_end
 
+    // First period for this company may start on any day (BFL 3 kap.)
+    const { count: earlierCount } = await supabase
+      .from('fiscal_periods')
+      .select('id', { count: 'exact', head: true })
+      .eq('company_id', companyId)
+      .neq('id', id)
+      .lt('period_start', newStart)
+
+    const isFirstPeriod = !earlierCount || earlierCount === 0
+
     // Validate period duration (max 18 months per BFL 3 kap.)
-    const durationError = validatePeriodDuration(newStart, newEnd)
+    const durationError = validatePeriodDuration(newStart, newEnd, { isFirstPeriod })
     if (durationError) {
       return NextResponse.json({ error: durationError }, { status: 400 })
     }
@@ -111,11 +121,11 @@ export async function PATCH(
     .single()
 
   if (updateError) {
-    // Database CHECK constraints will catch invalid month boundaries
+    // Database trigger/constraint will catch invalid month boundaries
     const msg = updateError.message
-    if (msg.includes('period_start') || msg.includes('period_end')) {
+    if (msg.includes('period_start') || msg.includes('period_end') || msg.includes('first of a month') || msg.includes('1st of a month')) {
       return NextResponse.json(
-        { error: 'Perioden måste börja den 1:a i en månad och sluta sista dagen i en månad' },
+        { error: 'Perioden måste sluta sista dagen i en månad. Efterföljande perioder måste börja den 1:a.' },
         { status: 400 }
       )
     }

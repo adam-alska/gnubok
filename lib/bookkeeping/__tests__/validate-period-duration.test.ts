@@ -48,10 +48,40 @@ describe('validatePeriodDuration', () => {
     )
   })
 
-  it('returns error when start is not 1st of month', () => {
+  it('returns error when start is not 1st of month (default)', () => {
     expect(validatePeriodDuration('2025-01-15', '2025-12-31')).toBe(
       'Period start must be the 1st of a month'
     )
+  })
+
+  it('returns error when start is not 1st of month (isFirstPeriod: false)', () => {
+    expect(validatePeriodDuration('2025-03-25', '2025-12-31', { isFirstPeriod: false })).toBe(
+      'Period start must be the 1st of a month'
+    )
+  })
+
+  it('allows mid-month start for first fiscal period', () => {
+    expect(validatePeriodDuration('2025-03-25', '2025-12-31', { isFirstPeriod: true })).toBeNull()
+  })
+
+  it('allows mid-month start for first period (October)', () => {
+    expect(validatePeriodDuration('2025-10-15', '2025-12-31', { isFirstPeriod: true })).toBeNull()
+  })
+
+  it('still allows day-1 start for first period', () => {
+    expect(validatePeriodDuration('2025-10-01', '2025-12-31', { isFirstPeriod: true })).toBeNull()
+  })
+
+  it('enforces end-of-month even for first period', () => {
+    expect(validatePeriodDuration('2025-03-25', '2025-12-15', { isFirstPeriod: true })).toBe(
+      'Period end must be the last day of a month'
+    )
+  })
+
+  it('enforces 18-month max for first period with mid-month start', () => {
+    const result = validatePeriodDuration('2025-01-15', '2026-12-31', { isFirstPeriod: true })
+    expect(result).toContain('months')
+    expect(result).toContain('18 months')
   })
 
   it('returns error when end is not last day of month', () => {

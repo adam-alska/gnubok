@@ -17,7 +17,8 @@ export function parseDateParts(dateStr: string): { year: number; month: number; 
 
 /**
  * Calculate the number of months between two dates (inclusive of partial months).
- * Assumes start is 1st of month and end is last of month.
+ * Uses year/month arithmetic only — a mid-month start counts the start month fully,
+ * which is conservative for the 18-month cap check.
  */
 export function monthsBetween(start: string, end: string): number {
   const s = parseDateParts(start)
@@ -25,11 +26,16 @@ export function monthsBetween(start: string, end: string): number {
   return (e.year - s.year) * 12 + (e.month - s.month) + 1
 }
 
+export interface ValidatePeriodOptions {
+  /** Allow any start day (not just 1st of month) for the first fiscal period per BFL 3 kap. */
+  isFirstPeriod?: boolean
+}
+
 /**
  * Validate a fiscal period's duration and date constraints.
  * Returns null if valid, or an error message string if invalid.
  */
-export function validatePeriodDuration(start: string, end: string): string | null {
+export function validatePeriodDuration(start: string, end: string, options?: ValidatePeriodOptions): string | null {
   const startParts = parseDateParts(start)
   const endParts = parseDateParts(end)
 
@@ -38,8 +44,8 @@ export function validatePeriodDuration(start: string, end: string): string | nul
     return 'Period end must be after period start'
   }
 
-  // start must be 1st of month
-  if (startParts.day !== 1) {
+  // start must be 1st of month — unless this is the first fiscal period (BFL 3 kap.)
+  if (startParts.day !== 1 && !options?.isFirstPeriod) {
     return 'Period start must be the 1st of a month'
   }
 

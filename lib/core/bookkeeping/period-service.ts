@@ -162,8 +162,8 @@ export async function createNextPeriod(
   const nextStartStr = nextStart.toISOString().split('T')[0]
   const nextEndStr = nextEnd.toISOString().split('T')[0]
 
-  // Validate period duration (max 18 months per BFL 3 kap.)
-  const durationError = validatePeriodDuration(nextStartStr, nextEndStr)
+  // Validate period duration — subsequent periods always start on 1st of month
+  const durationError = validatePeriodDuration(nextStartStr, nextEndStr, { isFirstPeriod: false })
   if (durationError) {
     throw new Error(durationError)
   }
