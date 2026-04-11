@@ -19,7 +19,7 @@ export async function DELETE(
   // Fetch the transaction with ownership check
   const { data: transaction, error: fetchError } = await supabase
     .from('transactions')
-    .select('id, journal_entry_id, bank_connection_id, import_source')
+    .select('id, journal_entry_id')
     .eq('id', id)
     .eq('company_id', companyId)
     .single()
@@ -28,22 +28,10 @@ export async function DELETE(
     return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
   }
 
-  // Guard: only manually added, unbooked transactions can be deleted
+  // Guard: only unbooked transactions can be deleted
   if (transaction.journal_entry_id) {
     return NextResponse.json(
       { error: 'Cannot delete a booked transaction. Use reversal (storno) instead.' },
-      { status: 409 }
-    )
-  }
-  if (transaction.bank_connection_id) {
-    return NextResponse.json(
-      { error: 'Cannot delete a bank-synced transaction' },
-      { status: 409 }
-    )
-  }
-  if (transaction.import_source) {
-    return NextResponse.json(
-      { error: 'Cannot delete an imported transaction' },
       { status: 409 }
     )
   }

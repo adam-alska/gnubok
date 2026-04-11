@@ -43,6 +43,14 @@ const SEB_CSV = [
   '2024-01-13;2024-01-13;12347;LÖNEUTBETALNING;25000,00;12877,17',
 ].join('\n')
 
+// SEB privatbanken web export: "Bokföringsdatum" (with ö AND -datum suffix)
+const SEB_PRIVAT_CSV = [
+  'Bokföringsdatum;Valutadatum;Verifikationsnummer;Text;Belopp;Saldo',
+  '2025-12-30;2025-12-31;0;RÄNTA;7,84;1241,16',
+  '2025-09-15;2025-09-14;5490990004;53290171515;-1000,00;1233,32',
+  '2024-10-31;2024-10-31;5841990687;H31520956893;433,16;5147,56',
+].join('\n')
+
 const SWEDBANK_CSV = [
   'Kontouppgifter',
   'Clearingnummer,Kontonummer,Datum,Text,Belopp,Saldo',
@@ -710,6 +718,33 @@ describe('parseBankFile — SEB format', () => {
     expect(result.format).toBe('seb')
     expect(result.transactions).toHaveLength(1)
     expect(result.transactions[0].amount).toBe(-50)
+  })
+
+  it('auto-detects SEB privatbanken variant with Bokföringsdatum + Valutadatum headers', () => {
+    const format = detectFileFormat(SEB_PRIVAT_CSV, 'kontoutdrag.csv')
+    expect(format).not.toBeNull()
+    expect(format!.id).toBe('seb')
+  })
+
+  it('parses SEB privatbanken CSV (Bokföringsdatum / Valutadatum / RÄNTA / negative amounts)', () => {
+    const result = parseBankFile(SEB_PRIVAT_CSV, 'kontoutdrag.csv')
+
+    expect(result.format).toBe('seb')
+    expect(result.transactions).toHaveLength(3)
+    expect(result.issues).toHaveLength(0)
+
+    const ranta = result.transactions[0]
+    expect(ranta.date).toBe('2025-12-30')
+    expect(ranta.description).toBe('RÄNTA')
+    expect(ranta.amount).toBe(7.84)
+    expect(ranta.balance).toBe(1241.16)
+
+    const withdrawal = result.transactions[1]
+    expect(withdrawal.date).toBe('2025-09-15')
+    expect(withdrawal.amount).toBe(-1000)
+
+    const deposit = result.transactions[2]
+    expect(deposit.amount).toBe(433.16)
   })
 })
 

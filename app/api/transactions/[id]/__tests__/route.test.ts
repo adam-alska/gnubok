@@ -60,28 +60,30 @@ describe('DELETE /api/transactions/[id]', () => {
     expect(body.error).toContain('booked')
   })
 
-  it('returns 409 when transaction is bank-synced', async () => {
+  it('allows deleting unbooked bank-synced transactions', async () => {
     const tx = makeTransaction({ bank_connection_id: 'bc-1', journal_entry_id: null, import_source: null })
-    enqueue({ data: tx, error: null })
+    enqueue({ data: tx, error: null }) // fetch
+    enqueue({ data: null, error: null }) // delete
 
     const request = new Request('http://localhost/api/transactions/tx-1', { method: 'DELETE' })
     const response = await DELETE(request, createMockRouteParams({ id: 'tx-1' }))
-    const { status, body } = await parseJsonResponse<{ error: string }>(response)
+    const { status, body } = await parseJsonResponse(response)
 
-    expect(status).toBe(409)
-    expect(body.error).toContain('bank-synced')
+    expect(status).toBe(200)
+    expect(body).toEqual({ success: true })
   })
 
-  it('returns 409 when transaction was imported', async () => {
+  it('allows deleting unbooked imported transactions', async () => {
     const tx = makeTransaction({ import_source: 'csv_nordea', journal_entry_id: null, bank_connection_id: null })
-    enqueue({ data: tx, error: null })
+    enqueue({ data: tx, error: null }) // fetch
+    enqueue({ data: null, error: null }) // delete
 
     const request = new Request('http://localhost/api/transactions/tx-1', { method: 'DELETE' })
     const response = await DELETE(request, createMockRouteParams({ id: 'tx-1' }))
-    const { status, body } = await parseJsonResponse<{ error: string }>(response)
+    const { status, body } = await parseJsonResponse(response)
 
-    expect(status).toBe(409)
-    expect(body.error).toContain('imported')
+    expect(status).toBe(200)
+    expect(body).toEqual({ success: true })
   })
 
   it('deletes a manually added unbooked transaction', async () => {

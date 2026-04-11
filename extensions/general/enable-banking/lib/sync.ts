@@ -76,7 +76,7 @@ export async function syncAccountTransactions(
     description: tx.description || tx.counterparty_name || 'Unknown',
     amount: tx.amount,
     currency: tx.currency || account.currency,
-    external_id: `${connectionId}_${tx.id}`,
+    external_id: `eb_${account.iban || account.uid}_${tx.id}`,
     mcc_code: tx.merchant_category_code ? parseInt(tx.merchant_category_code, 10) : null,
     merchant_name: tx.counterparty_name || null,
     reference: tx.reference || null,

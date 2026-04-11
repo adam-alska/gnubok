@@ -42,16 +42,23 @@ export default function LoginPage() {
     return () => clearInterval(interval)
   }, [resetCooldownUntil])
 
+  const [bankIdUnavailable, setBankIdUnavailable] = useState(false)
+
   const handleBankIdComplete = async (result: BankIdResult) => {
     if (result.error === 'no_account') {
       setBankIdNoAccount({ givenName: result.givenName, surname: result.surname })
       return
     }
 
+    if (result.error === 'service_unavailable') {
+      setBankIdUnavailable(true)
+      return
+    }
+
     if (result.error) {
       toast({
         title: 'Inloggning misslyckades',
-        description: 'Kunde inte slutfora BankID-inloggningen.',
+        description: 'Kunde inte slutföra BankID-inloggningen.',
         variant: 'destructive',
       })
       return
@@ -375,6 +382,24 @@ export default function LoginPage() {
                 </div>
               </div>
             </>
+          )}
+          {bankIdUnavailable && (
+            <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/30">
+              <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                Har du inget lösenord?
+              </p>
+              <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                Om du skapade ditt konto med BankID kan du använda{' '}
+                <button
+                  type="button"
+                  onClick={() => setShowResetPassword(true)}
+                  className="font-medium underline underline-offset-2"
+                >
+                  &quot;Glömt lösenord?&quot;
+                </button>{' '}
+                för att få en inloggningslänk via e-post.
+              </p>
+            </div>
           )}
           <form onSubmit={handlePasswordLogin} className="space-y-5">
             <div className="space-y-2">
