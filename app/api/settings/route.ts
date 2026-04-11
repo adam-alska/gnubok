@@ -34,7 +34,7 @@ export async function GET() {
       .eq('id', companyId)
       .single()
     if (company?.entity_type) {
-      data.entity_type = company.entity_type
+      data = { ...data, entity_type: company.entity_type }
     }
   }
 

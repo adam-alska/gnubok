@@ -717,11 +717,12 @@ export async function generateINK2Declaration(
   // Resolve entity_type: prefer company_settings, fall back to companies table (NOT NULL, always reliable)
   let entityType = settings?.entity_type
   if (!entityType) {
-    const { data: company } = await supabase
+    const { data: company, error: companyError } = await supabase
       .from('companies')
       .select('entity_type')
       .eq('id', companyId)
       .single()
+    if (companyError) throw new Error(`Failed to resolve entity type: ${companyError.message}`)
     entityType = company?.entity_type
   }
 
