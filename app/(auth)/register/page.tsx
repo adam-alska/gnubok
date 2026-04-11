@@ -60,7 +60,14 @@ function RegisterPageContent() {
       .catch(() => {})
   }, [searchParams])
 
+  const [bankIdUnavailable, setBankIdUnavailable] = useState(false)
+
   const handleBankIdComplete = (result: BankIdResult) => {
+    if (result.error === 'service_unavailable') {
+      setBankIdUnavailable(true)
+      return
+    }
+
     if (result.error) {
       toast({
         title: 'BankID misslyckades',
@@ -348,6 +355,14 @@ function RegisterPageContent() {
                 </div>
               </div>
             </>
+          )}
+
+          {bankIdUnavailable && !bankIdUser && (
+            <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/30">
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                Skapa konto med e-post och lösenord nedan istället. Du kan koppla BankID i inställningar senare.
+              </p>
+            </div>
           )}
 
           {bankIdUser ? (

@@ -60,7 +60,7 @@ export default function TransactionInboxCard({
   const isUncategorized = transaction.is_business === null && !transaction.journal_entry_id
   const showCheckbox = isBatchMode && isUncategorized
   const hasDocumentMatch = !!transaction.matched_inbox_item
-  const isManualTransaction = !transaction.bank_connection_id && !transaction.import_source && !transaction.journal_entry_id
+  const isDeletable = !transaction.journal_entry_id
 
   function handleSuggestionClick(suggestion: SuggestedCategory) {
     if (onOpenQuickReview) {
@@ -251,8 +251,8 @@ export default function TransactionInboxCard({
                 Välj mall...
               </Button>
 
-              {/* Delete button — only for manually added, unbooked transactions */}
-              {isManualTransaction && onDelete && (
+              {/* Delete button — available for all unbooked transactions */}
+              {isDeletable && onDelete && (
                 <Button
                   size="sm"
                   variant="ghost"

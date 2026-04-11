@@ -25,14 +25,13 @@ export const sebFormat: BankFileFormat = {
   detect(content: string, _filename: string): boolean {
     const prepared = prepareContent(content)
     const firstLine = prepared.split('\n')[0]?.toLowerCase() || ''
-    // SEB headers contain "bokföringsdag"/"bokforingsdatum" AND "valutadag"/"verifikationsnummer"
-    // The secondary check distinguishes SEB from Länsförsäkringar (which also has "bokföringsdag")
-    return (
-      firstLine.includes(';') &&
-      (firstLine.includes('bokföringsdag') ||
-        firstLine.includes('bokforingsdatum')) &&
-      (firstLine.includes('valutadag') || firstLine.includes('verifikationsnummer'))
-    )
+    // SEB uses semicolon delimiter. Header always has a bokföringsdag/bokföringsdatum
+    // column plus either valutadag/valutadatum or verifikationsnummer. The secondary
+    // check distinguishes SEB from Länsförsäkringar (which also has bokföringsdag).
+    const hasBookingDate = /bokf(ö|o)ringsda(g|tum)/.test(firstLine)
+    const hasSebSecondary =
+      /valuta(dag|datum)/.test(firstLine) || firstLine.includes('verifikationsnummer')
+    return firstLine.includes(';') && hasBookingDate && hasSebSecondary
   },
 
   parse(content: string): BankFileParseResult {
@@ -48,9 +47,7 @@ export const sebFormat: BankFileFormat = {
     const headers = headerLine.split(';').map((h) => h.trim().toLowerCase().replace(/"/g, ''))
 
     // Find column indices dynamically
-    const dateIdx = headers.findIndex(
-      (h) => h.includes('bokföringsdag') || h.includes('bokforingsdatum')
-    )
+    const dateIdx = headers.findIndex((h) => /bokf(ö|o)ringsda(g|tum)/.test(h))
     const descIdx = headers.findIndex(
       (h) => h.includes('text') || h.includes('mottagare') || h.includes('beskrivning')
     )

@@ -4,9 +4,12 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Image from 'next/image'
 import { BankIdQrCode } from './BankIdQrCode'
 import { Button } from '@/components/ui/button'
-import { Smartphone, Monitor } from 'lucide-react'
+import { Smartphone, Monitor, AlertTriangle } from 'lucide-react'
 
-type BankIdStatus = 'idle' | 'scanning' | 'complete' | 'failed' | 'no_account'
+type BankIdStatus = 'idle' | 'scanning' | 'complete' | 'failed' | 'no_account' | 'service_unavailable'
+
+/** Max consecutive poll failures before we declare service unavailable */
+const MAX_POLL_FAILURES = 3
 
 interface BankIdSession {
   sessionId: string
@@ -19,7 +22,7 @@ export interface BankIdResult {
   tokenHash?: string
   type?: string
   isNewUser?: boolean
-  error?: 'no_account' | 'already_linked' | 'session_invalid'
+  error?: 'no_account' | 'already_linked' | 'session_invalid' | 'service_unavailable'
   givenName?: string
   surname?: string
   sessionId?: string
@@ -53,6 +56,8 @@ export function BankIdAuth({ mode, onComplete }: BankIdAuthProps) {
   const onCompleteRef = useRef(onComplete)
   onCompleteRef.current = onComplete
 
+  const pollFailureCount = useRef(0)
+
   const cleanup = useCallback(() => {
     if (pollRef.current) {
       clearInterval(pollRef.current)
@@ -62,6 +67,7 @@ export function BankIdAuth({ mode, onComplete }: BankIdAuthProps) {
       abortRef.current.abort()
       abortRef.current = null
     }
+    pollFailureCount.current = 0
   }, [])
 
   useEffect(() => cleanup, [cleanup])
@@ -81,7 +87,14 @@ export function BankIdAuth({ mode, onComplete }: BankIdAuthProps) {
       const res = await fetch(`${API_BASE}/start`, { method: 'POST' })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'Failed to start BankID')
+        if (err.error === 'service_unavailable' || err.error === 'not_configured' || res.status === 502 || res.status === 503) {
+          cleanup()
+          setStatus('service_unavailable')
+          setErrorMessage('BankID-tjänsten är inte tillgänglig just nu')
+          onCompleteRef.current({ error: 'service_unavailable' })
+          return
+        }
+        throw new Error(err.message || err.error || 'Failed to start BankID')
       }
 
       const { data } = await res.json()
@@ -105,7 +118,22 @@ export function BankIdAuth({ mode, onComplete }: BankIdAuthProps) {
             signal: abortRef.current?.signal,
           })
 
-          if (!pollRes.ok) return
+          if (!pollRes.ok) {
+            const pollErr = await pollRes.json().catch(() => ({}))
+            if (pollErr.error === 'service_unavailable' || pollRes.status === 502 || pollRes.status === 503) {
+              pollFailureCount.current++
+              if (pollFailureCount.current >= MAX_POLL_FAILURES) {
+                cleanup()
+                setStatus('service_unavailable')
+                setErrorMessage('BankID-tjänsten är inte tillgänglig just nu')
+                onCompleteRef.current({ error: 'service_unavailable' })
+              }
+            }
+            return
+          }
+
+          // Reset failure counter on successful poll
+          pollFailureCount.current = 0
 
           const pollJson = await pollRes.json()
           const pollData = pollJson.data
@@ -147,8 +175,15 @@ export function BankIdAuth({ mode, onComplete }: BankIdAuthProps) {
                 const completeJson = await completeRes.json()
 
                 if (!completeRes.ok) {
+                  const errorCode = completeJson.error === 'service_unavailable' || completeRes.status === 502 || completeRes.status === 503
+                    ? 'service_unavailable' as const
+                    : completeJson.error
+                  if (errorCode === 'service_unavailable') {
+                    setStatus('service_unavailable')
+                    setErrorMessage('BankID-tjänsten är inte tillgänglig just nu')
+                  }
                   onCompleteRef.current({
-                    error: completeJson.error,
+                    error: errorCode,
                     givenName: completeJson.givenName,
                     surname: completeJson.surname,
                   })
@@ -197,7 +232,13 @@ export function BankIdAuth({ mode, onComplete }: BankIdAuthProps) {
           }
         } catch (error) {
           if (error instanceof Error && error.name === 'AbortError') return
-          // Polling error — will retry next tick
+          pollFailureCount.current++
+          if (pollFailureCount.current >= MAX_POLL_FAILURES) {
+            cleanup()
+            setStatus('service_unavailable')
+            setErrorMessage('BankID-tjänsten är inte tillgänglig just nu')
+            onCompleteRef.current({ error: 'service_unavailable' })
+          }
         }
       }, 2000)
     } catch (error) {
@@ -234,13 +275,43 @@ export function BankIdAuth({ mode, onComplete }: BankIdAuthProps) {
     )
   }
 
+  if (status === 'service_unavailable') {
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+              BankID är inte tillgängligt just nu
+            </p>
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              {mode === 'login'
+                ? 'Logga in med e-post och lösenord nedan, eller använd "Glömt lösenord?" för en inloggningslänk via e-post.'
+                : mode === 'signup'
+                  ? 'Skapa konto med e-post och lösenord nedan istället.'
+                  : 'Försök igen senare.'}
+            </p>
+            <Button
+              onClick={startSession}
+              variant="ghost"
+              size="sm"
+              className="mt-1 h-auto px-0 py-0 text-xs text-amber-600 underline underline-offset-2 hover:text-amber-800 dark:text-amber-400"
+            >
+              Försök med BankID igen
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (status === 'failed') {
     return (
       <div className="flex flex-col items-center gap-4">
         <p className="text-sm text-destructive">{errorMessage}</p>
         <Button onClick={startSession} variant="outline" className="gap-2">
           <BankIdIcon />
-          Forsok igen
+          Försök igen
         </Button>
       </div>
     )
