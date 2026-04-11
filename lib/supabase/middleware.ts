@@ -49,14 +49,22 @@ export async function updateSession(request: NextRequest) {
     await supabase.auth.signOut()
   }
 
+  // Invite pages — accessible to everyone, signed in or not. A user who
+  // already has an account and is signed in should still be able to land on
+  // /invite/[token] to accept the invite with one click (see
+  // app/invite/[token]/page.tsx). If we bounce them to '/', they never see
+  // the invite at all.
+  if (pathname.startsWith('/invite')) {
+    return supabaseResponse
+  }
+
   // Public auth routes — allow access
   if (
     pathname.startsWith('/login') ||
     pathname.startsWith('/register') ||
     pathname.startsWith('/auth') ||
     pathname.startsWith('/reset-password') ||
-    pathname.startsWith('/sandbox') ||
-    pathname.startsWith('/invite')
+    pathname.startsWith('/sandbox')
   ) {
     // If user is logged in and trying to access auth pages, redirect to dashboard
     if (user) {

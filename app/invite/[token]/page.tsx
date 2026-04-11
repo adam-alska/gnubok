@@ -7,6 +7,8 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Loader2, Building2, AlertCircle } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { useToast } from '@/components/ui/use-toast'
 
 interface InviteInfo {
   type: 'company'
@@ -19,24 +21,36 @@ interface InviteInfo {
 export default function InvitePage() {
   const params = useParams()
   const router = useRouter()
+  const { toast } = useToast()
   const token = params.token as string
 
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [invite, setInvite] = useState<InviteInfo | null>(null)
+  // Email of the currently signed-in user (if any). Used to short-circuit
+  // the login redirect for users who are already authenticated.
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null)
+  const [isJoining, setIsJoining] = useState(false)
 
   useEffect(() => {
     async function loadInvite() {
       try {
-        const res = await fetch(`/api/team/accept?token=${encodeURIComponent(token)}`)
-        const data = await res.json()
+        // Load invite info and current session in parallel — the page needs
+        // both to decide which CTA to render.
+        const supabase = createClient()
+        const [inviteRes, sessionRes] = await Promise.all([
+          fetch(`/api/team/accept?token=${encodeURIComponent(token)}`),
+          supabase.auth.getUser(),
+        ])
 
-        if (!res.ok) {
+        const data = await inviteRes.json()
+        if (!inviteRes.ok) {
           setError(data.error || 'Inbjudan är ogiltig.')
           return
         }
 
         setInvite(data.data)
+        setCurrentUserEmail(sessionRes.data.user?.email ?? null)
       } catch {
         setError('Kunde inte ladda inbjudan.')
       } finally {
@@ -48,6 +62,18 @@ export default function InvitePage() {
 
   const secureCookieFlag = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; secure' : ''
 
+  // True when the signed-in user's email matches the invite — in that case
+  // we can accept the invite with a single click, no re-login required.
+  const isLoggedInAsInvitee =
+    !!currentUserEmail &&
+    !!invite &&
+    currentUserEmail.toLowerCase() === invite.email.toLowerCase()
+
+  // True when someone is signed in but with a different email than the
+  // invite is for. They need to sign out first.
+  const isLoggedInAsOther =
+    !!currentUserEmail && !!invite && !isLoggedInAsInvitee
+
   const handleAccept = () => {
     // Store invite token in cookie before redirecting to register
     document.cookie = `gnubok-invite-token=${token}; path=/; max-age=3600; samesite=lax${secureCookieFlag}`
@@ -56,6 +82,58 @@ export default function InvitePage() {
 
   const handleAcceptExistingUser = () => {
     // Store invite token in cookie before redirecting to login
+    document.cookie = `gnubok-invite-token=${token}; path=/; max-age=3600; samesite=lax${secureCookieFlag}`
+    router.push('/login')
+  }
+
+  // Already signed in as the invitee — accept directly, no login detour.
+  // POST /api/team/accept handles the membership insert + sets the active
+  // company; we then full-reload to '/' so middleware picks up the new
+  // company context and the switcher shows it.
+  const handleJoinNow = async () => {
+    setIsJoining(true)
+    try {
+      const res = await fetch('/api/team/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      })
+      const body = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        toast({
+          title: 'Kunde inte gå med',
+          description: body.error || 'Ett oväntat fel uppstod. Försök igen.',
+          variant: 'destructive',
+        })
+        setIsJoining(false)
+        return
+      }
+
+      toast({
+        title: 'Välkommen!',
+        description: invite?.companyName
+          ? `Du är nu medlem i ${invite.companyName}.`
+          : 'Du är nu medlem.',
+      })
+      // Full reload so the middleware re-resolves company context from the
+      // updated user_preferences.active_company_id.
+      window.location.href = '/'
+    } catch (err) {
+      console.error('[invite] join failed:', err)
+      toast({
+        title: 'Kunde inte gå med',
+        description: 'Ett oväntat fel uppstod. Försök igen.',
+        variant: 'destructive',
+      })
+      setIsJoining(false)
+    }
+  }
+
+  const handleSignOutAndRetry = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    // Keep the invite cookie alive so the next login/register picks it up.
     document.cookie = `gnubok-invite-token=${token}; path=/; max-age=3600; samesite=lax${secureCookieFlag}`
     router.push('/login')
   }
@@ -131,7 +209,70 @@ export default function InvitePage() {
                   </div>
                 </div>
               </Card>
+            ) : invite?.alreadyHasAccount && isLoggedInAsInvitee ? (
+              // Already signed in as the invitee — one-click join.
+              <div className="space-y-6">
+                <Card className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="p-2.5 rounded-lg bg-muted/50">
+                      <Building2 className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{invite.companyName}</p>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        Du har bjudits in som medlem till detta företag.
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Inloggad som <strong>{currentUserEmail}</strong>.
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+
+                <Button
+                  size="lg"
+                  className="w-full"
+                  onClick={handleJoinNow}
+                  disabled={isJoining}
+                >
+                  {isJoining ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Går med…
+                    </>
+                  ) : (
+                    <>Gå med i {invite.companyName}</>
+                  )}
+                </Button>
+              </div>
+            ) : invite?.alreadyHasAccount && isLoggedInAsOther ? (
+              // Signed in as a different user — ask them to sign out first.
+              <div className="space-y-6">
+                <Card className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="p-2.5 rounded-lg bg-muted/50">
+                      <Building2 className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{invite.companyName}</p>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        Inbjudan är skickad till <strong>{invite.email}</strong>, men
+                        du är inloggad som <strong>{currentUserEmail}</strong>.
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Logga ut och logga in igen med rätt konto för att gå med.
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+
+                <Button size="lg" className="w-full" onClick={handleSignOutAndRetry}>
+                  Logga ut och byt konto
+                </Button>
+              </div>
             ) : invite?.alreadyHasAccount ? (
+              // Not signed in yet — current behavior: bounce to /login with
+              // the invite cookie.
               <div className="space-y-6">
                 <Card className="p-6">
                   <div className="flex items-start gap-4">
