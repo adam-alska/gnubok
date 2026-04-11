@@ -27,6 +27,7 @@ export async function GET() {
   }
 
   // Fall back to companies.entity_type if company_settings.entity_type is null
+  let responseData = data
   if (data && !data.entity_type) {
     const { data: company } = await supabase
       .from('companies')
@@ -34,11 +35,11 @@ export async function GET() {
       .eq('id', companyId)
       .single()
     if (company?.entity_type) {
-      data = { ...data, entity_type: company.entity_type }
+      responseData = { ...data, entity_type: company.entity_type }
     }
   }
 
-  return NextResponse.json({ data })
+  return NextResponse.json({ data: responseData })
 }
 
 export async function PUT(request: Request) {
