@@ -13,30 +13,34 @@ import type { Transaction, RawTransaction, IngestResult, IngestOptions, Supplier
 // Re-export types for backward compatibility
 export type { RawTransaction, IngestResult } from '@/types'
 
-/**
- * Build a lookup map of existing transactions keyed by "date|amount".
- * Each key maps to the number of existing transactions with that date+amount
- * combination, allowing correct dedup when multiple transactions share
- * the same date and amount.
- *
- * Checks both booked transactions (any source) and unbooked bank-synced
- * transactions. The latter catches reconnect duplicates where the external_id
- * changed but the same transaction already exists from a prior sync.
- */
-async function buildExistingTransactionMap(
+interface ExistingTransactionMaps {
+  /** Booked transactions (any source) — consumed by any incoming raw transaction. */
+  booked: Map<string, number>
+  /**
+   * Unbooked enable_banking transactions — only consumed when the incoming raw
+   * transaction is also from enable_banking. This catches reconnect duplicates
+   * (external_id changed but the same tx already exists from a prior sync)
+   * without producing false positives for unrelated CSV imports that happen to
+   * share a date/amount with a pending bank-synced row.
+   */
+  unbookedEnableBanking: Map<string, number>
+}
+
+async function buildExistingTransactionMaps(
   supabase: SupabaseClient,
   companyId: string,
   rawTransactions: RawTransaction[]
-): Promise<Map<string, number>> {
-  const map = new Map<string, number>()
-  if (rawTransactions.length === 0) return map
+): Promise<ExistingTransactionMaps> {
+  const booked = new Map<string, number>()
+  const unbookedEnableBanking = new Map<string, number>()
+  if (rawTransactions.length === 0) return { booked, unbookedEnableBanking }
 
   const dates = rawTransactions.map((t) => t.date).sort()
   const dateFrom = dates[0]
   const dateTo = dates[dates.length - 1]
 
   try {
-    const { data: booked } = await supabase
+    const { data: bookedRows } = await supabase
       .from('transactions')
       .select('date, amount')
       .eq('company_id', companyId)
@@ -44,18 +48,16 @@ async function buildExistingTransactionMap(
       .gte('date', dateFrom)
       .lte('date', dateTo)
 
-    if (booked) {
-      for (const tx of booked) {
+    if (bookedRows) {
+      for (const tx of bookedRows) {
         const key = `${tx.date}|${tx.amount}`
-        map.set(key, (map.get(key) || 0) + 1)
+        booked.set(key, (booked.get(key) || 0) + 1)
       }
     }
   } catch {
     // Non-critical — content-based dedup will be skipped
   }
 
-  // Also check unbooked bank-synced transactions (catches reconnect duplicates
-  // where external_id changed but the same transaction exists from a prior sync)
   try {
     const { data: unbookedBank } = await supabase
       .from('transactions')
@@ -69,14 +71,14 @@ async function buildExistingTransactionMap(
     if (unbookedBank) {
       for (const tx of unbookedBank) {
         const key = `${tx.date}|${tx.amount}`
-        map.set(key, (map.get(key) || 0) + 1)
+        unbookedEnableBanking.set(key, (unbookedEnableBanking.get(key) || 0) + 1)
       }
     }
   } catch {
     // Non-critical — reconnect dedup will be skipped
   }
 
-  return map
+  return { booked, unbookedEnableBanking }
 }
 
 /**
@@ -111,10 +113,11 @@ export async function ingestTransactions(
     transaction_ids: [],
   }
 
-  // Pre-fetch booked transactions for content-based dedup (date+amount)
-  // This catches cross-source duplicates (e.g. same transaction imported
-  // via CSV and then again via PSD2 with different external_id)
-  const existingMap = await buildExistingTransactionMap(supabase, companyId, rawTransactions)
+  // Pre-fetch existing transactions for content-based dedup (date+amount).
+  // Booked rows (any source) catch cross-source duplicates; unbooked
+  // enable_banking rows catch reconnect duplicates but are only consumed
+  // by incoming enable_banking rows to avoid blocking unrelated CSV imports.
+  const existingMaps = await buildExistingTransactionMaps(supabase, companyId, rawTransactions)
 
   // Pre-fetch unlinked GL lines for reconciliation (non-critical)
   let glLinePool: UnlinkedGLLine[] = []
@@ -180,13 +183,25 @@ export async function ingestTransactions(
     }
 
     // 1b. Content-based dedup: skip if an already-booked transaction
-    // exists with the same date and amount (cross-source duplicate)
+    // exists with the same date and amount (cross-source duplicate).
     const contentKey = `${raw.date}|${raw.amount}`
-    const existingCount = existingMap.get(contentKey) || 0
-    if (existingCount > 0) {
-      existingMap.set(contentKey, existingCount - 1)
+    const bookedCount = existingMaps.booked.get(contentKey) || 0
+    if (bookedCount > 0) {
+      existingMaps.booked.set(contentKey, bookedCount - 1)
       result.duplicates++
       continue
+    }
+
+    // 1c. Reconnect dedup: only enable_banking rows consume slots from the
+    // unbooked-enable_banking map, so a CSV row with the same date/amount as
+    // a pending bank-synced row is not incorrectly dropped as a duplicate.
+    if (raw.import_source === 'enable_banking') {
+      const unbookedEbCount = existingMaps.unbookedEnableBanking.get(contentKey) || 0
+      if (unbookedEbCount > 0) {
+        existingMaps.unbookedEnableBanking.set(contentKey, unbookedEbCount - 1)
+        result.duplicates++
+        continue
+      }
     }
 
     // 2. Insert new transaction (with SEK conversion for foreign currencies)

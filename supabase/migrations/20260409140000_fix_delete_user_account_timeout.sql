@@ -91,5 +91,26 @@ BEGIN
   ALTER TABLE fiscal_periods ENABLE TRIGGER audit_fiscal_periods;
   ALTER TABLE journal_entries ENABLE TRIGGER audit_journal_entries;
   ALTER TABLE supplier_invoices ENABLE TRIGGER audit_supplier_invoices;
+
+EXCEPTION WHEN OTHERS THEN
+  -- PostgreSQL transactional DDL already rolls back the DISABLE TRIGGER
+  -- statements if the function aborts, but re-enable explicitly as a
+  -- defensive guard against sub-transaction edge cases so enforcement
+  -- triggers are never left disabled on the live tables.
+  BEGIN ALTER TABLE audit_log ENABLE TRIGGER audit_log_no_delete; EXCEPTION WHEN OTHERS THEN NULL; END;
+  BEGIN ALTER TABLE payment_match_log ENABLE TRIGGER payment_match_log_no_delete; EXCEPTION WHEN OTHERS THEN NULL; END;
+  BEGIN ALTER TABLE document_attachments ENABLE TRIGGER block_document_deletion; EXCEPTION WHEN OTHERS THEN NULL; END;
+  BEGIN ALTER TABLE journal_entries ENABLE TRIGGER enforce_journal_entry_immutability; EXCEPTION WHEN OTHERS THEN NULL; END;
+  BEGIN ALTER TABLE journal_entries ENABLE TRIGGER enforce_retention_journal_entries; EXCEPTION WHEN OTHERS THEN NULL; END;
+  BEGIN ALTER TABLE journal_entry_lines ENABLE TRIGGER enforce_journal_entry_line_immutability; EXCEPTION WHEN OTHERS THEN NULL; END;
+  BEGIN ALTER TABLE api_keys ENABLE TRIGGER audit_api_keys; EXCEPTION WHEN OTHERS THEN NULL; END;
+  BEGIN ALTER TABLE chart_of_accounts ENABLE TRIGGER audit_chart_of_accounts; EXCEPTION WHEN OTHERS THEN NULL; END;
+  BEGIN ALTER TABLE company_settings ENABLE TRIGGER audit_company_settings; EXCEPTION WHEN OTHERS THEN NULL; END;
+  BEGIN ALTER TABLE document_attachments ENABLE TRIGGER audit_document_attachments; EXCEPTION WHEN OTHERS THEN NULL; END;
+  BEGIN ALTER TABLE extension_data ENABLE TRIGGER audit_extension_data; EXCEPTION WHEN OTHERS THEN NULL; END;
+  BEGIN ALTER TABLE fiscal_periods ENABLE TRIGGER audit_fiscal_periods; EXCEPTION WHEN OTHERS THEN NULL; END;
+  BEGIN ALTER TABLE journal_entries ENABLE TRIGGER audit_journal_entries; EXCEPTION WHEN OTHERS THEN NULL; END;
+  BEGIN ALTER TABLE supplier_invoices ENABLE TRIGGER audit_supplier_invoices; EXCEPTION WHEN OTHERS THEN NULL; END;
+  RAISE;
 END;
 $$;
