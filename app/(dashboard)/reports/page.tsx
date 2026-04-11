@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Download, AlertCircle, ChevronDown, ChevronRight, ArrowRight } from 'lucide-react'
 import { AccountNumber } from '@/components/ui/account-number'
+import { useCompany } from '@/contexts/CompanyContext'
 import { NEDeclarationView } from '@/components/reports/NEDeclarationView'
 import { INK2DeclarationView } from '@/components/reports/INK2DeclarationView'
 import { BankReconciliationView } from '@/components/reports/BankReconciliationView'
@@ -48,8 +49,8 @@ export default function ReportsPage() {
   const [periods, setPeriods] = useState<FiscalPeriod[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState('')
   const [activeTab, setActiveTab] = useState('trial-balance')
-  const [entityType, setEntityType] = useState<string | null>(null)
   const [isLoadingInit, setIsLoadingInit] = useState(true)
+  const { company } = useCompany()
 
   // Drill-down state: when navigating from a report to the GL for a specific account
   const [glAccountFilter, setGlAccountFilter] = useState<string | null>(null)
@@ -89,26 +90,14 @@ export default function ReportsPage() {
     }
   }
 
-  async function fetchEntityType() {
-    try {
-      const res = await fetch('/api/settings')
-      const { data } = await res.json()
-      if (data?.entity_type) {
-        setEntityType(data.entity_type)
-      }
-    } catch {
-      // Ignore - entity type is optional for tab visibility
-    }
-  }
-
   useEffect(() => {
-    Promise.all([fetchPeriods(), fetchEntityType()]).finally(() => {
+    fetchPeriods().finally(() => {
       setIsLoadingInit(false)
     })
   }, [])
 
-  const isEnskildFirma = entityType === 'enskild_firma'
-  const isAktiebolag = entityType === 'aktiebolag'
+  const isEnskildFirma = company?.entity_type === 'enskild_firma'
+  const isAktiebolag = company?.entity_type === 'aktiebolag'
 
   return (
     <div className="space-y-6">

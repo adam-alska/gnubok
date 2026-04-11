@@ -179,8 +179,19 @@ export async function generateNEDeclaration(
     .eq('company_id', companyId)
     .single()
 
-  // Check if it's enskild firma
-  if (settings?.entity_type !== 'enskild_firma') {
+  // Resolve entity_type: prefer company_settings, fall back to companies table (NOT NULL, always reliable)
+  let entityType = settings?.entity_type
+  if (!entityType) {
+    const { data: company, error: companyError } = await supabase
+      .from('companies')
+      .select('entity_type')
+      .eq('id', companyId)
+      .single()
+    if (companyError) throw new Error(`Failed to resolve entity type: ${companyError.message}`)
+    entityType = company?.entity_type
+  }
+
+  if (entityType !== 'enskild_firma') {
     throw new Error('NE declaration is only for enskild firma (sole proprietorship)')
   }
 
