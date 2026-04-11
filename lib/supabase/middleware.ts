@@ -157,39 +157,34 @@ export async function updateSession(request: NextRequest) {
 
 /**
  * Resolve the active company for the authenticated user.
- * Uses cookie → user_preferences → first membership as fallback.
- * Cannot use lib/company/context.ts because middleware runs on Edge.
  *
- * All three lookups filter out archived (soft-deleted) companies via an
- * inner join on companies + archived_at IS NULL — otherwise deleted
- * companies would reappear any time the cookie or user_preferences still
- * pointed at them.
+ * Resolution: user_preferences → first non-archived membership.
+ *
+ * `user_preferences.active_company_id` is the authoritative source for
+ * the active company on both the Next.js and Postgres RLS side. The
+ * `gnubok-company-id` cookie is still refreshed for legacy read paths
+ * but it is no longer READ here, because RLS (via
+ * `current_active_company_id()`) cannot see cookies — so letting the
+ * cookie override the database would re-introduce the divergence this
+ * entire migration exists to fix.
+ *
+ * When we fall back to "first membership" (no user_preferences row yet),
+ * we also upsert user_preferences so subsequent RLS lookups agree with
+ * us without needing the fallback scan.
+ *
+ * Cannot use lib/company/context.ts because middleware runs on Edge.
  */
 async function resolveCompanyForMiddleware(
   supabase: ReturnType<typeof createServerClient>,
   userId: string,
-  request: NextRequest
+  _request: NextRequest
 ): Promise<string | null> {
-  // 1. Try cookie
-  const cookieCompanyId = request.cookies.get('gnubok-company-id')?.value
-  if (cookieCompanyId) {
-    const { data: membership } = await supabase
-      .from('company_members')
-      .select('company_id, companies!inner(archived_at)')
-      .eq('company_id', cookieCompanyId)
-      .eq('user_id', userId)
-      .is('companies.archived_at', null)
-      .single()
-
-    if (membership) return membership.company_id
-  }
-
-  // 2. Try user_preferences
+  // 1. user_preferences (authoritative)
   const { data: prefs } = await supabase
     .from('user_preferences')
     .select('active_company_id')
     .eq('user_id', userId)
-    .single()
+    .maybeSingle()
 
   if (prefs?.active_company_id) {
     const { data: membership } = await supabase
@@ -198,12 +193,12 @@ async function resolveCompanyForMiddleware(
       .eq('company_id', prefs.active_company_id)
       .eq('user_id', userId)
       .is('companies.archived_at', null)
-      .single()
+      .maybeSingle()
 
     if (membership) return membership.company_id
   }
 
-  // 3. Fallback: first non-archived membership by created_at
+  // 2. Fallback: first non-archived membership by created_at
   const { data: firstCompany } = await supabase
     .from('company_members')
     .select('company_id, companies!inner(archived_at)')
@@ -211,7 +206,18 @@ async function resolveCompanyForMiddleware(
     .is('companies.archived_at', null)
     .order('created_at', { ascending: true })
     .limit(1)
-    .single()
+    .maybeSingle()
 
-  return firstCompany?.company_id ?? null
+  if (!firstCompany) return null
+
+  // Write the fallback back to user_preferences so future RLS lookups
+  // see the same active company without needing this fallback scan.
+  await supabase
+    .from('user_preferences')
+    .upsert(
+      { user_id: userId, active_company_id: firstCompany.company_id },
+      { onConflict: 'user_id' }
+    )
+
+  return firstCompany.company_id
 }

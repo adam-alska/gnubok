@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { cookies, headers } from 'next/headers'
+import { headers } from 'next/headers'
 import DashboardNav from '@/components/dashboard/DashboardNav'
+import CompanyTabSync from '@/components/dashboard/CompanyTabSync'
 import { RecaptIdentify } from '@/components/RecaptIdentify'
 import { SentryIdentify } from '@/components/SentryIdentify'
 import { SandboxBanner } from '@/components/dashboard/SandboxBanner'
@@ -30,9 +31,12 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
-  const cookieStore = await cookies()
-  const companyId = cookieStore.get('gnubok-company-id')?.value
-    ?? await getActiveCompanyId(supabase, user.id)
+  // Resolve active company from user_preferences (authoritative). The
+  // `gnubok-company-id` cookie is intentionally no longer consulted here —
+  // `getActiveCompanyId` reads from user_preferences, matching what RLS
+  // sees via `current_active_company_id()`. Keeping both sides on the same
+  // source avoids cross-tab / cookie divergence.
+  const companyId = await getActiveCompanyId(supabase, user.id)
 
   // Read the pathname forwarded by middleware so we can branch on it.
   const headerStore = await headers()
@@ -79,6 +83,7 @@ export default async function DashboardLayout({
           team,
         }}
       >
+        <CompanyTabSync />
         <div className="min-h-screen bg-background">
           <DashboardNav
             companyName="gnubok"
@@ -130,6 +135,7 @@ export default async function DashboardLayout({
 
     return (
       <CompanyProvider value={companyContextValue}>
+        <CompanyTabSync />
         <div className="min-h-screen bg-background">
           <DashboardNav
             companyName="gnubok"
@@ -196,6 +202,7 @@ export default async function DashboardLayout({
 
   return (
     <CompanyProvider value={companyContextValue}>
+      <CompanyTabSync />
       <div className="min-h-screen bg-background">
         {/* Skip to content link for keyboard/screen reader users */}
         <a

@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect, useTransition, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useCompany } from '@/contexts/CompanyContext'
@@ -11,9 +10,8 @@ import { Check, ChevronsUpDown, Plus, Loader2 } from 'lucide-react'
 
 export default function CompanySwitcher() {
   const { company, companies } = useCompany()
-  const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [isPending, startTransition] = useTransition()
+  const [isPending, setIsPending] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 })
@@ -73,18 +71,35 @@ export default function CompanySwitcher() {
     return () => document.removeEventListener('keydown', handleKey)
   }, [open])
 
-  const handleSwitch = (companyId: string) => {
+  const handleSwitch = async (companyId: string) => {
     if (company && companyId === company.id) {
       setOpen(false)
       return
     }
-    startTransition(async () => {
-      const result = await switchCompany(companyId)
-      if (!result.error) {
-        setOpen(false)
-        router.refresh()
+    setIsPending(true)
+    const result = await switchCompany(companyId)
+    if (result.error) {
+      setIsPending(false)
+      return
+    }
+    // Notify every other open tab of the same user so they hard-reload
+    // onto the new company. BroadcastChannel is best-effort — if the
+    // browser doesn't support it (very old) we still hard-reload
+    // ourselves, and other tabs will self-correct via the visibilitychange
+    // / pageshow listeners in CompanyTabSync on their next focus event.
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        const channel = new BroadcastChannel('gnubok-company-switch')
+        channel.postMessage({ companyId })
+        channel.close()
+      } catch {
+        // Ignore — hard reload still happens below
       }
-    })
+    }
+    // Hard navigation — tears down React state, router cache, in-flight
+    // fetches, blob URLs, etc. This is the whole point: nothing from the
+    // previous company can survive the switch.
+    window.location.assign('/')
   }
 
   // Always allow opening the dropdown (to show "Lägg till företag")

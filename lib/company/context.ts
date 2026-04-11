@@ -5,56 +5,52 @@ const COMPANY_COOKIE = 'gnubok-company-id'
 
 /**
  * Get the active company ID for the authenticated user.
- * Resolution order: cookie → user_preferences → first owned company.
- * Returns null if user has no companies.
+ *
+ * Resolution order: user_preferences → first non-archived membership.
+ *
+ * `user_preferences.active_company_id` is the authoritative source. The
+ * cookie `gnubok-company-id` is written as a hint for backwards-compat but
+ * is no longer READ as a source of truth, because Postgres RLS (via
+ * `current_active_company_id()`) can only read the database, not cookies.
+ * Having Next.js and RLS both read from `user_preferences` keeps them
+ * perfectly in sync.
+ *
+ * Returns null if the user has no non-archived companies.
  */
 export async function getActiveCompanyId(
   supabase: SupabaseClient,
   userId: string
 ): Promise<string | null> {
-  // 1. Try cookie
-  const cookieStore = await cookies()
-  const cookieValue = cookieStore.get(COMPANY_COOKIE)?.value
-
-  if (cookieValue) {
-    // Validate the user is a member of this company
-    const { data: membership } = await supabase
-      .from('company_members')
-      .select('company_id')
-      .eq('company_id', cookieValue)
-      .eq('user_id', userId)
-      .single()
-
-    if (membership) return membership.company_id
-  }
-
-  // 2. Try user_preferences
+  // 1. user_preferences — authoritative
   const { data: prefs } = await supabase
     .from('user_preferences')
     .select('active_company_id')
     .eq('user_id', userId)
-    .single()
+    .maybeSingle()
 
   if (prefs?.active_company_id) {
-    // Validate membership
+    // Validate the preference still points to a non-archived company the
+    // user is a member of.
     const { data: membership } = await supabase
       .from('company_members')
-      .select('company_id')
+      .select('company_id, companies!inner(archived_at)')
       .eq('company_id', prefs.active_company_id)
       .eq('user_id', userId)
-      .single()
+      .is('companies.archived_at', null)
+      .maybeSingle()
 
     if (membership) return membership.company_id
   }
 
-  // 3. Fallback: first company where user is owner (or any member)
+  // 2. Fallback: first non-archived membership by created_at
   const { data: firstCompany } = await supabase
     .from('company_members')
-    .select('company_id')
+    .select('company_id, companies!inner(archived_at)')
     .eq('user_id', userId)
+    .is('companies.archived_at', null)
     .order('created_at', { ascending: true })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   return firstCompany?.company_id ?? null
 }
@@ -89,7 +85,11 @@ export async function getUserCompanies(
 }
 
 /**
- * Set the active company for the user (updates cookie + user_preferences).
+ * Set the active company for the user.
+ *
+ * Writes to `user_preferences` (authoritative, consulted by RLS via
+ * `current_active_company_id()`) and refreshes the `gnubok-company-id`
+ * cookie for backwards-compat with any code still reading it.
  */
 export async function setActiveCompany(
   supabase: SupabaseClient,
@@ -108,7 +108,7 @@ export async function setActiveCompany(
     throw new Error('User is not a member of this company')
   }
 
-  // Update user_preferences
+  // Update user_preferences — this is the authoritative value RLS reads
   await supabase
     .from('user_preferences')
     .upsert(
@@ -116,7 +116,7 @@ export async function setActiveCompany(
       { onConflict: 'user_id' }
     )
 
-  // Set cookie
+  // Refresh the cookie as a compat hint
   const cookieStore = await cookies()
   cookieStore.set(COMPANY_COOKIE, companyId, {
     path: '/',
