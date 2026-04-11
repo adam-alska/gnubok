@@ -27,7 +27,20 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ data })
+  // Fall back to companies.entity_type if company_settings.entity_type is null
+  let responseData = data
+  if (data && !data.entity_type) {
+    const { data: company } = await supabase
+      .from('companies')
+      .select('entity_type')
+      .eq('id', companyId)
+      .single()
+    if (company?.entity_type) {
+      responseData = { ...data, entity_type: company.entity_type }
+    }
+  }
+
+  return NextResponse.json({ data: responseData })
 }
 
 export async function PUT(request: Request) {

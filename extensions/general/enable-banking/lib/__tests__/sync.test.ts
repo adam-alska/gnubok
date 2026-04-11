@@ -163,7 +163,7 @@ describe('syncAccountTransactions', () => {
     expect(mockIngest).toHaveBeenCalledTimes(1)
     const rawTxns = mockIngest.mock.calls[0][3]
     expect(rawTxns).toHaveLength(1)
-    expect(rawTxns[0].external_id).toBe('conn-1_tx-500')
+    expect(rawTxns[0].external_id).toBe('eb_acc-uid-1_tx-500')
     expect(rawTxns[0].import_source).toBe('enable_banking')
   })
 })

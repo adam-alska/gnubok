@@ -23,7 +23,10 @@ import type { BankIdCompleteRequest } from './lib/bankid-types'
 import type { CompanyLookupResult } from '@/lib/company-lookup/types'
 import { hashPersonalNumber, encryptPersonalNumber } from '@/lib/auth/bankid'
 import { createServiceClient } from '@/lib/supabase/server'
+import { createLogger } from '@/lib/logger'
 import crypto from 'crypto'
+
+const log = createLogger('tic/bankid')
 
 // Server-side per-IP rate limit for /bankid/start (each call = billable TIC session)
 const bankIdStartCooldowns = new Map<string, number>()
@@ -393,14 +396,21 @@ export const ticExtension: Extension = {
         } catch (error) {
           if (error instanceof TICAPIError) {
             if (error.code === 'NOT_CONFIGURED') {
-              return NextResponse.json({ error: 'BankID is not configured' }, { status: 503 })
+              return NextResponse.json({ error: 'not_configured', message: 'BankID is not configured' }, { status: 503 })
             }
             if (error.code === 'RATE_LIMIT_EXCEEDED') {
-              return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+              return NextResponse.json({ error: 'rate_limit', message: 'Rate limit exceeded' }, { status: 429 })
             }
+            if (error.code === 'TIMEOUT') {
+              log.error('start timed out — TIC Identity API unreachable', { statusCode: error.statusCode })
+              return NextResponse.json({ error: 'service_unavailable', message: 'BankID service is not responding' }, { status: 503 })
+            }
+            // TIC API returned an error (e.g. 5xx)
+            log.error('start failed — TIC API error', { statusCode: error.statusCode, code: error.code, message: error.message })
+            return NextResponse.json({ error: 'service_unavailable', message: 'BankID service is temporarily unavailable' }, { status: 502 })
           }
-          console.error('[tic/bankid] start failed', error)
-          return NextResponse.json({ error: 'Failed to start BankID session' }, { status: 500 })
+          log.error('start failed — unexpected error', error)
+          return NextResponse.json({ error: 'internal_error', message: 'Failed to start BankID session' }, { status: 500 })
         }
       },
     },
@@ -419,17 +429,23 @@ export const ticExtension: Extension = {
 
           const result = await pollBankIdSession(sessionId)
           if (result.status !== 'pending') {
-            console.log('[tic/bankid] poll status:', result.status, result.hintCode, result.user?.personalNumber ? 'has-user' : 'no-user')
+            log.info('poll status', { status: result.status, hintCode: result.hintCode, hasUser: !!result.user?.personalNumber })
           }
           return NextResponse.json({ data: result })
         } catch (error) {
           if (error instanceof TICAPIError) {
             if (error.code === 'RATE_LIMIT_EXCEEDED') {
-              return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+              return NextResponse.json({ error: 'rate_limit', message: 'Rate limit exceeded' }, { status: 429 })
             }
+            if (error.code === 'TIMEOUT') {
+              log.error('poll timed out — TIC Identity API unreachable')
+              return NextResponse.json({ error: 'service_unavailable', message: 'BankID service is not responding' }, { status: 503 })
+            }
+            log.error('poll failed — TIC API error', { statusCode: error.statusCode, code: error.code, message: error.message })
+            return NextResponse.json({ error: 'service_unavailable', message: 'BankID service is temporarily unavailable' }, { status: 502 })
           }
-          console.error('[tic/bankid] poll failed', error)
-          return NextResponse.json({ error: 'Failed to poll BankID session' }, { status: 500 })
+          log.error('poll failed — unexpected error', error)
+          return NextResponse.json({ error: 'internal_error', message: 'Failed to poll BankID session' }, { status: 500 })
         }
       },
     },
@@ -503,7 +519,7 @@ export const ticExtension: Extension = {
             })
 
             if (linkError || !link?.properties?.hashed_token) {
-              console.error('[tic/bankid] generateLink failed', linkError)
+              log.error('generateLink failed for login', { message: linkError?.message, code: linkError?.code })
               return NextResponse.json(
                 { error: 'Failed to create session' },
                 { status: 500 }
@@ -557,7 +573,7 @@ export const ticExtension: Extension = {
             })
 
             if (createError || !newUser?.user) {
-              console.error('[tic/bankid] createUser failed', { email: trimmedEmail, status: createError?.status, code: (createError as any)?.code, message: createError?.message })
+              log.error('createUser failed', { email: trimmedEmail, status: createError?.status, code: createError?.code, message: createError?.message })
               return NextResponse.json(
                 { error: 'Failed to create account', message: createError?.message },
                 { status: 500 }
@@ -584,7 +600,7 @@ export const ticExtension: Extension = {
             })
 
           if (insertError) {
-            console.error('[tic/bankid] insert bankid_identities failed', insertError)
+            log.error('insert bankid_identities failed', { message: insertError.message, code: insertError.code })
             return NextResponse.json(
               { error: 'Failed to link BankID identity' },
               { status: 500 }
@@ -598,7 +614,7 @@ export const ticExtension: Extension = {
           })
 
           if (linkError || !link?.properties?.hashed_token) {
-            console.error('[tic/bankid] generateLink failed for new user', linkError)
+            log.error('generateLink failed for signup', { message: linkError?.message, code: linkError?.code })
             return NextResponse.json(
               { error: 'Account created but failed to create session' },
               { status: 500 }
@@ -610,7 +626,7 @@ export const ticExtension: Extension = {
             const enrichment = await requestEnrichment(sessionId, ['SPAR', 'CompanyRoles'])
             if (enrichment.status === 'Completed' && enrichment.secureUrl) {
               const enrichmentData = await fetchEnrichmentData(enrichment.secureUrl)
-              console.log('[tic/bankid] enrichment success', {
+              log.info('enrichment success', {
                 hasSpar: !!enrichmentData.spar,
                 companyCount: enrichmentData.companyRoles?.length ?? 0,
               })
@@ -627,7 +643,7 @@ export const ticExtension: Extension = {
             }
           } catch (enrichError) {
             // Enrichment is optional — don't fail signup
-            console.warn('[tic/bankid] enrichment failed (non-blocking)', enrichError)
+            log.warn('enrichment failed (non-blocking)', enrichError)
           }
 
           return NextResponse.json({
@@ -639,18 +655,21 @@ export const ticExtension: Extension = {
           })
         } catch (error) {
           if (error instanceof TICAPIError) {
-            console.error('[tic/bankid] complete TIC error', {
-              message: error.message,
-              code: error.code,
-            })
+            log.error('complete failed — TIC API error', { statusCode: error.statusCode, code: error.code, message: error.message })
+            if (error.code === 'TIMEOUT') {
+              return NextResponse.json(
+                { error: 'service_unavailable', message: 'BankID service is not responding' },
+                { status: 503 }
+              )
+            }
             return NextResponse.json(
-              { error: 'BankID verification failed' },
+              { error: 'service_unavailable', message: 'BankID verification failed' },
               { status: 502 }
             )
           }
-          console.error('[tic/bankid] complete unexpected error', error)
+          log.error('complete failed — unexpected error', error)
           return NextResponse.json(
-            { error: 'Failed to complete BankID authentication' },
+            { error: 'internal_error', message: 'Failed to complete BankID authentication' },
             { status: 500 }
           )
         }
@@ -672,7 +691,7 @@ export const ticExtension: Extension = {
           await cancelBankIdSession(sessionId)
           return NextResponse.json({ data: { cancelled: true } })
         } catch (error) {
-          console.error('[tic/bankid] cancel failed', error)
+          log.error('cancel failed', error)
           return NextResponse.json({ error: 'Failed to cancel session' }, { status: 500 })
         }
       },
@@ -734,7 +753,7 @@ export const ticExtension: Extension = {
             })
 
           if (insertError) {
-            console.error('[tic/bankid] link insert failed', insertError)
+            log.error('link insert failed', { message: insertError.message, code: insertError.code })
             return NextResponse.json(
               { error: 'Failed to link BankID' },
               { status: 500 }
@@ -748,9 +767,16 @@ export const ticExtension: Extension = {
 
           return NextResponse.json({ data: { linked: true } })
         } catch (error) {
-          console.error('[tic/bankid] link failed', error)
+          if (error instanceof TICAPIError) {
+            log.error('link failed — TIC API error', { statusCode: error.statusCode, code: error.code, message: error.message })
+            return NextResponse.json(
+              { error: 'service_unavailable', message: 'BankID service is temporarily unavailable' },
+              { status: 502 }
+            )
+          }
+          log.error('link failed — unexpected error', error)
           return NextResponse.json(
-            { error: 'Failed to link BankID' },
+            { error: 'internal_error', message: 'Failed to link BankID' },
             { status: 500 }
           )
         }
@@ -776,7 +802,7 @@ export const ticExtension: Extension = {
             .eq('user_id', ctx.userId)
 
           if (deleteError) {
-            console.error('[tic/bankid] unlink delete failed', deleteError)
+            log.error('unlink delete failed', { message: deleteError.message, code: deleteError.code })
             return NextResponse.json({ error: 'Failed to unlink BankID' }, { status: 500 })
           }
 
@@ -787,7 +813,7 @@ export const ticExtension: Extension = {
 
           return NextResponse.json({ data: { unlinked: true } })
         } catch (error) {
-          console.error('[tic/bankid] unlink failed', error)
+          log.error('unlink failed', error)
           return NextResponse.json({ error: 'Failed to unlink BankID' }, { status: 500 })
         }
       },

@@ -116,6 +116,7 @@ function makeMappingResult(overrides: Record<string, unknown> = {}) {
 //
 // Queue order after batch dedup refactor:
 // 1. Booked transaction map query
+// 1b. Unbooked bank-synced transaction map query
 // 2. Supplier invoices fetch
 // 3. Batch external_id dedup query (returns matching external_ids)
 // 4. Per-transaction: insert, updates, etc.
@@ -138,6 +139,8 @@ describe('ingestTransactions', () => {
     const inserted = makeTransaction({ id: 'tx-1', external_id: raw.external_id })
 
     // Booked transaction map query (no booked transactions)
+    enqueue({ data: [], error: null })
+    // Unbooked bank-synced transaction map query
     enqueue({ data: [], error: null })
     // Supplier invoices fetch (no unpaid invoices)
     enqueue({ data: [], error: null })
@@ -165,6 +168,8 @@ describe('ingestTransactions', () => {
 
     // Booked transaction map query
     enqueue({ data: [], error: null })
+    // Unbooked bank-synced transaction map query
+    enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
     // Batch external_id dedup query — returns matching external_id
@@ -185,6 +190,8 @@ describe('ingestTransactions', () => {
     const raw = makeRaw()
 
     // Booked transaction map query
+    enqueue({ data: [], error: null })
+    // Unbooked bank-synced transaction map query
     enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
@@ -213,6 +220,8 @@ describe('ingestTransactions', () => {
     })
 
     // Booked transaction map query
+    enqueue({ data: [], error: null })
+    // Unbooked bank-synced transaction map query
     enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
@@ -257,6 +266,8 @@ describe('ingestTransactions', () => {
 
     // Booked transaction map query
     enqueue({ data: [], error: null })
+    // Unbooked bank-synced transaction map query
+    enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
     // Batch external_id dedup query (no matches)
@@ -287,6 +298,8 @@ describe('ingestTransactions', () => {
     const journalEntry = makeJournalEntry({ id: 'je-1' })
 
     // Booked transaction map query
+    enqueue({ data: [], error: null })
+    // Unbooked bank-synced transaction map query
     enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
@@ -328,6 +341,8 @@ describe('ingestTransactions', () => {
 
     // Booked transaction map query
     enqueue({ data: [], error: null })
+    // Unbooked bank-synced transaction map query
+    enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
     // Batch external_id dedup query (no matches)
@@ -359,6 +374,8 @@ describe('ingestTransactions', () => {
 
     // Booked transaction map query
     enqueue({ data: [], error: null })
+    // Unbooked bank-synced transaction map query
+    enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
     // Batch external_id dedup query (no matches)
@@ -388,6 +405,8 @@ describe('ingestTransactions', () => {
     const inserted2 = makeTransaction({ id: 'tx-b', amount: -200 })
 
     // Booked transaction map query
+    enqueue({ data: [], error: null })
+    // Unbooked bank-synced transaction map query
     enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
@@ -427,6 +446,8 @@ describe('ingestTransactions', () => {
     })
 
     // Booked transaction map query
+    enqueue({ data: [], error: null })
+    // Unbooked bank-synced transaction map query
     enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
@@ -501,6 +522,8 @@ describe('ingestTransactions', () => {
 
     // Booked transaction map query
     enqueue({ data: [], error: null })
+    // Unbooked bank-synced transaction map query
+    enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
     // Batch external_id dedup query (no matches)
@@ -527,6 +550,8 @@ describe('ingestTransactions', () => {
     const inserted = makeTransaction({ id: 'tx-cat-err', amount: -400 })
 
     // Booked transaction map query
+    enqueue({ data: [], error: null })
+    // Unbooked bank-synced transaction map query
     enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
@@ -581,6 +606,8 @@ describe('ingestTransactions', () => {
 
     // Booked transaction map query
     enqueue({ data: [], error: null })
+    // Unbooked bank-synced transaction map query
+    enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
     // Batch external_id dedup query (no matches)
@@ -625,6 +652,8 @@ describe('ingestTransactions', () => {
 
     // Booked transaction map query
     enqueue({ data: [], error: null })
+    // Unbooked bank-synced transaction map query
+    enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
     // Batch external_id dedup query (no matches)
@@ -653,6 +682,8 @@ describe('ingestTransactions', () => {
     mockFetchUnlinkedGLLines.mockRejectedValue(new Error('RPC error'))
 
     // Booked transaction map query
+    enqueue({ data: [], error: null })
+    // Unbooked bank-synced transaction map query
     enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
@@ -686,6 +717,8 @@ describe('ingestTransactions', () => {
       data: [{ date: '2024-06-15', amount: -250 }],
       error: null,
     })
+    // Unbooked bank-synced transaction map query
+    enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
     // Batch external_id dedup query (no match by external_id)
@@ -711,6 +744,8 @@ describe('ingestTransactions', () => {
       data: [{ date: '2024-06-15', amount: -250 }],
       error: null,
     })
+    // Unbooked bank-synced transaction map query
+    enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
     // Batch external_id dedup query (no match)
@@ -745,6 +780,8 @@ describe('ingestTransactions', () => {
       ],
       error: null,
     })
+    // Unbooked bank-synced transaction map query
+    enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
     // Batch external_id dedup query (no matches for any)
@@ -768,8 +805,10 @@ describe('ingestTransactions', () => {
     const raw = makeRaw({ amount: -200 })
     const inserted = makeTransaction({ id: 'tx-mapfail', amount: -200 })
 
-    // Booked map query throws (caught by try/catch in buildBookedTransactionMap)
+    // Booked map query throws (caught by try/catch in buildExistingTransactionMap)
     enqueue({ error: { message: 'Query failed' } })
+    // Unbooked bank-synced transaction map query
+    enqueue({ data: [], error: null })
     // Supplier invoices fetch
     enqueue({ data: [], error: null })
     // Batch external_id dedup query (no matches)
