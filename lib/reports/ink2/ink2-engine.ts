@@ -714,8 +714,18 @@ export async function generateINK2Declaration(
     .eq('company_id', companyId)
     .single()
 
-  // Validate entity type
-  if (settings?.entity_type !== 'aktiebolag') {
+  // Resolve entity_type: prefer company_settings, fall back to companies table (NOT NULL, always reliable)
+  let entityType = settings?.entity_type
+  if (!entityType) {
+    const { data: company } = await supabase
+      .from('companies')
+      .select('entity_type')
+      .eq('id', companyId)
+      .single()
+    entityType = company?.entity_type
+  }
+
+  if (entityType !== 'aktiebolag') {
     throw new Error('INK2 declaration is only for aktiebolag (limited company)')
   }
 
