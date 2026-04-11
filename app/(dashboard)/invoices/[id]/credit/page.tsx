@@ -12,7 +12,8 @@ import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/components/ui/use-toast'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import { getVatTreatmentLabel } from '@/lib/invoices/vat-rules'
-import { Loader2, ArrowLeft, AlertTriangle } from 'lucide-react'
+import { Loader2, ArrowLeft, AlertTriangle, Lock } from 'lucide-react'
+import { useCanWrite } from '@/lib/hooks/use-can-write'
 import type { Invoice, InvoiceItem, Customer } from '@/types'
 
 interface InvoiceWithRelations extends Invoice {
@@ -21,6 +22,7 @@ interface InvoiceWithRelations extends Invoice {
 }
 
 export default function CreateCreditNotePage({ params }: { params: Promise<{ id: string }> }) {
+  const { canWrite } = useCanWrite()
   const { id } = use(params)
   const router = useRouter()
   const { toast } = useToast()
@@ -325,12 +327,18 @@ export default function CreateCreditNotePage({ params }: { params: Promise<{ id:
         <Button
           variant="destructive"
           onClick={handleSubmit}
-          disabled={isSubmitting || confirmText !== invoice.invoice_number}
+          disabled={isSubmitting || confirmText !== invoice.invoice_number || !canWrite}
+          title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
         >
           {isSubmitting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Skapar...
+            </>
+          ) : !canWrite ? (
+            <>
+              <Lock className="mr-2 h-4 w-4" />
+              Skapa kreditfaktura
             </>
           ) : (
             'Skapa kreditfaktura'

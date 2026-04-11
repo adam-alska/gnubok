@@ -22,6 +22,10 @@ vi.mock('@/lib/company/context', () => ({
   getActiveCompanyId: vi.fn().mockResolvedValue('company-1'),
 }))
 
+vi.mock('@/lib/auth/require-write', () => ({
+  requireWritePermission: vi.fn().mockResolvedValue({ ok: true }),
+}))
+
 const mockGetVatRules = vi.fn()
 const mockCalculateVat = vi.fn()
 const mockGetAvailableVatRates = vi.fn()

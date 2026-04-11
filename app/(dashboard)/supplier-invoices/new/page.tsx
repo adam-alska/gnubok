@@ -11,7 +11,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/components/ui/use-toast'
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Lock } from 'lucide-react'
+import { useCanWrite } from '@/lib/hooks/use-can-write'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { SupplierInvoiceReviewContent } from '@/components/suppliers/SupplierInvoiceReviewContent'
 import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
@@ -62,6 +63,7 @@ function inferVatTreatment(items: LineItem[], reverseCharge: boolean): VatTreatm
 
 export default function NewSupplierInvoicePage() {
   const router = useRouter()
+  const { canWrite } = useCanWrite()
   const { toast } = useToast()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [accounts, setAccounts] = useState<BASAccount[]>([])
@@ -579,7 +581,12 @@ export default function NewSupplierInvoicePage() {
           <Button type="button" variant="outline" onClick={() => router.push('/supplier-invoices')}>
             Avbryt
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button
+            type="submit"
+            disabled={isSubmitting || !canWrite}
+            title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+          >
+            {!canWrite && <Lock className="mr-2 h-4 w-4 inline" />}
             Granska & registrera
           </Button>
         </div>

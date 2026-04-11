@@ -18,7 +18,8 @@ import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
 import { getAccountDescription } from '@/lib/bookkeeping/account-descriptions'
 import { getErrorMessage } from '@/lib/errors/get-error-message'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
-import { ArrowLeft, Plus, Trash2, ChevronDown, Loader2 } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, ChevronDown, Loader2, Lock } from 'lucide-react'
+import { useCanWrite } from '@/lib/hooks/use-can-write'
 import type { Supplier, BASAccount, VatTreatment, EntityType } from '@/types'
 
 interface LineItem {
@@ -72,6 +73,7 @@ function inferVatTreatment(items: LineItem[], reverseCharge: boolean): VatTreatm
 
 export default function NewExpensePage() {
   const router = useRouter()
+  const { canWrite } = useCanWrite()
   const { toast } = useToast()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [accounts, setAccounts] = useState<BASAccount[]>([])
@@ -704,11 +706,21 @@ export default function NewExpensePage() {
           <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => router.push('/expenses')}>
             Avbryt
           </Button>
-          <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
+          <Button
+            type="submit"
+            disabled={isSubmitting || !canWrite}
+            className="w-full sm:w-auto"
+            title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+          >
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Registrerar...
+              </>
+            ) : !canWrite ? (
+              <>
+                <Lock className="mr-2 h-4 w-4" />
+                {isEF ? 'Registrera utgift' : 'Granska & registrera'}
               </>
             ) : isEF ? (
               'Registrera utgift'

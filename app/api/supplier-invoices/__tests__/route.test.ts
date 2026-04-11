@@ -21,6 +21,10 @@ vi.mock('@/lib/company/context', () => ({
   getActiveCompanyId: vi.fn().mockResolvedValue('company-1'),
 }))
 
+vi.mock('@/lib/auth/require-write', () => ({
+  requireWritePermission: vi.fn().mockResolvedValue({ ok: true }),
+}))
+
 const mockFindFiscalPeriod = vi.fn()
 vi.mock('@/lib/bookkeeping/engine', () => ({
   findFiscalPeriod: (...args: unknown[]) => mockFindFiscalPeriod(...args),

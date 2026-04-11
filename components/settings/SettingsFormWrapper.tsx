@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-import { Loader2, Check } from 'lucide-react'
+import { Loader2, Check, Lock } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
+import { useCanWrite } from '@/lib/hooks/use-can-write'
 
 type SaveResult =
   | Record<string, unknown>
@@ -17,6 +18,7 @@ interface SettingsFormWrapperProps {
 
 export function SettingsFormWrapper({ children, onSave, className }: SettingsFormWrapperProps) {
   const { toast } = useToast()
+  const { canWrite } = useCanWrite()
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -82,11 +84,21 @@ export function SettingsFormWrapper({ children, onSave, className }: SettingsFor
             Sparat
           </span>
         )}
-        <Button type="submit" disabled={isSaving} size="sm">
+        <Button
+          type="submit"
+          disabled={isSaving || !canWrite}
+          size="sm"
+          title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+        >
           {isSaving ? (
             <>
               <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
               Sparar...
+            </>
+          ) : !canWrite ? (
+            <>
+              <Lock className="mr-2 h-3.5 w-3.5" />
+              Spara ändringar
             </>
           ) : (
             'Spara ändringar'

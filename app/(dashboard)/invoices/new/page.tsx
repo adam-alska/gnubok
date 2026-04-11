@@ -19,7 +19,8 @@ import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency } from '@/lib/utils'
 import { getVatRules, getAvailableVatRates } from '@/lib/invoices/vat-rules'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { Loader2, Plus, Trash2, ArrowLeft, Send, Eye, Landmark } from 'lucide-react'
+import { Loader2, Plus, Trash2, ArrowLeft, Send, Eye, Landmark, Lock } from 'lucide-react'
+import { useCanWrite } from '@/lib/hooks/use-can-write'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { InvoiceReviewContent } from '@/components/invoices/InvoiceReviewContent'
 import { getErrorMessage } from '@/lib/errors/get-error-message'
@@ -57,6 +58,7 @@ const units = ['st', 'tim', 'dag', 'månad', 'km', 'kg']
 export default function NewInvoicePage() {
   const router = useRouter()
   const { toast } = useToast()
+  const { canWrite } = useCanWrite()
   const supabase = createClient()
 
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -763,7 +765,14 @@ export default function NewInvoicePage() {
             </Card>
 
             {/* Actions — desktop only */}
-            <Button type="submit" className="w-full hidden lg:block" size="lg" disabled={isSubmitting}>
+            <Button
+              type="submit"
+              className="w-full hidden lg:block"
+              size="lg"
+              disabled={isSubmitting || !canWrite}
+              title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+            >
+              {!canWrite && <Lock className="mr-2 h-4 w-4 inline" />}
               Granska & skapa
             </Button>
           </div>
@@ -776,7 +785,12 @@ export default function NewInvoicePage() {
               <p className="text-xs text-muted-foreground">Totalt</p>
               <p className="text-lg font-bold tabular-nums">{formatCurrency(total, watchCurrency)}</p>
             </div>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button
+              type="submit"
+              disabled={isSubmitting || !canWrite}
+              title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+            >
+              {!canWrite && <Lock className="mr-2 h-4 w-4 inline" />}
               Granska & skapa
             </Button>
           </div>

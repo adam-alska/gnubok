@@ -5,6 +5,7 @@ import { runReconciliation } from '@/lib/reconciliation/bank-reconciliation'
 import { validateBody } from '@/lib/api/validate'
 import { RunReconciliationSchema } from '@/lib/api/schemas'
 import { requireCompanyId } from '@/lib/company/context'
+import { requireWritePermission } from '@/lib/auth/require-write'
 
 ensureInitialized()
 
@@ -15,6 +16,9 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const writeCheck = await requireWritePermission(supabase, user.id)
+  if (!writeCheck.ok) return writeCheck.response
 
   const companyId = await requireCompanyId(supabase, user.id)
 

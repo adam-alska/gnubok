@@ -12,8 +12,9 @@ import { PageHeader } from '@/components/ui/page-header'
 import { EmptyState } from '@/components/ui/empty-state'
 import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency } from '@/lib/utils'
-import { Plus, Search, Wallet, Clock, AlertCircle } from 'lucide-react'
+import { Plus, Search, Wallet, Clock, AlertCircle, Lock } from 'lucide-react'
 import { useCompany } from '@/contexts/CompanyContext'
+import { useCanWrite } from '@/lib/hooks/use-can-write'
 import type { SupplierInvoice } from '@/types'
 
 type ExpenseInvoice = SupplierInvoice & { supplier?: { id: string; name: string } }
@@ -62,6 +63,7 @@ function getRelativeTimeLabel(dueDateStr: string, status: string): { text: strin
 
 export default function ExpensesPage() {
   const { company } = useCompany()
+  const { canWrite } = useCanWrite()
   const [invoices, setInvoices] = useState<ExpenseInvoice[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -119,12 +121,22 @@ export default function ExpensesPage() {
         title="Utgifter"
         description="Registrera och hantera dina utgifter"
         action={
-          <Link href="/expenses/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
+          canWrite ? (
+            <Link href="/expenses/new">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Ny utgift
+              </Button>
+            </Link>
+          ) : (
+            <Button
+              disabled
+              title="Du har endast läsbehörighet i detta företag"
+            >
+              <Lock className="mr-2 h-4 w-4" />
               Ny utgift
             </Button>
-          </Link>
+          )
         }
       />
 

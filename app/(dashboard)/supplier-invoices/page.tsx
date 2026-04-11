@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Plus, FileInput } from 'lucide-react'
+import { Plus, FileInput, Lock } from 'lucide-react'
 import Link from 'next/link'
+import { useCanWrite } from '@/lib/hooks/use-can-write'
 import type { SupplierInvoice } from '@/types'
 
 function formatAmount(amount: number): string {
@@ -34,6 +35,7 @@ const statusLabels: Record<string, string> = {
 }
 
 export default function SupplierInvoicesPage() {
+  const { canWrite } = useCanWrite()
   const [invoices, setInvoices] = useState<(SupplierInvoice & { supplier?: { id: string; name: string } })[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('all')
@@ -78,12 +80,22 @@ export default function SupplierInvoicesPage() {
             Registrera och hantera inkommande fakturor
           </p>
         </div>
-        <Link href="/supplier-invoices/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
+        {canWrite ? (
+          <Link href="/supplier-invoices/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Registrera faktura
+            </Button>
+          </Link>
+        ) : (
+          <Button
+            disabled
+            title="Du har endast läsbehörighet i detta företag"
+          >
+            <Lock className="mr-2 h-4 w-4" />
             Registrera faktura
           </Button>
-        </Link>
+        )}
       </div>
 
       {/* Summary cards */}
@@ -182,7 +194,7 @@ export default function SupplierInvoicesPage() {
                     ? 'Registrera din första leverantörsfaktura'
                     : 'Inga fakturor i denna kategori'}
                 </p>
-                {activeTab === 'all' && (
+                {activeTab === 'all' && canWrite && (
                   <Link href="/supplier-invoices/new">
                     <Button className="mt-4">
                       <Plus className="mr-2 h-4 w-4" />

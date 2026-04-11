@@ -21,8 +21,10 @@ import {
   Calendar,
   FileText,
   Database,
+  Lock,
 } from 'lucide-react'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
+import { useCanWrite } from '@/lib/hooks/use-can-write'
 import type { ImportPreview, AccountMapping } from '@/lib/import/types'
 
 interface ImportReviewStepProps {
@@ -47,6 +49,7 @@ export default function ImportReviewStep({
   onBack,
   isLoading,
 }: ImportReviewStepProps) {
+  const { canWrite } = useCanWrite()
   const [options, setOptions] = useState<ImportExecuteOptions>({
     createFiscalPeriod: true,
     importOpeningBalances: true,
@@ -295,9 +298,15 @@ export default function ImportReviewStep({
         <Button variant="outline" className="min-h-11" onClick={onBack}>
           Tillbaka
         </Button>
-        <Button className="min-h-11" onClick={handleExecute}>
+        <Button
+          className="min-h-11"
+          onClick={handleExecute}
+          disabled={!canWrite || isLoading}
+          title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+        >
+          {!canWrite && <Lock className="mr-2 h-4 w-4" />}
           Starta import
-          <ArrowRight className="ml-2 h-4 w-4" />
+          {canWrite && <ArrowRight className="ml-2 h-4 w-4" />}
         </Button>
       </div>
     </div>
