@@ -13,9 +13,10 @@ import { PageHeader } from '@/components/ui/page-header'
 import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
-import { Plus, Search, Receipt } from 'lucide-react'
+import { Plus, Search, Receipt, Lock } from 'lucide-react'
 import { EmptyInvoices } from '@/components/ui/empty-state'
 import { useCompany } from '@/contexts/CompanyContext'
+import { useCanWrite } from '@/lib/hooks/use-can-write'
 import type { Invoice, InvoiceStatus } from '@/types'
 
 const statusConfig: Record<InvoiceStatus, { label: string; variant: 'default' | 'secondary' | 'success' | 'warning' | 'destructive'; borderColor: string }> = {
@@ -51,6 +52,7 @@ function getRelativeTimeLabel(dueDateStr: string, status: InvoiceStatus): { text
 
 export default function InvoicesPage() {
   const { company } = useCompany()
+  const { canWrite } = useCanWrite()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -115,12 +117,22 @@ export default function InvoicesPage() {
         title="Fakturor"
         description="Skicka fakturor, följ betalningar och skapa kreditnotor"
         action={
-          <Link href="/invoices/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
+          canWrite ? (
+            <Link href="/invoices/new">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Ny faktura
+              </Button>
+            </Link>
+          ) : (
+            <Button
+              disabled
+              title="Du har endast läsbehörighet i detta företag"
+            >
+              <Lock className="mr-2 h-4 w-4" />
               Ny faktura
             </Button>
-          </Link>
+          )
         }
       />
 

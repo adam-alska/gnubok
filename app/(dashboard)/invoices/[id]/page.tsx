@@ -26,7 +26,9 @@ import {
   AlertTriangle,
   MessageSquare,
   Trash2,
+  Lock,
 } from 'lucide-react'
+import { useCanWrite } from '@/lib/hooks/use-can-write'
 import PaymentBookingDialog from '@/components/invoices/PaymentBookingDialog'
 import SendInvoiceDialog from '@/components/invoices/SendInvoiceDialog'
 import {
@@ -62,6 +64,7 @@ interface InvoiceWithRelations extends Invoice {
 }
 
 export default function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { canWrite } = useCanWrite()
   const { id } = use(params)
   const router = useRouter()
   const { toast } = useToast()
@@ -379,9 +382,15 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         {/* Actions */}
         <div className="flex flex-wrap items-center gap-2">
           {isProforma && invoice.status !== 'cancelled' && (
-            <Button onClick={convertToInvoice} disabled={isConverting}>
+            <Button
+              onClick={convertToInvoice}
+              disabled={isConverting || !canWrite}
+              title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+            >
               {isConverting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : !canWrite ? (
+                <Lock className="mr-2 h-4 w-4" />
               ) : (
                 <FileText className="mr-2 h-4 w-4" />
               )}
@@ -390,26 +399,44 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           )}
           {invoice.status === 'draft' && !isDeliveryNote && (
             customerHasEmail ? (
-              <Button onClick={() => openSendDialog('email')}>
-                <Mail className="mr-2 h-4 w-4" />
+              <Button
+                onClick={() => openSendDialog('email')}
+                disabled={!canWrite}
+                title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+              >
+                {canWrite ? <Mail className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />}
                 Skicka via e-post
               </Button>
             ) : (
-              <Button variant="secondary" onClick={() => openSendDialog('manual')}>
-                <Send className="mr-2 h-4 w-4" />
+              <Button
+                variant="secondary"
+                onClick={() => openSendDialog('manual')}
+                disabled={!canWrite}
+                title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+              >
+                {canWrite ? <Send className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />}
                 Skickad manuellt
               </Button>
             )
           )}
           {isDeliveryNote && invoice.status === 'draft' && (
-            <Button variant="secondary" onClick={() => updateStatus('sent')} disabled={isUpdating}>
-              <Send className="mr-2 h-4 w-4" />
+            <Button
+              variant="secondary"
+              onClick={() => updateStatus('sent')}
+              disabled={isUpdating || !canWrite}
+              title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+            >
+              {canWrite ? <Send className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />}
               Markera som skickad
             </Button>
           )}
           {(invoice.status === 'sent' || invoice.status === 'overdue') && isRealInvoice && (
-            <Button onClick={() => setShowPaymentDialog(true)} disabled={isUpdating}>
-              <CheckCircle className="mr-2 h-4 w-4" />
+            <Button
+              onClick={() => setShowPaymentDialog(true)}
+              disabled={isUpdating || !canWrite}
+              title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+            >
+              {canWrite ? <CheckCircle className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />}
               Markera som betald
             </Button>
           )}

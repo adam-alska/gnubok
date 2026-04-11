@@ -1,6 +1,8 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { ensureInitialized } from '@/lib/init'
 import { requireCompanyId } from '@/lib/company/context'
+import { requireWritePermission } from '@/lib/auth/require-write'
 import { generateInviteToken, getInviteExpiry } from '@/lib/auth/invite-tokens'
 import { getEmailService } from '@/lib/email/service'
 import {
@@ -8,6 +10,12 @@ import {
   generateInviteEmailHtml,
   generateInviteEmailText,
 } from '@/lib/email/invite-templates'
+
+// Loads the email extension so getEmailService() returns the Resend
+// implementation instead of the noop default. Without this, the invite email
+// is silently skipped in dev whenever this route is hit before any other
+// init'd route in the process.
+ensureInitialized()
 
 /**
  * POST /api/company/members/invite
@@ -18,6 +26,9 @@ export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const writeCheck = await requireWritePermission(supabase, user.id)
+  if (!writeCheck.ok) return writeCheck.response
 
   const companyId = await requireCompanyId(supabase, user.id)
   const serviceClient = await createServiceClient()
@@ -136,6 +147,12 @@ export async function POST(request: Request) {
       inviteUrl,
     }
 
+    console.log('[company/members/invite] sending email', {
+      to: email,
+      company: emailData.companyName,
+      from: user.email,
+    })
+
     const result = await emailService.sendEmail({
       to: email,
       subject: generateInviteEmailSubject(emailData),
@@ -143,9 +160,18 @@ export async function POST(request: Request) {
       text: generateInviteEmailText(emailData),
     })
 
-    if (!result.success) {
+    if (result.success) {
+      console.log('[company/members/invite] email sent', {
+        to: email,
+        messageId: result.messageId,
+      })
+    } else {
       console.error('[company/members/invite] email send failed:', result.error)
     }
+  } else {
+    console.warn('[company/members/invite] email service not configured — skipping send', {
+      to: email,
+    })
   }
 
   // In development, return the invite URL directly (no email service)

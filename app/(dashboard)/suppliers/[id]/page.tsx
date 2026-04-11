@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
-import { ArrowLeft, Edit, Trash2, FileText } from 'lucide-react'
+import { ArrowLeft, Edit, Trash2, FileText, Lock } from 'lucide-react'
+import { useCanWrite } from '@/lib/hooks/use-can-write'
 import SupplierForm from '@/components/suppliers/SupplierForm'
 import Link from 'next/link'
 import { DestructiveConfirmDialog, useDestructiveConfirm } from '@/components/ui/destructive-confirm-dialog'
@@ -24,6 +25,7 @@ function formatAmount(amount: number): string {
 }
 
 export default function SupplierDetailPage() {
+  const { canWrite } = useCanWrite()
   const params = useParams()
   const router = useRouter()
   const { toast } = useToast()
@@ -153,12 +155,23 @@ export default function SupplierDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsEditOpen(true)}>
-            <Edit className="mr-2 h-4 w-4" />
+          <Button
+            variant="outline"
+            onClick={() => setIsEditOpen(true)}
+            disabled={!canWrite}
+            title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+          >
+            {canWrite ? <Edit className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />}
             Redigera
           </Button>
-          <Button variant="destructive" size="icon" onClick={handleDelete}>
-            <Trash2 className="h-4 w-4" />
+          <Button
+            variant="destructive"
+            size="icon"
+            onClick={handleDelete}
+            disabled={!canWrite}
+            title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+          >
+            {canWrite ? <Trash2 className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
           </Button>
         </div>
       </div>

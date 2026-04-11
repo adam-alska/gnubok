@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { AccountNumber } from '@/components/ui/account-number'
-import { Loader2, ArrowLeft, Paperclip, AlertTriangle } from 'lucide-react'
+import { Loader2, ArrowLeft, Paperclip, AlertTriangle, Lock } from 'lucide-react'
+import { useCanWrite } from '@/lib/hooks/use-can-write'
 import JournalEntryAttachments from '@/components/bookkeeping/JournalEntryAttachments'
 import JournalEntryStatusBadge, { sourceTypeLabels } from '@/components/bookkeeping/JournalEntryStatusBadge'
 import CorrectionEntryDialog from '@/components/bookkeeping/CorrectionEntryDialog'
@@ -14,6 +15,7 @@ import type { JournalEntry, JournalEntryLine } from '@/types'
 
 export default function JournalEntryDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const { canWrite } = useCanWrite()
   const [entry, setEntry] = useState<JournalEntry | null>(null)
   const [chain, setChain] = useState<JournalEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -124,7 +126,10 @@ export default function JournalEntryDetailPage({ params }: { params: Promise<{ i
             size="sm"
             className="w-full sm:w-auto"
             onClick={() => setShowCorrection(true)}
+            disabled={!canWrite}
+            title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
           >
+            {!canWrite && <Lock className="mr-2 h-4 w-4" />}
             Skapa ändringsverifikation
           </Button>
         )}

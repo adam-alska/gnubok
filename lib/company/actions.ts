@@ -14,7 +14,10 @@ export async function switchCompany(companyId: string): Promise<{ error?: string
 
   try {
     await setActiveCompany(supabase, user.id, companyId)
-    revalidatePath('/')
+    // No revalidatePath — the client performs a hard navigation
+    // (window.location.assign) after this action returns, which wipes
+    // every React/router/fetch cache wholesale. revalidatePath would be a
+    // no-op and would just race with the hard reload.
     return {}
   } catch {
     return { error: 'Du har inte tillgång till detta företag.' }

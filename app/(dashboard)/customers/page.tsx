@@ -8,11 +8,12 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
-import { Plus, Search, Users } from 'lucide-react'
+import { Plus, Search, Users, Lock } from 'lucide-react'
 import CustomerForm from '@/components/customers/CustomerForm'
 import { EmptyCustomers } from '@/components/ui/empty-state'
 import Link from 'next/link'
 import { useCompany } from '@/contexts/CompanyContext'
+import { useCanWrite } from '@/lib/hooks/use-can-write'
 import type { Customer, CustomerType, CreateCustomerInput } from '@/types'
 
 const customerTypeLabels: Record<CustomerType, string> = {
@@ -33,6 +34,7 @@ function getInitials(name: string): string {
 
 export default function CustomersPage() {
   const { company } = useCompany()
+  const { canWrite } = useCanWrite()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -112,8 +114,15 @@ export default function CustomersPage() {
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
+            <Button
+              disabled={!canWrite}
+              title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+            >
+              {canWrite ? (
+                <Plus className="mr-2 h-4 w-4" />
+              ) : (
+                <Lock className="mr-2 h-4 w-4" />
+              )}
               Ny kund
             </Button>
           </DialogTrigger>

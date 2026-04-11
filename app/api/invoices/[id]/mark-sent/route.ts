@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { createInvoiceJournalEntry } from '@/lib/bookkeeping/invoice-entries'
 import { ensureInitialized } from '@/lib/init'
 import { requireCompanyId } from '@/lib/company/context'
+import { requireWritePermission } from '@/lib/auth/require-write'
 import type { EntityType, Invoice } from '@/types'
 
 ensureInitialized()
@@ -26,6 +27,9 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const writeCheck = await requireWritePermission(supabase, user.id)
+  if (!writeCheck.ok) return writeCheck.response
 
   const companyId = await requireCompanyId(supabase, user.id)
 

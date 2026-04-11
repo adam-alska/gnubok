@@ -21,6 +21,8 @@ import {
 } from '@/components/ui/select'
 import { Deadline, DeadlineType, DeadlinePriority } from '@/types'
 import { formatDateISO, DEADLINE_TYPE_LABELS, PRIORITY_LABELS } from '@/lib/calendar/utils'
+import { useCanWrite } from '@/lib/hooks/use-can-write'
+import { Lock } from 'lucide-react'
 
 interface DeadlineFormProps {
   open: boolean
@@ -41,6 +43,7 @@ export function DeadlineForm({
   initialDate,
   customers,
 }: DeadlineFormProps) {
+  const { canWrite } = useCanWrite()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
@@ -300,7 +303,12 @@ export function DeadlineForm({
               >
                 Avbryt
               </Button>
-              <Button type="submit" disabled={isLoading || !formData.title}>
+              <Button
+                type="submit"
+                disabled={isLoading || !formData.title || !canWrite}
+                title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+              >
+                {!canWrite && <Lock className="mr-2 h-4 w-4" />}
                 {isLoading ? 'Sparar...' : initialData?.id ? 'Spara' : 'Skapa'}
               </Button>
             </div>

@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
-import { Plus, Trash2, AlertTriangle, Loader2 } from 'lucide-react'
+import { Plus, Trash2, AlertTriangle, Loader2, Lock } from 'lucide-react'
+import { useCanWrite } from '@/lib/hooks/use-can-write'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { JournalEntryReviewContent } from '@/components/bookkeeping/JournalEntryReviewContent'
 import DocumentUploadZone from '@/components/bookkeeping/DocumentUploadZone'
@@ -62,6 +63,7 @@ export default function JournalEntryForm({
   submitUrl,
   embedded,
 }: Props) {
+  const { canWrite } = useCanWrite()
   const { toast } = useToast()
   const [periods, setPeriods] = useState<FiscalPeriod[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState('')
@@ -615,8 +617,10 @@ export default function JournalEntryForm({
       <div className="flex flex-col items-end gap-1">
         <Button
           onClick={handleReview}
-          disabled={!isBalanced || !description || !selectedPeriod || isSubmitting || isUploading}
+          disabled={!isBalanced || !description || !selectedPeriod || isSubmitting || isUploading || !canWrite}
+          title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
         >
+          {!canWrite && <Lock className="mr-2 h-4 w-4" />}
           Granska & skapa
         </Button>
         {(!description || !selectedPeriod || isUploading) && (

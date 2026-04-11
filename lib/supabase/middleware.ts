@@ -49,14 +49,22 @@ export async function updateSession(request: NextRequest) {
     await supabase.auth.signOut()
   }
 
+  // Invite pages — accessible to everyone, signed in or not. A user who
+  // already has an account and is signed in should still be able to land on
+  // /invite/[token] to accept the invite with one click (see
+  // app/invite/[token]/page.tsx). If we bounce them to '/', they never see
+  // the invite at all.
+  if (pathname.startsWith('/invite')) {
+    return supabaseResponse
+  }
+
   // Public auth routes — allow access
   if (
     pathname.startsWith('/login') ||
     pathname.startsWith('/register') ||
     pathname.startsWith('/auth') ||
     pathname.startsWith('/reset-password') ||
-    pathname.startsWith('/sandbox') ||
-    pathname.startsWith('/invite')
+    pathname.startsWith('/sandbox')
   ) {
     // If user is logged in and trying to access auth pages, redirect to dashboard
     if (user) {
@@ -99,12 +107,32 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
+  // Forward the pathname so server layouts can branch on it (e.g. render a
+  // no-company shell for /settings/account).
+  supabaseResponse.headers.set('x-pathname', pathname)
+
   // Company context resolution
+  const cookieCompanyId = request.cookies.get('gnubok-company-id')?.value
   const companyId = await resolveCompanyForMiddleware(supabase, user.id, request)
 
-  // No companies — only allow /onboarding, redirect everything else there
+  // If the cookie pointed at a company we can no longer resolve (e.g.
+  // archived), clear it so the browser stops sending it.
+  if (cookieCompanyId && cookieCompanyId !== companyId) {
+    supabaseResponse.cookies.set('gnubok-company-id', '', { path: '/', maxAge: 0 })
+  }
+
+  // Routes that stay accessible when the user has no active company.
+  // Needed so a user who archived their last company can still delete
+  // their account without being trapped on /onboarding forever.
+  const isNoCompanyAllowed =
+    pathname.startsWith('/onboarding') ||
+    pathname.startsWith('/settings/account') ||
+    pathname.startsWith('/api/account/') ||
+    pathname.startsWith('/api/company')
+
+  // No companies — redirect to onboarding, but allow the escape-hatch routes
   if (!companyId) {
-    if (pathname.startsWith('/onboarding')) {
+    if (isNoCompanyAllowed) {
       return supabaseResponse
     }
     return NextResponse.redirect(new URL('/onboarding', request.url))
@@ -129,53 +157,67 @@ export async function updateSession(request: NextRequest) {
 
 /**
  * Resolve the active company for the authenticated user.
- * Uses cookie → user_preferences → first membership as fallback.
+ *
+ * Resolution: user_preferences → first non-archived membership.
+ *
+ * `user_preferences.active_company_id` is the authoritative source for
+ * the active company on both the Next.js and Postgres RLS side. The
+ * `gnubok-company-id` cookie is still refreshed for legacy read paths
+ * but it is no longer READ here, because RLS (via
+ * `current_active_company_id()`) cannot see cookies — so letting the
+ * cookie override the database would re-introduce the divergence this
+ * entire migration exists to fix.
+ *
+ * When we fall back to "first membership" (no user_preferences row yet),
+ * we also upsert user_preferences so subsequent RLS lookups agree with
+ * us without needing the fallback scan.
+ *
  * Cannot use lib/company/context.ts because middleware runs on Edge.
  */
 async function resolveCompanyForMiddleware(
   supabase: ReturnType<typeof createServerClient>,
   userId: string,
-  request: NextRequest
+  _request: NextRequest
 ): Promise<string | null> {
-  // 1. Try cookie
-  const cookieCompanyId = request.cookies.get('gnubok-company-id')?.value
-  if (cookieCompanyId) {
-    const { data: membership } = await supabase
-      .from('company_members')
-      .select('company_id')
-      .eq('company_id', cookieCompanyId)
-      .eq('user_id', userId)
-      .single()
-
-    if (membership) return membership.company_id
-  }
-
-  // 2. Try user_preferences
+  // 1. user_preferences (authoritative)
   const { data: prefs } = await supabase
     .from('user_preferences')
     .select('active_company_id')
     .eq('user_id', userId)
-    .single()
+    .maybeSingle()
 
   if (prefs?.active_company_id) {
     const { data: membership } = await supabase
       .from('company_members')
-      .select('company_id')
+      .select('company_id, companies!inner(archived_at)')
       .eq('company_id', prefs.active_company_id)
       .eq('user_id', userId)
-      .single()
+      .is('companies.archived_at', null)
+      .maybeSingle()
 
     if (membership) return membership.company_id
   }
 
-  // 3. Fallback: first company membership
+  // 2. Fallback: first non-archived membership by created_at
   const { data: firstCompany } = await supabase
     .from('company_members')
-    .select('company_id')
+    .select('company_id, companies!inner(archived_at)')
     .eq('user_id', userId)
+    .is('companies.archived_at', null)
     .order('created_at', { ascending: true })
     .limit(1)
-    .single()
+    .maybeSingle()
 
-  return firstCompany?.company_id ?? null
+  if (!firstCompany) return null
+
+  // Write the fallback back to user_preferences so future RLS lookups
+  // see the same active company without needing this fallback scan.
+  await supabase
+    .from('user_preferences')
+    .upsert(
+      { user_id: userId, active_company_id: firstCompany.company_id },
+      { onConflict: 'user_id' }
+    )
+
+  return firstCompany.company_id
 }

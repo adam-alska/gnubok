@@ -7,7 +7,8 @@ import { DeadlineCard } from './DeadlineCard'
 import { DeadlineFilters } from './DeadlineFilters'
 import { DeadlineForm } from './DeadlineForm'
 import { isDeadlineOverdue } from '@/lib/calendar/utils'
-import { Plus } from 'lucide-react'
+import { Plus, Lock } from 'lucide-react'
+import { useCanWrite } from '@/lib/hooks/use-can-write'
 
 interface DeadlineListProps {
   deadlines: Deadline[]
@@ -26,6 +27,7 @@ export function DeadlineList({
   onDeadlineEdit,
   onDeadlineDelete,
 }: DeadlineListProps) {
+  const { canWrite } = useCanWrite()
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed'>('pending')
   const [typeFilter, setTypeFilter] = useState<DeadlineType | 'all'>('all')
   const [showForm, setShowForm] = useState(false)
@@ -105,8 +107,16 @@ export function DeadlineList({
           onTypeChange={setTypeFilter}
           onReset={handleResetFilters}
         />
-        <Button onClick={() => setShowForm(true)}>
-          <Plus className="h-4 w-4 mr-2" />
+        <Button
+          onClick={() => setShowForm(true)}
+          disabled={!canWrite}
+          title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+        >
+          {canWrite ? (
+            <Plus className="h-4 w-4 mr-2" />
+          ) : (
+            <Lock className="h-4 w-4 mr-2" />
+          )}
           Ny deadline
         </Button>
       </div>
@@ -124,8 +134,14 @@ export function DeadlineList({
             size="sm"
             className="mt-4"
             onClick={() => setShowForm(true)}
+            disabled={!canWrite}
+            title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
           >
-            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            {canWrite ? (
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+            ) : (
+              <Lock className="h-3.5 w-3.5 mr-1.5" />
+            )}
             Skapa en deadline
           </Button>
         </div>

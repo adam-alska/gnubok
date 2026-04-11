@@ -1,6 +1,7 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { requireCompanyId } from '@/lib/company/context'
+import { requireWritePermission } from '@/lib/auth/require-write'
 
 /**
  * DELETE /api/company/members/invite/[id]
@@ -14,6 +15,9 @@ export async function DELETE(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const writeCheck = await requireWritePermission(supabase, user.id)
+  if (!writeCheck.ok) return writeCheck.response
 
   const companyId = await requireCompanyId(supabase, user.id)
   const { id: inviteId } = await params

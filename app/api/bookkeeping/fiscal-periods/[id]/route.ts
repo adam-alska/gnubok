@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { validateBody } from '@/lib/api/validate'
 import { validatePeriodDuration } from '@/lib/bookkeeping/validate-period-duration'
 import { requireCompanyId } from '@/lib/company/context'
+import { requireWritePermission } from '@/lib/auth/require-write'
 import { z } from 'zod'
 
 const UpdateFiscalPeriodSchema = z.object({
@@ -22,6 +23,9 @@ export async function PATCH(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const writeCheck = await requireWritePermission(supabase, user.id)
+  if (!writeCheck.ok) return writeCheck.response
 
   const companyId = await requireCompanyId(supabase, user.id)
 

@@ -8,10 +8,11 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
-import { Plus, Search, Building2, Globe } from 'lucide-react'
+import { Plus, Search, Building2, Globe, Lock } from 'lucide-react'
 import SupplierForm from '@/components/suppliers/SupplierForm'
 import Link from 'next/link'
 import { useCompany } from '@/contexts/CompanyContext'
+import { useCanWrite } from '@/lib/hooks/use-can-write'
 import type { Supplier, SupplierType, CreateSupplierInput } from '@/types'
 
 const supplierTypeLabels: Record<SupplierType, string> = {
@@ -28,6 +29,7 @@ const supplierTypeIcons: Record<SupplierType, React.ElementType> = {
 
 export default function SuppliersPage() {
   const { company } = useCompany()
+  const { canWrite } = useCanWrite()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -108,8 +110,15 @@ export default function SuppliersPage() {
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
+            <Button
+              disabled={!canWrite}
+              title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+            >
+              {canWrite ? (
+                <Plus className="mr-2 h-4 w-4" />
+              ) : (
+                <Lock className="mr-2 h-4 w-4" />
+              )}
               Ny leverantör
             </Button>
           </DialogTrigger>
@@ -169,8 +178,17 @@ export default function SuppliersPage() {
                 <p className="text-muted-foreground text-center mt-1">
                   Lägg till din första leverantör för att börja registrera inköpsfakturor
                 </p>
-                <Button className="mt-4" onClick={() => setIsDialogOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
+                <Button
+                  className="mt-4"
+                  onClick={() => setIsDialogOpen(true)}
+                  disabled={!canWrite}
+                  title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+                >
+                  {canWrite ? (
+                    <Plus className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Lock className="mr-2 h-4 w-4" />
+                  )}
                   Ny leverantör
                 </Button>
               </div>

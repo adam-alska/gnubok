@@ -23,7 +23,9 @@ import {
   Trash2,
   Loader2,
   Receipt,
+  Lock,
 } from 'lucide-react'
+import { useCanWrite } from '@/lib/hooks/use-can-write'
 import type { Customer, CustomerType, CreateCustomerInput } from '@/types'
 
 const customerTypeLabels: Record<CustomerType, string> = {
@@ -63,6 +65,7 @@ export default function CustomerDetailPage({
   const { id } = use(params)
   const router = useRouter()
   const { toast } = useToast()
+  const { canWrite } = useCanWrite()
   const [customer, setCustomer] = useState<CustomerWithRelations | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isEditOpen, setIsEditOpen] = useState(false)
@@ -203,8 +206,14 @@ export default function CustomerDetailPage({
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setIsEditOpen(true)}>
-            <Edit2 className="h-4 w-4 mr-1" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsEditOpen(true)}
+            disabled={!canWrite}
+            title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+          >
+            {canWrite ? <Edit2 className="h-4 w-4 mr-1" /> : <Lock className="h-4 w-4 mr-1" />}
             Redigera
           </Button>
           <Button
@@ -212,8 +221,10 @@ export default function CustomerDetailPage({
             size="sm"
             onClick={handleDelete}
             className="text-destructive hover:text-destructive"
+            disabled={!canWrite}
+            title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
           >
-            <Trash2 className="h-4 w-4 mr-1" />
+            {canWrite ? <Trash2 className="h-4 w-4 mr-1" /> : <Lock className="h-4 w-4 mr-1" />}
             Ta bort
           </Button>
         </div>

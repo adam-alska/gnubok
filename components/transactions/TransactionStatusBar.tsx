@@ -3,7 +3,8 @@
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
-import { Upload, Wand, Plus, CheckSquare, FileText } from 'lucide-react'
+import { Upload, Wand, Plus, CheckSquare, FileText, Lock } from 'lucide-react'
+import { useCanWrite } from '@/lib/hooks/use-can-write'
 import type { ViewMode } from './transaction-types'
 
 interface TransactionStatusBarProps {
@@ -29,6 +30,7 @@ export default function TransactionStatusBar({
   isBatchMode,
   onToggleBatchMode,
 }: TransactionStatusBarProps) {
+  const { canWrite } = useCanWrite()
   return (
     <div className="space-y-4">
       {/* Header with title + actions */}
@@ -79,8 +81,17 @@ export default function TransactionStatusBar({
               </Button>
             </>
           )}
-          <Button size="sm" onClick={onOpenCreateDialog}>
-            <Plus className="mr-2 h-4 w-4" />
+          <Button
+            size="sm"
+            onClick={onOpenCreateDialog}
+            disabled={!canWrite}
+            title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+          >
+            {canWrite ? (
+              <Plus className="mr-2 h-4 w-4" />
+            ) : (
+              <Lock className="mr-2 h-4 w-4" />
+            )}
             Ny transaktion
           </Button>
         </div>

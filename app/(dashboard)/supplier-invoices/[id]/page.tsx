@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
-import { ArrowLeft, CheckCircle, CreditCard, FileText, Trash2 } from 'lucide-react'
+import { ArrowLeft, CheckCircle, CreditCard, FileText, Trash2, Lock } from 'lucide-react'
+import { useCanWrite } from '@/lib/hooks/use-can-write'
 import Link from 'next/link'
 import { AccountNumber } from '@/components/ui/account-number'
 import { DestructiveConfirmDialog, useDestructiveConfirm } from '@/components/ui/destructive-confirm-dialog'
@@ -40,6 +41,7 @@ const statusLabels: Record<string, string> = {
 }
 
 export default function SupplierInvoiceDetailPage() {
+  const { canWrite } = useCanWrite()
   const params = useParams()
   const router = useRouter()
   const { toast } = useToast()
@@ -189,24 +191,43 @@ export default function SupplierInvoiceDetailPage() {
         <div className="flex flex-wrap gap-2">
           {invoice.status === 'registered' && (
             <>
-              <Button onClick={handleApprove} disabled={isProcessing}>
-                <CheckCircle className="mr-2 h-4 w-4" />
+              <Button
+                onClick={handleApprove}
+                disabled={isProcessing || !canWrite}
+                title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+              >
+                {canWrite ? <CheckCircle className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />}
                 Godkänn
               </Button>
-              <Button variant="destructive" size="icon" onClick={handleDelete} disabled={isProcessing}>
-                <Trash2 className="h-4 w-4" />
+              <Button
+                variant="destructive"
+                size="icon"
+                onClick={handleDelete}
+                disabled={isProcessing || !canWrite}
+                title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+              >
+                {canWrite ? <Trash2 className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
               </Button>
             </>
           )}
           {['approved', 'overdue', 'partially_paid'].includes(invoice.status) && (
             <>
-              <Button onClick={() => setIsPayDialogOpen(true)} disabled={isProcessing}>
-                <CreditCard className="mr-2 h-4 w-4" />
+              <Button
+                onClick={() => setIsPayDialogOpen(true)}
+                disabled={isProcessing || !canWrite}
+                title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+              >
+                {canWrite ? <CreditCard className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />}
                 Markera betald
               </Button>
               {invoice.status !== 'partially_paid' && (
-                <Button variant="outline" onClick={handleCredit} disabled={isProcessing}>
-                  <FileText className="mr-2 h-4 w-4" />
+                <Button
+                  variant="outline"
+                  onClick={handleCredit}
+                  disabled={isProcessing || !canWrite}
+                  title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+                >
+                  {canWrite ? <FileText className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />}
                   Kreditfaktura
                 </Button>
               )}

@@ -8,6 +8,7 @@ import { createTransactionJournalEntry } from '@/lib/bookkeeping/transaction-ent
 import { saveUserMappingRule } from '@/lib/bookkeeping/mapping-engine'
 import { upsertCounterpartyTemplate, buildMappingResultFromCounterpartyTemplate } from '@/lib/bookkeeping/counterparty-templates'
 import { requireCompanyId } from '@/lib/company/context'
+import { requireWritePermission } from '@/lib/auth/require-write'
 import type { CategorizationTemplate } from '@/types'
 import { validateBody } from '@/lib/api/validate'
 import { CategorizeTransactionSchema } from '@/lib/api/schemas'
@@ -98,6 +99,9 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const writeCheck = await requireWritePermission(supabase, user.id)
+  if (!writeCheck.ok) return writeCheck.response
 
   const companyId = await requireCompanyId(supabase, user.id)
 

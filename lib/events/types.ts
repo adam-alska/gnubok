@@ -72,6 +72,9 @@ export type CoreEvent =
   | { type: 'supplier_invoice.received'; payload: { inboxItem: InvoiceInboxItem; userId: string; companyId: string } }
   | { type: 'supplier_invoice.extracted'; payload: { inboxItem: InvoiceInboxItem; confidence: number; userId: string; companyId: string } }
   | { type: 'supplier_invoice.confirmed'; payload: { inboxItem: InvoiceInboxItem; supplierInvoice: SupplierInvoice; userId: string; companyId: string } }
+  // Company & account lifecycle
+  | { type: 'company.deleted'; payload: { companyId: string; userId: string; archivedAt: string } }
+  | { type: 'account.deleted'; payload: { userId: string; deletedAt: string } }
 
 // ============================================================
 // Helper Types

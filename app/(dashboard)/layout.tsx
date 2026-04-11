@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
+import { headers } from 'next/headers'
 import DashboardNav from '@/components/dashboard/DashboardNav'
+import CompanyTabSync from '@/components/dashboard/CompanyTabSync'
 import { RecaptIdentify } from '@/components/RecaptIdentify'
 import { SentryIdentify } from '@/components/SentryIdentify'
 import { SandboxBanner } from '@/components/dashboard/SandboxBanner'
@@ -9,6 +10,13 @@ import { getExtensionNavItems } from '@/lib/extensions/sectors'
 import { CompanyProvider } from '@/contexts/CompanyContext'
 import { getActiveCompanyId } from '@/lib/company/context'
 import type { EntityType, CompanyRole, Team } from '@/types'
+
+/**
+ * Routes inside the dashboard group that must remain reachable when the
+ * user has no active company. Keep in sync with the middleware's
+ * no-company allowlist.
+ */
+const NO_COMPANY_ALLOWED_PATHS = ['/settings/account']
 
 export default async function DashboardLayout({
   children,
@@ -23,9 +31,19 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
-  const cookieStore = await cookies()
-  const companyId = cookieStore.get('gnubok-company-id')?.value
-    ?? await getActiveCompanyId(supabase, user.id)
+  // Resolve active company from user_preferences (authoritative). The
+  // `gnubok-company-id` cookie is intentionally no longer consulted here —
+  // `getActiveCompanyId` reads from user_preferences, matching what RLS
+  // sees via `current_active_company_id()`. Keeping both sides on the same
+  // source avoids cross-tab / cookie divergence.
+  const companyId = await getActiveCompanyId(supabase, user.id)
+
+  // Read the pathname forwarded by middleware so we can branch on it.
+  const headerStore = await headers()
+  const pathname = headerStore.get('x-pathname') ?? ''
+  const isNoCompanyAllowed = NO_COMPANY_ALLOWED_PATHS.some((p) =>
+    pathname.startsWith(p)
+  )
 
   // Fetch team membership + team info
   const { data: teamMembership } = await supabase
@@ -47,9 +65,47 @@ export default async function DashboardLayout({
 
   const isTeamMember = !!teamMembership
 
-  // No companies — redirect to onboarding
+  // No companies — redirect to onboarding, except for allowed escape-hatch
+  // routes (so the user can still reach /settings/account to delete their
+  // account after archiving their last company).
   if (!companyId) {
-    redirect('/onboarding')
+    if (!isNoCompanyAllowed) {
+      redirect('/onboarding')
+    }
+
+    return (
+      <CompanyProvider
+        value={{
+          company: null,
+          role: null,
+          companies: [],
+          isTeamMember,
+          team,
+        }}
+      >
+        <CompanyTabSync />
+        <div className="min-h-screen bg-background">
+          <DashboardNav
+            companyName="gnubok"
+            entityType="enskild_firma"
+            uncategorizedTransactionCount={0}
+            pendingOperationsCount={0}
+            isSandbox={false}
+            extensionNavItems={getExtensionNavItems()}
+          />
+          <main
+            id="main-content"
+            className="safe-area-main-padding md:!pb-0 md:pl-[232px]"
+            role="main"
+          >
+            <div className="max-w-5xl mx-auto px-5 py-8 md:px-8 md:py-10">
+              {children}
+            </div>
+          </main>
+          <SentryIdentify userId={user.id} email={user.email} />
+        </div>
+      </CompanyProvider>
+    )
   }
 
   // Fetch company + membership for context provider
@@ -79,6 +135,7 @@ export default async function DashboardLayout({
 
     return (
       <CompanyProvider value={companyContextValue}>
+        <CompanyTabSync />
         <div className="min-h-screen bg-background">
           <DashboardNav
             companyName="gnubok"
@@ -145,6 +202,7 @@ export default async function DashboardLayout({
 
   return (
     <CompanyProvider value={companyContextValue}>
+      <CompanyTabSync />
       <div className="min-h-screen bg-background">
         {/* Skip to content link for keyboard/screen reader users */}
         <a

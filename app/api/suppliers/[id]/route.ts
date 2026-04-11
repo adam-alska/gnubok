@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { validateBody } from '@/lib/api/validate'
 import { UpdateSupplierSchema } from '@/lib/api/schemas'
 import { requireCompanyId } from '@/lib/company/context'
+import { requireWritePermission } from '@/lib/auth/require-write'
 
 export async function GET(
   _request: Request,
@@ -70,6 +71,9 @@ export async function PUT(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const writeCheck = await requireWritePermission(supabase, user.id)
+  if (!writeCheck.ok) return writeCheck.response
+
   const companyId = await requireCompanyId(supabase, user.id)
 
   const result = await validateBody(request, UpdateSupplierSchema)
@@ -124,6 +128,9 @@ export async function DELETE(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const writeCheck = await requireWritePermission(supabase, user.id)
+  if (!writeCheck.ok) return writeCheck.response
 
   const companyId = await requireCompanyId(supabase, user.id)
 

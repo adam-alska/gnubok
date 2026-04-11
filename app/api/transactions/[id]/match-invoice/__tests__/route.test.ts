@@ -42,6 +42,11 @@ vi.mock('@/lib/init', () => ({
 
 vi.mock('@/lib/company/context', () => ({
   requireCompanyId: vi.fn().mockResolvedValue('company-1'),
+  getActiveCompanyId: vi.fn().mockResolvedValue('company-1'),
+}))
+
+vi.mock('@/lib/auth/require-write', () => ({
+  requireWritePermission: vi.fn().mockResolvedValue({ ok: true }),
 }))
 
 import { POST } from '../route'

@@ -11,6 +11,7 @@ import { logMatchEvent } from '@/lib/invoices/match-log'
 import { eventBus } from '@/lib/events/bus'
 import { ensureInitialized } from '@/lib/init'
 import { requireCompanyId } from '@/lib/company/context'
+import { requireWritePermission } from '@/lib/auth/require-write'
 import type { EntityType, Invoice, Transaction } from '@/types'
 
 ensureInitialized()
@@ -39,6 +40,9 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const writeCheck = await requireWritePermission(supabase, user.id)
+  if (!writeCheck.ok) return writeCheck.response
 
   const companyId = await requireCompanyId(supabase, user.id)
 

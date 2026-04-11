@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Lock } from 'lucide-react'
+import { useCanWrite } from '@/lib/hooks/use-can-write'
 import type { CreateSupplierInput, SupplierType } from '@/types'
 
 const schema = z.object({
@@ -46,6 +47,7 @@ export default function SupplierForm({
   isLoading,
   initialData,
 }: SupplierFormProps) {
+  const { canWrite } = useCanWrite()
   const {
     register,
     handleSubmit,
@@ -275,11 +277,20 @@ export default function SupplierForm({
 
       {/* Submit */}
       <div className="flex justify-end gap-2">
-        <Button type="submit" disabled={isLoading}>
+        <Button
+          type="submit"
+          disabled={isLoading || !canWrite}
+          title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+        >
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Sparar...
+            </>
+          ) : !canWrite ? (
+            <>
+              <Lock className="mr-2 h-4 w-4" />
+              Spara leverantör
             </>
           ) : (
             'Spara leverantör'
