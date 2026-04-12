@@ -305,7 +305,7 @@ export const CreateJournalEntrySchema = z.object({
   description: z.string().min(1, 'Description is required'),
   source_type: JournalEntrySourceTypeSchema.default('manual'),
   source_id: z.string().optional(),
-  voucher_series: z.string().optional(),
+  voucher_series: z.string().regex(/^[A-Z]$/, 'Verifikationsserie måste vara en bokstav A–Z').optional(),
   lines: z.array(CreateJournalEntryLineSchema).min(2, 'At least two lines are required for double-entry'),
 })
 
@@ -384,6 +384,8 @@ export const UpdateSettingsSchema = z.object({
   // Bookkeeping lock
   bookkeeping_locked_through: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ogiltigt datumformat (YYYY-MM-DD)').nullable().optional(),
   auto_lock_period_days: z.number().int().positive().nullable().optional(),
+  // Voucher series
+  default_voucher_series: z.string().regex(/^[A-Z]$/, 'Verifikationsserie måste vara en bokstav A–Z').optional(),
   // Invoice PDF settings
   ore_rounding: z.boolean().optional(),
   invoice_show_ocr: z.boolean().optional(),
@@ -584,7 +586,7 @@ export const PendingOperationsQuerySchema = z.object({
 
 export const VoucherGapQuerySchema = z.object({
   fiscal_period_id: uuid,
-  voucher_series: z.string().optional(),
+  voucher_series: z.string().regex(/^[A-Z]$/, 'Verifikationsserie måste vara en bokstav A–Z').optional(),
 })
 
 export const SaveGapExplanationSchema = z.object({

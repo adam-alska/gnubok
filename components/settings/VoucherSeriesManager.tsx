@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useCompany } from '@/contexts/CompanyContext'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 
 interface VoucherSeries {
   voucher_series: string
@@ -11,7 +12,11 @@ interface VoucherSeries {
   fiscal_period_id: string
 }
 
-export function VoucherSeriesManager() {
+interface VoucherSeriesManagerProps {
+  defaultSeries?: string
+}
+
+export function VoucherSeriesManager({ defaultSeries }: VoucherSeriesManagerProps) {
   const { company } = useCompany()
   const [series, setSeries] = useState<VoucherSeries[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -52,7 +57,7 @@ export function VoucherSeriesManager() {
         </div>
       ) : seriesEntries.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          Inga verifikationsserier ännu. Serie A skapas automatiskt vid första verifikationen.
+          Inga verifikationsserier ännu. Serie {defaultSeries || 'A'} skapas automatiskt vid första verifikationen.
         </p>
       ) : (
         <div className="space-y-2">
@@ -60,7 +65,12 @@ export function VoucherSeriesManager() {
           <div className="divide-y divide-border/8">
             {seriesEntries.map(([letter, lastNum]) => (
               <div key={letter} className="flex items-center justify-between py-2">
-                <span className="text-sm font-medium tabular-nums">Serie {letter}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium tabular-nums">Serie {letter}</span>
+                  {letter === (defaultSeries || 'A') && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">standard</Badge>
+                  )}
+                </div>
                 <span className="text-sm text-muted-foreground tabular-nums">
                   Senaste nr: {lastNum}
                 </span>
@@ -69,6 +79,10 @@ export function VoucherSeriesManager() {
           </div>
         </div>
       )}
+
+      <p className="text-xs text-muted-foreground">
+        Nya serier skapas automatiskt första gången de används vid bokföring.
+      </p>
     </section>
   )
 }
