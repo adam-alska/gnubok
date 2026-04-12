@@ -191,6 +191,9 @@ export interface CompanySettings {
   bookkeeping_locked_through: string | null
   auto_lock_period_days: number | null
 
+  // Voucher series
+  default_voucher_series: string
+
   // Invoice PDF settings
   ore_rounding: boolean
   invoice_show_ocr: boolean

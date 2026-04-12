@@ -15,6 +15,7 @@ interface JournalEntryReviewContentProps {
   periodName: string
   entryDate: string
   description: string
+  voucherSeries?: string
   lines: ReviewLine[]
   totalDebit: number
   totalCredit: number
@@ -31,6 +32,7 @@ export function JournalEntryReviewContent({
   periodName,
   entryDate,
   description,
+  voucherSeries,
   lines,
   totalDebit,
   totalCredit,
@@ -46,7 +48,7 @@ export function JournalEntryReviewContent({
     <div className="space-y-4">
       {/* Header info */}
       <div className="bg-muted rounded-lg p-4 space-y-2">
-        <div className={`grid gap-4 text-sm ${hideDate ? 'grid-cols-1' : 'grid-cols-2'}`}>
+        <div className={`grid gap-4 text-sm ${hideDate && !voucherSeries ? 'grid-cols-1' : hideDate || !voucherSeries ? 'grid-cols-2' : 'grid-cols-3'}`}>
           <div>
             <span className="text-muted-foreground">Räkenskapsår</span>
             <p className="font-medium">{periodName}</p>
@@ -55,6 +57,12 @@ export function JournalEntryReviewContent({
             <div>
               <span className="text-muted-foreground">Datum</span>
               <p className="font-medium">{entryDate}</p>
+            </div>
+          )}
+          {voucherSeries && (
+            <div>
+              <span className="text-muted-foreground">Serie</span>
+              <p className="font-medium font-mono">{voucherSeries}</p>
             </div>
           )}
         </div>

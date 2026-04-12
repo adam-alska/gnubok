@@ -72,6 +72,7 @@ export default function JournalEntryForm({
   const [lines, setLines] = useState<FormLine[]>(
     initialLines ?? [{ ...BLANK_LINE }, { ...BLANK_LINE }]
   )
+  const [voucherSeries, setVoucherSeries] = useState('A')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showReview, setShowReview] = useState(false)
   const [showNoDocWarning, setShowNoDocWarning] = useState(false)
@@ -109,6 +110,12 @@ export default function JournalEntryForm({
   useEffect(() => {
     fetchPeriods()
     fetchAccounts()
+    // Fetch default voucher series from company settings
+    if (!embedded) {
+      fetch('/api/settings').then(r => r.json()).then(({ data }) => {
+        if (data?.default_voucher_series) setVoucherSeries(data.default_voucher_series)
+      }).catch(() => {/* keep 'A' */})
+    }
   }, [])
 
   // Fetch exchange rate from Riksbanken when currency changes
@@ -250,6 +257,7 @@ export default function JournalEntryForm({
         description,
         source_type: sourceType ?? 'manual',
         source_id: sourceId,
+        voucher_series: voucherSeries || 'A',
         lines: entryLines,
       }),
     })
@@ -311,7 +319,13 @@ export default function JournalEntryForm({
 
   const formContent = (
     <div className="space-y-4">
-      <div className={`grid gap-4 grid-cols-1 ${embedded && initialDate ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
+      <div className={`grid gap-4 grid-cols-1 ${
+        embedded && initialDate
+          ? 'sm:grid-cols-2'
+          : embedded
+            ? 'sm:grid-cols-3'
+            : 'sm:grid-cols-[1fr_auto_1fr_3.5rem]'
+      }`}>
         <div>
           <Label>Räkenskapsår</Label>
           <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
@@ -345,6 +359,20 @@ export default function JournalEntryForm({
             placeholder="Verifikationstext..."
           />
         </div>
+        {!embedded && (
+          <div>
+            <Label>Serie</Label>
+            <Input
+              value={voucherSeries}
+              onChange={(e) => {
+                const v = e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 1)
+                setVoucherSeries(v || 'A')
+              }}
+              className="mt-1 text-center font-mono"
+              maxLength={1}
+            />
+          </div>
+        )}
       </div>
 
       {/* Currency section */}
@@ -644,6 +672,7 @@ export default function JournalEntryForm({
           periodName={periods.find((p) => p.id === selectedPeriod)?.name || ''}
           entryDate={entryDate}
           description={description}
+          voucherSeries={!embedded ? voucherSeries : undefined}
           lines={lines}
           totalDebit={totalDebit}
           totalCredit={totalCredit}

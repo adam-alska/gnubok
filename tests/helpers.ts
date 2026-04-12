@@ -520,6 +520,7 @@ export function makeCompanySettings(
     invoice_default_notes: null,
     bookkeeping_locked_through: null,
     auto_lock_period_days: null,
+    default_voucher_series: 'A',
     ore_rounding: true,
     invoice_show_ocr: true,
     invoice_show_bankgiro: true,
