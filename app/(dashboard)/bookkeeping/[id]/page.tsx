@@ -1,27 +1,39 @@
 'use client'
 
 import { useState, useEffect, useCallback, use } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { AccountNumber } from '@/components/ui/account-number'
-import { Loader2, ArrowLeft, Paperclip, AlertTriangle, Lock } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
+import { Loader2, ArrowLeft, Paperclip, AlertTriangle, Lock, MessageSquare, Pencil, Check, X } from 'lucide-react'
 import { useCanWrite } from '@/lib/hooks/use-can-write'
 import JournalEntryAttachments from '@/components/bookkeeping/JournalEntryAttachments'
 import JournalEntryStatusBadge, { sourceTypeLabels } from '@/components/bookkeeping/JournalEntryStatusBadge'
 import CorrectionEntryDialog from '@/components/bookkeeping/CorrectionEntryDialog'
 import CorrectionChain from '@/components/bookkeeping/CorrectionChain'
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
+import { useToast } from '@/components/ui/use-toast'
 import type { JournalEntry, JournalEntryLine } from '@/types'
 
 export default function JournalEntryDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const router = useRouter()
   const { canWrite } = useCanWrite()
+  const { toast } = useToast()
   const [entry, setEntry] = useState<JournalEntry | null>(null)
   const [chain, setChain] = useState<JournalEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showCorrection, setShowCorrection] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isLastInSeries, setIsLastInSeries] = useState(false)
   const [attachmentCount, setAttachmentCount] = useState(0)
+  const [editingNotes, setEditingNotes] = useState(false)
+  const [notesValue, setNotesValue] = useState('')
+  const [savingNotes, setSavingNotes] = useState(false)
 
   const fetchData = useCallback(async () => {
     setIsLoading(true)
@@ -36,12 +48,57 @@ export default function JournalEntryDetailPage({ params }: { params: Promise<{ i
       const { data } = await res.json()
       setEntry(data.entry)
       setChain(data.chain)
+      setIsLastInSeries(data.is_last_in_series ?? false)
     } catch {
       setError('Kunde inte hämta verifikation')
     } finally {
       setIsLoading(false)
     }
   }, [id])
+
+  const saveNotes = useCallback(async (value: string) => {
+    setSavingNotes(true)
+    try {
+      const res = await fetch(`/api/bookkeeping/journal-entries/${id}/notes`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: value || null }),
+      })
+      if (res.ok) {
+        setEntry(prev => prev ? { ...prev, notes: value || null } : prev)
+        setEditingNotes(false)
+      } else {
+        toast({ title: 'Kunde inte spara anteckning', variant: 'destructive' })
+      }
+    } catch {
+      toast({ title: 'Kunde inte spara anteckning', variant: 'destructive' })
+    } finally {
+      setSavingNotes(false)
+    }
+  }, [id, toast])
+
+  const handleDelete = useCallback(async () => {
+    setIsDeleting(true)
+    try {
+      const res = await fetch(`/api/bookkeeping/journal-entries/${id}`, { method: 'DELETE' })
+      const result = await res.json()
+      if (res.ok) {
+        toast({
+          title: 'Verifikat raderat',
+          description: `Verifikat ${result.data?.voucher_series ?? ''}${result.data?.voucher_number ?? ''} har raderats.`,
+        })
+        router.push('/bookkeeping')
+      } else {
+        toast({ title: 'Kunde inte radera', description: result.error, variant: 'destructive' })
+        setShowDeleteConfirm(false)
+      }
+    } catch {
+      toast({ title: 'Kunde inte radera verifikat', variant: 'destructive' })
+      setShowDeleteConfirm(false)
+    } finally {
+      setIsDeleting(false)
+    }
+  }, [id, router, toast])
 
   useEffect(() => {
     fetchData()
@@ -120,18 +177,35 @@ export default function JournalEntryDetailPage({ params }: { params: Promise<{ i
           <p className="text-muted-foreground">{entry.description}</p>
         </div>
 
-        {canCorrect && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full sm:w-auto"
-            onClick={() => setShowCorrection(true)}
-            disabled={!canWrite}
-            title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
-          >
-            {!canWrite && <Lock className="mr-2 h-4 w-4" />}
-            Skapa ändringsverifikation
-          </Button>
+        {entry.status === 'posted' && (
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            {isLastInSeries && (
+              <Button
+                variant="destructive"
+                size="sm"
+                className="w-full sm:w-auto"
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={!canWrite}
+                title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+              >
+                {!canWrite && <Lock className="mr-2 h-4 w-4" />}
+                Radera verifikat
+              </Button>
+            )}
+            {canCorrect && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full sm:w-auto"
+                onClick={() => setShowCorrection(true)}
+                disabled={!canWrite}
+                title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+              >
+                {!canWrite && <Lock className="mr-2 h-4 w-4" />}
+                Skapa ändringsverifikation
+              </Button>
+            )}
+          </div>
         )}
       </div>
 
@@ -155,6 +229,61 @@ export default function JournalEntryDetailPage({ params }: { params: Promise<{ i
             <div className="flex justify-between">
               <span className="text-muted-foreground">Typ</span>
               <span>{sourceTypeLabels[entry.source_type] || entry.source_type}</span>
+            </div>
+            {/* Notes — always editable (internal metadata, not BFL verifikation content) */}
+            <div className="border-t pt-2 mt-2">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  Anteckning
+                </span>
+                {!editingNotes && canWrite && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    onClick={() => { setNotesValue(entry.notes || ''); setEditingNotes(true) }}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+              {editingNotes ? (
+                <div className="space-y-2">
+                  <Textarea
+                    value={notesValue}
+                    onChange={(e) => setNotesValue(e.target.value)}
+                    placeholder="Intern anteckning..."
+                    className="resize-none text-sm"
+                    rows={3}
+                    maxLength={2000}
+                    autoFocus
+                  />
+                  <div className="flex gap-1 justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2"
+                      onClick={() => setEditingNotes(false)}
+                      disabled={savingNotes}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-7 px-2"
+                      onClick={() => saveNotes(notesValue)}
+                      disabled={savingNotes}
+                    >
+                      {savingNotes ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">
+                  {entry.notes || 'Ingen anteckning'}
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -374,6 +503,29 @@ export default function JournalEntryDetailPage({ params }: { params: Promise<{ i
           }}
         />
       )}
+
+      {/* Delete confirmation dialog */}
+      <ConfirmationDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        onConfirm={handleDelete}
+        isSubmitting={isDeleting}
+        title="Radera verifikat"
+        warningText={`Verifikat ${entry?.voucher_series ?? ''}${entry?.voucher_number ?? ''} raderas permanent. Eventuella kopplade underlag behålls men avlänkas. Denna åtgärd kan inte ångras.`}
+        confirmLabel="Radera permanent"
+      >
+        <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4">
+          <AlertTriangle className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
+          <div className="text-sm">
+            <p className="font-medium mb-1">Permanent radering</p>
+            <p className="text-muted-foreground">
+              Verifikatet och dess kontorader tas bort. Kopplade transaktioner och
+              fakturor behåller sina uppgifter men markeras som ej bokförda.
+              Underlag (kvitton, dokument) behålls men avlänkas.
+            </p>
+          </div>
+        </div>
+      </ConfirmationDialog>
     </div>
   )
 }

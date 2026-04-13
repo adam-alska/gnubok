@@ -239,6 +239,7 @@ export function makeJournalEntry(overrides: Partial<JournalEntry> = {}): Journal
     reverses_id: null,
     correction_of_id: null,
     attachment_urls: null,
+    notes: null,
     created_at: '2024-06-15T14:30:00Z',
     updated_at: '2024-06-15T14:30:00Z',
     ...overrides,

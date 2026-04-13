@@ -128,7 +128,7 @@ export default function BankFileConfirmStep({
 
             <div className="p-4 bg-muted/50 rounded-lg">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <span className="text-xs">Utgifter</span>
+                <span className="text-xs">Leverantörsfakturor</span>
               </div>
               <p className="text-xl font-display font-medium tabular-nums">
                 {formatCurrency(stats.total_expenses)}
