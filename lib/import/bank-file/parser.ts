@@ -98,6 +98,11 @@ export function parseBankFile(
   } else {
     format = detectFileFormat(content, filename) || undefined
     if (!format) {
+      // Build diagnostic message listing which formats were tried
+      const tried = FORMATS
+        .filter(f => f.id !== 'generic_csv')
+        .map(f => f.name)
+      const firstLine = content.split('\n')[0]?.substring(0, 80) || ''
       return {
         format: 'generic_csv',
         format_name: 'Unknown',
@@ -106,7 +111,7 @@ export function parseBankFile(
         date_to: null,
         issues: [{
           row: 0,
-          message: 'Could not auto-detect file format. Please select your bank manually.',
+          message: `Kunde inte identifiera bankformat. Testade: ${tried.join(', ')}. Första raden: "${firstLine}". Välj bank manuellt eller använd "Annan CSV".`,
           severity: 'error',
         }],
         stats: { total_rows: 0, parsed_rows: 0, skipped_rows: 0, total_income: 0, total_expenses: 0 },

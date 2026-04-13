@@ -15,6 +15,7 @@
 
 import type { BankFileFormat, BankFileParseResult, ParsedBankTransaction, BankFileParseIssue } from '../types'
 import { prepareContent } from '../encoding'
+import { normalizeDate } from '../date-utils'
 import { parseCSVLine } from './nordea'
 
 function parseLunarAmount(value: string): number {
@@ -90,6 +91,10 @@ export const lunarFormat: BankFileFormat = {
       const balanceStr = balanceIdx >= 0 ? fields[balanceIdx] : undefined
 
       if (!date || !amountStr) {
+        const missing = []
+        if (!date) missing.push('datum')
+        if (!amountStr) missing.push('belopp')
+        issues.push({ row: i + 1, message: `Saknar ${missing.join(' och ')}`, severity: 'warning' })
         skippedRows++
         continue
       }
@@ -101,7 +106,8 @@ export const lunarFormat: BankFileFormat = {
         continue
       }
 
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const normalizedDate = normalizeDate(date)
+      if (!normalizedDate) {
         issues.push({ row: i + 1, message: `Invalid date: ${date}`, severity: 'warning' })
         skippedRows++
         continue
@@ -110,7 +116,7 @@ export const lunarFormat: BankFileFormat = {
       const balance = balanceStr ? parseLunarAmount(balanceStr) : null
 
       transactions.push({
-        date,
+        date: normalizedDate,
         description: (description || 'Unknown').trim(),
         amount,
         currency: 'SEK',

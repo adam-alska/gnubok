@@ -132,7 +132,13 @@ export async function GET(request: Request) {
       }
 
       const toDate = new Date().toISOString().split('T')[0]
-      const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      // First sync: 90-day lookback (PSD2 max). Subsequent: 7-day window.
+      const isFirstSync = !connection.last_synced_at
+      const lookbackDays = isFirstSync ? 90 : 7
+      if (isFirstSync) {
+        console.log(`[bank-sync-cron] First sync for connection ${connection.id}, using ${lookbackDays}-day lookback`)
+      }
+      const fromDate = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000)
         .toISOString()
         .split('T')[0]
 
