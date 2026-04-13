@@ -12,7 +12,7 @@ export type SIEType = 1 | 2 | 3 | 4
 export type SIEEncoding = 'cp437' | 'utf8' | 'windows1252'
 
 // Import status
-export type SIEImportStatus = 'pending' | 'mapped' | 'completed' | 'failed'
+export type SIEImportStatus = 'pending' | 'mapped' | 'completed' | 'failed' | 'replaced'
 
 // Match type for account mapping
 export type AccountMatchType = 'exact' | 'name' | 'class' | 'manual' | 'bas_range'
@@ -193,6 +193,7 @@ export interface SIEImport {
   imported_at: string | null
   migration_documentation: MigrationDocumentation | null
   file_storage_path: string | null
+  replaced_at: string | null
   created_at: string
   updated_at: string
 }
