@@ -76,6 +76,8 @@ export async function POST(request: Request) {
       plan_type: body.plan_type || 'k1',
       is_system_account: false,
       description: body.description || null,
+      default_vat_code: body.default_vat_code || null,
+      sru_code: body.sru_code || null,
       sort_order: parseInt(body.account_number),
     })
     .select()

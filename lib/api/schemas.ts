@@ -494,7 +494,9 @@ export const CreateAccountSchema = z.object({
   account_type: AccountTypeSchema,
   normal_balance: NormalBalanceSchema,
   plan_type: z.enum(['k1', 'full_bas']).optional(),
-  description: z.string().optional(),
+  description: z.string().nullable().optional(),
+  default_vat_code: z.string().nullable().optional(),
+  sru_code: z.string().nullable().optional(),
 })
 
 export const UpdateAccountSchema = z.object({

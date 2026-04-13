@@ -165,7 +165,7 @@ function BankFileImportWizard() {
     setBankStep('confirm')
   }, [rawFileContent])
 
-  const handleExecuteImport = useCallback(async (options: { skip_duplicates: boolean; auto_categorize: boolean }) => {
+  const handleExecuteImport = useCallback(async (options: { skip_duplicates: boolean; auto_categorize: boolean; settlement_account?: string }) => {
     if (!parseResult) return
 
     setBankIsLoading(true)

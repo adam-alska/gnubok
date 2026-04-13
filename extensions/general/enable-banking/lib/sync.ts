@@ -102,7 +102,7 @@ export async function syncAccountTransactions(
     try {
       const fileName = `psd2-response_${connectionId}_${account.uid}_${new Date().toISOString().replace(/[:.]/g, '-')}_p${i + 1}.json`
       const buffer = new TextEncoder().encode(rawPages[i]).buffer as ArrayBuffer
-      await uploadDocument(supabase, companyId, userId,
+      await uploadDocument(supabase, userId, companyId,
         { name: fileName, buffer, type: 'application/json' },
         { upload_source: 'api' }
       )
