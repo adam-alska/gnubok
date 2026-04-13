@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -13,8 +13,6 @@ import { AccountNumber } from '@/components/ui/account-number'
 import { getAccountDescription } from '@/lib/bookkeeping/account-descriptions'
 import JournalEntryAttachments from '@/components/bookkeeping/JournalEntryAttachments'
 import CorrectionEntryDialog from '@/components/bookkeeping/CorrectionEntryDialog'
-import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
-import { useToast } from '@/components/ui/use-toast'
 import JournalEntryStatusBadge from '@/components/bookkeeping/JournalEntryStatusBadge'
 import type { JournalEntry, JournalEntryLine } from '@/types'
 
@@ -32,7 +30,6 @@ interface Props {
 }
 
 export default function JournalEntryList({ periodId }: Props) {
-  const { toast } = useToast()
   const [entries, setEntries] = useState<JournalEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -41,8 +38,6 @@ export default function JournalEntryList({ periodId }: Props) {
   const [attachmentCounts, setAttachmentCounts] = useState<Record<string, number>>({})
   const [showMissingOnly, setShowMissingOnly] = useState(false)
   const [correctionEntry, setCorrectionEntry] = useState<JournalEntry | null>(null)
-  const [deleteEntry, setDeleteEntry] = useState<JournalEntry | null>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
   const [dateSortDir, setDateSortDir] = useState<'desc' | 'asc'>('desc')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -138,43 +133,6 @@ export default function JournalEntryList({ periodId }: Props) {
   const handleAttachmentCountChange = useCallback((entryId: string, count: number) => {
     setAttachmentCounts((prev) => ({ ...prev, [entryId]: count }))
   }, [])
-
-  // Compute which entries are the last in their series (enables delete button)
-  const lastInSeriesIds = useMemo(() => {
-    const maxPerSeries = new Map<string, { id: string; num: number }>()
-    for (const e of entries) {
-      if (e.status !== 'posted') continue
-      const key = `${e.fiscal_period_id}:${e.voucher_series}`
-      const current = maxPerSeries.get(key)
-      if (!current || e.voucher_number > current.num) {
-        maxPerSeries.set(key, { id: e.id, num: e.voucher_number })
-      }
-    }
-    return new Set(Array.from(maxPerSeries.values()).map(v => v.id))
-  }, [entries])
-
-  const handleDeleteEntry = useCallback(async () => {
-    if (!deleteEntry) return
-    setIsDeleting(true)
-    try {
-      const res = await fetch(`/api/bookkeeping/journal-entries/${deleteEntry.id}`, { method: 'DELETE' })
-      const result = await res.json()
-      if (res.ok) {
-        toast({
-          title: 'Verifikat raderat',
-          description: `Verifikat ${result.data?.voucher_series ?? ''}${result.data?.voucher_number ?? ''} har raderats.`,
-        })
-        setDeleteEntry(null)
-        fetchEntries()
-      } else {
-        toast({ title: 'Kunde inte radera', description: result.error, variant: 'destructive' })
-      }
-    } catch {
-      toast({ title: 'Kunde inte radera verifikat', variant: 'destructive' })
-    } finally {
-      setIsDeleting(false)
-    }
-  }, [deleteEntry, toast])
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id)
@@ -477,16 +435,6 @@ export default function JournalEntryList({ periodId }: Props) {
                     <Button variant="outline" size="sm" className="w-full sm:w-auto" asChild>
                       <Link href={`/bookkeeping/${entry.id}`}>Visa detaljer</Link>
                     </Button>
-                    {entry.status === 'posted' && lastInSeriesIds.has(entry.id) && (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="w-full sm:w-auto"
-                        onClick={() => setDeleteEntry(entry)}
-                      >
-                        Radera
-                      </Button>
-                    )}
                     {entry.status === 'posted' && entry.source_type !== 'storno' && entry.source_type !== 'correction' && (
                       <Button
                         variant="outline"
@@ -514,28 +462,6 @@ export default function JournalEntryList({ periodId }: Props) {
           onCorrected={() => { setCorrectionEntry(null); fetchEntries() }}
         />
       )}
-
-      {/* Delete confirmation dialog */}
-      <ConfirmationDialog
-        open={!!deleteEntry}
-        onOpenChange={(open) => { if (!open) setDeleteEntry(null) }}
-        onConfirm={handleDeleteEntry}
-        isSubmitting={isDeleting}
-        title="Radera verifikat"
-        warningText={deleteEntry ? `Verifikat ${deleteEntry.voucher_series}${deleteEntry.voucher_number} raderas permanent. Denna åtgärd kan inte ångras.` : ''}
-        confirmLabel="Radera permanent"
-      >
-        <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4">
-          <AlertTriangle className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
-          <div className="text-sm">
-            <p className="font-medium mb-1">Permanent radering</p>
-            <p className="text-muted-foreground">
-              Verifikatet och dess kontorader tas bort. Kopplade transaktioner och
-              fakturor markeras som ej bokförda. Underlag behålls men avlänkas.
-            </p>
-          </div>
-        </div>
-      </ConfirmationDialog>
 
       {/* Pagination */}
       {count > pageSize && (
