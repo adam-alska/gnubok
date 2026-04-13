@@ -408,6 +408,7 @@ export async function POST(request: Request) {
 5. **Never modify existing migrations** — create new ones
 6. **Never modify enforcement triggers** (migration 017) — legally required
 7. **Apply via Supabase MCP tool**: `mcp__plugin_supabase_supabase__apply_migration`
+8. **Always include `NOTIFY pgrst, 'reload schema'`** at the end of migrations that alter table structure (ADD/DROP COLUMN, CREATE TABLE, ALTER TYPE). Without this, PostgREST serves stale schema until next reload.
 
 ---
 

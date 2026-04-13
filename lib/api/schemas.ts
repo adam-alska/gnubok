@@ -306,6 +306,7 @@ export const CreateJournalEntrySchema = z.object({
   source_type: JournalEntrySourceTypeSchema.default('manual'),
   source_id: z.string().optional(),
   voucher_series: z.string().regex(/^[A-Z]$/, 'Verifikationsserie måste vara en bokstav A–Z').optional(),
+  notes: z.string().max(2000).optional(),
   lines: z.array(CreateJournalEntryLineSchema).min(2, 'At least two lines are required for double-entry'),
 })
 

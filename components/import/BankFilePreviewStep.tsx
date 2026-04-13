@@ -85,7 +85,7 @@ export default function BankFilePreviewStep({
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <TrendingDown className="h-4 w-4" />
-              <span className="text-sm">Utgifter</span>
+              <span className="text-sm">Leverantörsfakturor</span>
             </div>
             <p className="text-lg font-display font-medium tabular-nums">
               {formatCurrency(stats.total_expenses)}

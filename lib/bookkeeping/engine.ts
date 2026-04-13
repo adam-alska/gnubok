@@ -187,6 +187,7 @@ export async function createDraftEntry(
       description: input.description,
       source_type: input.source_type,
       source_id: input.source_id || null,
+      notes: input.notes || null,
       status: 'draft',
     })
     .select()

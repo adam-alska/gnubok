@@ -42,8 +42,9 @@ function buildMockSupabase({
     chainFn('or')
     chainFn('in')
     chainFn('order')
+    chainFn('limit')
 
-    // First call: single entry fetch
+    // First call: single entry fetch (the main entry)
     if (callIndex === 1) {
       builder.single = vi.fn().mockResolvedValue({
         data: singleResult,
@@ -53,18 +54,29 @@ function buildMockSupabase({
 
     // Second call: reverse lookup for referencing entries
     if (callIndex === 2) {
-      // The or() call resolves the query
-      builder.or = vi.fn().mockReturnValue({
-        then: (resolve: (v: unknown) => void) => resolve({ data: referencingIds }),
-      }) as unknown as ReturnType<typeof vi.fn>
-      // Make it thenable
       const orResult = { data: referencingIds }
       builder.or = vi.fn().mockResolvedValue(orResult)
     }
 
-    // Third+ calls: chain entries fetch
+    // Third+ calls: chain entries fetch or is_last_in_series check
     if (callIndex >= 3) {
-      builder.order = vi.fn().mockResolvedValue({ data: chainEntries })
+      builder.order = vi.fn().mockReturnValue(builder)
+      builder.single = vi.fn().mockResolvedValue({
+        data: singleResult ? { voucher_number: singleResult.voucher_number } : null,
+      })
+      // Also handle when .order resolves directly (chain entries fetch)
+      const orderResult = { data: chainEntries }
+      builder.order = vi.fn().mockImplementation(() => {
+        const obj = { ...builder, ...orderResult }
+        obj.then = (fn: (v: unknown) => void) => Promise.resolve(fn(orderResult))
+        // Support both .limit().single() and direct resolution
+        obj.limit = vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: singleResult ? { voucher_number: singleResult.voucher_number } : null,
+          }),
+        })
+        return obj
+      })
     }
 
     return builder

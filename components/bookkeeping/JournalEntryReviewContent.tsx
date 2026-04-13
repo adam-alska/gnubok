@@ -15,6 +15,7 @@ interface JournalEntryReviewContentProps {
   periodName: string
   entryDate: string
   description: string
+  notes?: string
   voucherSeries?: string
   lines: ReviewLine[]
   totalDebit: number
@@ -32,6 +33,7 @@ export function JournalEntryReviewContent({
   periodName,
   entryDate,
   description,
+  notes,
   voucherSeries,
   lines,
   totalDebit,
@@ -70,6 +72,12 @@ export function JournalEntryReviewContent({
           <span className="text-muted-foreground">Beskrivning</span>
           <p className="font-medium">{description}</p>
         </div>
+        {notes && (
+          <div className="text-sm">
+            <span className="text-muted-foreground">Intern anteckning</span>
+            <p className="text-muted-foreground italic">{notes}</p>
+          </div>
+        )}
       </div>
 
       {/* Balance status */}

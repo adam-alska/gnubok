@@ -118,7 +118,7 @@ export default function ExpensesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Utgifter"
+        title="Leverantörsfakturor"
         description="Registrera och hantera dina utgifter"
         action={
           canWrite ? (
