@@ -123,7 +123,16 @@ BEGIN
     RAISE EXCEPTION 'Cannot delete voucher in a locked fiscal period';
   END IF;
 
-  -- 4. Verify it is the LAST voucher in its series
+  -- 4. Lock voucher_sequences row to serialise against concurrent commit_journal_entry.
+  --    Without this, a concurrent commit could assign a new voucher number between
+  --    our MAX check and the DELETE, producing a gap (violating BFL 5 kap 7§).
+  PERFORM 1 FROM voucher_sequences
+  WHERE company_id = p_company_id
+    AND fiscal_period_id = v_entry.fiscal_period_id
+    AND voucher_series = v_entry.voucher_series
+  FOR UPDATE;
+
+  -- Verify it is the LAST voucher in its series
   SELECT MAX(voucher_number) INTO v_max_voucher
   FROM journal_entries
   WHERE company_id = p_company_id

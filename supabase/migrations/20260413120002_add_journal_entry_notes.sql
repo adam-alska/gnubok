@@ -38,8 +38,13 @@ BEGIN
        AND NEW.voucher_series = OLD.voucher_series
        AND NEW.source_type = OLD.source_type
        AND COALESCE(NEW.source_id::text, '') = COALESCE(OLD.source_id::text, '')
+       AND NEW.user_id = OLD.user_id
+       AND COALESCE(NEW.reversed_by_id::text, '') = COALESCE(OLD.reversed_by_id::text, '')
+       AND COALESCE(NEW.reverses_id::text, '') = COALESCE(OLD.reverses_id::text, '')
+       AND COALESCE(NEW.correction_of_id::text, '') = COALESCE(OLD.correction_of_id::text, '')
+       AND NEW.committed_at IS NOT DISTINCT FROM OLD.committed_at
     THEN
-      RETURN NEW;
+      RETURN NEW; -- Only notes and updated_at may differ
     END IF;
   END IF;
 
