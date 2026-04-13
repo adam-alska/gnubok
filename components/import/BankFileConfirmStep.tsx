@@ -13,11 +13,9 @@ import {
   FileText,
   Link2,
   Calendar,
-  Lock,
   Landmark,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
-import { useCanWrite } from '@/lib/hooks/use-can-write'
 import { createClient } from '@/lib/supabase/client'
 import type { BankFileParseResult } from '@/lib/import/bank-file/types'
 
@@ -39,7 +37,6 @@ export default function BankFileConfirmStep({
   onBack,
   isLoading,
 }: BankFileConfirmStepProps) {
-  const { canWrite } = useCanWrite()
   const { transactions, stats, date_from, date_to } = parseResult
   const refsCount = transactions.filter((t) => t.reference).length
 
@@ -188,18 +185,12 @@ export default function BankFileConfirmStep({
             auto_categorize: false,
             settlement_account: selectedAccount !== '1930' ? selectedAccount : undefined,
           })}
-          disabled={isLoading || !canWrite}
-          title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+          disabled={isLoading}
         >
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Importerar...
-            </>
-          ) : !canWrite ? (
-            <>
-              <Lock className="mr-2 h-4 w-4" />
-              Importera {stats.parsed_rows} transaktioner
             </>
           ) : (
             <>

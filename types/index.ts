@@ -2197,6 +2197,9 @@ export interface IngestOptions {
   /** Override the default settlement account (1930) for bank transactions.
    * Used when importing to a secondary bank account (e.g., 1931). */
   settlementAccount?: string
+  /** Only INSERT transactions + dedup. Skip reconciliation, invoice matching,
+   * supplier matching, and auto-categorization. For viewer imports. */
+  rawInsertOnly?: boolean
 }
 
 /** Result of the transaction ingestion pipeline */

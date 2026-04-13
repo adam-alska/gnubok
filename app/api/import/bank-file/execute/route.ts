@@ -4,8 +4,8 @@ import { eventBus } from '@/lib/events'
 import { ensureInitialized } from '@/lib/init'
 import { ingestTransactions, type RawTransaction } from '@/lib/transactions/ingest'
 import { generateExternalId } from '@/lib/import/bank-file/parser'
-import { requireCompanyId } from '@/lib/company/context'
-import { requireWritePermission } from '@/lib/auth/require-write'
+import type { IngestOptions } from '@/types'
+import { getCompanyRole } from '@/lib/auth/require-write'
 import type { ParsedBankTransaction, BankFileFormatId } from '@/lib/import/bank-file/types'
 import type { Transaction } from '@/types'
 
@@ -36,10 +36,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const writeCheck = await requireWritePermission(supabase, user.id)
-  if (!writeCheck.ok) return writeCheck.response
-
-  const companyId = await requireCompanyId(supabase, user.id)
+  const roleCheck = await getCompanyRole(supabase, user.id)
+  if (!roleCheck.ok) return roleCheck.response
+  const { role, companyId } = roleCheck
 
   const body: ExecuteRequest = await request.json()
   const { transactions, format, filename, file_hash, skip_duplicates: _skip_duplicates = true, auto_categorize: _auto_categorize = true, settlement_account } = body
@@ -84,8 +83,11 @@ export async function POST(request: Request) {
       import_source: format === 'camt053' ? 'camt053' : `csv_${format}`,
     }))
 
-    // Run ingestion pipeline
-    const ingestResult = await ingestTransactions(supabase, companyId, user.id, rawTransactions, settlement_account ? { settlementAccount: settlement_account } : undefined)
+    // Run ingestion pipeline — viewers get rawInsertOnly (no categorization, no matching)
+    const ingestOptions: IngestOptions = {}
+    if (settlement_account) ingestOptions.settlementAccount = settlement_account
+    if (role === 'viewer') ingestOptions.rawInsertOnly = true
+    const ingestResult = await ingestTransactions(supabase, companyId, user.id, rawTransactions, ingestOptions)
 
     // Update import record with results
     await supabase

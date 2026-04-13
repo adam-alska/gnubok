@@ -702,6 +702,64 @@ describe('ingestTransactions', () => {
   })
 
   // -----------------------------------------------------------------------
+  // rawInsertOnly: skips reconciliation, matching, and auto-categorization
+  // -----------------------------------------------------------------------
+  it('skips reconciliation, matching, and categorization when rawInsertOnly is set', async () => {
+    const { supabase, enqueue } = createQueueMockSupabase()
+    const raw = makeRaw({ amount: 5000, description: 'Payment received' })
+    const inserted = makeTransaction({
+      id: 'tx-raw',
+      amount: 5000,
+      external_id: raw.external_id,
+    })
+
+    // Booked transaction map query
+    enqueue({ data: [], error: null })
+    // Unbooked bank-synced transaction map query
+    enqueue({ data: [], error: null })
+    // No supplier invoices fetch (skipped by rawInsertOnly)
+    // Batch external_id dedup query (no matches)
+    enqueue({ data: [], error: null })
+    // Insert returns the new transaction
+    enqueue({ data: inserted, error: null })
+
+    const result = await ingestTransactions(
+      supabase as never, COMPANY_ID, USER_ID, [raw],
+      { rawInsertOnly: true }
+    )
+
+    expect(result.imported).toBe(1)
+    expect(result.reconciled).toBe(0)
+    expect(result.auto_categorized).toBe(0)
+    expect(result.auto_matched_invoices).toBe(0)
+    // Should NOT have attempted any post-insert operations
+    expect(mockFetchUnlinkedGLLines).not.toHaveBeenCalled()
+    expect(mockTryReconcileTransaction).not.toHaveBeenCalled()
+    expect(mockGetBestInvoiceMatch).not.toHaveBeenCalled()
+    expect(mockEvaluateMappingRules).not.toHaveBeenCalled()
+  })
+
+  it('still deduplicates when rawInsertOnly is set', async () => {
+    const { supabase, enqueue } = createQueueMockSupabase()
+    const raw = makeRaw({ external_id: 'ext-dup-raw' })
+
+    // Booked transaction map query
+    enqueue({ data: [], error: null })
+    // Unbooked bank-synced transaction map query
+    enqueue({ data: [], error: null })
+    // Batch external_id dedup query — already exists
+    enqueue({ data: [{ external_id: 'ext-dup-raw' }], error: null })
+
+    const result = await ingestTransactions(
+      supabase as never, COMPANY_ID, USER_ID, [raw],
+      { rawInsertOnly: true }
+    )
+
+    expect(result.duplicates).toBe(1)
+    expect(result.imported).toBe(0)
+  })
+
+  // -----------------------------------------------------------------------
   // Content-based dedup: cross-source duplicate detection
   // -----------------------------------------------------------------------
   it('skips transactions that match already-booked ones by date+amount', async () => {

@@ -17,6 +17,8 @@ export type IngestFn = (
 export interface SyncOptions {
   /** Skip auto-categorization during ingestion (e.g. SIE overlap) */
   skipAutoCategorization?: boolean
+  /** Only INSERT + dedup, no matching/categorization (viewer imports) */
+  rawInsertOnly?: boolean
 }
 
 export interface SyncResult {
@@ -84,9 +86,9 @@ export async function syncAccountTransactions(
     import_source: 'enable_banking',
   }))
 
-  const ingestOptions: IngestOptions | undefined = syncOptions?.skipAutoCategorization
-    ? { skipAutoCategorization: true }
-    : undefined
+  const ingestOptions: IngestOptions = {}
+  if (syncOptions?.skipAutoCategorization) ingestOptions.skipAutoCategorization = true
+  if (syncOptions?.rawInsertOnly) ingestOptions.rawInsertOnly = true
   const ingestResult = await ingest(supabase, companyId, userId, rawTransactions, ingestOptions)
 
   console.log('[enable-banking] Ingest result', {
