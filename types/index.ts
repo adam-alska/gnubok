@@ -1059,6 +1059,45 @@ export interface CategorizationTemplate {
   updated_at: string
 }
 
+// Booking template library categories
+export type BookingTemplateCategory =
+  | 'eu_trade'
+  | 'tax_account'
+  | 'private_transfer'
+  | 'salary'
+  | 'representation'
+  | 'year_end'
+  | 'vat'
+  | 'financial'
+  | 'other'
+
+// Booking template library line
+export interface BookingTemplateLibraryLine {
+  account: string
+  label: string
+  side: 'debit' | 'credit'
+  type: 'business' | 'vat' | 'settlement'
+  ratio?: number
+  vat_rate?: number
+}
+
+// Booking template library entry (system, team, or company-scoped)
+export interface BookingTemplateLibrary {
+  id: string
+  company_id: string | null
+  team_id: string | null
+  created_by: string | null
+  name: string
+  description: string
+  category: BookingTemplateCategory
+  entity_type: 'all' | EntityType
+  lines: BookingTemplateLibraryLine[]
+  is_system: boolean
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
 // Account Balance (cached)
 export interface AccountBalance {
   id: string
