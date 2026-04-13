@@ -18,6 +18,7 @@ interface ExecuteRequest {
   file_hash: string
   skip_duplicates: boolean
   auto_categorize: boolean
+  settlement_account?: string
 }
 
 /**
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
   const companyId = await requireCompanyId(supabase, user.id)
 
   const body: ExecuteRequest = await request.json()
-  const { transactions, format, filename, file_hash, skip_duplicates: _skip_duplicates = true, auto_categorize: _auto_categorize = true } = body
+  const { transactions, format, filename, file_hash, skip_duplicates: _skip_duplicates = true, auto_categorize: _auto_categorize = true, settlement_account } = body
 
   if (!transactions || transactions.length === 0) {
     return NextResponse.json({ error: 'No transactions to import' }, { status: 400 })
@@ -84,7 +85,7 @@ export async function POST(request: Request) {
     }))
 
     // Run ingestion pipeline
-    const ingestResult = await ingestTransactions(supabase, companyId, user.id, rawTransactions)
+    const ingestResult = await ingestTransactions(supabase, companyId, user.id, rawTransactions, settlement_account ? { settlementAccount: settlement_account } : undefined)
 
     // Update import record with results
     await supabase

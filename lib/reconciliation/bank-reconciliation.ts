@@ -206,13 +206,14 @@ export async function runReconciliation(
 // ============================================================
 
 /**
- * Compare bank transaction totals vs GL 1930 balance.
+ * Compare bank transaction totals vs GL bank account balance.
  */
 export async function getReconciliationStatus(
   supabase: SupabaseClient,
   companyId: string,
   dateFrom?: string,
-  dateTo?: string
+  dateTo?: string,
+  bankAccount = '1930'
 ): Promise<ReconciliationStatus> {
   // Get all transactions in range
   let txQuery = supabase
@@ -226,11 +227,11 @@ export async function getReconciliationStatus(
 
   const { data: transactions } = await txQuery
 
-  // Get GL 1930 lines (all, not just unlinked)
+  // Get GL bank account lines (all, not just unlinked)
   let glQuery = supabase
     .from('journal_entry_lines')
     .select('debit_amount, credit_amount, journal_entries!inner(company_id, entry_date, status)')
-    .eq('account_number', '1930')
+    .eq('account_number', bankAccount)
     .eq('journal_entries.company_id', companyId)
     .eq('journal_entries.status', 'posted')
 
@@ -280,7 +281,7 @@ export async function getReconciliationStatus(
 
 /**
  * Manually link a transaction to an existing journal entry.
- * Validates that the journal entry has a 1930 line and amounts are directionally compatible.
+ * Validates that the journal entry has a bank account line and amounts are directionally compatible.
  */
 export async function manualLink(
   supabase: SupabaseClient,
@@ -321,15 +322,16 @@ export async function manualLink(
     return { success: false, error: 'Journal entry is not posted' }
   }
 
-  // Check for 1930 line
+  // Check for a bank account line (19xx class accounts)
   const { data: lines } = await supabase
     .from('journal_entry_lines')
-    .select('debit_amount, credit_amount')
+    .select('debit_amount, credit_amount, account_number')
     .eq('journal_entry_id', journalEntryId)
-    .eq('account_number', '1930')
+    .gte('account_number', '1900')
+    .lte('account_number', '1999')
 
   if (!lines || lines.length === 0) {
-    return { success: false, error: 'Journal entry has no line on account 1930' }
+    return { success: false, error: 'Verifikationen saknar rad på bankkonto (19xx)' }
   }
 
   // Check that no other transaction is already linked to this entry
@@ -434,18 +436,31 @@ export async function unlinkReconciliation(
 // Helpers
 // ============================================================
 
-/** Fetch unlinked 1930 GL lines via the RPC function */
+/** Fetch unlinked bank GL lines via the RPC function */
 export async function fetchUnlinkedGLLines(
   supabase: SupabaseClient,
   companyId: string,
   dateFrom?: string,
-  dateTo?: string
+  dateTo?: string,
+  bankAccount = '1930'
 ): Promise<UnlinkedGLLine[]> {
-  const { data, error } = await supabase.rpc('get_unlinked_1930_lines', {
+  const { data, error } = await supabase.rpc('get_unlinked_bank_lines', {
     p_company_id: companyId,
     p_date_from: dateFrom || null,
     p_date_to: dateTo || null,
+    p_account_number: bankAccount,
   })
+
+  // Fall back to legacy RPC if the new one doesn't exist yet
+  if (error && bankAccount === '1930') {
+    const { data: fallbackData, error: fallbackError } = await supabase.rpc('get_unlinked_1930_lines', {
+      p_company_id: companyId,
+      p_date_from: dateFrom || null,
+      p_date_to: dateTo || null,
+    })
+    if (fallbackError || !fallbackData) return []
+    return fallbackData as UnlinkedGLLine[]
+  }
 
   if (error || !data) return []
   return data as UnlinkedGLLine[]

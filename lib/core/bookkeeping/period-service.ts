@@ -207,6 +207,95 @@ export async function createNextPeriod(
 }
 
 /**
+ * Create a previous fiscal period before the given one.
+ * Computes a 12-month period ending the day before the given period starts.
+ * Updates previous_period_id chain so the given period points to the new one.
+ */
+export async function createPreviousPeriod(
+  supabase: SupabaseClient,
+  companyId: string,
+  userId: string,
+  currentPeriodId: string
+): Promise<FiscalPeriod> {
+
+  const { data: current, error: fetchError } = await supabase
+    .from('fiscal_periods')
+    .select('*')
+    .eq('id', currentPeriodId)
+    .eq('company_id', companyId)
+    .single()
+
+  if (fetchError || !current) {
+    throw new Error('Current fiscal period not found')
+  }
+
+  // Compute previous period end (day before current start)
+  const prevEnd = new Date(current.period_start + 'T12:00:00Z')
+  prevEnd.setUTCDate(prevEnd.getUTCDate() - 1)
+
+  // Compute previous period start (1st of month, 12 months before prevEnd)
+  const prevStart = new Date(prevEnd)
+  prevStart.setUTCMonth(prevStart.getUTCMonth() - 11)
+  prevStart.setUTCDate(1)
+
+  const prevStartStr = prevStart.toISOString().split('T')[0]
+  const prevEndStr = prevEnd.toISOString().split('T')[0]
+
+  // Validate period duration
+  const durationError = validatePeriodDuration(prevStartStr, prevEndStr, { isFirstPeriod: false })
+  if (durationError) {
+    throw new Error(durationError)
+  }
+
+  // Check for overlapping periods
+  const { data: overlapping } = await supabase
+    .from('fiscal_periods')
+    .select('id')
+    .eq('company_id', companyId)
+    .lte('period_start', prevEndStr)
+    .gte('period_end', prevStartStr)
+    .limit(1)
+
+  if (overlapping && overlapping.length > 0) {
+    throw new Error('Previous fiscal period already exists or overlaps with an existing period')
+  }
+
+  // Generate name
+  const startYear = prevStart.getFullYear()
+  const endYear = prevEnd.getFullYear()
+  const name = startYear === endYear ? `FY ${startYear}` : `FY ${startYear}/${endYear}`
+
+  const { data: newPeriod, error: insertError } = await supabase
+    .from('fiscal_periods')
+    .insert({
+      company_id: companyId,
+      user_id: userId,
+      name,
+      period_start: prevStartStr,
+      period_end: prevEndStr,
+    })
+    .select()
+    .single()
+
+  if (insertError || !newPeriod) {
+    throw new Error(`Failed to create previous period: ${insertError?.message}`)
+  }
+
+  // Update the current period to point to the new one
+  const { error: updateError } = await supabase
+    .from('fiscal_periods')
+    .update({ previous_period_id: newPeriod.id })
+    .eq('id', currentPeriodId)
+    .eq('company_id', companyId)
+
+  if (updateError) {
+    throw new Error(`Failed to update period chain: ${updateError.message}`)
+  }
+
+  return newPeriod as FiscalPeriod
+}
+
+/**
  * Get status summary for a fiscal period.
  */
 export async function getPeriodStatus(

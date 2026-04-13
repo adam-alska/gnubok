@@ -1,8 +1,11 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   ArrowLeft,
   Loader2,
@@ -11,14 +14,21 @@ import {
   Link2,
   Calendar,
   Lock,
+  Landmark,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { useCanWrite } from '@/lib/hooks/use-can-write'
+import { createClient } from '@/lib/supabase/client'
 import type { BankFileParseResult } from '@/lib/import/bank-file/types'
+
+interface BankAccount {
+  account_number: string
+  account_name: string
+}
 
 interface BankFileConfirmStepProps {
   parseResult: BankFileParseResult
-  onExecute: (options: { skip_duplicates: boolean; auto_categorize: boolean }) => void
+  onExecute: (options: { skip_duplicates: boolean; auto_categorize: boolean; settlement_account?: string }) => void
   onBack: () => void
   isLoading: boolean
 }
@@ -32,6 +42,30 @@ export default function BankFileConfirmStep({
   const { canWrite } = useCanWrite()
   const { transactions, stats, date_from, date_to } = parseResult
   const refsCount = transactions.filter((t) => t.reference).length
+
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
+  const [selectedAccount, setSelectedAccount] = useState('1930')
+
+  useEffect(() => {
+    async function fetchBankAccounts() {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('chart_of_accounts')
+        .select('account_number, account_name')
+        .eq('is_active', true)
+        .gte('account_number', '1900')
+        .lte('account_number', '1999')
+        .order('account_number')
+
+      if (data && data.length > 0) {
+        setBankAccounts(data)
+        // Default to 1930 if available, otherwise first account
+        const has1930 = data.some(a => a.account_number === '1930')
+        if (!has1930) setSelectedAccount(data[0].account_number)
+      }
+    }
+    fetchBankAccounts()
+  }, [])
 
   if (isLoading) {
     return (
@@ -102,6 +136,33 @@ export default function BankFileConfirmStep({
             </div>
           </div>
 
+          {/* Bank account selector */}
+          {bankAccounts.length > 1 && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Landmark className="h-4 w-4 text-muted-foreground" />
+                Bankkonto
+              </Label>
+              <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+                <SelectTrigger className="w-full sm:w-72">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {bankAccounts.map((account) => (
+                    <SelectItem key={account.account_number} value={account.account_number}>
+                      <span className="font-mono">{account.account_number}</span>
+                      {' '}
+                      {account.account_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Välj vilket bankkonto transaktionerna ska bokföras mot.
+              </p>
+            </div>
+          )}
+
           {/* Additional info */}
           {refsCount > 0 && (
             <div className="flex flex-wrap gap-2">
@@ -125,6 +186,7 @@ export default function BankFileConfirmStep({
           onClick={() => onExecute({
             skip_duplicates: true,
             auto_categorize: false,
+            settlement_account: selectedAccount !== '1930' ? selectedAccount : undefined,
           })}
           disabled={isLoading || !canWrite}
           title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}

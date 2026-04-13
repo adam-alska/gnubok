@@ -110,7 +110,7 @@ export async function createTransactionJournalEntry(
         debit_amount: 0,
         credit_amount: absAmount,
         line_description: transaction.description,
-        ...(settlementAccount === '1930' ? currencyMeta : {}),
+        ...(isForeign ? currencyMeta : {}),
       })
     } else {
       // Debit bank for full amount
@@ -119,7 +119,7 @@ export async function createTransactionJournalEntry(
         debit_amount: absAmount,
         credit_amount: 0,
         line_description: transaction.description,
-        ...(settlementAccount === '1930' ? currencyMeta : {}),
+        ...(isForeign ? currencyMeta : {}),
       })
       // All non-settlement lines
       for (const line of mappingResult.vat_lines) {
@@ -176,7 +176,7 @@ export async function createTransactionJournalEntry(
       debit_amount: 0,
       credit_amount: absAmount,
       line_description: transaction.description,
-      ...(creditAccount === '1930' ? currencyMeta : {}),
+      ...(isForeign ? currencyMeta : {}),
     })
   } else {
     // Income (legacy single debit/credit path)
@@ -196,7 +196,7 @@ export async function createTransactionJournalEntry(
         debit_amount: absAmount,
         credit_amount: 0,
         line_description: transaction.description,
-        ...(debitAccount === '1930' ? currencyMeta : {}),
+        ...(isForeign ? currencyMeta : {}),
       })
       // Credit revenue for net amount
       lines.push({
@@ -222,7 +222,7 @@ export async function createTransactionJournalEntry(
           debit_amount: absAmount,
           credit_amount: 0,
           line_description: transaction.description,
-          ...(debitAccount === '1930' ? currencyMeta : {}),
+          ...(isForeign ? currencyMeta : {}),
         },
         {
           account_number: creditAccount,
@@ -253,7 +253,8 @@ export function buildDomesticExpenseLines(
   amount: number,
   expenseAccount: string,
   description: string,
-  vatRate: number = 0.25
+  vatRate: number = 0.25,
+  bankAccount: string = '1930'
 ): CreateJournalEntryLineInput[] {
   const absAmount = Math.abs(amount)
   const lines: CreateJournalEntryLineInput[] = []
@@ -276,7 +277,7 @@ export function buildDomesticExpenseLines(
         line_description: `Ingående moms ${vatRate * 100}%`,
       },
       {
-        account_number: '1930', // Företagskonto
+        account_number: bankAccount,
         debit_amount: 0,
         credit_amount: absAmount,
         line_description: description,
@@ -291,7 +292,7 @@ export function buildDomesticExpenseLines(
         line_description: description,
       },
       {
-        account_number: '1930',
+        account_number: bankAccount,
         debit_amount: 0,
         credit_amount: absAmount,
         line_description: description,

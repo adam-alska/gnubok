@@ -50,8 +50,11 @@ export async function evaluateMappingRules(
   supabase: SupabaseClient,
   companyId: string,
   transaction: Transaction,
-  entityType?: EntityType
+  entityType?: EntityType,
+  settlementAccount?: string
 ): Promise<MappingResult> {
+  const bankAccount = settlementAccount || '1930'
+
   // Fetch all active rules (user-specific + system defaults), ordered by priority
   const { data: rules, error } = await supabase
     .from('mapping_rules')
@@ -63,29 +66,29 @@ export async function evaluateMappingRules(
   if (error || !rules || rules.length === 0) {
     // Try counterparty templates before static template fallback
     const counterpartyResult = await evaluateCounterpartyTemplates(supabase, companyId, transaction, entityType)
-    if (counterpartyResult) return counterpartyResult
+    if (counterpartyResult) return applySettlementAccount(counterpartyResult, bankAccount)
 
     const templateResult = evaluateTemplateRules(transaction, entityType)
-    if (templateResult) return templateResult
-    return getDefaultResult(transaction)
+    if (templateResult) return applySettlementAccount(templateResult, bankAccount)
+    return getDefaultResult(transaction, bankAccount)
   }
 
   // Evaluate each rule in priority order
   for (const rule of rules as MappingRule[]) {
     if (matchesRule(rule, transaction)) {
-      return buildResult(rule, transaction, entityType)
+      return applySettlementAccount(buildResult(rule, transaction, entityType), bankAccount)
     }
   }
 
   // Try counterparty templates before static template fallback
   const counterpartyResult = await evaluateCounterpartyTemplates(supabase, companyId, transaction, entityType)
-  if (counterpartyResult) return counterpartyResult
+  if (counterpartyResult) return applySettlementAccount(counterpartyResult, bankAccount)
 
   // Try template-based matching before default fallback
   const templateResult = evaluateTemplateRules(transaction, entityType)
-  if (templateResult) return templateResult
+  if (templateResult) return applySettlementAccount(templateResult, bankAccount)
 
-  return getDefaultResult(transaction)
+  return getDefaultResult(transaction, bankAccount)
 }
 
 /**
@@ -261,19 +264,33 @@ function buildResult(rule: MappingRule, transaction: Transaction, entityType?: E
 /**
  * Default result when no rule matches (uncategorized)
  */
-function getDefaultResult(transaction: Transaction): MappingResult {
+function getDefaultResult(transaction: Transaction, bankAccount = '1930'): MappingResult {
   const isExpense = transaction.amount < 0
 
   return {
     rule: null,
-    debit_account: isExpense ? '6991' : '1930',
-    credit_account: isExpense ? '1930' : '3900',
+    debit_account: isExpense ? '6991' : bankAccount,
+    credit_account: isExpense ? bankAccount : '3900',
     risk_level: 'MEDIUM',
     confidence: 0.1,
     requires_review: true,
     default_private: false,
     vat_lines: [],
     description: 'Obokförd transaktion',
+  }
+}
+
+/**
+ * Replace any default 1930 references in a mapping result with the actual settlement account.
+ * This allows mapping rules and templates that don't explicitly set a bank account
+ * to work correctly with secondary bank accounts (e.g. 1931).
+ */
+function applySettlementAccount(result: MappingResult, bankAccount: string): MappingResult {
+  if (bankAccount === '1930') return result
+  return {
+    ...result,
+    debit_account: result.debit_account === '1930' ? bankAccount : result.debit_account,
+    credit_account: result.credit_account === '1930' ? bankAccount : result.credit_account,
   }
 }
 

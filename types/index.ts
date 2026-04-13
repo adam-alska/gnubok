@@ -2192,6 +2192,9 @@ export interface IngestOptions {
    * Used when SIE-imported entries overlap the sync date range
    * to prevent double-booking. */
   skipAutoCategorization?: boolean
+  /** Override the default settlement account (1930) for bank transactions.
+   * Used when importing to a secondary bank account (e.g., 1931). */
+  settlementAccount?: string
 }
 
 /** Result of the transaction ingestion pipeline */

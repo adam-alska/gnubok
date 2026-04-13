@@ -412,7 +412,7 @@ describe('manualLink', () => {
     const result = await manualLink(supabase as never, 'company-1', 'tx-1', 'je-1')
 
     expect(result.success).toBe(false)
-    expect(result.error).toBe('Journal entry has no line on account 1930')
+    expect(result.error).toBe('Verifikationen saknar rad på bankkonto (19xx)')
   })
 
   it('succeeds when all validations pass', async () => {

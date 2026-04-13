@@ -122,7 +122,7 @@ export async function ingestTransactions(
   // Pre-fetch unlinked GL lines for reconciliation (non-critical)
   let glLinePool: UnlinkedGLLine[] = []
   try {
-    glLinePool = await fetchUnlinkedGLLines(supabase, companyId)
+    glLinePool = await fetchUnlinkedGLLines(supabase, companyId, undefined, undefined, options?.settlementAccount)
   } catch {
     // Non-critical — reconciliation will be skipped
   }
@@ -365,7 +365,9 @@ export async function ingestTransactions(
         const mappingResult = await evaluateMappingRules(
           supabase,
           companyId,
-          newTransaction as Transaction
+          newTransaction as Transaction,
+          undefined,
+          options?.settlementAccount
         )
 
         if (mappingResult.confidence >= 0.8 && !mappingResult.requires_review) {

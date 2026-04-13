@@ -46,17 +46,14 @@ export async function POST(request: Request) {
   if (!validation.success) return validation.response
   const body = validation.data
 
-  // Enforce continuity: new period must chain from the latest existing period (BFL 3:1)
-  const { data: latest } = await supabase
+  // Fetch all existing periods to determine direction
+  const { data: allPeriods } = await supabase
     .from('fiscal_periods')
-    .select('period_end, is_closed')
+    .select('id, period_start, period_end, is_closed')
     .eq('company_id', companyId)
-    .order('period_end', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+    .order('period_start', { ascending: true })
 
-  // First period for this company may start on any day (BFL 3 kap.)
-  const isFirstPeriod = !latest
+  const isFirstPeriod = !allPeriods || allPeriods.length === 0
 
   // Validate period duration (max 18 months per BFL 3 kap.)
   const durationError = validatePeriodDuration(body.period_start, body.period_end, { isFirstPeriod })
@@ -64,30 +61,59 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: durationError }, { status: 400 })
   }
 
-  if (latest) {
-    const prev = new Date(latest.period_end + 'T00:00:00')
-    prev.setDate(prev.getDate() + 1)
-    const expectedStart = prev.toISOString().split('T')[0]
-    if (body.period_start !== expectedStart) {
+  if (allPeriods && allPeriods.length > 0) {
+    const earliest = allPeriods[0]
+    const latest = allPeriods[allPeriods.length - 1]
+
+    const isBackward = body.period_end < earliest.period_start
+    const isForward = body.period_start > latest.period_end
+
+    if (!isBackward && !isForward) {
+      // Neither backward nor forward — must overlap or be in the middle
       return NextResponse.json(
-        { error: `Period must start on ${expectedStart} (day after latest period ends)` },
+        { error: 'New period must chain before the earliest or after the latest existing period' },
         { status: 400 }
       )
     }
-  }
 
-  // Enforce: max one unclosed period (no skipping ahead)
-  const { count: openCount } = await supabase
-    .from('fiscal_periods')
-    .select('id', { count: 'exact', head: true })
-    .eq('company_id', companyId)
-    .eq('is_closed', false)
+    if (isBackward) {
+      // Backward chaining: new period_end must be day before earliest period_start
+      const expectedEnd = new Date(earliest.period_start + 'T12:00:00Z')
+      expectedEnd.setUTCDate(expectedEnd.getUTCDate() - 1)
+      const expectedEndStr = expectedEnd.toISOString().split('T')[0]
+      if (body.period_end !== expectedEndStr) {
+        return NextResponse.json(
+          { error: `Period must end on ${expectedEndStr} (day before earliest period starts)` },
+          { status: 400 }
+        )
+      }
+      // Skip "no unclosed period" constraint for backward chaining (backfill needs the period open)
+    } else {
+      // Forward chaining: keep existing constraints (contiguity + no unclosed periods)
+      const prev = new Date(latest.period_end + 'T12:00:00Z')
+      prev.setUTCDate(prev.getUTCDate() + 1)
+      const expectedStart = prev.toISOString().split('T')[0]
+      if (body.period_start !== expectedStart) {
+        return NextResponse.json(
+          { error: `Period must start on ${expectedStart} (day after latest period ends)` },
+          { status: 400 }
+        )
+      }
 
-  if (openCount && openCount > 0) {
-    return NextResponse.json(
-      { error: 'Cannot create a new period while an unclosed period exists' },
-      { status: 409 }
-    )
+      // Enforce: max one unclosed period (no skipping ahead) — forward only
+      const { count: openCount } = await supabase
+        .from('fiscal_periods')
+        .select('id', { count: 'exact', head: true })
+        .eq('company_id', companyId)
+        .eq('is_closed', false)
+
+      if (openCount && openCount > 0) {
+        return NextResponse.json(
+          { error: 'Cannot create a new period while an unclosed period exists' },
+          { status: 409 }
+        )
+      }
+    }
   }
 
   // Defense-in-depth: check for overlapping periods
@@ -120,6 +146,18 @@ export async function POST(request: Request) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // For backward chaining: update the old earliest period's previous_period_id
+  if (allPeriods && allPeriods.length > 0) {
+    const earliest = allPeriods[0]
+    if (body.period_end < earliest.period_start) {
+      await supabase
+        .from('fiscal_periods')
+        .update({ previous_period_id: data.id })
+        .eq('id', earliest.id)
+        .eq('company_id', companyId)
+    }
   }
 
   return NextResponse.json({ data })
