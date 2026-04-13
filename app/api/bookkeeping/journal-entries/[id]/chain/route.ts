@@ -109,5 +109,22 @@ export async function GET(
     chain = chainEntries || []
   }
 
-  return NextResponse.json({ data: { entry, chain } })
+  // Check if entry is the last in its voucher series (enables delete button in UI)
+  let isLastInSeries = false
+  if (entry.status === 'posted') {
+    const { data: maxResult } = await supabase
+      .from('journal_entries')
+      .select('voucher_number')
+      .eq('company_id', companyId)
+      .eq('fiscal_period_id', entry.fiscal_period_id)
+      .eq('voucher_series', entry.voucher_series)
+      .in('status', ['posted', 'reversed'])
+      .order('voucher_number', { ascending: false })
+      .limit(1)
+      .single()
+
+    isLastInSeries = maxResult?.voucher_number === entry.voucher_number
+  }
+
+  return NextResponse.json({ data: { entry, chain, is_last_in_series: isLastInSeries } })
 }

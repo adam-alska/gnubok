@@ -938,6 +938,7 @@ export interface JournalEntry {
   reverses_id: string | null
   correction_of_id: string | null
   attachment_urls: string[] | null
+  notes: string | null
   created_at: string
   updated_at: string
   // Relations
@@ -1136,6 +1137,7 @@ export interface CreateJournalEntryInput {
   source_type: JournalEntrySourceType
   source_id?: string
   voucher_series?: string
+  notes?: string
   lines: CreateJournalEntryLineInput[]
 }
 

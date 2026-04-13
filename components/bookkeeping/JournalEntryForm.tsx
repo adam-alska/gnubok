@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
@@ -45,6 +46,7 @@ interface Props {
   initialLines?: FormLine[]
   initialDate?: string
   initialDescription?: string
+  initialNotes?: string
   sourceType?: JournalEntrySourceType
   sourceId?: string
   submitUrl?: string
@@ -59,6 +61,7 @@ export default function JournalEntryForm({
   initialLines,
   initialDate,
   initialDescription,
+  initialNotes,
   sourceType,
   sourceId,
   submitUrl,
@@ -70,6 +73,7 @@ export default function JournalEntryForm({
   const [selectedPeriod, setSelectedPeriod] = useState('')
   const [entryDate, setEntryDate] = useState(initialDate ?? new Date().toISOString().split('T')[0])
   const [description, setDescription] = useState(initialDescription ?? '')
+  const [notes, setNotes] = useState(initialNotes ?? '')
   const [lines, setLines] = useState<FormLine[]>(
     initialLines ?? [{ ...BLANK_LINE }, { ...BLANK_LINE }]
   )
@@ -90,7 +94,7 @@ export default function JournalEntryForm({
 
   const isUploading = uploadedFiles.some((f) => f.status === 'uploading')
 
-  const hasContent = description !== '' ||
+  const hasContent = description !== '' || notes !== '' ||
     lines.some(l => l.account_number !== '' || l.debit_amount !== '' || l.credit_amount !== '') ||
     uploadedFiles.length > 0
   useUnsavedChanges(hasContent)
@@ -285,6 +289,7 @@ export default function JournalEntryForm({
         source_type: sourceType ?? 'manual',
         source_id: sourceId,
         voucher_series: voucherSeries || 'A',
+        notes: notes || undefined,
         lines: entryLines,
       }),
     })
@@ -330,6 +335,7 @@ export default function JournalEntryForm({
       setShowReview(false)
       // Reset form
       setDescription('')
+      setNotes('')
       setUploadedFiles([])
       setLines([{ ...BLANK_LINE }, { ...BLANK_LINE }])
       setEntryCurrency('SEK')
@@ -384,6 +390,17 @@ export default function JournalEntryForm({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Verifikationstext..."
+          />
+        </div>
+        <div className={embedded ? 'hidden' : 'col-span-full'}>
+          <Label>Intern anteckning <span className="text-muted-foreground font-normal">(valfritt)</span></Label>
+          <Textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="T.ex. anledning till bokning, referens till mejl, etc."
+            className="mt-1 resize-none"
+            rows={2}
+            maxLength={2000}
           />
         </div>
         {!embedded && (
@@ -720,6 +737,7 @@ export default function JournalEntryForm({
           periodName={periods.find((p) => p.id === selectedPeriod)?.name || ''}
           entryDate={entryDate}
           description={description}
+          notes={notes || undefined}
           voucherSeries={!embedded ? voucherSeries : undefined}
           lines={lines}
           totalDebit={totalDebit}
