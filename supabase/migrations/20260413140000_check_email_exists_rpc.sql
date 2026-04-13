@@ -13,4 +13,7 @@ AS $$
 $$;
 
 -- Only callable by service role — prevents email enumeration via PostgREST.
-REVOKE EXECUTE ON FUNCTION public.check_email_exists(text) FROM anon, authenticated;
+-- Must revoke from PUBLIC first (PostgreSQL grants EXECUTE to PUBLIC by default),
+-- then grant explicitly to service_role.
+REVOKE EXECUTE ON FUNCTION public.check_email_exists(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.check_email_exists(text) TO service_role;

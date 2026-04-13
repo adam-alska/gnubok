@@ -135,7 +135,11 @@ export default function InvitePage() {
     await supabase.auth.signOut()
     // Keep the invite cookie alive so the next login/register picks it up.
     document.cookie = `gnubok-invite-token=${token}; path=/; max-age=3600; samesite=lax${secureCookieFlag}`
-    router.push('/login')
+    if (invite?.alreadyHasAccount) {
+      router.push('/login')
+    } else {
+      router.push(`/register?invite=${encodeURIComponent(token)}`)
+    }
   }
 
   if (isLoading) {
