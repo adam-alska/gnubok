@@ -153,6 +153,24 @@ export async function createDraftEntry(
     )
   }
 
+  // Validate that entry_date falls within the selected fiscal period
+  const { data: period, error: periodError } = await supabase
+    .from('fiscal_periods')
+    .select('name, period_start, period_end')
+    .eq('id', input.fiscal_period_id)
+    .eq('company_id', companyId)
+    .single()
+
+  if (periodError || !period) {
+    throw new Error('Fiscal period not found')
+  }
+
+  if (input.entry_date < period.period_start || input.entry_date > period.period_end) {
+    throw new Error(
+      `Entry date ${input.entry_date} is outside fiscal period "${period.name}" (${period.period_start} - ${period.period_end})`
+    )
+  }
+
   // Resolve account IDs
   const accountIdMap = await resolveAccountIds(supabase, companyId, input.lines)
 

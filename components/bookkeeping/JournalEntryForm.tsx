@@ -7,12 +7,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
-import { Plus, Trash2, AlertTriangle, Loader2, Lock } from 'lucide-react'
+import { Plus, Trash2, AlertTriangle, Loader2, Lock, CalendarPlus } from 'lucide-react'
 import { useCanWrite } from '@/lib/hooks/use-can-write'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { JournalEntryReviewContent } from '@/components/bookkeeping/JournalEntryReviewContent'
 import DocumentUploadZone from '@/components/bookkeeping/DocumentUploadZone'
 import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
+import CreatePeriodDialog from '@/components/bookkeeping/CreatePeriodDialog'
 import { getErrorMessage } from '@/lib/errors/get-error-message'
 import { formatCurrency } from '@/lib/utils'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
@@ -82,6 +83,8 @@ export default function JournalEntryForm({
   const [exchangeRate, setExchangeRate] = useState('')
   const [isFetchingRate, setIsFetchingRate] = useState(false)
   const [foreignAmount, setForeignAmount] = useState('')
+  const [periodMismatch, setPeriodMismatch] = useState<'no_period' | 'wrong_period' | null>(null)
+  const [showCreatePeriod, setShowCreatePeriod] = useState(false)
 
   const isForeign = entryCurrency !== 'SEK'
 
@@ -95,9 +98,19 @@ export default function JournalEntryForm({
   async function fetchPeriods() {
     const res = await fetch('/api/bookkeeping/fiscal-periods')
     const { data } = await res.json()
-    setPeriods(data || [])
-    if (data && data.length > 0) {
-      setSelectedPeriod(data[0].id)
+    const fetched: FiscalPeriod[] = data || []
+    setPeriods(fetched)
+
+    // Auto-select period matching the current entry date
+    const match = fetched.find(
+      (p) => entryDate >= p.period_start && entryDate <= p.period_end
+    )
+    if (match) {
+      setSelectedPeriod(match.id)
+      setPeriodMismatch(null)
+    } else if (fetched.length > 0) {
+      setSelectedPeriod(fetched[0].id)
+      setPeriodMismatch('no_period')
     }
   }
 
@@ -117,6 +130,20 @@ export default function JournalEntryForm({
       }).catch(() => {/* keep 'A' */})
     }
   }, [])
+
+  // Auto-select period when entry date changes
+  useEffect(() => {
+    if (periods.length === 0) return
+    const match = periods.find(
+      (p) => entryDate >= p.period_start && entryDate <= p.period_end
+    )
+    if (match) {
+      setSelectedPeriod(match.id)
+      setPeriodMismatch(null)
+    } else {
+      setPeriodMismatch('no_period')
+    }
+  }, [entryDate, periods])
 
   // Fetch exchange rate from Riksbanken when currency changes
   const fetchRate = useCallback(async (currency: Currency) => {
@@ -205,7 +232,7 @@ export default function JournalEntryForm({
     : 0
 
   const handleReview = () => {
-    if (!selectedPeriod || !description || !isBalanced) return
+    if (!selectedPeriod || !description || !isBalanced || periodMismatch) return
     const hasDocuments = uploadedFiles.some((f) => f.status === 'uploaded')
     if (!embedded && !hasDocuments) {
       setShowNoDocWarning(true)
@@ -374,6 +401,26 @@ export default function JournalEntryForm({
           </div>
         )}
       </div>
+
+      {/* Period mismatch warning */}
+      {periodMismatch === 'no_period' && (
+        <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-3">
+          <AlertTriangle className="h-5 w-5 text-warning-foreground mt-0.5 shrink-0" />
+          <div className="flex-1 text-sm text-warning-foreground">
+            <p className="font-medium">Inget räkenskapsår matchar datumet {entryDate}</p>
+            <p className="mt-0.5">Skapa ett räkenskapsår som täcker detta datum för att kunna bokföra.</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowCreatePeriod(true)}
+            className="shrink-0"
+          >
+            <CalendarPlus className="h-3.5 w-3.5 mr-1.5" />
+            Skapa räkenskapsår
+          </Button>
+        </div>
+      )}
 
       {/* Currency section */}
       <div className="flex flex-wrap items-end gap-3">
@@ -645,16 +692,17 @@ export default function JournalEntryForm({
       <div className="flex flex-col items-end gap-1">
         <Button
           onClick={handleReview}
-          disabled={!isBalanced || !description || !selectedPeriod || isSubmitting || isUploading || !canWrite}
+          disabled={!isBalanced || !description || !selectedPeriod || !!periodMismatch || isSubmitting || isUploading || !canWrite}
           title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
         >
           {!canWrite && <Lock className="mr-2 h-4 w-4" />}
           Granska & skapa
         </Button>
-        {(!description || !selectedPeriod || isUploading) && (
+        {(!description || !selectedPeriod || isUploading || periodMismatch) && (
           <div className="text-xs text-muted-foreground space-y-0.5 text-right">
             {!description && <p>Ange en beskrivning</p>}
             {!selectedPeriod && <p>Välj en räkenskapsperiod</p>}
+            {periodMismatch === 'no_period' && <p>Skapa ett räkenskapsår som matchar datumet</p>}
             {isUploading && <p>Vänta tills filerna laddats upp</p>}
           </div>
         )}
@@ -706,6 +754,14 @@ export default function JournalEntryForm({
           </div>
         </div>
       </ConfirmationDialog>
+
+      <CreatePeriodDialog
+        open={showCreatePeriod}
+        onOpenChange={setShowCreatePeriod}
+        entryDate={entryDate}
+        periods={periods}
+        onCreated={fetchPeriods}
+      />
     </div>
   )
 

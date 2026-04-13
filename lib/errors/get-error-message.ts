@@ -80,6 +80,10 @@ const ERROR_PATTERN_MAP: [RegExp, string | null][] = [
     /Cannot attach documents to entries in a locked/i,
     'Kan inte bifoga dokument till verifikationer i en låst period.',
   ],
+  [
+    /Entry date .+ is outside fiscal period/i,
+    'Datumet ligger utanför det valda räkenskapsåret.',
+  ],
 ]
 
 /**
