@@ -44,6 +44,7 @@ export default function BankFileColumnMappingStep({
   const [balanceCol, setBalanceCol] = useState<number>(-1)
   const [delimiter, setDelimiter] = useState<string>(',')
   const [decimalSep, setDecimalSep] = useState<',' | '.'>(',')
+  const [dateFormat, setDateFormat] = useState<string>('YYYY-MM-DD')
 
   const isValid = dateCol >= 0 && descCol >= 0 && amountCol >= 0
 
@@ -58,7 +59,7 @@ export default function BankFileColumnMappingStep({
       delimiter,
       decimal_separator: decimalSep,
       skip_rows: 1, // Skip header
-      date_format: 'YYYY-MM-DD',
+      date_format: dateFormat,
     }
     onConfirm(mapping)
   }
@@ -78,8 +79,8 @@ export default function BankFileColumnMappingStep({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Delimiter and decimal settings */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Delimiter, decimal, and date format settings */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Avgränsare</Label>
               <Select value={delimiter} onValueChange={(v) => { if (v) setDelimiter(v) }}>
@@ -102,6 +103,20 @@ export default function BankFileColumnMappingStep({
                 <SelectContent>
                   <SelectItem value=",">Komma (1 234,56)</SelectItem>
                   <SelectItem value=".">Punkt (1234.56)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Datumformat</Label>
+              <Select value={dateFormat} onValueChange={(v) => { if (v) setDateFormat(v) }}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
+                  <SelectItem value="DD.MM.YYYY">DD.MM.YYYY</SelectItem>
+                  <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
+                  <SelectItem value="YYYYMMDD">YYYYMMDD</SelectItem>
                 </SelectContent>
               </Select>
             </div>

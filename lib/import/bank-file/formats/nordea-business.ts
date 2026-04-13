@@ -22,6 +22,7 @@
 
 import type { BankFileFormat, BankFileParseResult, ParsedBankTransaction, BankFileParseIssue } from '../types'
 import { prepareContent } from '../encoding'
+import { normalizeDate } from '../date-utils'
 
 function parseCommaDecimal(value: string): number {
   const cleaned = value.replace(/\s/g, '').replace(',', '.')
@@ -158,11 +159,8 @@ export const nordeaBusinessFormat: BankFileFormat = {
         continue
       }
 
-      // Normalize YYYY/MM/DD → YYYY-MM-DD (Format D variant)
-      const normalizedDate = date.includes('/') ? date.replace(/\//g, '-') : date
-
-      // Validate date format (YYYY-MM-DD)
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
+      const normalizedDate = normalizeDate(date)
+      if (!normalizedDate) {
         issues.push({ row: i + 1, message: `Invalid date: ${date}`, severity: 'warning' })
         skippedRows++
         continue

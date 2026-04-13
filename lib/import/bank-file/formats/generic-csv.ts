@@ -8,6 +8,7 @@
 import type { BankFileFormat, BankFileParseResult, ParsedBankTransaction, BankFileParseIssue, GenericCSVColumnMapping } from '../types'
 import { prepareContent } from '../encoding'
 import { parseCSVLine } from './nordea'
+import { normalizeDate } from '../date-utils'
 
 /**
  * Parse a generic CSV with user-provided column mapping
@@ -25,6 +26,32 @@ export function parseGenericCSV(
 
   // Skip configured number of header/metadata rows
   const startRow = mapping.skip_rows
+
+  // Detect decimal separator mismatch by sampling amount column
+  const sampleSize = Math.min(lines.length - startRow, 20)
+  let commaPattern = 0
+  let periodPattern = 0
+  for (let s = startRow; s < startRow + sampleSize && s < lines.length; s++) {
+    const sampleLine = lines[s]?.trim()
+    if (!sampleLine) continue
+    const sampleFields = parseCSVLine(sampleLine, mapping.delimiter).map(f => f.trim().replace(/^"|"$/g, ''))
+    const amtStr = sampleFields[mapping.amount] || ''
+    if (/\d,\d{1,2}$/.test(amtStr)) commaPattern++
+    if (/\d\.\d{1,2}$/.test(amtStr)) periodPattern++
+  }
+  if (mapping.decimal_separator === ',' && periodPattern > commaPattern && periodPattern >= 3) {
+    issues.push({
+      row: 0,
+      message: 'Decimalavgränsare verkar vara punkt (.) men komma (,) är valt. Kontrollera inställningen.',
+      severity: 'warning',
+    })
+  } else if (mapping.decimal_separator === '.' && commaPattern > periodPattern && commaPattern >= 3) {
+    issues.push({
+      row: 0,
+      message: 'Decimalavgränsare verkar vara komma (,) men punkt (.) är valt. Kontrollera inställningen.',
+      severity: 'warning',
+    })
+  }
 
   for (let i = startRow; i < lines.length; i++) {
     const line = lines[i].trim()
@@ -54,6 +81,10 @@ export function parseGenericCSV(
     const balanceStr = mapping.balance !== undefined ? fields[mapping.balance] : undefined
 
     if (!dateStr || !amountStr) {
+      const missing = []
+      if (!dateStr) missing.push('datum')
+      if (!amountStr) missing.push('belopp')
+      issues.push({ row: i + 1, message: `Saknar ${missing.join(' och ')}`, severity: 'warning' })
       skippedRows++
       continue
     }
@@ -72,10 +103,10 @@ export function parseGenericCSV(
       continue
     }
 
-    // Parse date - expect YYYY-MM-DD
-    const date = dateStr.trim()
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      issues.push({ row: i + 1, message: `Invalid date format: ${date} (expected YYYY-MM-DD)`, severity: 'warning' })
+    // Normalize date from multiple formats to YYYY-MM-DD
+    const date = normalizeDate(dateStr, mapping.date_format)
+    if (!date) {
+      issues.push({ row: i + 1, message: `Ogiltigt datumformat: ${dateStr.trim()}`, severity: 'warning' })
       skippedRows++
       continue
     }

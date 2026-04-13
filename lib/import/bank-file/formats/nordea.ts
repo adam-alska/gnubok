@@ -13,6 +13,7 @@
 
 import type { BankFileFormat, BankFileParseResult, ParsedBankTransaction, BankFileParseIssue } from '../types'
 import { prepareContent } from '../encoding'
+import { normalizeDate } from '../date-utils'
 
 function parseCommaDecimal(value: string): number {
   // Swedish format: "1 234,56" or "-1 234,56"
@@ -77,8 +78,8 @@ export const nordeaFormat: BankFileFormat = {
         continue
       }
 
-      // Validate date format
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date?.trim())) {
+      const normalizedDate = normalizeDate(date)
+      if (!normalizedDate) {
         issues.push({ row: i + 1, message: `Invalid date: ${date}`, severity: 'warning' })
         skippedRows++
         continue
@@ -87,7 +88,7 @@ export const nordeaFormat: BankFileFormat = {
       const balance = balanceStr ? parseCommaDecimal(balanceStr) : null
 
       transactions.push({
-        date: date.trim(),
+        date: normalizedDate,
         description: description?.trim() || 'Unknown',
         amount,
         currency: 'SEK',

@@ -14,6 +14,7 @@
 
 import type { BankFileFormat, BankFileParseResult, ParsedBankTransaction, BankFileParseIssue } from '../types'
 import { prepareContent } from '../encoding'
+import { normalizeDate } from '../date-utils'
 
 function parseCommaDecimal(value: string): number {
   const cleaned = value.replace(/\s/g, '').replace(',', '.')
@@ -135,6 +136,10 @@ export const icaBankenFormat: BankFileFormat = {
       const balanceStr = balanceIdx >= 0 ? fields[balanceIdx] : undefined
 
       if (!date || !amountStr) {
+        const missing = []
+        if (!date) missing.push('datum')
+        if (!amountStr) missing.push('belopp')
+        issues.push({ row: i + 1, message: `Saknar ${missing.join(' och ')}`, severity: 'warning' })
         skippedRows++
         continue
       }
@@ -146,7 +151,8 @@ export const icaBankenFormat: BankFileFormat = {
         continue
       }
 
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const normalizedDate = normalizeDate(date)
+      if (!normalizedDate) {
         issues.push({ row: i + 1, message: `Invalid date: ${date}`, severity: 'warning' })
         skippedRows++
         continue
@@ -155,7 +161,7 @@ export const icaBankenFormat: BankFileFormat = {
       const balance = balanceStr ? parseCommaDecimal(balanceStr) : null
 
       transactions.push({
-        date,
+        date: normalizedDate,
         description: (description || 'Unknown').trim(),
         amount,
         currency: 'SEK',

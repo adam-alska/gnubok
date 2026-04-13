@@ -1151,7 +1151,7 @@ describe('parseBankFile — explicit format override', () => {
     expect(result.format_name).toBe('Unknown')
     expect(result.transactions).toHaveLength(0)
     expect(result.issues).toHaveLength(1)
-    expect(result.issues[0].message).toContain('Could not auto-detect')
+    expect(result.issues[0].message).toContain('Kunde inte identifiera bankformat')
   })
 
   it('can force generic_csv format by explicit ID', () => {

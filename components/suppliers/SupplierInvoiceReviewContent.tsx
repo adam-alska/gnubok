@@ -40,12 +40,19 @@ interface JournalPreviewLine {
   credit: number
 }
 
+function getOutputVatAccount(rate: number): string {
+  if (rate === 0.12) return '2624'
+  if (rate === 0.06) return '2634'
+  return '2614'
+}
+
 function buildJournalPreview(
   items: ReviewLineItem[],
   subtotal: number,
   totalVat: number,
   total: number,
   reverseCharge: boolean,
+  supplierType?: string,
 ): JournalPreviewLine[] {
   const lines: JournalPreviewLine[] = []
 
@@ -67,21 +74,35 @@ function buildJournalPreview(
   }
 
   if (reverseCharge) {
-    // EU reverse charge: fiktiv moms
-    const vatRate = 0.25
-    const fiktivVat = Math.round(subtotal * vatRate * 100) / 100
-    lines.push({
-      account_number: '2645',
-      description: 'Beräknad ingående moms',
-      debit: fiktivVat,
-      credit: 0,
-    })
-    lines.push({
-      account_number: '2614',
-      description: 'Utgående moms omvänd',
-      debit: 0,
-      credit: fiktivVat,
-    })
+    // Reverse charge: fiktiv moms per VAT rate (matches engine groupVatByRate logic)
+    const isDomesticRC = supplierType === 'swedish_business'
+    const inputAccount = isDomesticRC ? '2647' : '2645'
+
+    const vatByRate = new Map<number, number>()
+    for (const item of items) {
+      if (item.vat_rate > 0) {
+        const current = vatByRate.get(item.vat_rate) || 0
+        vatByRate.set(item.vat_rate, current + Math.round(item.amount * 100) / 100)
+      }
+    }
+
+    for (const [rate, netAmount] of vatByRate) {
+      const fiktivVat = Math.round(netAmount * rate * 100) / 100
+      const outputAccount = getOutputVatAccount(rate)
+      lines.push({
+        account_number: inputAccount,
+        description: inputAccount,
+        debit: fiktivVat,
+        credit: 0,
+      })
+      lines.push({
+        account_number: outputAccount,
+        description: outputAccount,
+        debit: 0,
+        credit: fiktivVat,
+      })
+    }
+
     // Credit: 2440 at subtotal (no real VAT for reverse charge)
     lines.push({
       account_number: '2440',
@@ -113,8 +134,11 @@ function buildJournalPreview(
 const ACCOUNT_LABELS: Record<string, string> = {
   '2440': 'Leverantörsskulder',
   '2641': 'Ingående moms',
-  '2645': 'Beräknad ingående moms',
-  '2614': 'Utg. moms omvänd skattskyldighet',
+  '2645': 'Beräknad ing. moms förvärv utlandet',
+  '2647': 'Beräknad ing. moms omvänd i Sverige',
+  '2614': 'Utg. moms omvänd 25%',
+  '2624': 'Utg. moms omvänd 12%',
+  '2634': 'Utg. moms omvänd 6%',
 }
 
 export function SupplierInvoiceReviewContent({
@@ -132,7 +156,7 @@ export function SupplierInvoiceReviewContent({
   totalVat,
   total,
 }: SupplierInvoiceReviewContentProps) {
-  const journalLines = buildJournalPreview(items, subtotal, totalVat, total, reverseCharge)
+  const journalLines = buildJournalPreview(items, subtotal, totalVat, total, reverseCharge, supplier.supplier_type)
   const totalDebit = journalLines.reduce((sum, l) => sum + l.debit, 0)
   const totalCredit = journalLines.reduce((sum, l) => sum + l.credit, 0)
 
