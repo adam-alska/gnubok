@@ -130,6 +130,66 @@ export async function checkDuplicatePeriodImport(
 }
 
 /**
+ * Replace (cancel) a completed SIE import so the user can re-import corrected
+ * data for the same fiscal period.
+ *
+ * Per BFL 5 kap 5§ (rättelse), the original entries are preserved with
+ * status='cancelled'. The import record is marked as 'replaced' with a
+ * timestamp for audit trail (BFNAR 2013:2 kap 8 behandlingshistorik).
+ * Nothing is deleted.
+ *
+ * The actual cancellation + status update is atomic via the replace_sie_import
+ * DB RPC to prevent inconsistent state.
+ */
+export async function replaceSIEImport(
+  supabase: SupabaseClient,
+  companyId: string,
+  importId: string
+): Promise<{ success: boolean; cancelledEntries: number; error?: string }> {
+  // 1. Fetch and validate the import record
+  const { data: importRecord } = await supabase
+    .from('sie_imports')
+    .select('status, fiscal_period_id')
+    .eq('id', importId)
+    .eq('company_id', companyId)
+    .single()
+
+  if (!importRecord) {
+    return { success: false, cancelledEntries: 0, error: 'Import hittades inte' }
+  }
+
+  if (importRecord.status !== 'completed') {
+    return { success: false, cancelledEntries: 0, error: `Kan bara ersätta slutförda importer (status: ${importRecord.status})` }
+  }
+
+  // 2. Check that the fiscal period is not closed or locked
+  if (importRecord.fiscal_period_id) {
+    const { data: period } = await supabase
+      .from('fiscal_periods')
+      .select('is_closed, locked_at')
+      .eq('id', importRecord.fiscal_period_id)
+      .eq('company_id', companyId)
+      .single()
+
+    if (period?.is_closed || period?.locked_at) {
+      return { success: false, cancelledEntries: 0, error: 'Kan inte ersätta import i ett låst eller stängt räkenskapsår. Öppna perioden först.' }
+    }
+  }
+
+  // 3. Atomically cancel entries and mark import as replaced via DB RPC
+  const { data: cancelledCount, error: rpcError } = await supabase.rpc('replace_sie_import', {
+    p_company_id: companyId,
+    p_import_id: importId,
+  })
+
+  if (rpcError) {
+    return { success: false, cancelledEntries: 0, error: `Kunde inte ersätta import: ${rpcError.message}` }
+  }
+
+  return { success: true, cancelledEntries: cancelledCount as number }
+}
+
+/**
  * Clean up stale pending/failed import records for a given file hash.
  * Prevents UNIQUE constraint conflicts when re-importing after a failure.
  */

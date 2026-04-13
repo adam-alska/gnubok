@@ -326,6 +326,8 @@ function SIEImportWizard() {
   const [errorType, setErrorType] = useState<'duplicate' | 'duplicate_period' | 'validation' | 'parse' | undefined>()
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [validationWarnings, setValidationWarnings] = useState<string[]>([])
+  const [duplicatePeriodImportId, setDuplicatePeriodImportId] = useState<string | null>(null)
+  const [isReplacing, setIsReplacing] = useState(false)
 
   const [file, setFile] = useState<File | null>(null)
   const [, setParsed] = useState<ParsedSIEFile | null>(null)
@@ -370,6 +372,9 @@ function SIEImportWizard() {
         if (type === 'duplicate' || type === 'duplicate_period') {
           setErrorType(type)
           setError(data.message)
+          if (type === 'duplicate_period' && data.importId) {
+            setDuplicatePeriodImportId(data.importId)
+          }
           toast({ title: type === 'duplicate' ? 'Filen har redan importerats' : 'Överlappande räkenskapsår', description: data.message, variant: 'destructive' })
         } else if (type === 'validation') {
           setErrorType('validation')
@@ -424,6 +429,39 @@ function SIEImportWizard() {
       setIsLoading(false)
     }
   }, [toast])
+
+  const handleReplace = useCallback(async (importId: string) => {
+    if (!file) return
+
+    setIsReplacing(true)
+    try {
+      const res = await fetch(`/api/import/sie/${importId}/replace`, { method: 'POST' })
+      const data = await res.json()
+
+      if (!res.ok) {
+        toast({ title: 'Kunde inte ersätta import', description: data.error || 'Ett fel uppstod', variant: 'destructive' })
+        return
+      }
+
+      toast({
+        title: 'Import ersatt',
+        description: `${data.cancelledEntries} verifikation${data.cancelledEntries === 1 ? '' : 'er'} makulerades. Importerar ny fil...`,
+      })
+
+      // Clear error state and re-trigger the file upload
+      setError(null)
+      setErrorType(undefined)
+      setDuplicatePeriodImportId(null)
+
+      // Small delay so the user sees the success toast before re-upload starts
+      await new Promise(resolve => setTimeout(resolve, 500))
+      handleFileSelect(file)
+    } catch {
+      toast({ title: 'Anslutningsfel', description: 'Kunde inte nå servern.', variant: 'destructive' })
+    } finally {
+      setIsReplacing(false)
+    }
+  }, [file, handleFileSelect, toast])
 
   const handleMappingChange = useCallback((sourceAccount: string, targetAccount: string, targetName: string) => {
     setMappings((prev) => applyMappingOverride(prev, sourceAccount, targetAccount, targetName))
@@ -572,7 +610,7 @@ function SIEImportWizard() {
   const handleNewImport = () => {
     setStep('upload'); setFile(null); setParsed(null); setMappings([])
     setPreview(null); setIssues([]); setImportResult(null); setError(null); setErrorType(undefined)
-    setValidationErrors([]); setValidationWarnings([])
+    setValidationErrors([]); setValidationWarnings([]); setDuplicatePeriodImportId(null)
     setSieAccounts([]); setIsCreatingAccounts(false)
   }
 
@@ -599,7 +637,7 @@ function SIEImportWizard() {
         </CardContent>
       </Card>
 
-      {step === 'upload' && <SIEUploadStep onFileSelect={handleFileSelect} isLoading={isLoading} error={error} errorType={errorType} validationErrors={validationErrors} validationWarnings={validationWarnings} />}
+      {step === 'upload' && <SIEUploadStep onFileSelect={handleFileSelect} isLoading={isLoading} error={error} errorType={errorType} validationErrors={validationErrors} validationWarnings={validationWarnings} duplicatePeriodImportId={duplicatePeriodImportId} onReplace={handleReplace} isReplacing={isReplacing} />}
       {step === 'preview' && preview && (
         <SIEPreviewStep preview={preview} issues={issues} missingAccounts={missingAccounts}
           onCreateAccounts={handleCreateAccounts} isCreatingAccounts={isCreatingAccounts}
