@@ -135,7 +135,11 @@ export default function InvitePage() {
     await supabase.auth.signOut()
     // Keep the invite cookie alive so the next login/register picks it up.
     document.cookie = `gnubok-invite-token=${token}; path=/; max-age=3600; samesite=lax${secureCookieFlag}`
-    router.push('/login')
+    if (invite?.alreadyHasAccount) {
+      router.push('/login')
+    } else {
+      router.push(`/register?invite=${encodeURIComponent(token)}`)
+    }
   }
 
   if (isLoading) {
@@ -209,8 +213,11 @@ export default function InvitePage() {
                   </div>
                 </div>
               </Card>
-            ) : invite?.alreadyHasAccount && isLoggedInAsInvitee ? (
+            ) : isLoggedInAsInvitee ? (
               // Already signed in as the invitee — one-click join.
+              // Prioritized over alreadyHasAccount to avoid the broken flow
+              // where a false-negative from the email check would send a
+              // logged-in user to /register, which middleware bounces to /.
               <div className="space-y-6">
                 <Card className="p-6">
                   <div className="flex items-start gap-4">
@@ -245,7 +252,7 @@ export default function InvitePage() {
                   )}
                 </Button>
               </div>
-            ) : invite?.alreadyHasAccount && isLoggedInAsOther ? (
+            ) : isLoggedInAsOther ? (
               // Signed in as a different user — ask them to sign out first.
               <div className="space-y-6">
                 <Card className="p-6">
@@ -271,8 +278,7 @@ export default function InvitePage() {
                 </Button>
               </div>
             ) : invite?.alreadyHasAccount ? (
-              // Not signed in yet — current behavior: bounce to /login with
-              // the invite cookie.
+              // Not signed in — email has an existing account, bounce to login.
               <div className="space-y-6">
                 <Card className="p-6">
                   <div className="flex items-start gap-4">
@@ -297,6 +303,7 @@ export default function InvitePage() {
                 </Button>
               </div>
             ) : invite ? (
+              // Not signed in, no existing account — register.
               <div className="space-y-6">
                 <Card className="p-6">
                   <div className="flex items-start gap-4">

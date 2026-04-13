@@ -33,10 +33,9 @@ export async function GET(request: NextRequest) {
 
   const expired = new Date(companyInvite.expires_at) < new Date()
 
-  const { data: existingUsers } = await serviceClient.auth.admin.listUsers()
-  const alreadyHasAccount = existingUsers?.users?.some(
-    (u) => u.email?.toLowerCase() === companyInvite.email.toLowerCase()
-  ) ?? false
+  const { data: alreadyHasAccount } = await serviceClient.rpc('check_email_exists', {
+    email_to_check: companyInvite.email,
+  })
 
   return NextResponse.json({
     data: {
