@@ -119,8 +119,14 @@ export async function ingestTransactions(
   // by incoming enable_banking rows to avoid blocking unrelated CSV imports.
   const existingMaps = await buildExistingTransactionMaps(supabase, companyId, rawTransactions)
 
-  // Pre-fetch unlinked GL lines for reconciliation (non-critical)
+  // When rawInsertOnly is set (viewer imports), skip pre-fetching GL lines,
+  // supplier invoices, and exchange rates — they are not used.
   let glLinePool: UnlinkedGLLine[] = []
+  let unpaidSupplierInvoices: SupplierInvoice[] = []
+  let exchangeRates = new Map<Currency, ExchangeRate>()
+
+  if (!options?.rawInsertOnly) {
+  // Pre-fetch unlinked GL lines for reconciliation (non-critical)
   try {
     glLinePool = await fetchUnlinkedGLLines(supabase, companyId, undefined, undefined, options?.settlementAccount)
   } catch {
@@ -128,7 +134,6 @@ export async function ingestTransactions(
   }
 
   // Pre-fetch unpaid supplier invoices for expense matching (non-critical)
-  let unpaidSupplierInvoices: SupplierInvoice[] = []
   try {
     const { data } = await supabase
       .from('supplier_invoices')
@@ -141,20 +146,22 @@ export async function ingestTransactions(
   } catch {
     // Non-critical — supplier invoice matching will be skipped
   }
+  }
 
   // Pre-fetch exchange rates for non-SEK currencies (non-critical)
-  let exchangeRates = new Map<Currency, ExchangeRate>()
-  try {
-    const uniqueCurrencies = [...new Set(
-      rawTransactions
-        .map(t => t.currency)
-        .filter((c): c is Currency => c != null && c !== 'SEK')
-    )]
-    if (uniqueCurrencies.length > 0) {
-      exchangeRates = await fetchMultipleRates(uniqueCurrencies)
+  if (!options?.rawInsertOnly) {
+    try {
+      const uniqueCurrencies = [...new Set(
+        rawTransactions
+          .map(t => t.currency)
+          .filter((c): c is Currency => c != null && c !== 'SEK')
+      )]
+      if (uniqueCurrencies.length > 0) {
+        exchangeRates = await fetchMultipleRates(uniqueCurrencies)
+      }
+    } catch {
+      // Non-critical — amount_sek fields will stay null
     }
-  } catch {
-    // Non-critical — amount_sek fields will stay null
   }
 
   // Pre-fetch existing external_ids in batches for dedup (avoids N+1 queries)
@@ -243,6 +250,9 @@ export async function ingestTransactions(
 
     result.imported++
     result.transaction_ids.push(newTransaction.id)
+
+    // rawInsertOnly: skip reconciliation, invoice matching, and auto-categorization
+    if (options?.rawInsertOnly) continue
 
     // 2.5. Try reconciliation against pre-fetched unlinked GL lines
     if (glLinePool.length > 0) {

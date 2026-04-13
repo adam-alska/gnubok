@@ -234,6 +234,7 @@ export const enableBankingExtension: Extension = {
 
           // Use ctx.services.ingestTransactions when available
           const ingestFn = ctx?.services.ingestTransactions
+          const companyId = ctx?.companyId ?? user.id
 
           // Detect SIE overlap — skip auto-categorization if the sync range
           // overlaps with a completed SIE import to prevent double-booking.
@@ -241,15 +242,25 @@ export const enableBankingExtension: Extension = {
           const { data: sieOverlap } = await supabase
             .from('sie_imports')
             .select('id')
-            .eq('company_id', ctx?.companyId ?? user.id)
+            .eq('company_id', companyId)
             .eq('status', 'completed')
             .gte('fiscal_year_end', fromDate)
             .limit(1)
             .maybeSingle()
 
-          const syncOptions = sieOverlap
-            ? { skipAutoCategorization: true }
-            : undefined
+          // Check if user is a viewer — viewers get rawInsertOnly (no categorization)
+          const { data: membership } = await supabase
+            .from('company_members')
+            .select('role')
+            .eq('company_id', companyId)
+            .eq('user_id', user.id)
+            .maybeSingle()
+          const isViewer = membership?.role === 'viewer'
+
+          const syncOptions = {
+            ...(sieOverlap ? { skipAutoCategorization: true } : {}),
+            ...(isViewer ? { rawInsertOnly: true } : {}),
+          }
 
           if (sieOverlap) {
             log.info('SIE import overlap detected — suppressing auto-categorization', {
@@ -258,8 +269,6 @@ export const enableBankingExtension: Extension = {
               toDate,
             })
           }
-
-          const companyId = ctx?.companyId ?? user.id
           const results = await Promise.all(
             accounts.map(account => syncAccountTransactions(
               supabase,
@@ -281,7 +290,8 @@ export const enableBankingExtension: Extension = {
           // The greedy algorithm considers all candidates globally (highest-
           // confidence first) and catches matches the inline per-transaction
           // pass may have missed due to processing order.
-          if (sieOverlap && totalImported > 0) {
+          // Skip for viewers — reconciliation updates transactions which viewers cannot do.
+          if (sieOverlap && totalImported > 0 && !isViewer) {
             try {
               const reconResult = await runReconciliation(supabase, ctx?.companyId ?? user.id, {
                 dateFrom: fromDate,
