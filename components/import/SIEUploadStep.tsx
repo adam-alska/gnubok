@@ -3,7 +3,8 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { Upload, FileText, AlertCircle, CheckCircle, Loader2, XCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Upload, FileText, AlertCircle, CheckCircle, Loader2, XCircle, RefreshCw } from 'lucide-react'
 
 const LOADING_PHASES = [
   { message: 'Läser fil...', progress: 10 },
@@ -19,9 +20,12 @@ interface SIEUploadStepProps {
   errorType?: 'duplicate' | 'duplicate_period' | 'validation' | 'parse'
   validationErrors?: string[]
   validationWarnings?: string[]
+  duplicatePeriodImportId?: string | null
+  onReplace?: (importId: string) => Promise<void>
+  isReplacing?: boolean
 }
 
-export default function SIEUploadStep({ onFileSelect, isLoading, error, errorType, validationErrors, validationWarnings }: SIEUploadStepProps) {
+export default function SIEUploadStep({ onFileSelect, isLoading, error, errorType, validationErrors, validationWarnings, duplicatePeriodImportId, onReplace, isReplacing }: SIEUploadStepProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [loadingPhase, setLoadingPhase] = useState(0)
@@ -192,7 +196,27 @@ export default function SIEUploadStep({ onFileSelect, isLoading, error, errorTyp
                       <p>Om du vill importera om filen, ta först bort den tidigare importen under Bokföring.</p>
                     )}
                     {errorType === 'duplicate_period' && (
-                      <p>Varje räkenskapsår kan bara importeras en gång. Ta bort den befintliga importen först om du vill ersätta den.</p>
+                      <div className="space-y-2">
+                        <p>Den befintliga importens verifikationer kommer att makuleras (status ändras till &quot;makulerad&quot;). De finns kvar som spårbar historik.</p>
+                        {duplicatePeriodImportId && onReplace && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-warning/50 text-warning hover:bg-warning/10"
+                            disabled={isReplacing}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onReplace(duplicatePeriodImportId)
+                            }}
+                          >
+                            {isReplacing ? (
+                              <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Ersätter...</>
+                            ) : (
+                              <><RefreshCw className="h-4 w-4 mr-2" />Ersätt befintlig import</>
+                            )}
+                          </Button>
+                        )}
+                      </div>
                     )}
                     {errorType === 'validation' && (
                       <p>Prova att exportera filen igen från ditt bokföringsprogram. Om felet kvarstår, kontrollera att alla verifikationer är korrekt bokförda i källsystemet.</p>
