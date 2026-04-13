@@ -137,6 +137,9 @@ export async function checkDuplicatePeriodImport(
  * status='cancelled'. The import record is marked as 'replaced' with a
  * timestamp for audit trail (BFNAR 2013:2 kap 8 behandlingshistorik).
  * Nothing is deleted.
+ *
+ * The actual cancellation + status update is atomic via the replace_sie_import
+ * DB RPC to prevent inconsistent state.
  */
 export async function replaceSIEImport(
   supabase: SupabaseClient,
@@ -146,7 +149,7 @@ export async function replaceSIEImport(
   // 1. Fetch and validate the import record
   const { data: importRecord } = await supabase
     .from('sie_imports')
-    .select('*')
+    .select('status, fiscal_period_id')
     .eq('id', importId)
     .eq('company_id', companyId)
     .single()
@@ -159,86 +162,31 @@ export async function replaceSIEImport(
     return { success: false, cancelledEntries: 0, error: `Kan bara ersätta slutförda importer (status: ${importRecord.status})` }
   }
 
-  // 2. Check that the fiscal period is not closed
+  // 2. Check that the fiscal period is not closed or locked
   if (importRecord.fiscal_period_id) {
     const { data: period } = await supabase
       .from('fiscal_periods')
-      .select('is_closed')
+      .select('is_closed, locked_at')
       .eq('id', importRecord.fiscal_period_id)
       .eq('company_id', companyId)
       .single()
 
-    if (period?.is_closed) {
-      return { success: false, cancelledEntries: 0, error: 'Kan inte ersätta import i ett stängt räkenskapsår. Öppna perioden först.' }
+    if (period?.is_closed || period?.locked_at) {
+      return { success: false, cancelledEntries: 0, error: 'Kan inte ersätta import i ett låst eller stängt räkenskapsår. Öppna perioden först.' }
     }
   }
 
-  // 3. Find all journal entries belonging to this import
-  const entryIds: string[] = []
+  // 3. Atomically cancel entries and mark import as replaced via DB RPC
+  const { data: cancelledCount, error: rpcError } = await supabase.rpc('replace_sie_import', {
+    p_company_id: companyId,
+    p_import_id: importId,
+  })
 
-  // 3a. Opening balance entry (source_type='opening_balance')
-  if (importRecord.opening_balance_entry_id) {
-    entryIds.push(importRecord.opening_balance_entry_id)
+  if (rpcError) {
+    return { success: false, cancelledEntries: 0, error: `Kunde inte ersätta import: ${rpcError.message}` }
   }
 
-  // 3b. All imported vouchers + migration adjustment (source_type='import')
-  if (importRecord.fiscal_period_id) {
-    const { data: importedEntries } = await supabase
-      .from('journal_entries')
-      .select('id')
-      .eq('company_id', companyId)
-      .eq('fiscal_period_id', importRecord.fiscal_period_id)
-      .eq('source_type', 'import')
-      .eq('status', 'posted')
-
-    if (importedEntries) {
-      for (const entry of importedEntries) {
-        if (!entryIds.includes(entry.id)) {
-          entryIds.push(entry.id)
-        }
-      }
-    }
-  }
-
-  if (entryIds.length === 0) {
-    // No entries to cancel — just mark import as replaced
-    await supabase
-      .from('sie_imports')
-      .update({ status: 'replaced', replaced_at: new Date().toISOString() })
-      .eq('id', importId)
-      .eq('company_id', companyId)
-
-    return { success: true, cancelledEntries: 0 }
-  }
-
-  // 4. Cancel all entries (posted → cancelled, allowed by immutability trigger)
-  const { error: cancelError, count } = await supabase
-    .from('journal_entries')
-    .update({ status: 'cancelled' })
-    .in('id', entryIds)
-    .eq('company_id', companyId)
-    .eq('status', 'posted')
-
-  if (cancelError) {
-    return { success: false, cancelledEntries: 0, error: `Kunde inte makulera verifikationer: ${cancelError.message}` }
-  }
-
-  // Also cancel the opening balance entry if it's still posted
-  // (it has source_type='opening_balance', not 'import', so the query above may miss it
-  //  only if it wasn't in the entryIds — but we added it explicitly, so this is a safety net)
-
-  // 5. Mark the import as replaced
-  const { error: replaceError } = await supabase
-    .from('sie_imports')
-    .update({ status: 'replaced', replaced_at: new Date().toISOString() })
-    .eq('id', importId)
-    .eq('company_id', companyId)
-
-  if (replaceError) {
-    return { success: false, cancelledEntries: count ?? 0, error: `Verifikationer makulerades men importstatusen kunde inte uppdateras: ${replaceError.message}` }
-  }
-
-  return { success: true, cancelledEntries: count ?? entryIds.length }
+  return { success: true, cancelledEntries: cancelledCount as number }
 }
 
 /**
