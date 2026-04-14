@@ -194,6 +194,21 @@ export async function GET(
     },
   })
 
+  // Auto-complete arbetsgivardeklaration deadline for this period
+  // Per Skatteförfarandelagen: AGI generation satisfies the filing obligation
+  const period = `${run.period_year}-${String(run.period_month).padStart(2, '0')}`
+  await supabase
+    .from('deadlines')
+    .update({
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      completed_by: user.id,
+    })
+    .eq('company_id', companyId)
+    .eq('type', 'arbetsgivardeklaration')
+    .eq('period', period)
+    .eq('status', 'pending')
+
   // Return as downloadable XML
   return new Response(xml, {
     headers: {

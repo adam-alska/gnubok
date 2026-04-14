@@ -37,7 +37,7 @@ export interface AvgifterBasisReport {
 
 const CATEGORY_LABELS: Record<string, string> = {
   standard: 'Standard (31,42%)',
-  reduced_65plus: 'Reducerad 65+ (10,21%)',
+  reduced_65plus: 'Reducerad 67+ (10,21%)',
   youth: 'Ungdomsrabatt (20,81%)',
   vaxa_stod: 'Växa-stöd (10,21%)',
   exempt: 'Undantagen (0%)',

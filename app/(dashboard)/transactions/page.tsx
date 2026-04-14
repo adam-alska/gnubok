@@ -85,6 +85,9 @@ export default function TransactionsPage() {
   const [hasMore, setHasMore] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
 
+  // True uncategorized count from DB (not limited by pagination)
+  const [totalUncategorizedCount, setTotalUncategorizedCount] = useState<number | null>(null)
+
   // Set of transaction IDs that are animating out (just categorized)
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set())
 
@@ -108,12 +111,19 @@ export default function TransactionsPage() {
   async function fetchTransactions() {
     if (!company) return
     setIsLoading(true)
-    const { data: txData, error: txError } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('company_id', company.id)
-      .order('date', { ascending: false })
-      .limit(PAGE_SIZE)
+    const [{ data: txData, error: txError }, { count: uncatCount }] = await Promise.all([
+      supabase
+        .from('transactions')
+        .select('*')
+        .eq('company_id', company.id)
+        .order('date', { ascending: false })
+        .limit(PAGE_SIZE),
+      supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('company_id', company.id)
+        .is('is_business', null),
+    ])
 
     if (txError) {
       toast({ title: 'Kunde inte ladda transaktioner', description: 'Kontrollera din anslutning och försök igen.', variant: 'destructive' })
@@ -164,6 +174,7 @@ export default function TransactionsPage() {
     }))
 
     setTransactions(transactionsWithInvoices)
+    setTotalUncategorizedCount(uncatCount ?? 0)
     setHasMore((txData || []).length >= PAGE_SIZE)
     setIsLoading(false)
   }
@@ -314,6 +325,7 @@ export default function TransactionsPage() {
 
       // Mark as exiting for animation, then update state
       setExitingIds((prev) => new Set(prev).add(id))
+      setTotalUncategorizedCount((prev) => Math.max(0, (prev ?? 1) - 1))
 
       if (result.journal_entry_created) {
         toast({
@@ -331,6 +343,7 @@ export default function TransactionsPage() {
                         : t
                     )
                   )
+                  setTotalUncategorizedCount((prev) => (prev ?? 0) + 1)
                   toast({ title: 'Ångrad', description: 'Kategorisering har ångrats' })
                 } else {
                   const errData = await undoRes.json()
@@ -771,7 +784,7 @@ export default function TransactionsPage() {
     <div className="space-y-6">
       {/* Status bar with mode toggle */}
       <TransactionStatusBar
-        uncategorizedCount={uncategorizedTransactions.length}
+        uncategorizedCount={totalUncategorizedCount ?? uncategorizedTransactions.length}
         invoiceMatchCount={transactionsWithMatches.length}
         mode={mode}
         onModeChange={setMode}

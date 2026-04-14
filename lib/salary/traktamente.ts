@@ -65,14 +65,15 @@ export function calculateTraktamente(params: {
     })
   }
 
-  // Meal reductions (from max tax-free amount)
+  // Meal reductions per Skatteverket (from max tax-free amount)
+  // Breakfast: 15%, Lunch: 35%, Dinner: 35%, All three: 85%
   let mealReduction = 0
   if (params.tripType === 'full_day') {
     switch (params.mealsProvided) {
-      case 'breakfast': mealReduction = r(baseRate * 0.20); break
-      case 'lunch': case 'dinner': mealReduction = r(baseRate * 0.352); break
+      case 'breakfast': mealReduction = r(baseRate * 0.15); break
+      case 'lunch': case 'dinner': mealReduction = r(baseRate * 0.35); break
       case 'lunch_dinner': mealReduction = r(baseRate * 0.70); break
-      case 'all': mealReduction = r(baseRate * 0.90); break
+      case 'all': mealReduction = r(baseRate * 0.85); break
     }
   }
 

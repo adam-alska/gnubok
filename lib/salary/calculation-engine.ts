@@ -287,14 +287,42 @@ export function calculateSalary(
   // ─── Step 8: Employer contributions (avgifter) ───
   const avgifterCalc = calculateAvgifterRate(input, config, paymentYear)
   const avgifterBasis = r(grossSalary + totalBenefits)
-  const avgifterAmount = r(avgifterBasis * avgifterCalc.rate)
-  steps.push(...avgifterCalc.steps)
-  steps.push({
-    label: 'Arbetsgivaravgifter',
-    formula: 'avgifter_basis × rate',
-    input: { avgifter_basis: avgifterBasis, rate: avgifterCalc.rate },
-    output: avgifterAmount,
-  })
+
+  // Handle salary caps for youth and växa-stöd:
+  // Reduced rate applies only up to the cap, standard rate on the rest
+  let avgifterAmount: number
+  if (avgifterCalc.category === 'youth' && config.avgifterYouthSalaryCap && avgifterBasis > config.avgifterYouthSalaryCap) {
+    const reducedPart = r(config.avgifterYouthSalaryCap * avgifterCalc.rate)
+    const standardPart = r((avgifterBasis - config.avgifterYouthSalaryCap) * config.avgifterTotal)
+    avgifterAmount = r(reducedPart + standardPart)
+    steps.push(...avgifterCalc.steps)
+    steps.push({
+      label: 'Arbetsgivaravgifter (ungdomsrabatt med tak)',
+      formula: `${config.avgifterYouthSalaryCap} × ${avgifterCalc.rate} + ${r(avgifterBasis - config.avgifterYouthSalaryCap)} × ${config.avgifterTotal}`,
+      input: { cap: config.avgifterYouthSalaryCap, reduced: reducedPart, standard: standardPart },
+      output: avgifterAmount,
+    })
+  } else if (avgifterCalc.category === 'vaxa_stod' && config.avgifterVaxaStodCap && avgifterBasis > config.avgifterVaxaStodCap) {
+    const reducedPart = r(config.avgifterVaxaStodCap * avgifterCalc.rate)
+    const standardPart = r((avgifterBasis - config.avgifterVaxaStodCap) * config.avgifterTotal)
+    avgifterAmount = r(reducedPart + standardPart)
+    steps.push(...avgifterCalc.steps)
+    steps.push({
+      label: 'Arbetsgivaravgifter (växa-stöd med tak)',
+      formula: `${config.avgifterVaxaStodCap} × ${avgifterCalc.rate} + ${r(avgifterBasis - config.avgifterVaxaStodCap)} × ${config.avgifterTotal}`,
+      input: { cap: config.avgifterVaxaStodCap, reduced: reducedPart, standard: standardPart },
+      output: avgifterAmount,
+    })
+  } else {
+    avgifterAmount = r(avgifterBasis * avgifterCalc.rate)
+    steps.push(...avgifterCalc.steps)
+    steps.push({
+      label: 'Arbetsgivaravgifter',
+      formula: 'avgifter_basis × rate',
+      input: { avgifter_basis: avgifterBasis, rate: avgifterCalc.rate },
+      output: avgifterAmount,
+    })
+  }
 
   // ─── Step 9: Vacation accrual ───
   const vacationBasisItems = input.lineItems.filter(li => li.isVacationBasis)
@@ -312,12 +340,16 @@ export function calculateSalary(
       output: vacationAccrual,
     })
   } else {
-    // Sammalöneregeln: daily rate × semestertillägg × days
+    // Sammalöneregeln (§16a): employee keeps regular salary during vacation
+    // + semestertillägg per day (min 0.43%, often 0.8% per CBA)
+    // Accrual = tillägg only (salary cost is already in normal monthly expense)
+    // The liability (2920) for sammalöneregeln is the tillägg portion,
+    // since the base salary is expensed monthly regardless of vacation.
     const dailyRate = r(input.monthlySalary / 21)
     const tillagg = r(dailyRate * input.semestertillaggRate * input.vacationDaysPerYear)
     vacationAccrual = tillagg
     steps.push({
-      label: `Semesteravsättning (sammalöneregeln, tillägg ${input.semestertillaggRate * 100}%)`,
+      label: `Semesteravsättning (sammalöneregeln, tillägg ${(input.semestertillaggRate * 100).toFixed(2)}%)`,
       formula: 'daily_rate × semestertillagg_rate × vacation_days',
       input: { daily_rate: dailyRate, semestertillagg_rate: input.semestertillaggRate, vacation_days: input.vacationDaysPerYear },
       output: vacationAccrual,
@@ -432,7 +464,8 @@ export function calculateAvgifterRate(
     const [, monthStr] = input.paymentDate.split('-')
     const month = parseInt(monthStr)
     // Youth rate valid Apr 2026 - Sep 2027
-    if (paymentYear === 2026 && month >= 4 && month <= 12) {
+    const isYouthPeriod = (paymentYear === 2026 && month >= 4) || (paymentYear === 2027 && month <= 9)
+    if (isYouthPeriod) {
       steps.push({
         label: 'Avgiftskategori',
         formula: `Ungdomsrabatt (${ageAtYearStart} år): ${config.avgifterYouthRate * 100}% på första ${config.avgifterYouthSalaryCap} SEK`,

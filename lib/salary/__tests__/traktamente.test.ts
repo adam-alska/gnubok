@@ -91,7 +91,7 @@ describe('calculateTraktamente', () => {
     expect(result.taxable).toBe(150) // 300 - 150
   })
 
-  it('reduces for meals provided — lunch reduces by 35.2%', () => {
+  it('reduces for meals provided — lunch reduces by 35%', () => {
     const result = calculateTraktamente({
       tripType: 'full_day',
       days: 1,
@@ -99,11 +99,11 @@ describe('calculateTraktamente', () => {
       consecutiveMonths: 0,
       config,
     })
-    const mealReduction = Math.round(300 * 0.352 * 100) / 100
+    const mealReduction = Math.round(300 * 0.35 * 100) / 100
     expect(result.taxFree).toBe(Math.round((300 - mealReduction) * 100) / 100)
   })
 
-  it('reduces for all meals — 90%', () => {
+  it('reduces for all meals — 85%', () => {
     const result = calculateTraktamente({
       tripType: 'full_day',
       days: 1,
@@ -111,7 +111,7 @@ describe('calculateTraktamente', () => {
       consecutiveMonths: 0,
       config,
     })
-    const mealReduction = Math.round(300 * 0.90 * 100) / 100
+    const mealReduction = Math.round(300 * 0.85 * 100) / 100
     expect(result.taxFree).toBe(Math.round((300 - mealReduction) * 100) / 100)
   })
 })

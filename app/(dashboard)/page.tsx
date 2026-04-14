@@ -74,6 +74,7 @@ export default async function DashboardPage() {
     { data: recentReceiptActivity },
     { count: sieImportCount },
     { count: staleUncategorizedCount },
+    { count: uncategorizedCount },
   ] = await Promise.all([
     supabase.from('profiles').select('full_name').eq('id', user.id).single(),
     supabase.from('company_settings').select('*').eq('company_id', companyId).single(),
@@ -99,6 +100,7 @@ export default async function DashboardPage() {
     supabase.from('receipts').select('created_at').eq('company_id', companyId).eq('status', 'confirmed').order('created_at', { ascending: false }).limit(30),
     supabase.from('sie_imports').select('*', { count: 'exact', head: true }).eq('company_id', companyId).eq('status', 'completed'),
     supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('company_id', companyId).is('journal_entry_id', null).not('is_business', 'eq', false).lt('date', new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
+    supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('company_id', companyId).is('is_business', null),
   ])
 
   const firstName = profile?.full_name?.split(' ')[0] || null
@@ -148,7 +150,6 @@ export default async function DashboardPage() {
   const uncategorizedTxns = (transactions || []).filter(
     (t) => t.is_business === null
   )
-  const uncategorizedCount = uncategorizedTxns.length
   const uncategorizedIncome = uncategorizedTxns
     .filter((t) => t.amount > 0)
     .reduce((sum, t) => sum + Number(t.amount_sek || t.amount), 0)
@@ -234,7 +235,7 @@ export default async function DashboardPage() {
       summary={{
         ytd: ytdTotals,
         mtd: mtdTotals,
-        uncategorizedCount,
+        uncategorizedCount: uncategorizedCount || 0,
         uncategorizedIncome,
         uncategorizedExpenses,
         unpaidInvoicesCount: (unpaidInvoices || []).length,

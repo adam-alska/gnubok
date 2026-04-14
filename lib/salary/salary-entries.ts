@@ -136,9 +136,13 @@ async function createSalaryEntry(
     // Base salary and additions go to the employee-type account
     const salaryAccount = getEmployeeSalaryAccount(emp.employment_type)
 
-    // Add salary line items that are expenses (positive amounts)
+    // Add salary line items that are cash expenses
+    // Förmånsvärden (benefits) are excluded — they affect the tax base but
+    // have no cash flow and should not appear as expense lines in the journal.
+    const BENEFIT_TYPES = ['benefit_car', 'benefit_housing', 'benefit_meals', 'benefit_wellness', 'benefit_other']
     for (const li of emp.line_items) {
       if (li.is_net_deduction || li.is_gross_deduction) continue
+      if (BENEFIT_TYPES.includes(li.item_type)) continue // No cash flow for förmånsvärden
       const account = li.account_number || getLineItemAccount(li.item_type as never, emp.employment_type)
       const current = expenseByAccount.get(account) || 0
       expenseByAccount.set(account, current + li.amount)

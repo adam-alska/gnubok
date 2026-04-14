@@ -621,7 +621,7 @@ export const EmploymentTypeSchema = z.enum(['employee', 'company_owner', 'board_
 export const SalaryTypeSchema = z.enum(['monthly', 'hourly'])
 export const FSkattStatusSchema = z.enum(['a_skatt', 'f_skatt', 'fa_skatt', 'not_verified'])
 export const VacationRuleSchema = z.enum(['procentregeln', 'sammaloneregeln'])
-export const SalaryRunStatusSchema = z.enum(['draft', 'review', 'approved', 'paid', 'booked'])
+export const SalaryRunStatusSchema = z.enum(['draft', 'review', 'approved', 'paid', 'booked', 'corrected'])
 
 export const SalaryLineItemTypeSchema = z.enum([
   'monthly_salary', 'hourly_salary', 'overtime', 'bonus', 'commission',

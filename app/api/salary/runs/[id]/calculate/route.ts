@@ -5,7 +5,7 @@ import { requireCompanyId } from '@/lib/company/context'
 import { requireWritePermission } from '@/lib/auth/require-write'
 import { calculateSalary } from '@/lib/salary/calculation-engine'
 import { loadPayrollConfig, serializePayrollConfig } from '@/lib/salary/payroll-config'
-import { loadAllTaxTableRates } from '@/lib/salary/tax-tables'
+import { fetchAllTaxTableRatesForRun } from '@/lib/salary/tax-tables'
 import type { SalaryLineItemType } from '@/types'
 
 ensureInitialized()
@@ -41,9 +41,8 @@ export async function POST(
 
   const paymentYear = parseInt(run.payment_date.split('-')[0])
 
-  // Load config and tax tables
+  // Load config
   const config = await loadPayrollConfig(supabase, paymentYear)
-  const taxRates = await loadAllTaxTableRates(supabase, paymentYear)
 
   // Load all employees in this run
   const { data: runEmployees, error: empError } = await supabase
@@ -54,6 +53,13 @@ export async function POST(
   if (empError || !runEmployees || runEmployees.length === 0) {
     return NextResponse.json({ error: 'Inga anställda i lönekörningen' }, { status: 400 })
   }
+
+  // Fetch tax table rates from Skatteverket API for all needed tables/columns
+  const tableNumbers = [...new Set(runEmployees.filter(e => e.employee?.tax_table_number).map(e => e.employee.tax_table_number as number))]
+  const columns = [...new Set(runEmployees.filter(e => e.employee?.tax_column).map(e => e.employee.tax_column as number))]
+  const taxRates = tableNumbers.length > 0
+    ? await fetchAllTaxTableRatesForRun(paymentYear, tableNumbers, columns.length > 0 ? columns : [1])
+    : []
 
   let totalGross = 0
   let totalTax = 0

@@ -1,5 +1,4 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { fetchAllRows } from '@/lib/supabase/fetch-all'
 
 /**
  * Lönejournal — Monthly/annual per-employee salary register.
@@ -78,8 +77,9 @@ export async function generateSalaryJournal(
 
   const rows: SalaryJournalRow[] = (data || [])
     .filter(sre => {
-      const run = sre.salary_run as { period_year: number; period_month: number } | null
+      const run = sre.salary_run as { period_year: number; period_month: number; status: string } | null
       if (!run || run.period_year !== year) return false
+      if (run.status !== 'booked') return false // Only booked runs for BFL-compliant lönejournal
       if (monthFrom && run.period_month < monthFrom) return false
       if (monthTo && run.period_month > monthTo) return false
       return true

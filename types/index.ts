@@ -2328,7 +2328,7 @@ export type EmploymentType = 'employee' | 'company_owner' | 'board_member'
 export type SalaryType = 'monthly' | 'hourly'
 export type FSkattStatus = 'a_skatt' | 'f_skatt' | 'fa_skatt' | 'not_verified'
 export type VacationRule = 'procentregeln' | 'sammaloneregeln'
-export type SalaryRunStatus = 'draft' | 'review' | 'approved' | 'paid' | 'booked'
+export type SalaryRunStatus = 'draft' | 'review' | 'approved' | 'paid' | 'booked' | 'corrected'
 export type AGIStatus = 'generated' | 'exported' | 'submitted' | 'accepted' | 'rejected'
 
 export type SalaryLineItemType =
@@ -2414,6 +2414,8 @@ export interface SalaryRun {
   booked_at: string | null
   booked_by: string | null
   notes: string | null
+  is_correction: boolean
+  corrects_run_id: string | null
   created_at: string
   updated_at: string
   // Relations

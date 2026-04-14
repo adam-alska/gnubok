@@ -130,12 +130,12 @@ export function generateAGIXml(
     lines.push('    <Blankettinnehall>')
     lines.push('      <IU>')
 
-    // FK215: Personnummer (CRITICAL: must be decrypted)
+    // FK215: Personnummer (CRITICAL: must be decrypted for AGI)
     let pnr: string
     try {
       pnr = decryptPersonnummer(emp.personnummer)
     } catch {
-      pnr = '000000000000'
+      throw new Error(`Kunde inte dekryptera personnummer för anställd med FK570=${emp.specificationNumber}. AGI kan inte genereras utan giltigt personnummer.`)
     }
     lines.push(`        <Personnummer faltkod="215">${pnr}</Personnummer>`)
 

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { loadTaxTableRates, lookupTaxAmount } from '@/lib/salary/tax-tables'
+import { lookupTaxFromApi } from '@/lib/salary/tax-tables'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -17,22 +17,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Skattetabell måste vara 29-42' }, { status: 400 })
   }
 
-  const rates = await loadTaxTableRates(supabase, year, tableNumber, column)
-
-  if (rates.length === 0) {
-    return NextResponse.json({
-      data: {
-        year,
-        tableNumber,
-        column,
-        income,
-        taxAmount: Math.round(income * 0.30 * 100) / 100,
-        source: 'fallback_30pct',
-      },
-    })
-  }
-
-  const taxAmount = lookupTaxAmount(tableNumber, column, income, rates)
+  const taxAmount = await lookupTaxFromApi(tableNumber, column, income, year)
 
   return NextResponse.json({
     data: {
@@ -41,7 +26,7 @@ export async function GET(request: Request) {
       column,
       income,
       taxAmount,
-      source: 'tax_table',
+      source: 'skatteverket_api',
     },
   })
 }
