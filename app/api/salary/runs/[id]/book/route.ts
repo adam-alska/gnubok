@@ -47,7 +47,7 @@ export async function POST(
   }
 
   try {
-    const { salaryEntry, avgifterEntry, vacationEntry } = await createSalaryRunEntries(
+    const { salaryEntry, avgifterEntry, vacationEntry, pensionEntry } = await createSalaryRunEntries(
       supabase,
       companyId,
       user.id,
@@ -95,6 +95,9 @@ export async function POST(
     if (vacationEntry) {
       updates.vacation_entry_id = vacationEntry.id
       entryIds.push(vacationEntry.id)
+    }
+    if (pensionEntry) {
+      entryIds.push(pensionEntry.id)
     }
 
     const { data: bookedRun, error: updateError } = await supabase

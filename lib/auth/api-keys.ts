@@ -14,6 +14,8 @@ export const API_KEY_SCOPES = {
   'invoices:write':     { label: 'Fakturor — skriv',     description: 'Skapa, skicka, markera betald/skickad (4 verktyg)' },
   'suppliers:read':     { label: 'Leverantörer — läs',   description: 'Lista leverantörer och leverantörsfakturor (2 verktyg)' },
   'reports:read':       { label: 'Rapporter — läs',      description: 'Kontoplan, huvudbok, balansräkning, resultaträkning, moms, KPI, reskontra, perioder, bankavstämning (11 verktyg)' },
+  'payroll:read':       { label: 'Löner — läs',          description: 'Lista anställda, lönekörningar, lönejournal (3 verktyg)' },
+  'payroll:write':      { label: 'Löner — skriv',        description: 'Skapa lönekörning, beräkna, generera AGI (3 verktyg)' },
 } as const
 
 export type ApiKeyScope = keyof typeof API_KEY_SCOPES
@@ -36,6 +38,7 @@ export const SCOPE_GROUPS = [
   { domain: 'invoices',     label: 'Fakturor',       read: 'invoices:read' as const,     write: 'invoices:write' as const },
   { domain: 'suppliers',    label: 'Leverantörer',   read: 'suppliers:read' as const,    write: null },
   { domain: 'reports',      label: 'Rapporter',      read: 'reports:read' as const,      write: null },
+  { domain: 'payroll',      label: 'Löner',          read: 'payroll:read' as const,      write: 'payroll:write' as const },
 ] as const
 
 /** Map MCP tool name → required scope */
@@ -75,6 +78,13 @@ export const TOOL_SCOPE_MAP: Record<string, ApiKeyScope> = {
   gnubok_upload_document:                 'transactions:write',
   gnubok_list_inbox_items:                'transactions:read',
   gnubok_get_inbox_item:                  'transactions:read',
+  // Payroll
+  gnubok_list_employees:                  'payroll:read',
+  gnubok_get_salary_run:                  'payroll:read',
+  gnubok_get_salary_journal:              'payroll:read',
+  gnubok_create_salary_run:               'payroll:write',
+  gnubok_calculate_salary_run:            'payroll:write',
+  gnubok_generate_agi:                    'payroll:write',
 }
 
 export function validateScopes(scopes: unknown): ApiKeyScope[] | null {

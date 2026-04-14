@@ -117,22 +117,27 @@ export const TAX_DEADLINE_CONFIGS: TaxDeadlineConfig[] = [
     },
   },
 
-  // Arbetsgivardeklaration (monthly, AB with employees)
+  // Arbetsgivardeklaration (monthly, any employer with employees — AB or EF)
+  // Per Skatteförfarandelagen: every employer paying salary must file AGI monthly.
+  // Deadline: 12th of following month (17th in Jan/Aug for turnover ≤40 MSEK per agi-filing.md)
   {
     type: 'arbetsgivardeklaration',
     titleTemplate: 'Arbetsgivardeklaration {periodLabel}',
-    description: 'Arbetsgivardeklaration för aktiebolag med anställda',
-    condition: (s) => s.entity_type === 'aktiebolag' && s.pays_salaries,
+    description: 'Arbetsgivardeklaration för arbetsgivare med anställda',
+    condition: (s) => s.pays_salaries,
     priority: 'important',
     linkedReportType: null,
     generateDates: (year) => {
       const instances: DeadlineInstance[] = []
       // Due on the 12th of the following month
+      // Exception: January (for Dec) and August (for Jul) = 17th for ≤40 MSEK turnover
       for (let month = 0; month < 12; month++) {
         const deadlineMonth = (month + 1) % 12
         const deadlineYear = month === 11 ? year + 1 : year
+        // Jan (deadlineMonth=0) and Aug (deadlineMonth=7) get 17th
+        const day = (deadlineMonth === 0 || deadlineMonth === 7) ? 17 : 12
         instances.push({
-          day: 12,
+          day,
           month: deadlineMonth,
           year: deadlineYear,
           period: `${year}-${String(month + 1).padStart(2, '0')}`,

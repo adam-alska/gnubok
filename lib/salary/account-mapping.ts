@@ -93,4 +93,10 @@ export const SALARY_ACCOUNTS = {
   // Vacation accrual avgifter
   VACATION_AVGIFTER_EXPENSE: '7519',   // Sociala avgifter semester (debit)
   VACATION_AVGIFTER_LIABILITY: '2940', // Upplupna sociala avgifter (credit)
+
+  // Pension provisions (löneväxling)
+  PENSION_EXPENSE: '7410',             // Pensionsförsäkringspremier (debit)
+  PENSION_LIABILITY: '2740',           // Skuld pensionsförsäkringar (credit)
+  SLP_EXPENSE: '7533',                // Särskild löneskatt på pensionskostnader (debit)
+  SLP_LIABILITY: '2514',              // Beräknad särskild löneskatt (credit)
 } as const

@@ -142,6 +142,32 @@ export async function GET(
     )
   }
 
+  // Build pension entry preview (löneväxling — per deductions-lonevaxling.md)
+  // This would be populated from salary_line_items with type 'gross_deduction_pension'
+  // For now, pension preview is shown when pension line items exist
+  const pensionLineItems = employees.flatMap(e =>
+    ((e.line_items || []) as Array<Record<string, unknown>>)
+      .filter(li => li.item_type === 'gross_deduction_pension')
+  )
+  const pensionLines: CreateJournalEntryLineInput[] = []
+  if (pensionLineItems.length > 0) {
+    const totalPensionDeduction = Math.abs(pensionLineItems.reduce((s, li) => s + ((li.amount as number) || 0), 0))
+    const pensionContribution = Math.round(totalPensionDeduction * 1.058 * 100) / 100
+    const slp = Math.round(pensionContribution * 0.2426 * 100) / 100
+    if (pensionContribution > 0) {
+      pensionLines.push(
+        { account_number: '7410', debit_amount: pensionContribution, credit_amount: 0, line_description: `${desc} — Pensionsförsäkringspremier` },
+        { account_number: '2740', debit_amount: 0, credit_amount: pensionContribution, line_description: `${desc} — Pensionsförsäkringspremier` },
+      )
+      if (slp > 0) {
+        pensionLines.push(
+          { account_number: '7533', debit_amount: slp, credit_amount: 0, line_description: `${desc} — Särskild löneskatt 24,26%` },
+          { account_number: '2514', debit_amount: 0, credit_amount: slp, line_description: `${desc} — Särskild löneskatt 24,26%` },
+        )
+      }
+    }
+  }
+
   return NextResponse.json({
     data: {
       salaryEntry: {
@@ -155,6 +181,10 @@ export async function GET(
       vacationEntry: vacationLines.length > 0 ? {
         description: `${desc} — Semesteravsättning`,
         lines: vacationLines,
+      } : null,
+      pensionEntry: pensionLines.length > 0 ? {
+        description: `${desc} — Pensionsavsättning`,
+        lines: pensionLines,
       } : null,
     },
   })

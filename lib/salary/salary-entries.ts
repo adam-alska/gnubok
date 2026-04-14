@@ -20,6 +20,8 @@ interface SalaryRunEmployee {
   avgifter_rate: number
   vacation_accrual: number
   vacation_accrual_avgifter: number
+  cost_center?: string
+  project?: string
   line_items: Array<{
     item_type: string
     amount: number
@@ -27,6 +29,9 @@ interface SalaryRunEmployee {
     is_net_deduction: boolean
     is_gross_deduction: boolean
   }>
+  // Löneväxling pension (if applicable)
+  pension_contribution?: number
+  pension_slp?: number
 }
 
 interface SalaryRunData {
@@ -61,6 +66,7 @@ export async function createSalaryRunEntries(
   salaryEntry: JournalEntry
   avgifterEntry: JournalEntry
   vacationEntry: JournalEntry | null
+  pensionEntry: JournalEntry | null
 }> {
   const entryDate = run.payment_date
   const fiscalPeriodId = await findFiscalPeriod(supabase, companyId, entryDate)
@@ -91,7 +97,20 @@ export async function createSalaryRunEntries(
     )
   }
 
-  return { salaryEntry, avgifterEntry, vacationEntry }
+  // ─── Entry 4: Pension provisions + SLP (if löneväxling) ───
+  // Per deductions-lonevaxling.md: pension = löneväxling × 1.058, SLP = pension × 24.26%
+  // Debit 7410 Pensionsförsäkringspremier / Credit 2740 Skuld pensionsförsäkringar
+  // Debit 7533 Särskild löneskatt / Credit 2514 Beräknad särskild löneskatt
+  let pensionEntry: JournalEntry | null = null
+  const totalPension = run.employees.reduce((sum, e) => sum + (e.pension_contribution || 0), 0)
+  const totalSlp = run.employees.reduce((sum, e) => sum + (e.pension_slp || 0), 0)
+  if (totalPension > 0) {
+    pensionEntry = await createPensionEntry(
+      supabase, companyId, userId, run, fiscalPeriodId, desc, totalPension, totalSlp
+    )
+  }
+
+  return { salaryEntry, avgifterEntry, vacationEntry, pensionEntry }
 }
 
 /**
@@ -303,6 +322,75 @@ async function createVacationEntry(
   }
 
   log.info(`Creating vacation entry for ${desc}: ${roundedVacation} SEK + ${roundedAvgifter} SEK avgifter`)
+  return createJournalEntry(supabase, companyId, userId, input)
+}
+
+/**
+ * Entry 4: Pension provisions + SLP (löneväxling).
+ *
+ * Debit:  7410 Pensionsförsäkringspremier
+ * Credit: 2740 Skuld pensionsförsäkringar
+ * Debit:  7533 Särskild löneskatt på pensionskostnader (24.26%)
+ * Credit: 2514 Beräknad särskild löneskatt
+ *
+ * Per deductions-lonevaxling.md: pension = löneväxling × 1.058
+ */
+async function createPensionEntry(
+  supabase: SupabaseClient,
+  companyId: string,
+  userId: string,
+  run: SalaryRunData,
+  fiscalPeriodId: string,
+  desc: string,
+  totalPension: number,
+  totalSlp: number
+): Promise<JournalEntry> {
+  const roundedPension = Math.round(totalPension * 100) / 100
+  const roundedSlp = Math.round(totalSlp * 100) / 100
+
+  const lines: CreateJournalEntryLineInput[] = [
+    {
+      account_number: SALARY_ACCOUNTS.PENSION_EXPENSE,
+      debit_amount: roundedPension,
+      credit_amount: 0,
+      line_description: `${desc} — Pensionsförsäkringspremier`,
+    },
+    {
+      account_number: SALARY_ACCOUNTS.PENSION_LIABILITY,
+      debit_amount: 0,
+      credit_amount: roundedPension,
+      line_description: `${desc} — Pensionsförsäkringspremier`,
+    },
+  ]
+
+  if (roundedSlp > 0) {
+    lines.push(
+      {
+        account_number: SALARY_ACCOUNTS.SLP_EXPENSE,
+        debit_amount: roundedSlp,
+        credit_amount: 0,
+        line_description: `${desc} — Särskild löneskatt 24,26%`,
+      },
+      {
+        account_number: SALARY_ACCOUNTS.SLP_LIABILITY,
+        debit_amount: 0,
+        credit_amount: roundedSlp,
+        line_description: `${desc} — Särskild löneskatt 24,26%`,
+      }
+    )
+  }
+
+  const input: CreateJournalEntryInput = {
+    fiscal_period_id: fiscalPeriodId,
+    entry_date: run.payment_date,
+    description: `${desc} — Pensionsavsättning`,
+    source_type: 'salary_payment',
+    source_id: run.id,
+    voucher_series: run.voucher_series,
+    lines,
+  }
+
+  log.info(`Creating pension entry for ${desc}: ${roundedPension} SEK pension + ${roundedSlp} SEK SLP`)
   return createJournalEntry(supabase, companyId, userId, input)
 }
 

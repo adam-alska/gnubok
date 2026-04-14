@@ -62,6 +62,24 @@ export async function POST(
   let totalVacationAccrual = 0
   let totalEmployerCost = 0
 
+  // Load YTD data from prior booked salary runs this year
+  const { data: priorRuns } = await supabase
+    .from('salary_run_employees')
+    .select('employee_id, gross_salary, tax_withheld, net_salary, salary_run:salary_runs!inner(period_year, period_month, status)')
+    .eq('company_id', companyId)
+
+  const ytdByEmployee = new Map<string, { gross: number; tax: number; net: number }>()
+  for (const prior of (priorRuns || [])) {
+    const priorRun = prior.salary_run as unknown as { period_year: number; period_month: number; status: string } | null
+    if (!priorRun || priorRun.period_year !== run.period_year || priorRun.status !== 'booked') continue
+    if (priorRun.period_month >= run.period_month) continue // Only prior months
+    const current = ytdByEmployee.get(prior.employee_id) || { gross: 0, tax: 0, net: 0 }
+    current.gross += prior.gross_salary
+    current.tax += prior.tax_withheld
+    current.net += prior.net_salary
+    ytdByEmployee.set(prior.employee_id, current)
+  }
+
   for (const sre of runEmployees) {
     const emp = sre.employee
     if (!emp) continue
@@ -148,6 +166,9 @@ export async function POST(
         parental_days: parentalDays,
         vacation_days_taken: vacationDays,
         calculation_breakdown: { steps: result.steps },
+        ytd_gross: Math.round(((ytdByEmployee.get(sre.employee_id)?.gross || 0) + result.grossSalary) * 100) / 100,
+        ytd_tax: Math.round(((ytdByEmployee.get(sre.employee_id)?.tax || 0) + result.taxWithheld) * 100) / 100,
+        ytd_net: Math.round(((ytdByEmployee.get(sre.employee_id)?.net || 0) + result.netSalary) * 100) / 100,
       })
       .eq('id', sre.id)
 

@@ -297,7 +297,7 @@ export default function SalaryRunDetailPage({ params }: { params: Promise<{ id: 
             <CardTitle className="text-base">Förhandsgranskning — verifikationer</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {[preview.salaryEntry, preview.avgifterEntry, preview.vacationEntry].filter(Boolean).map((entry, idx) => (
+            {[preview.salaryEntry, preview.avgifterEntry, preview.vacationEntry, (preview as unknown as Record<string, EntryPreview | null>).pensionEntry].filter(Boolean).map((entry, idx) => (
               <div key={idx} className="space-y-2">
                 <h4 className="text-sm font-medium">{entry!.description}</h4>
                 <table className="w-full text-xs">
