@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   ArrowLeft, Plus, Calculator, Eye, Check, CreditCard, BookOpen,
   ArrowLeftCircle, Loader2,
@@ -53,6 +54,7 @@ export default function SalaryRunDetailPage({ params }: { params: Promise<{ id: 
   const [preview, setPreview] = useState<PreviewData | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [addEmployeeKey, setAddEmployeeKey] = useState(0)
 
   async function loadRun() {
     const res = await fetch(`/api/salary/runs/${id}`)
@@ -203,22 +205,22 @@ export default function SalaryRunDetailPage({ params }: { params: Promise<{ id: 
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">Anställda ({employees.length})</CardTitle>
           {run.status === 'draft' && canWrite && notAdded.length > 0 && (
-            <div className="flex gap-2">
-              <select
-                id="add-employee-select"
-                className="text-sm border rounded px-2 py-1"
-                defaultValue=""
-                onChange={(e) => {
-                  if (e.target.value) handleAddEmployee(e.target.value)
-                  e.target.value = ''
-                }}
-              >
-                <option value="" disabled>Lägg till anställd...</option>
+            <Select
+              key={addEmployeeKey}
+              onValueChange={(value) => {
+                handleAddEmployee(value)
+                setAddEmployeeKey(k => k + 1)
+              }}
+            >
+              <SelectTrigger className="w-[200px] h-8 text-sm">
+                <SelectValue placeholder="Lägg till anställd..." />
+              </SelectTrigger>
+              <SelectContent>
                 {notAdded.map(emp => (
-                  <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name}</option>
+                  <SelectItem key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name}</SelectItem>
                 ))}
-              </select>
-            </div>
+              </SelectContent>
+            </Select>
           )}
         </CardHeader>
         <CardContent className="p-0">

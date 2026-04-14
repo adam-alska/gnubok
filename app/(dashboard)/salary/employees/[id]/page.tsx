@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArrowLeft, Save, Trash2 } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 import { useCanWrite } from '@/lib/hooks/use-can-write'
@@ -28,6 +29,7 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
   const [employee, setEmployee] = useState<Employee | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [employmentType, setEmploymentType] = useState('employee')
 
   useEffect(() => {
     async function load() {
@@ -35,6 +37,7 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
       if (res.ok) {
         const { data } = await res.json()
         setEmployee(data)
+        setEmploymentType(data.employment_type)
       }
       setLoading(false)
     }
@@ -49,7 +52,7 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
     const body = {
       first_name: form.get('first_name') as string,
       last_name: form.get('last_name') as string,
-      employment_type: form.get('employment_type') as string,
+      employment_type: employmentType,
       employment_degree: parseFloat(form.get('employment_degree') as string) || 100,
       monthly_salary: parseFloat(form.get('monthly_salary') as string) || undefined,
       hourly_rate: parseFloat(form.get('hourly_rate') as string) || undefined,
@@ -149,13 +152,16 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="employment_type">Typ</Label>
-                <select id="employment_type" name="employment_type" defaultValue={employee.employment_type}
-                  disabled={!canWrite}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm">
-                  <option value="employee">Anställd</option>
-                  <option value="company_owner">Företagsledare</option>
-                  <option value="board_member">Styrelseledamot</option>
-                </select>
+                <Select value={employmentType} onValueChange={setEmploymentType} disabled={!canWrite}>
+                  <SelectTrigger id="employment_type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="employee">Anställd</SelectItem>
+                    <SelectItem value="company_owner">Företagsledare</SelectItem>
+                    <SelectItem value="board_member">Styrelseledamot</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="employment_degree">Sysselsättningsgrad (%)</Label>

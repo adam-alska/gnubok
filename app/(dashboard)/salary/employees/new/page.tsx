@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArrowLeft, Save } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 import { getErrorMessage } from '@/lib/errors/get-error-message'
@@ -15,6 +16,8 @@ export default function NewEmployeePage() {
   const router = useRouter()
   const { toast } = useToast()
   const [saving, setSaving] = useState(false)
+  const [employmentType, setEmploymentType] = useState('employee')
+  const [salaryType, setSalaryType] = useState('monthly')
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -25,10 +28,10 @@ export default function NewEmployeePage() {
       first_name: form.get('first_name') as string,
       last_name: form.get('last_name') as string,
       personnummer: (form.get('personnummer') as string).replace(/\D/g, ''),
-      employment_type: form.get('employment_type') as string,
+      employment_type: employmentType,
       employment_start: form.get('employment_start') as string,
       employment_degree: parseFloat(form.get('employment_degree') as string) || 100,
-      salary_type: form.get('salary_type') as string,
+      salary_type: salaryType,
       monthly_salary: parseFloat(form.get('monthly_salary') as string) || undefined,
       hourly_rate: parseFloat(form.get('hourly_rate') as string) || undefined,
       tax_table_number: parseInt(form.get('tax_table_number') as string) || undefined,
@@ -114,12 +117,16 @@ export default function NewEmployeePage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="employment_type">Typ</Label>
-                <select id="employment_type" name="employment_type" defaultValue="employee"
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm">
-                  <option value="employee">Anställd</option>
-                  <option value="company_owner">Företagsledare</option>
-                  <option value="board_member">Styrelseledamot</option>
-                </select>
+                <Select value={employmentType} onValueChange={setEmploymentType}>
+                  <SelectTrigger id="employment_type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="employee">Anställd</SelectItem>
+                    <SelectItem value="company_owner">Företagsledare</SelectItem>
+                    <SelectItem value="board_member">Styrelseledamot</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="employment_start">Anställningsdatum</Label>
@@ -142,11 +149,15 @@ export default function NewEmployeePage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="salary_type">Löneform</Label>
-                <select id="salary_type" name="salary_type" defaultValue="monthly"
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm">
-                  <option value="monthly">Månadslön</option>
-                  <option value="hourly">Timlön</option>
-                </select>
+                <Select value={salaryType} onValueChange={setSalaryType}>
+                  <SelectTrigger id="salary_type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">Månadslön</SelectItem>
+                    <SelectItem value="hourly">Timlön</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="monthly_salary">Månadslön (brutto, SEK)</Label>
