@@ -599,3 +599,16 @@ export const SaveGapExplanationSchema = z.object({
   gap_end: z.number().int().positive(),
   explanation: z.string().min(1).max(500),
 })
+
+// ============================================================
+// Opening balance import schemas
+// ============================================================
+
+export const OpeningBalanceExecuteSchema = z.object({
+  fiscal_period_id: uuid,
+  lines: z.array(z.object({
+    account_number: accountNumber,
+    debit_amount: nonNegativeAmount,
+    credit_amount: nonNegativeAmount,
+  })).min(2, 'At least two lines are required for double-entry'),
+})

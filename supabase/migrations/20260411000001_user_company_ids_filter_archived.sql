@@ -34,3 +34,5 @@ ALTER TABLE public.companies
 CREATE INDEX companies_active_idx
   ON public.companies (id)
   WHERE archived_at IS NULL;
+
+NOTIFY pgrst, 'reload schema';
