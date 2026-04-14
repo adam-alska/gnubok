@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { Mail, Loader2, Send } from 'lucide-react'
 import {
@@ -29,11 +29,16 @@ export function SupportLink({
   children,
   className,
 }: SupportLinkProps) {
+  const [mounted, setMounted] = useState(false)
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [sent, setSent] = useState(false)
   const { toast } = useToast()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -100,6 +105,10 @@ export function SupportLink({
         {children ?? 'Kontakta support'}
       </button>
     )
+
+  if (!mounted) {
+    return trigger
+  }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

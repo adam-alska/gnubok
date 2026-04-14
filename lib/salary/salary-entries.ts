@@ -1,0 +1,334 @@
+import { createJournalEntry, findFiscalPeriod } from '@/lib/bookkeeping/engine'
+import { createLogger } from '@/lib/logger'
+import { SALARY_ACCOUNTS, getLineItemAccount } from './account-mapping'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type {
+  CreateJournalEntryInput,
+  CreateJournalEntryLineInput,
+  JournalEntry,
+} from '@/types'
+
+const log = createLogger('salary-entries')
+
+interface SalaryRunEmployee {
+  employee_id: string
+  employment_type: string
+  gross_salary: number
+  tax_withheld: number
+  net_salary: number
+  avgifter_amount: number
+  avgifter_rate: number
+  vacation_accrual: number
+  vacation_accrual_avgifter: number
+  line_items: Array<{
+    item_type: string
+    amount: number
+    account_number: string | null
+    is_net_deduction: boolean
+    is_gross_deduction: boolean
+  }>
+}
+
+interface SalaryRunData {
+  id: string
+  period_year: number
+  period_month: number
+  payment_date: string
+  voucher_series: string
+  total_gross: number
+  total_tax: number
+  total_net: number
+  total_avgifter: number
+  total_vacation_accrual: number
+  employees: SalaryRunEmployee[]
+}
+
+/**
+ * Create all journal entries for a salary run.
+ * Creates 3 entries:
+ *   1. Salary entry: gross salary expenses, tax withholding, net payment
+ *   2. Avgifter entry: employer contributions expense + liability
+ *   3. Vacation entry: vacation accrual expense + liability + avgifter on accrual
+ *
+ * All entries use source_type: 'salary_payment' and source_id: salaryRun.id
+ */
+export async function createSalaryRunEntries(
+  supabase: SupabaseClient,
+  companyId: string,
+  userId: string,
+  run: SalaryRunData
+): Promise<{
+  salaryEntry: JournalEntry
+  avgifterEntry: JournalEntry
+  vacationEntry: JournalEntry | null
+}> {
+  const entryDate = run.payment_date
+  const fiscalPeriodId = await findFiscalPeriod(supabase, companyId, entryDate)
+  if (!fiscalPeriodId) {
+    throw new Error(`Ingen öppen räkenskapsperiod för datum ${entryDate}`)
+  }
+
+  const periodLabel = `${run.period_year}-${String(run.period_month).padStart(2, '0')}`
+  const desc = `Lön ${periodLabel}`
+
+  // ─── Entry 1: Salary (brutto, skatt, netto) ───
+  const salaryEntry = await createSalaryEntry(
+    supabase, companyId, userId, run, fiscalPeriodId, desc
+  )
+
+  // ─── Entry 2: Arbetsgivaravgifter ───
+  const avgifterEntry = await createAvgifterEntry(
+    supabase, companyId, userId, run, fiscalPeriodId, desc
+  )
+
+  // ─── Entry 3: Vacation accrual (if any) ───
+  let vacationEntry: JournalEntry | null = null
+  const totalVacation = run.employees.reduce((sum, e) => sum + e.vacation_accrual, 0)
+  const totalVacationAvgifter = run.employees.reduce((sum, e) => sum + e.vacation_accrual_avgifter, 0)
+  if (totalVacation > 0 || totalVacationAvgifter > 0) {
+    vacationEntry = await createVacationEntry(
+      supabase, companyId, userId, run, fiscalPeriodId, desc, totalVacation, totalVacationAvgifter
+    )
+  }
+
+  return { salaryEntry, avgifterEntry, vacationEntry }
+}
+
+/**
+ * Entry 1: Salary booking.
+ *
+ * Debit:  7210/7220/7240 Löner (per employee by type)
+ * Credit: 2710 Personalskatt (total tax withheld)
+ * Credit: 1930 Företagskonto (total net salary)
+ */
+async function createSalaryEntry(
+  supabase: SupabaseClient,
+  companyId: string,
+  userId: string,
+  run: SalaryRunData,
+  fiscalPeriodId: string,
+  desc: string
+): Promise<JournalEntry> {
+  const lines: CreateJournalEntryLineInput[] = []
+
+  // Aggregate salary expenses by account
+  const expenseByAccount = new Map<string, number>()
+  for (const emp of run.employees) {
+    // Base salary and additions go to the employee-type account
+    const salaryAccount = getEmployeeSalaryAccount(emp.employment_type)
+
+    // Add salary line items that are expenses (positive amounts)
+    for (const li of emp.line_items) {
+      if (li.is_net_deduction || li.is_gross_deduction) continue
+      const account = li.account_number || getLineItemAccount(li.item_type as never, emp.employment_type)
+      const current = expenseByAccount.get(account) || 0
+      expenseByAccount.set(account, current + li.amount)
+    }
+
+    // If no specific line items resolved, use gross salary on default account
+    if (emp.line_items.length === 0) {
+      const current = expenseByAccount.get(salaryAccount) || 0
+      expenseByAccount.set(salaryAccount, current + emp.gross_salary)
+    }
+  }
+
+  // Debit: Salary expense accounts
+  for (const [account, amount] of expenseByAccount) {
+    if (amount === 0) continue
+    if (amount > 0) {
+      lines.push({
+        account_number: account,
+        debit_amount: Math.round(amount * 100) / 100,
+        credit_amount: 0,
+        line_description: `${desc} — ${accountLabel(account)}`,
+      })
+    } else {
+      // Negative amounts (deductions) become credits
+      lines.push({
+        account_number: account,
+        debit_amount: 0,
+        credit_amount: Math.round(Math.abs(amount) * 100) / 100,
+        line_description: `${desc} — ${accountLabel(account)}`,
+      })
+    }
+  }
+
+  // Credit: Tax withholding
+  const totalTax = run.employees.reduce((sum, e) => sum + e.tax_withheld, 0)
+  if (totalTax > 0) {
+    lines.push({
+      account_number: SALARY_ACCOUNTS.TAX_WITHHELD,
+      debit_amount: 0,
+      credit_amount: Math.round(totalTax * 100) / 100,
+      line_description: `${desc} — Personalskatt`,
+    })
+  }
+
+  // Credit: Net salary to bank
+  const totalNet = run.employees.reduce((sum, e) => sum + e.net_salary, 0)
+  if (totalNet > 0) {
+    lines.push({
+      account_number: SALARY_ACCOUNTS.BANK,
+      debit_amount: 0,
+      credit_amount: Math.round(totalNet * 100) / 100,
+      line_description: `${desc} — Nettolön`,
+    })
+  }
+
+  const input: CreateJournalEntryInput = {
+    fiscal_period_id: fiscalPeriodId,
+    entry_date: run.payment_date,
+    description: desc,
+    source_type: 'salary_payment',
+    source_id: run.id,
+    voucher_series: run.voucher_series,
+    lines,
+  }
+
+  log.info(`Creating salary entry for ${desc}: ${lines.length} lines`)
+  return createJournalEntry(supabase, companyId, userId, input)
+}
+
+/**
+ * Entry 2: Arbetsgivaravgifter.
+ *
+ * Debit:  7510 Lagstadgade sociala avgifter
+ * Credit: 2731 Avräkning sociala avgifter
+ */
+async function createAvgifterEntry(
+  supabase: SupabaseClient,
+  companyId: string,
+  userId: string,
+  run: SalaryRunData,
+  fiscalPeriodId: string,
+  desc: string
+): Promise<JournalEntry> {
+  const totalAvgifter = run.employees.reduce((sum, e) => sum + e.avgifter_amount, 0)
+  const roundedAvgifter = Math.round(totalAvgifter * 100) / 100
+
+  const lines: CreateJournalEntryLineInput[] = [
+    {
+      account_number: SALARY_ACCOUNTS.AVGIFTER_EXPENSE,
+      debit_amount: roundedAvgifter,
+      credit_amount: 0,
+      line_description: `${desc} — Arbetsgivaravgifter`,
+    },
+    {
+      account_number: SALARY_ACCOUNTS.AVGIFTER_LIABILITY,
+      debit_amount: 0,
+      credit_amount: roundedAvgifter,
+      line_description: `${desc} — Arbetsgivaravgifter`,
+    },
+  ]
+
+  const input: CreateJournalEntryInput = {
+    fiscal_period_id: fiscalPeriodId,
+    entry_date: run.payment_date,
+    description: `${desc} — Arbetsgivaravgifter`,
+    source_type: 'salary_payment',
+    source_id: run.id,
+    voucher_series: run.voucher_series,
+    lines,
+  }
+
+  log.info(`Creating avgifter entry for ${desc}: ${roundedAvgifter} SEK`)
+  return createJournalEntry(supabase, companyId, userId, input)
+}
+
+/**
+ * Entry 3: Vacation accrual.
+ *
+ * Debit:  7290 Förändring semesterlöneskuld
+ * Credit: 2920 Upplupna semesterlöner
+ * Debit:  7519 Sociala avgifter semester
+ * Credit: 2940 Upplupna sociala avgifter
+ */
+async function createVacationEntry(
+  supabase: SupabaseClient,
+  companyId: string,
+  userId: string,
+  run: SalaryRunData,
+  fiscalPeriodId: string,
+  desc: string,
+  totalVacation: number,
+  totalVacationAvgifter: number
+): Promise<JournalEntry> {
+  const roundedVacation = Math.round(totalVacation * 100) / 100
+  const roundedAvgifter = Math.round(totalVacationAvgifter * 100) / 100
+
+  const lines: CreateJournalEntryLineInput[] = []
+
+  if (roundedVacation > 0) {
+    lines.push(
+      {
+        account_number: SALARY_ACCOUNTS.VACATION_ACCRUAL_EXPENSE,
+        debit_amount: roundedVacation,
+        credit_amount: 0,
+        line_description: `${desc} — Semesteravsättning`,
+      },
+      {
+        account_number: SALARY_ACCOUNTS.VACATION_ACCRUAL_LIABILITY,
+        debit_amount: 0,
+        credit_amount: roundedVacation,
+        line_description: `${desc} — Semesteravsättning`,
+      }
+    )
+  }
+
+  if (roundedAvgifter > 0) {
+    lines.push(
+      {
+        account_number: SALARY_ACCOUNTS.VACATION_AVGIFTER_EXPENSE,
+        debit_amount: roundedAvgifter,
+        credit_amount: 0,
+        line_description: `${desc} — Sociala avgifter på semester`,
+      },
+      {
+        account_number: SALARY_ACCOUNTS.VACATION_AVGIFTER_LIABILITY,
+        debit_amount: 0,
+        credit_amount: roundedAvgifter,
+        line_description: `${desc} — Sociala avgifter på semester`,
+      }
+    )
+  }
+
+  const input: CreateJournalEntryInput = {
+    fiscal_period_id: fiscalPeriodId,
+    entry_date: run.payment_date,
+    description: `${desc} — Semesteravsättning`,
+    source_type: 'salary_payment',
+    source_id: run.id,
+    voucher_series: run.voucher_series,
+    lines,
+  }
+
+  log.info(`Creating vacation entry for ${desc}: ${roundedVacation} SEK + ${roundedAvgifter} SEK avgifter`)
+  return createJournalEntry(supabase, companyId, userId, input)
+}
+
+// ============================================================
+// Helpers
+// ============================================================
+
+function getEmployeeSalaryAccount(employmentType: string): string {
+  switch (employmentType) {
+    case 'company_owner': return SALARY_ACCOUNTS.SALARY_OWNER
+    case 'board_member': return SALARY_ACCOUNTS.SALARY_BOARD
+    default: return SALARY_ACCOUNTS.SALARY_EMPLOYEE
+  }
+}
+
+function accountLabel(account: string): string {
+  const labels: Record<string, string> = {
+    '7210': 'Löner tjänstemän',
+    '7220': 'Löner företagsledare',
+    '7240': 'Styrelsearvoden',
+    '7281': 'Sjuklöner',
+    '7285': 'Semesterlöner',
+    '7321': 'Traktamenten skattefria',
+    '7322': 'Traktamenten skattepliktiga',
+    '7331': 'Bilersättningar skattefria',
+    '7332': 'Bilersättningar skattepliktiga',
+  }
+  return labels[account] || `Konto ${account}`
+}

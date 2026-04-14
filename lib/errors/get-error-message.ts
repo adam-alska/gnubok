@@ -18,6 +18,7 @@ type ErrorContext =
   | 'journal_entry'
   | 'settings'
   | 'auth'
+  | 'salary'
 
 interface GetErrorMessageOptions {
   context?: ErrorContext
@@ -62,6 +63,7 @@ const CONTEXT_FALLBACKS: Record<ErrorContext, string> = {
   journal_entry: 'Kunde inte hantera verifikationen. Försök igen.',
   settings: 'Kunde inte spara inställningarna. Försök igen.',
   auth: 'Ett fel uppstod vid inloggningen. Försök igen.',
+  salary: 'Kunde inte hantera löneuppgifterna. Försök igen.',
 }
 
 const GENERIC_FALLBACK = 'Något gick fel. Försök igen.'

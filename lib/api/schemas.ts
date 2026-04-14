@@ -612,3 +612,90 @@ export const OpeningBalanceExecuteSchema = z.object({
     credit_amount: nonNegativeAmount,
   })).min(2, 'At least two lines are required for double-entry'),
 })
+
+// ============================================================
+// Salary schemas
+// ============================================================
+
+export const EmploymentTypeSchema = z.enum(['employee', 'company_owner', 'board_member'])
+export const SalaryTypeSchema = z.enum(['monthly', 'hourly'])
+export const FSkattStatusSchema = z.enum(['a_skatt', 'f_skatt', 'fa_skatt', 'not_verified'])
+export const VacationRuleSchema = z.enum(['procentregeln', 'sammaloneregeln'])
+export const SalaryRunStatusSchema = z.enum(['draft', 'review', 'approved', 'paid', 'booked'])
+
+export const SalaryLineItemTypeSchema = z.enum([
+  'monthly_salary', 'hourly_salary', 'overtime', 'bonus', 'commission',
+  'gross_deduction_pension', 'gross_deduction_other',
+  'benefit_car', 'benefit_housing', 'benefit_meals', 'benefit_wellness', 'benefit_other',
+  'sick_karens', 'sick_day2_14', 'sick_day15_plus',
+  'vab', 'parental_leave', 'vacation',
+  'traktamente_taxfree', 'traktamente_taxable',
+  'mileage_taxfree', 'mileage_taxable',
+  'net_deduction_advance', 'net_deduction_union', 'net_deduction_benefit_payment',
+  'net_deduction_other',
+  'correction', 'other',
+])
+
+export const CreateEmployeeSchema = z.object({
+  first_name: z.string().min(1).max(200),
+  last_name: z.string().min(1).max(200),
+  personnummer: z.string().regex(/^\d{12}$/, 'Personnummer måste vara 12 siffror (ÅÅÅÅMMDDNNNN)'),
+  employment_type: EmploymentTypeSchema.default('employee'),
+  employment_start: isoDate,
+  employment_end: isoDate.optional(),
+  employment_degree: z.number().min(1).max(100).default(100),
+  salary_type: SalaryTypeSchema.default('monthly'),
+  monthly_salary: z.number().nonnegative().optional(),
+  hourly_rate: z.number().nonnegative().optional(),
+  tax_table_number: z.number().int().min(29).max(42).optional(),
+  tax_column: z.number().int().min(1).max(6).default(1),
+  tax_municipality: z.string().max(100).optional(),
+  is_sidoinkomst: z.boolean().default(false),
+  f_skatt_status: FSkattStatusSchema.default('a_skatt'),
+  clearing_number: z.string().max(10).optional(),
+  bank_account_number: z.string().max(20).optional(),
+  vacation_rule: VacationRuleSchema.default('procentregeln'),
+  vacation_days_per_year: z.number().int().min(25).max(40).default(25),
+  semestertillagg_rate: z.number().min(0).max(0.05).default(0.0043),
+  email: z.string().email().optional(),
+  phone: z.string().max(20).optional(),
+  address_line1: z.string().max(200).optional(),
+  postal_code: z.string().max(10).optional(),
+  city: z.string().max(100).optional(),
+  vaxa_stod_eligible: z.boolean().default(false),
+  vaxa_stod_start: isoDate.optional(),
+  vaxa_stod_end: isoDate.optional(),
+})
+
+export const UpdateEmployeeSchema = CreateEmployeeSchema.partial()
+
+export const CreateSalaryRunSchema = z.object({
+  period_year: z.number().int().min(2020).max(2100),
+  period_month: z.number().int().min(1).max(12),
+  payment_date: isoDate,
+  voucher_series: z.string().regex(/^[A-Z]$/, 'Verifikationsserie måste vara en bokstav A–Z').default('A'),
+  notes: z.string().max(2000).optional(),
+})
+
+export const AddEmployeeToRunSchema = z.object({
+  employee_id: uuid,
+  hours_worked: z.number().nonnegative().optional(),
+})
+
+export const CreateSalaryLineItemSchema = z.object({
+  salary_run_employee_id: uuid,
+  item_type: SalaryLineItemTypeSchema,
+  description: z.string().min(1).max(500),
+  quantity: z.number().optional(),
+  unit_price: z.number().optional(),
+  amount: z.number(),
+  is_taxable: z.boolean().default(true),
+  is_avgift_basis: z.boolean().default(true),
+  is_vacation_basis: z.boolean().default(true),
+  is_gross_deduction: z.boolean().default(false),
+  is_net_deduction: z.boolean().default(false),
+  account_number: accountNumber.optional(),
+  sort_order: z.number().int().default(0),
+})
+
+export const UpdateSalaryLineItemSchema = CreateSalaryLineItemSchema.partial().omit({ salary_run_employee_id: true })
