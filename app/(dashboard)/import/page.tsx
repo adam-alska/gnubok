@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
-import { ArrowLeftRight, ArrowRightLeft, FileText, ArrowLeft, Landmark, Loader2, Info, ChevronRight } from 'lucide-react'
+import { ArrowLeftRight, ArrowRightLeft, FileText, ArrowLeft, Landmark, Loader2, Info, ChevronRight, Scale } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useCompany } from '@/contexts/CompanyContext'
@@ -21,6 +21,14 @@ import BankFilePreviewStep from '@/components/import/BankFilePreviewStep'
 import BankFileColumnMappingStep from '@/components/import/BankFileColumnMappingStep'
 import BankFileConfirmStep from '@/components/import/BankFileConfirmStep'
 import BankFileResultStep from '@/components/import/BankFileResultStep'
+
+// Opening balance import components
+import OpeningBalanceUploadStep from '@/components/import/OpeningBalanceUploadStep'
+import OpeningBalanceColumnMappingStep from '@/components/import/OpeningBalanceColumnMappingStep'
+import OpeningBalanceEditStep from '@/components/import/OpeningBalanceEditStep'
+import OpeningBalancePeriodStep from '@/components/import/OpeningBalancePeriodStep'
+import OpeningBalanceResultStep from '@/components/import/OpeningBalanceResultStep'
+import type { OpeningBalanceParseResult, OpeningBalanceExecuteResult, DetectedColumns } from '@/lib/import/opening-balance/types'
 
 // SIE import components
 import SIEUploadStep from '@/components/import/SIEUploadStep'
@@ -657,6 +665,260 @@ function SIEImportWizard() {
 }
 
 // ============================================================
+// Opening Balance Import Wizard
+// ============================================================
+
+type OpeningBalanceStep = 'upload' | 'column_mapping' | 'edit' | 'period' | 'result'
+
+const OB_STEP_LABELS: Record<OpeningBalanceStep, string> = {
+  upload: 'Ladda upp',
+  column_mapping: 'Kolumnmappning',
+  edit: 'Granska',
+  period: 'Period',
+  result: 'Resultat',
+}
+
+function OpeningBalanceImportWizard() {
+  const { toast } = useToast()
+
+  const [obStep, setObStep] = useState<OpeningBalanceStep>('upload')
+  const [obIsLoading, setObIsLoading] = useState(false)
+  const [obError, setObError] = useState<string | null>(null)
+  const [obFile, setObFile] = useState<File | null>(null)
+  const [parseResult, setParseResult] = useState<OpeningBalanceParseResult | null>(null)
+  const [editedRows, setEditedRows] = useState<{
+    id: string; account_number: string; account_name: string
+    debit_amount: number; credit_amount: number
+  }[]>([])
+  const [executeResult, setExecuteResult] = useState<OpeningBalanceExecuteResult | null>(null)
+
+  // Determine steps — skip column mapping if confidence >= 0.8
+  const needsMapping = parseResult && parseResult.detected_columns.confidence < 0.8
+  const steps: OpeningBalanceStep[] = needsMapping
+    ? ['upload', 'column_mapping', 'edit', 'period', 'result']
+    : ['upload', 'edit', 'period', 'result']
+  const currentStepIndex = steps.indexOf(obStep)
+  const progress = ((currentStepIndex + 1) / steps.length) * 100
+
+  const handleFileSelect = useCallback(async (file: File) => {
+    setObError(null)
+    setObIsLoading(true)
+    setObFile(file)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const res = await fetch('/api/import/opening-balance/parse', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setObError(data.error || 'Kunde inte läsa filen')
+        return
+      }
+
+      const result: OpeningBalanceParseResult = data.data
+      setParseResult(result)
+
+      if (result.rows.length === 0) {
+        setObError('Inga konton med belopp hittades i filen. Kontrollera att filen innehåller kontonummer och belopp.')
+        return
+      }
+
+      toast({
+        title: 'Fil analyserad',
+        description: `${result.rows.length} konton hittades`,
+      })
+
+      // Skip column mapping if confidence >= 0.8
+      if (result.detected_columns.confidence < 0.8) {
+        setObStep('column_mapping')
+      } else {
+        setObStep('edit')
+      }
+    } catch (err) {
+      setObError(err instanceof Error ? err.message : 'Kunde inte läsa filen')
+    } finally {
+      setObIsLoading(false)
+    }
+  }, [toast])
+
+  const handleColumnMappingConfirm = useCallback(async (columns: DetectedColumns) => {
+    if (!obFile) return
+
+    setObIsLoading(true)
+    setObError(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', obFile)
+      formData.append('column_overrides', JSON.stringify(columns))
+
+      const res = await fetch('/api/import/opening-balance/parse', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setObError(data.error || 'Kunde inte läsa filen med de valda kolumnerna')
+        return
+      }
+
+      setParseResult(data.data)
+      setObStep('edit')
+    } catch (err) {
+      setObError(err instanceof Error ? err.message : 'Kunde inte läsa filen')
+    } finally {
+      setObIsLoading(false)
+    }
+  }, [obFile])
+
+  const handleEditContinue = useCallback((rows: typeof editedRows) => {
+    setEditedRows(rows)
+    setObStep('period')
+  }, [])
+
+  const handleExecute = useCallback(async (fiscalPeriodId: string) => {
+    setObIsLoading(true)
+    setObError(null)
+
+    try {
+      const res = await fetch('/api/import/opening-balance/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fiscal_period_id: fiscalPeriodId,
+          lines: editedRows.map((r) => ({
+            account_number: r.account_number,
+            debit_amount: r.debit_amount,
+            credit_amount: r.credit_amount,
+          })),
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        if (res.status === 409) {
+          setObError(data.error || 'Perioden har redan ingående balanser')
+        } else {
+          setObError(data.error || 'Importen misslyckades')
+        }
+        return
+      }
+
+      setExecuteResult(data.data)
+      setObStep('result')
+
+      if (data.data.success) {
+        toast({
+          title: 'Ingående balanser bokförda',
+          description: `${data.data.lines_created} kontorader skapades`,
+        })
+      }
+    } catch (err) {
+      setObError(err instanceof Error ? err.message : 'Importen misslyckades')
+    } finally {
+      setObIsLoading(false)
+    }
+  }, [editedRows, toast])
+
+  const handleNewImport = () => {
+    setObStep('upload')
+    setObFile(null)
+    setParseResult(null)
+    setEditedRows([])
+    setExecuteResult(null)
+    setObError(null)
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Progress */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="sm:hidden text-primary font-medium">
+                Steg {currentStepIndex + 1}/{steps.length}: {OB_STEP_LABELS[obStep]}
+              </span>
+              {steps.map((s, i) => (
+                <span
+                  key={s}
+                  className={cn(
+                    'hidden sm:inline',
+                    i <= currentStepIndex ? 'text-primary font-medium' : 'text-muted-foreground',
+                  )}
+                >
+                  {OB_STEP_LABELS[s]}
+                </span>
+              ))}
+            </div>
+            <Progress value={progress} className="h-2" />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Step content */}
+      {obStep === 'upload' && (
+        <OpeningBalanceUploadStep
+          onFileSelect={handleFileSelect}
+          isLoading={obIsLoading}
+          error={obError}
+        />
+      )}
+
+      {obStep === 'column_mapping' && parseResult && (
+        <OpeningBalanceColumnMappingStep
+          headers={parseResult.headers}
+          previewRows={parseResult.preview_rows}
+          detectedColumns={parseResult.detected_columns}
+          onConfirm={handleColumnMappingConfirm}
+          onBack={() => setObStep('upload')}
+        />
+      )}
+
+      {obStep === 'edit' && parseResult && (
+        <OpeningBalanceEditStep
+          rows={parseResult.rows}
+          onContinue={handleEditContinue}
+          onBack={() => {
+            if (needsMapping) {
+              setObStep('column_mapping')
+            } else {
+              setObStep('upload')
+            }
+          }}
+        />
+      )}
+
+      {obStep === 'period' && (
+        <OpeningBalancePeriodStep
+          rows={editedRows}
+          onExecute={handleExecute}
+          onBack={() => setObStep('edit')}
+          isLoading={obIsLoading}
+          error={obError}
+        />
+      )}
+
+      {obStep === 'result' && executeResult && (
+        <OpeningBalanceResultStep
+          result={executeResult}
+          onNewImport={handleNewImport}
+        />
+      )}
+    </div>
+  )
+}
+
+// ============================================================
 // PSD2 Bank Connection (inline, from Enable Banking extension)
 // ============================================================
 
@@ -848,7 +1110,7 @@ function PSD2ConnectWizard() {
 // Import Page with Selection Cards
 // ============================================================
 
-type ImportMode = null | 'psd2' | 'bank' | 'sie' | 'migration'
+type ImportMode = null | 'psd2' | 'bank' | 'sie' | 'opening_balance' | 'migration'
 
 export default function ImportPage() {
   const { company } = useCompany()
@@ -882,7 +1144,7 @@ export default function ImportPage() {
       setMode('migration')
     } else {
       const modeParam = searchParams.get('mode')
-      if (modeParam && ['psd2', 'bank', 'sie', 'migration'].includes(modeParam)) {
+      if (modeParam && ['psd2', 'bank', 'sie', 'opening_balance', 'migration'].includes(modeParam)) {
         setMode(modeParam as ImportMode)
       }
     }
@@ -1023,7 +1285,40 @@ export default function ImportPage() {
               <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 mt-2.5 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
             </div>
 
-            {/* 4. Bokföringsdata (SIE) */}
+            {/* 4. Ingående balanser */}
+            <div
+              role="button"
+              tabIndex={isSandbox ? -1 : 0}
+              aria-disabled={isSandbox}
+              className={cn(
+                'group flex items-start gap-4 rounded-lg border bg-card p-5 transition-all',
+                isSandbox
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'cursor-pointer hover:border-foreground/15 hover:shadow-[var(--shadow-sm)] active:scale-[0.998]'
+              )}
+              onClick={() => { if (!isSandbox) setMode('opening_balance') }}
+              onKeyDown={(e) => { if (!isSandbox && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setMode('opening_balance') } }}
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-foreground/[0.06]">
+                <Scale className="h-[18px] w-[18px] text-foreground/60" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-[15px] font-semibold leading-tight">Ingående balanser</h3>
+                <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed max-w-lg">
+                  Importera ingående balanser från en Excel- eller CSV-fil.
+                </p>
+                <div className="flex flex-wrap gap-1.5 mt-2.5">
+                  {['XLSX', 'CSV'].map(fmt => (
+                    <span key={fmt} className="text-[11px] text-muted-foreground/80 bg-muted/80 px-1.5 py-0.5 rounded leading-none">
+                      {fmt}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 mt-2.5 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
+            </div>
+
+            {/* 5. Bokföringsdata (SIE) */}
             <div
               role="button"
               tabIndex={isSandbox ? -1 : 0}
@@ -1069,6 +1364,7 @@ export default function ImportPage() {
       {mode === 'psd2' && <PSD2ConnectWizard />}
       {mode === 'bank' && <BankFileImportWizard />}
       {mode === 'sie' && <SIEImportWizard />}
+      {mode === 'opening_balance' && <OpeningBalanceImportWizard />}
       {mode === 'migration' && <MigrationWizard userId={userId} />}
     </div>
   )

@@ -66,33 +66,30 @@ CREATE POLICY "btl_select" ON public.booking_template_library
     OR team_id IN (SELECT public.user_team_ids())
   );
 
--- INSERT: company templates (non-viewers) or team templates (team members)
+-- INSERT: company templates or team templates (viewer check enforced in API)
 CREATE POLICY "btl_insert" ON public.booking_template_library
   FOR INSERT WITH CHECK (
     NOT is_system
-    AND public.current_user_can_write()
-    AND (
-      company_id = public.current_active_company_id()
-      OR (company_id IS NULL AND team_id IN (SELECT public.user_team_ids()))
-    )
-  );
-
--- UPDATE: own company or own team templates (non-viewers), never system
-CREATE POLICY "btl_update" ON public.booking_template_library
-  FOR UPDATE USING (
-    NOT is_system
-    AND public.current_user_can_write()
     AND (
       company_id IN (SELECT public.user_company_ids())
       OR (company_id IS NULL AND team_id IN (SELECT public.user_team_ids()))
     )
   );
 
--- DELETE: own company or own team templates (non-viewers), never system
+-- UPDATE: own company or own team templates, never system
+CREATE POLICY "btl_update" ON public.booking_template_library
+  FOR UPDATE USING (
+    NOT is_system
+    AND (
+      company_id IN (SELECT public.user_company_ids())
+      OR (company_id IS NULL AND team_id IN (SELECT public.user_team_ids()))
+    )
+  );
+
+-- DELETE: own company or own team templates, never system
 CREATE POLICY "btl_delete" ON public.booking_template_library
   FOR DELETE USING (
     NOT is_system
-    AND public.current_user_can_write()
     AND (
       company_id IN (SELECT public.user_company_ids())
       OR (company_id IS NULL AND team_id IN (SELECT public.user_team_ids()))
@@ -294,11 +291,18 @@ INSERT INTO public.booking_template_library (name, description, category, entity
   ]'::jsonb
 );
 
+-- REPRESENTATION
+INSERT INTO public.booking_template_library (name, description, category, entity_type, is_system, lines) VALUES
+(
+  'Representation (avdragsgill, 25% moms)',
+  'Extern representation med avdragsgill moms. Max 300 kr/person exkl. moms.',
+  'representation', 'all', TRUE,
   '[
     {"account": "6072", "label": "Representation avdragsgill", "side": "debit", "type": "business", "ratio": 0.8},
     {"account": "2641", "label": "Ingående moms", "side": "debit", "type": "vat", "vat_rate": 0.25},
     {"account": "1930", "label": "Företagskonto", "side": "credit", "type": "settlement", "ratio": 1.0}
   ]'::jsonb
+);
 
 -- YEAR-END / FINANCIAL
 INSERT INTO public.booking_template_library (name, description, category, entity_type, is_system, lines) VALUES
