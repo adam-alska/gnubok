@@ -14,10 +14,12 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { JournalEntryReviewContent } from '@/components/bookkeeping/JournalEntryReviewContent'
 import DocumentUploadZone from '@/components/bookkeeping/DocumentUploadZone'
 import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
+import BookingTemplatePicker from '@/components/bookkeeping/BookingTemplatePicker'
 import CreatePeriodDialog from '@/components/bookkeeping/CreatePeriodDialog'
 import { getErrorMessage } from '@/lib/errors/get-error-message'
 import { formatCurrency } from '@/lib/utils'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
+import { useCompany } from '@/contexts/CompanyContext'
 import type { UploadedFile } from '@/components/bookkeeping/DocumentUploadZone'
 import type { CreateJournalEntryLineInput, FiscalPeriod, BASAccount, JournalEntrySourceType, Currency } from '@/types'
 
@@ -69,6 +71,7 @@ export default function JournalEntryForm({
 }: Props) {
   const { canWrite } = useCanWrite()
   const { toast } = useToast()
+  const { company } = useCompany()
   const [periods, setPeriods] = useState<FiscalPeriod[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState('')
   const [entryDate, setEntryDate] = useState(initialDate ?? new Date().toISOString().split('T')[0])
@@ -234,6 +237,11 @@ export default function JournalEntryForm({
   const computedSekAmount = isForeign && rate > 0 && computedForeignAmount > 0
     ? Math.round(computedForeignAmount * rate * 100) / 100
     : 0
+
+  const handleTemplateApply = (templateLines: FormLine[], templateDescription: string) => {
+    setLines(templateLines)
+    if (!description) setDescription(templateDescription)
+  }
 
   const handleReview = () => {
     if (!selectedPeriod || !description || !isBalanced || periodMismatch) return
@@ -575,15 +583,21 @@ export default function JournalEntryForm({
           </div>
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={addLine}
-          className="w-full"
-        >
-          <Plus className="h-3 w-3 mr-1" />
-          Lägg till rad
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={addLine}
+            className="flex-1"
+          >
+            <Plus className="h-3 w-3 mr-1" />
+            Lägg till rad
+          </Button>
+          <BookingTemplatePicker
+            onApply={handleTemplateApply}
+            entityType={company?.entity_type}
+          />
+        </div>
       </div>
 
       {/* Entry lines — desktop table */}
@@ -678,15 +692,20 @@ export default function JournalEntryForm({
           </tfoot>
         </table>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={addLine}
-          className="mt-2"
-        >
-          <Plus className="h-3 w-3 mr-1" />
-          Lägg till rad
-        </Button>
+        <div className="flex gap-2 mt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={addLine}
+          >
+            <Plus className="h-3 w-3 mr-1" />
+            Lägg till rad
+          </Button>
+          <BookingTemplatePicker
+            onApply={handleTemplateApply}
+            entityType={company?.entity_type}
+          />
+        </div>
       </div>
 
       {/* Document attachments */}
