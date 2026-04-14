@@ -294,27 +294,11 @@ INSERT INTO public.booking_template_library (name, description, category, entity
   ]'::jsonb
 );
 
--- REPRESENTATION
-INSERT INTO public.booking_template_library (name, description, category, entity_type, is_system, lines) VALUES
-(
-  'Extern representation (med moms)',
-  'Kundmåltid eller liknande. Max 300 kr/person exkl moms för momsavdrag.',
-  'representation', 'all', TRUE,
   '[
-    {"account": "6072", "label": "Representation avdragsgill", "side": "debit", "type": "business", "ratio": 1.0},
+    {"account": "6072", "label": "Representation avdragsgill", "side": "debit", "type": "business", "ratio": 0.8},
     {"account": "2641", "label": "Ingående moms", "side": "debit", "type": "vat", "vat_rate": 0.25},
     {"account": "1930", "label": "Företagskonto", "side": "credit", "type": "settlement", "ratio": 1.0}
   ]'::jsonb
-),
-(
-  'Intern representation (personalfest)',
-  'Personalfest eller intern representation. Ingen momsavdragsrätt.',
-  'representation', 'all', TRUE,
-  '[
-    {"account": "7631", "label": "Personalrepresentation", "side": "debit", "type": "business", "ratio": 1.0},
-    {"account": "1930", "label": "Företagskonto", "side": "credit", "type": "settlement", "ratio": 1.0}
-  ]'::jsonb
-);
 
 -- YEAR-END / FINANCIAL
 INSERT INTO public.booking_template_library (name, description, category, entity_type, is_system, lines) VALUES
