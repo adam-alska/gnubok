@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import { withSentryConfig } from "@sentry/nextjs";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -9,7 +8,7 @@ const activepiecesUrl = process.env.ACTIVEPIECES_URL ?? "";
 
 const cspDirectives = [
   "default-src 'self'",
-  `connect-src 'self' ${supabaseUrl} https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.enablebanking.com https://*.recapt.app`,
+  `connect-src 'self' ${supabaseUrl} https://*.supabase.co wss://*.supabase.co https://*.enablebanking.com https://*.recapt.app`,
   `style-src 'self' 'unsafe-inline' https://*.enablebanking.com`,
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://*.enablebanking.com https://cdn.recapt.app`,
   "img-src 'self' data: blob: https:",
@@ -20,7 +19,7 @@ const cspDirectives = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
-  output: process.env.VERCEL ? 'standalone' : undefined,
+  output: 'standalone',
   async redirects() {
     return [
       {
@@ -65,9 +64,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, {
-  silent: !process.env.SENTRY_AUTH_TOKEN,
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-  ...(process.env.SENTRY_AUTH_TOKEN ? {} : { sourcemaps: { disable: true } }),
-});
+export default nextConfig;
