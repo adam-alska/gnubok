@@ -13,6 +13,10 @@ import type {
   INK2AccountMapping,
   INK2RSRUCode,
 } from './types'
+import {
+  INK2R_ASSET_CODES,
+  INK2R_EQUITY_LIABILITY_CODES,
+} from './types'
 
 /**
  * INK2 Declaration Engine
@@ -667,24 +671,9 @@ function createEmptyINK2RRutor(): INK2RRutor {
   }
 }
 
-/** All INK2R asset codes for summing */
-const ASSET_CODES: INK2RSRUCode[] = [
-  '7201', '7202', '7214', '7215', '7216', '7217',
-  '7230', '7231', '7233', '7232', '7234', '7235',
-  '7241', '7242', '7243', '7244', '7245', '7246',
-  '7251', '7252', '7261', '7262', '7263',
-  '7270', '7271', '7281',
-]
-
-/** All INK2R equity/liability codes for summing */
-const EQUITY_LIABILITY_CODES: INK2RSRUCode[] = [
-  '7301', '7302',
-  '7321', '7322', '7323',
-  '7331', '7332', '7333',
-  '7350', '7351', '7352', '7353', '7354',
-  '7360', '7361', '7362', '7363', '7364', '7365', '7366', '7367', '7369', '7368',
-  '7370',
-]
+// Reuse canonical code arrays from types.ts (single source of truth)
+const ASSET_CODES = INK2R_ASSET_CODES
+const EQUITY_LIABILITY_CODES = INK2R_EQUITY_LIABILITY_CODES
 
 /**
  * Generate INK2 declaration for a fiscal period

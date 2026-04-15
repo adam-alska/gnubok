@@ -218,6 +218,24 @@ describe('INK2 SRU Generator', () => {
       expect(ink2rBlock).toContain('#UPPGIFT 7522 3000')
     })
 
+    it('handles bokslutsdispositioner fields with correct sign', () => {
+      const declaration = makeDeclaration({
+        ink2r: {
+          ...makeDeclaration().ink2r,
+          '7524': 50000,  // Lämnade koncernbidrag (debit-normal cost, positive)
+          '7525': 30000,  // Avsättning periodiseringsfond (debit-normal cost, positive)
+          '7419': 20000,  // Mottagna koncernbidrag (credit-normal income, positive)
+        },
+      })
+      const submission = generateSRUSubmission(declaration)
+      const ink2rBlock = extractBlock(submission.blanketterSru, 'INK2R')
+
+      // All bokslutsdispositioner fields are positive in the SRU output
+      expect(ink2rBlock).toContain('#UPPGIFT 7524 50000')
+      expect(ink2rBlock).toContain('#UPPGIFT 7525 30000')
+      expect(ink2rBlock).toContain('#UPPGIFT 7419 20000')
+    })
+
     it('includes INK2S with överskott/underskott', () => {
       const declaration = makeDeclaration()
       const submission = generateSRUSubmission(declaration)
