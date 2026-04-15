@@ -2319,3 +2319,189 @@ export interface KPIPreferences {
   kpiOrder: string[]
   accountOverrides: Record<string, string[]>
 }
+
+// ============================================================
+// Salary Module Types (Lönehantering)
+// ============================================================
+
+export type EmploymentType = 'employee' | 'company_owner' | 'board_member'
+export type SalaryType = 'monthly' | 'hourly'
+export type FSkattStatus = 'a_skatt' | 'f_skatt' | 'fa_skatt' | 'not_verified'
+export type VacationRule = 'procentregeln' | 'sammaloneregeln'
+export type SalaryRunStatus = 'draft' | 'review' | 'approved' | 'paid' | 'booked' | 'corrected'
+export type AGIStatus = 'generated' | 'exported' | 'submitted' | 'accepted' | 'rejected'
+
+export type SalaryLineItemType =
+  | 'monthly_salary' | 'hourly_salary' | 'overtime' | 'bonus' | 'commission'
+  | 'gross_deduction_pension' | 'gross_deduction_other'
+  | 'benefit_car' | 'benefit_housing' | 'benefit_meals' | 'benefit_wellness' | 'benefit_other'
+  | 'sick_karens' | 'sick_day2_14' | 'sick_day15_plus'
+  | 'vab' | 'parental_leave' | 'vacation'
+  | 'traktamente_taxfree' | 'traktamente_taxable'
+  | 'mileage_taxfree' | 'mileage_taxable'
+  | 'net_deduction_advance' | 'net_deduction_union' | 'net_deduction_benefit_payment'
+  | 'net_deduction_other'
+  | 'correction' | 'other'
+
+export interface Employee {
+  id: string
+  company_id: string
+  user_id: string
+  first_name: string
+  last_name: string
+  personnummer: string
+  personnummer_last4: string
+  employment_type: EmploymentType
+  employment_start: string
+  employment_end: string | null
+  employment_degree: number
+  salary_type: SalaryType
+  monthly_salary: number | null
+  hourly_rate: number | null
+  tax_table_number: number | null
+  tax_column: number
+  tax_municipality: string | null
+  jamkning_percentage: number | null
+  jamkning_valid_from: string | null
+  jamkning_valid_to: string | null
+  is_sidoinkomst: boolean
+  f_skatt_status: FSkattStatus
+  f_skatt_verified_at: string | null
+  clearing_number: string | null
+  bank_account_number: string | null
+  vacation_rule: VacationRule
+  vacation_days_per_year: number
+  vacation_days_saved: number
+  semestertillagg_rate: number
+  email: string | null
+  phone: string | null
+  address_line1: string | null
+  postal_code: string | null
+  city: string | null
+  specification_number: number | null
+  vaxa_stod_eligible: boolean
+  vaxa_stod_start: string | null
+  vaxa_stod_end: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface SalaryRun {
+  id: string
+  company_id: string
+  user_id: string
+  period_year: number
+  period_month: number
+  payment_date: string
+  status: SalaryRunStatus
+  voucher_series: string
+  total_gross: number
+  total_tax: number
+  total_net: number
+  total_avgifter: number
+  total_vacation_accrual: number
+  total_employer_cost: number
+  salary_entry_id: string | null
+  avgifter_entry_id: string | null
+  vacation_entry_id: string | null
+  agi_generated_at: string | null
+  agi_submitted_at: string | null
+  calculation_params: Record<string, unknown> | null
+  approved_by: string | null
+  approved_at: string | null
+  paid_at: string | null
+  booked_at: string | null
+  booked_by: string | null
+  notes: string | null
+  is_correction: boolean
+  corrects_run_id: string | null
+  created_at: string
+  updated_at: string
+  // Relations
+  employees?: SalaryRunEmployee[]
+}
+
+export interface SalaryRunEmployee {
+  id: string
+  salary_run_id: string
+  employee_id: string
+  company_id: string
+  employment_degree: number
+  monthly_salary: number
+  salary_type: string
+  hours_worked: number | null
+  gross_salary: number
+  gross_deductions: number
+  benefit_values: number
+  taxable_income: number
+  tax_withheld: number
+  net_deductions: number
+  net_salary: number
+  avgifter_rate: number
+  avgifter_amount: number
+  avgifter_basis: number
+  vacation_accrual: number
+  vacation_accrual_avgifter: number
+  tax_table_number: number | null
+  tax_column: number | null
+  tax_table_year: number | null
+  sick_days: number
+  vab_days: number
+  parental_days: number
+  vacation_days_taken: number
+  calculation_breakdown: Record<string, unknown> | null
+  ytd_gross: number
+  ytd_tax: number
+  ytd_net: number
+  created_at: string
+  updated_at: string
+  // Relations
+  employee?: Employee
+  line_items?: SalaryLineItem[]
+}
+
+export interface SalaryLineItem {
+  id: string
+  salary_run_employee_id: string
+  company_id: string
+  item_type: SalaryLineItemType
+  description: string
+  quantity: number | null
+  unit_price: number | null
+  amount: number
+  is_taxable: boolean
+  is_avgift_basis: boolean
+  is_vacation_basis: boolean
+  is_gross_deduction: boolean
+  is_net_deduction: boolean
+  account_number: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface AGIDeclaration {
+  id: string
+  company_id: string
+  user_id: string
+  salary_run_id: string | null
+  period_year: number
+  period_month: number
+  xml_content: string
+  status: AGIStatus
+  individuppgifter: Record<string, unknown>[]
+  total_gross: number
+  total_tax: number
+  total_avgifter_basis: number
+  total_avgifter: number
+  employee_count: number
+  kvittensnummer: string | null
+  submitted_at: string | null
+  submitted_by: string | null
+  response_data: Record<string, unknown> | null
+  is_correction: boolean
+  corrects_agi_id: string | null
+  created_at: string
+  updated_at: string
+}

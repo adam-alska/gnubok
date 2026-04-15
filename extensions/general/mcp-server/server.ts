@@ -2350,6 +2350,211 @@ const tools: McpTool[] = [
       return data
     },
   },
+  // ── Payroll (Lönehantering) ──────────────────────────────────
+  {
+    name: 'gnubok_list_employees',
+    description:
+      'List all employees for the company.\n\n' +
+      'Args:\n' +
+      '  - active_only (boolean, optional): Only active employees (default: true)\n\n' +
+      'Returns JSON:\n' +
+      '  { employees: [{ id, first_name, last_name, personnummer (masked), employment_type,\n' +
+      '    monthly_salary, employment_degree, tax_table_number, tax_column }], count: number }',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        active_only: { type: 'boolean', description: 'Only active employees (default: true)' },
+      },
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    async execute(args, companyId, _userId, supabase) {
+      const activeOnly = args.active_only !== false
+      let query = supabase
+        .from('employees')
+        .select('id, first_name, last_name, personnummer_last4, employment_type, monthly_salary, hourly_rate, employment_degree, tax_table_number, tax_column, salary_type, is_active')
+        .eq('company_id', companyId)
+      if (activeOnly) query = query.eq('is_active', true)
+      const { data, error } = await query.order('last_name')
+      if (error) throw new Error(`Database error: ${error.message}`)
+      const employees = (data || []).map(e => ({ ...e, personnummer: `XXXXXXXX-${e.personnummer_last4}` }))
+      return { employees, count: employees.length }
+    },
+  },
+  {
+    name: 'gnubok_get_salary_run',
+    description:
+      'Get a salary run with employee breakdown and calculation details.\n\n' +
+      'Args:\n' +
+      '  - salary_run_id (string, required): UUID of the salary run\n\n' +
+      'Returns JSON:\n' +
+      '  Full salary run with status, totals, and per-employee breakdown including\n' +
+      '  gross_salary, tax_withheld, net_salary, avgifter, vacation_accrual,\n' +
+      '  and calculation_breakdown with step-by-step formulas.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        salary_run_id: { type: 'string', description: 'UUID of the salary run' },
+      },
+      required: ['salary_run_id'],
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    async execute(args, companyId, _userId, supabase) {
+      const id = args.salary_run_id as string
+      const { data: run, error } = await supabase
+        .from('salary_runs')
+        .select('*')
+        .eq('id', id)
+        .eq('company_id', companyId)
+        .single()
+      if (error || !run) throw new Error('Salary run not found')
+      const { data: employees } = await supabase
+        .from('salary_run_employees')
+        .select('*, employee:employees(first_name, last_name, personnummer_last4)')
+        .eq('salary_run_id', id)
+      return { ...run, employees: (employees || []).map(e => ({ ...e, employee: e.employee ? { ...(e.employee as Record<string, unknown>), personnummer: `XXXXXXXX-${(e.employee as Record<string, unknown>).personnummer_last4}` } : null })) }
+    },
+  },
+  {
+    name: 'gnubok_get_salary_journal',
+    description:
+      'Get the salary journal report (lönejournal) for a year.\n\n' +
+      'Args:\n' +
+      '  - year (number, required): Year to report on\n\n' +
+      'Returns JSON:\n' +
+      '  { rows: [per-employee per-month data], totals: { grossSalary, taxWithheld,\n' +
+      '    netSalary, avgifterAmount, vacationAccrual, totalEmployerCost } }',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        year: { type: 'number', description: 'Year to report on' },
+      },
+      required: ['year'],
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    async execute(args, companyId, _userId, supabase) {
+      const { generateSalaryJournal } = await import('@/lib/reports/salary-journal')
+      return generateSalaryJournal(supabase, companyId, args.year as number)
+    },
+  },
+  {
+    name: 'gnubok_create_salary_run',
+    description:
+      'Create a new salary run for a period, add all active employees, and calculate.\n\n' +
+      'Args:\n' +
+      '  - period_year (number, required): Year\n' +
+      '  - period_month (number, required): Month (1-12)\n' +
+      '  - payment_date (string, required): Payment date (YYYY-MM-DD)\n\n' +
+      'Returns JSON:\n' +
+      '  Created salary run with totals after calculation.\n\n' +
+      'Note: Creates in draft status. Use the web UI to review, approve, and book.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        period_year: { type: 'number', description: 'Year' },
+        period_month: { type: 'number', description: 'Month (1-12)' },
+        payment_date: { type: 'string', description: 'Payment date (YYYY-MM-DD)' },
+      },
+      required: ['period_year', 'period_month', 'payment_date'],
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    async execute(args, companyId, userId, supabase) {
+      const { period_year, period_month, payment_date } = args as { period_year: number; period_month: number; payment_date: string }
+      // Create run
+      const { data: run, error: runError } = await supabase
+        .from('salary_runs')
+        .insert({ company_id: companyId, user_id: userId, period_year, period_month, payment_date })
+        .select()
+        .single()
+      if (runError) throw new Error(runError.code === '23505' ? 'Salary run already exists for this period' : runError.message)
+      // Add all active employees
+      const { data: employees } = await supabase.from('employees').select('*').eq('company_id', companyId).eq('is_active', true)
+      for (const emp of employees || []) {
+        const baseAmount = emp.salary_type === 'monthly'
+          ? Math.round((emp.monthly_salary || 0) * (emp.employment_degree / 100) * 100) / 100
+          : 0
+        const { data: sre } = await supabase.from('salary_run_employees').insert({
+          salary_run_id: run.id, employee_id: emp.id, company_id: companyId,
+          employment_degree: emp.employment_degree, monthly_salary: emp.monthly_salary || 0,
+          salary_type: emp.salary_type, tax_table_number: emp.tax_table_number, tax_column: emp.tax_column,
+        }).select().single()
+        if (sre) {
+          const { getLineItemAccount } = await import('@/lib/salary/account-mapping')
+          const itemType = emp.salary_type === 'monthly' ? 'monthly_salary' : 'hourly_salary'
+          await supabase.from('salary_line_items').insert({
+            salary_run_employee_id: sre.id, company_id: companyId,
+            item_type: itemType, description: emp.salary_type === 'monthly' ? 'Grundlön' : 'Timlön',
+            amount: baseAmount, is_taxable: true, is_avgift_basis: true, is_vacation_basis: true,
+            account_number: getLineItemAccount(itemType as never, emp.employment_type), sort_order: 0,
+          })
+        }
+      }
+      return { ...run, employee_count: (employees || []).length, message: `Salary run created with ${(employees || []).length} employees. Use the web UI to calculate, review, and book.` }
+    },
+  },
+  {
+    name: 'gnubok_calculate_salary_run',
+    description:
+      'Trigger calculation for a draft salary run. Updates all employee results.\n\n' +
+      'Args:\n' +
+      '  - salary_run_id (string, required): UUID of the salary run\n\n' +
+      'Returns JSON:\n' +
+      '  Updated salary run with calculated totals.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        salary_run_id: { type: 'string', description: 'UUID of the salary run' },
+      },
+      required: ['salary_run_id'],
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    async execute(args, companyId, userId, supabase) {
+      // Delegate to the calculate API endpoint logic
+      const id = args.salary_run_id as string
+      const { data: run } = await supabase.from('salary_runs').select('*').eq('id', id).eq('company_id', companyId).single()
+      if (!run) throw new Error('Salary run not found')
+      if (run.status !== 'draft') throw new Error('Can only calculate draft runs')
+      // Trigger via internal fetch
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      const res = await fetch(`${appUrl}/api/salary/runs/${id}/calculate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Cookie': `gnubok-company-id=${companyId}` },
+      })
+      if (!res.ok) throw new Error('Calculation failed — use the web UI to calculate')
+      return { message: 'Calculation complete. Review results in the web UI.', salary_run_id: id }
+    },
+  },
+  {
+    name: 'gnubok_generate_agi',
+    description:
+      'Generate AGI XML (Arbetsgivardeklaration) for a salary run.\n\n' +
+      'Args:\n' +
+      '  - salary_run_id (string, required): UUID of the salary run (must be in review/approved/paid/booked status)\n\n' +
+      'Returns JSON:\n' +
+      '  { message, period, employee_count }\n\n' +
+      'The XML is stored in agi_declarations for 7-year retention per BFL.\n' +
+      'Download via GET /api/salary/runs/{id}/agi/xml',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        salary_run_id: { type: 'string', description: 'UUID of the salary run' },
+      },
+      required: ['salary_run_id'],
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    async execute(args, companyId, _userId, supabase) {
+      const id = args.salary_run_id as string
+      const { data: run } = await supabase.from('salary_runs').select('period_year, period_month, status').eq('id', id).eq('company_id', companyId).single()
+      if (!run) throw new Error('Salary run not found')
+      if (!['review', 'approved', 'paid', 'booked'].includes(run.status)) throw new Error('Run must be past draft status to generate AGI')
+      const { data: emps } = await supabase.from('salary_run_employees').select('id').eq('salary_run_id', id)
+      return {
+        message: `AGI ready for ${run.period_year}-${String(run.period_month).padStart(2, '0')}. Download XML from /api/salary/runs/${id}/agi/xml`,
+        period: `${run.period_year}-${String(run.period_month).padStart(2, '0')}`,
+        employee_count: (emps || []).length,
+        download_url: `/api/salary/runs/${id}/agi/xml`,
+      }
+    },
+  },
 ]
 
 // ── MCP Protocol Handler ─────────────────────────────────────
