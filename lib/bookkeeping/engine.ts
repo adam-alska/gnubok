@@ -518,7 +518,7 @@ export async function reverseEntry(
           })
           .eq('id', original.source_id)
           .eq('company_id', companyId)
-          .eq('status', 'paid')
+          .in('status', ['paid', 'partially_paid'])
       }
     }
   }
