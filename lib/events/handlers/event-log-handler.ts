@@ -11,6 +11,7 @@ const log = createLogger('event-log')
  */
 const PERSISTED_EVENT_TYPES: CoreEventType[] = [
   'journal_entry.committed',
+  'journal_entry.reversed',
   'journal_entry.corrected',
   'document.uploaded',
   'document.accessed',
@@ -63,6 +64,15 @@ function extractEntityId(payload: Record<string, unknown>): string | null {
     const corrected = payload.corrected
     if (corrected && typeof corrected === 'object' && 'id' in corrected) {
       const id = (corrected as Record<string, unknown>).id
+      if (typeof id === 'string') return id
+    }
+  }
+
+  // For journal_entry.reversed: use the reversal entry's ID
+  if ('reversalEntry' in payload) {
+    const reversalEntry = payload.reversalEntry
+    if (reversalEntry && typeof reversalEntry === 'object' && 'id' in reversalEntry) {
+      const id = (reversalEntry as Record<string, unknown>).id
       if (typeof id === 'string') return id
     }
   }

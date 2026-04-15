@@ -116,8 +116,8 @@ describe('POST /api/supplier-invoices/[id]/mark-paid', () => {
 
     mockCreateSupplierInvoicePaymentEntry.mockResolvedValue({ id: 'je-1' })
 
-    // Update invoice
-    enqueue({ data: null, error: null })
+    // Update invoice (CAS guard: returns matched row)
+    enqueue({ data: [{ id: 'si-1' }], error: null })
     // Record payment
     enqueue({ data: null, error: null })
 
@@ -160,7 +160,8 @@ describe('POST /api/supplier-invoices/[id]/mark-paid', () => {
 
     mockCreateSupplierInvoicePaymentEntry.mockResolvedValue({ id: 'je-2' })
 
-    enqueue({ data: null, error: null })
+    // Update invoice (CAS guard: returns matched row)
+    enqueue({ data: [{ id: 'si-1' }], error: null })
     enqueue({ data: null, error: null })
 
     const request = createMockRequest('/api/supplier-invoices/si-1/mark-paid', {
@@ -215,7 +216,8 @@ describe('POST /api/supplier-invoices/[id]/mark-paid', () => {
 
     mockCreateSupplierInvoiceCashEntry.mockResolvedValue({ id: 'je-3' })
 
-    enqueue({ data: null, error: null })
+    // Update invoice (CAS guard: returns matched row)
+    enqueue({ data: [{ id: 'si-1' }], error: null })
     enqueue({ data: null, error: null })
 
     const request = createMockRequest('/api/supplier-invoices/si-1/mark-paid', {
@@ -234,7 +236,7 @@ describe('POST /api/supplier-invoices/[id]/mark-paid', () => {
     expect(mockCreateSupplierInvoicePaymentEntry).not.toHaveBeenCalled()
   })
 
-  it('returns success when journal entry creation fails (non-blocking)', async () => {
+  it('returns 500 when journal entry creation fails (blocking — GL must succeed for payment)', async () => {
     const supplier = makeSupplier()
     const invoice = makeSupplierInvoice({
       id: 'si-1',
@@ -251,22 +253,15 @@ describe('POST /api/supplier-invoices/[id]/mark-paid', () => {
 
     mockCreateSupplierInvoicePaymentEntry.mockRejectedValue(new Error('Period locked'))
 
-    enqueue({ data: null, error: null })
-    enqueue({ data: null, error: null })
-
     const request = createMockRequest('/api/supplier-invoices/si-1/mark-paid', {
       method: 'POST',
       body: {},
     })
     const response = await POST(request, createMockRouteParams({ id: 'si-1' }))
-    const { status, body } = await parseJsonResponse<{
-      success: boolean
-      journal_entry_id: null
-    }>(response)
+    const { status, body } = await parseJsonResponse<{ error: string }>(response)
 
-    expect(status).toBe(200)
-    expect(body.success).toBe(true)
-    expect(body.journal_entry_id).toBeNull()
+    expect(status).toBe(500)
+    expect(body.error).toBe('Kunde inte bokföra betalningen')
   })
 
   it('emits supplier_invoice.paid event', async () => {
@@ -284,7 +279,8 @@ describe('POST /api/supplier-invoices/[id]/mark-paid', () => {
     enqueue({ data: invoice, error: null })
     enqueue({ data: { accounting_method: 'accrual' }, error: null })
     mockCreateSupplierInvoicePaymentEntry.mockResolvedValue({ id: 'je-1' })
-    enqueue({ data: null, error: null })
+    // Update invoice (CAS guard: returns matched row)
+    enqueue({ data: [{ id: 'si-1' }], error: null })
     enqueue({ data: null, error: null })
 
     const emitSpy = vi.spyOn(eventBus, 'emit')

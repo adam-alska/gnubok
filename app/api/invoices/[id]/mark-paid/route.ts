@@ -168,8 +168,8 @@ export async function POST(
     }
   }
 
-  // Update status to paid — only after journal entry succeeds
-  const { error: updateError } = await supabase
+  // Update status to paid (CAS guard: only if still in payable status)
+  const { data: updateResult, error: updateError } = await supabase
     .from('invoices')
     .update({
       status: 'paid',
@@ -178,9 +178,25 @@ export async function POST(
     })
     .eq('id', id)
     .eq('company_id', companyId)
+    .in('status', ['sent', 'overdue'])
+    .select('id')
 
   if (updateError) {
     return NextResponse.json({ error: 'Kunde inte uppdatera status' }, { status: 500 })
+  }
+
+  // CAS guard: status changed between our read and write
+  if (!updateResult || updateResult.length === 0) {
+    if (journalEntryId) {
+      await supabase
+        .from('journal_entries')
+        .update({ status: 'cancelled' })
+        .eq('id', journalEntryId)
+    }
+    return NextResponse.json(
+      { error: 'Fakturan har redan betalats av en annan förfrågan' },
+      { status: 409 }
+    )
   }
 
   return NextResponse.json({

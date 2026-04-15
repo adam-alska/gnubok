@@ -174,6 +174,15 @@ export async function createDraftEntry(
   // Resolve account IDs
   const accountIdMap = await resolveAccountIds(supabase, companyId, input.lines)
 
+  // Validate all account numbers resolved to IDs
+  const allAccountNumbers = [...new Set(input.lines.map(l => l.account_number))]
+  const missingAccounts = allAccountNumbers.filter(num => !accountIdMap.has(num))
+  if (missingAccounts.length > 0) {
+    throw new Error(
+      `Account(s) not found in chart of accounts: ${missingAccounts.join(', ')}`
+    )
+  }
+
   // Insert journal entry header as draft (voucher_number = 0, will be assigned on commit)
   const { data: entry, error: entryError } = await supabase
     .from('journal_entries')
@@ -350,6 +359,15 @@ export async function reverseEntry(
   // Resolve account IDs
   const accountIdMap = await resolveAccountIds(supabase, companyId, reversedLines)
 
+  // Validate all account numbers resolved to IDs
+  const reversalAccountNumbers = [...new Set(reversedLines.map(l => l.account_number))]
+  const missingReversalAccounts = reversalAccountNumbers.filter(num => !accountIdMap.has(num))
+  if (missingReversalAccounts.length > 0) {
+    throw new Error(
+      `Account(s) not found in chart of accounts: ${missingReversalAccounts.join(', ')}`
+    )
+  }
+
   // Create reversal entry with reverses_id link
   const { data: reversalEntry, error: reversalError } = await supabase
     .from('journal_entries')
@@ -417,6 +435,58 @@ export async function reverseEntry(
     throw new Error('Entry was already reversed by a concurrent operation')
   }
 
+  // If this was a payment entry, sync the linked invoice/supplier-invoice status
+  const paymentSourceTypes = [
+    'invoice_paid', 'invoice_cash_payment',
+    'supplier_invoice_paid', 'supplier_invoice_cash_payment',
+  ]
+
+  if (paymentSourceTypes.includes(original.source_type) && original.source_id) {
+    if (original.source_type.startsWith('supplier_invoice')) {
+      // Recalculate from the reversed entry's debit to 2440 (AP)
+      const reversedLines = (original.lines as JournalEntryLine[]) || []
+      const paymentAmount = reversedLines.reduce((sum, line) => {
+        return line.account_number === '2440'
+          ? sum + (Number(line.debit_amount) || 0)
+          : sum
+      }, 0)
+
+      const { data: supplierInvoice } = await supabase
+        .from('supplier_invoices')
+        .select('paid_amount, total_amount')
+        .eq('id', original.source_id)
+        .single()
+
+      if (supplierInvoice) {
+        const newPaidAmount = Math.round((supplierInvoice.paid_amount - paymentAmount) * 100) / 100
+        const newRemaining = Math.round((supplierInvoice.total_amount - newPaidAmount) * 100) / 100
+        const newStatus = newPaidAmount <= 0 ? 'approved' : 'partially_paid'
+
+        await supabase
+          .from('supplier_invoices')
+          .update({
+            status: newStatus,
+            paid_amount: Math.max(0, newPaidAmount),
+            remaining_amount: newRemaining,
+            paid_at: null,
+            payment_journal_entry_id: null,
+          })
+          .eq('id', original.source_id)
+      }
+    } else {
+      // Customer invoice: revert from paid back to sent
+      await supabase
+        .from('invoices')
+        .update({
+          status: 'sent',
+          paid_at: null,
+          paid_amount: 0,
+        })
+        .eq('id', original.source_id)
+        .eq('status', 'paid')
+    }
+  }
+
   // Fetch complete reversal entry with lines
   const { data: completeEntry } = await supabase
     .from('journal_entries')
@@ -429,6 +499,11 @@ export async function reverseEntry(
   await eventBus.emit({
     type: 'journal_entry.committed',
     payload: { entry: result, userId, companyId },
+  })
+
+  await eventBus.emit({
+    type: 'journal_entry.reversed',
+    payload: { originalEntry: original as JournalEntry, reversalEntry: result, userId, companyId },
   })
 
   return result

@@ -163,7 +163,7 @@ describe('correctEntry', () => {
       { data: reversalEntry, error: null },           // 1: insert reversal
       { data: null, error: null },                    // 2: insert reversal lines
       { data: null, error: null },                    // 3: post reversal
-      { data: [], error: null },                      // 4: accounts
+      { data: [{ id: 'acc-5420', account_number: '5420' }, { id: 'acc-1930', account_number: '1930' }], error: null }, // 4: accounts
       { data: null, error: { message: 'DB error' } }, // 5: insert corrected FAILS
       { data: null, error: null },                    // 6: cancelEntry reversal update
       { data: null, error: null },                    // 7: cancelEntry reversal lines delete

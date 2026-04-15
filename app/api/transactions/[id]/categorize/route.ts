@@ -380,8 +380,8 @@ export async function POST(
     }
   }
 
-  // Update the transaction
-  const { error: updateError } = await supabase
+  // Update the transaction (CAS guard: only set journal_entry_id if still null)
+  const { data: updateResult, error: updateError } = await supabase
     .from('transactions')
     .update({
       is_business,
@@ -389,12 +389,45 @@ export async function POST(
       journal_entry_id: journalEntryId,
     })
     .eq('id', id)
+    .is('journal_entry_id', null)
+    .select('id')
 
   if (updateError) {
     console.error('Failed to update transaction:', updateError)
     return NextResponse.json(
       { error: 'Failed to update transaction' },
       { status: 500 }
+    )
+  }
+
+  // CAS guard: another request already set journal_entry_id
+  if ((!updateResult || updateResult.length === 0) && journalEntryId) {
+    // Cancel the orphaned journal entry and document the voucher gap
+    const { data: orphan } = await supabase
+      .from('journal_entries')
+      .select('fiscal_period_id, voucher_series, voucher_number')
+      .eq('id', journalEntryId)
+      .single()
+
+    await supabase
+      .from('journal_entries')
+      .update({ status: 'cancelled' })
+      .eq('id', journalEntryId)
+
+    if (orphan) {
+      await supabase.from('voucher_gap_explanations').insert({
+        company_id: companyId,
+        fiscal_period_id: orphan.fiscal_period_id,
+        voucher_series: orphan.voucher_series || 'A',
+        gap_number: orphan.voucher_number,
+        explanation: 'Automatiskt makulerad: dubblettbokning förhindrad av samtidighetsskydd',
+        created_by: user.id,
+      })
+    }
+
+    return NextResponse.json(
+      { error: 'Transaction was already categorized by another request' },
+      { status: 409 }
     )
   }
 

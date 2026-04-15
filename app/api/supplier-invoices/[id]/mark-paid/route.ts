@@ -99,6 +99,10 @@ export async function POST(
     }
   } catch (err) {
     console.error('Failed to create payment journal entry:', err)
+    return NextResponse.json(
+      { error: 'Kunde inte bokföra betalningen' },
+      { status: 500 }
+    )
   }
 
   // Calculate new remaining amount
@@ -107,8 +111,8 @@ export async function POST(
   const isFullyPaid = newRemaining <= 0
   const newStatus = isFullyPaid ? 'paid' : 'partially_paid'
 
-  // Update invoice
-  const { error: updateError } = await supabase
+  // Update invoice (CAS guard: only if status hasn't changed since we read it)
+  const { data: updateResult, error: updateError } = await supabase
     .from('supplier_invoices')
     .update({
       status: newStatus,
@@ -118,9 +122,25 @@ export async function POST(
       payment_journal_entry_id: journalEntryId,
     })
     .eq('id', id)
+    .in('status', ['registered', 'approved', 'partially_paid', 'overdue'])
+    .select('id')
 
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 })
+  }
+
+  // CAS guard: status changed between our read and write
+  if (!updateResult || updateResult.length === 0) {
+    if (journalEntryId) {
+      await supabase
+        .from('journal_entries')
+        .update({ status: 'cancelled' })
+        .eq('id', journalEntryId)
+    }
+    return NextResponse.json(
+      { error: 'Fakturan har redan betalats av en annan förfrågan' },
+      { status: 409 }
+    )
   }
 
   // Record payment

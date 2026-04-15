@@ -146,8 +146,8 @@ describe('POST /api/transactions/[id]/categorize', () => {
     mockCreateTransactionJournalEntry.mockResolvedValue({ id: 'je-1' })
     mockSaveUserMappingRule.mockResolvedValue(undefined)
 
-    // Update transaction
-    enqueue({ data: null, error: null })
+    // Update transaction (CAS guard: returns matched row)
+    enqueue({ data: [{ id: 'tx-1' }], error: null })
 
     const emitSpy = vi.spyOn(eventBus, 'emit')
 
@@ -284,8 +284,8 @@ describe('POST /api/transactions/[id]/categorize', () => {
 
     mockCreateTransactionJournalEntry.mockResolvedValue({ id: 'je-1' })
 
-    // Update transaction
-    enqueue({ data: null, error: null })
+    // Update transaction (CAS guard: returns matched row)
+    enqueue({ data: [{ id: 'tx-1' }], error: null })
 
     const request = createMockRequest('/api/transactions/tx-1/categorize', {
       method: 'POST',
