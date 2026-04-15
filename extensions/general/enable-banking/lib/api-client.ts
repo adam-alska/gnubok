@@ -221,13 +221,13 @@ async function authenticatedFetchWithRetry(
 /**
  * Get list of supported banks (ASPSPs) for a country
  */
-export async function getASPSPs(country: string = 'SE'): Promise<ASPSP[]> {
-  const psuType = process.env.ENABLE_BANKING_PSU_TYPE || 'business'
+export async function getASPSPs(country: string = 'SE', psuType?: 'personal' | 'business'): Promise<ASPSP[]> {
+  const resolvedPsuType = psuType || process.env.ENABLE_BANKING_PSU_TYPE || 'business'
   const isSandbox = ENABLE_BANKING_API_URL.includes('tilisy')
   const params = new URLSearchParams({
     country,
     sandbox: String(isSandbox),
-    psu_type: psuType,
+    psu_type: resolvedPsuType,
   })
   const response = await authenticatedFetchWithRetry(`/aspsps?${params.toString()}`)
 
@@ -238,7 +238,7 @@ export async function getASPSPs(country: string = 'SE'): Promise<ASPSP[]> {
       statusText: response.statusText,
       body,
       country,
-      psuType,
+      psuType: resolvedPsuType,
       sandbox: isSandbox,
       apiUrl: ENABLE_BANKING_API_URL,
     })

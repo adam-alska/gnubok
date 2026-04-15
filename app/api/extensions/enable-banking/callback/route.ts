@@ -54,6 +54,14 @@ export async function GET(request: Request) {
             .from('bank_connections')
             .update({ status: 'error', error_message: errorMessage, oauth_state: null })
             .eq('id', pendingConn.id)
+
+          // Include bank name and error code in redirect so the UI can offer PSU type retry
+          const params = new URLSearchParams({
+            bank_error: errorMessage,
+            ...(pendingConn.bank_name ? { bank_name: pendingConn.bank_name } : {}),
+            ...(error === 'access_denied' ? { bank_error_code: error } : {}),
+          })
+          return NextResponse.redirect(`${baseUrl}/settings/banking?${params.toString()}`)
         }
       } catch (cleanupError) {
         console.error('[enable-banking] Failed to clean up pending bank connection:', cleanupError)

@@ -17,6 +17,8 @@ export default function BankingSettingsPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [bankConnectionError, setBankConnectionError] = useState<string | null>(null)
+  const [failedBankName, setFailedBankName] = useState<string | null>(null)
+  const [isAccessDenied, setIsAccessDenied] = useState(false)
   const syncInitiatedRef = useRef(false)
   const abortControllerRef = useRef<AbortController | null>(null)
   const unmountedRef = useRef(false)
@@ -94,12 +96,16 @@ export default function BankingSettingsPage() {
 
     if (bankError) {
       const errorMsg = decodeURIComponent(bankError)
+      const bankName = searchParams.get('bank_name')
+      const errorCode = searchParams.get('bank_error_code')
       toast({
         title: 'Anslutning misslyckades',
         description: errorMsg,
         variant: 'destructive',
       })
       setBankConnectionError(errorMsg)
+      if (bankName) setFailedBankName(bankName)
+      if (errorCode === 'access_denied') setIsAccessDenied(true)
       router.replace('/settings/banking')
     }
   }, [searchParams, router, toast])
@@ -111,12 +117,21 @@ export default function BankingSettingsPage() {
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
           <div className="flex-1">
             <p className="text-sm font-medium text-destructive">{bankConnectionError}</p>
+            {isAccessDenied && failedBankName && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                Banken nekade åtkomst. Om du använder ett privatkonto kan du prova att ansluta med kontotypen &quot;Privat&quot; i bankväljaren nedan.
+              </p>
+            )}
             <p className="mt-1 text-sm text-muted-foreground">
               Du kan också <Link href="/import?mode=bank" className="underline hover:text-foreground">importera transaktioner via bankfil</Link> istället.
             </p>
           </div>
           <button
-            onClick={() => setBankConnectionError(null)}
+            onClick={() => {
+              setBankConnectionError(null)
+              setFailedBankName(null)
+              setIsAccessDenied(false)
+            }}
             className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-foreground"
             aria-label="Stäng"
           >
