@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
 import { DestructiveConfirmDialog, useDestructiveConfirm } from '@/components/ui/destructive-confirm-dialog'
 import { Loader2, Upload } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useCompany } from '@/contexts/CompanyContext'
 import { BankSelector, type Bank } from './BankSelector'
@@ -31,6 +32,7 @@ export default function BankingSettingsPanel() {
   const connectingRef = useRef(false)
   const [isLoading, setIsLoading] = useState(true)
   const [showCsvFallback, setShowCsvFallback] = useState(false)
+  const [psuType, setPsuType] = useState<'personal' | 'business'>('business')
 
   useEffect(() => {
     fetchConnections()
@@ -52,7 +54,7 @@ export default function BankingSettingsPanel() {
     setIsLoading(false)
   }
 
-  async function handleConnectBank(bank: Bank) {
+  async function handleConnectBank(bank: Bank, psuTypeOverride?: 'personal' | 'business') {
     if (connectingRef.current) return
     connectingRef.current = true
     setIsConnecting(true)
@@ -62,12 +64,16 @@ export default function BankingSettingsPanel() {
       console.log('[enable-banking] Initiating bank connection', {
         bankName: bank.name,
         bankCountry: bank.country,
+        psuTypeOverride,
       })
+
+      const body: Record<string, string> = { aspsp_name: bank.name, aspsp_country: bank.country }
+      if (psuTypeOverride) body.psu_type = psuTypeOverride
 
       const response = await fetch('/api/extensions/ext/enable-banking/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ aspsp_name: bank.name, aspsp_country: bank.country }),
+        body: JSON.stringify(body),
       })
 
       const data = await response.json()
@@ -288,9 +294,45 @@ export default function BankingSettingsPanel() {
             Välj din bank nedan för att koppla ditt konto via PSD2.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {/* Account type selector */}
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground">Kontotyp:</span>
+            <div className="inline-flex rounded-lg border border-border p-0.5">
+              <button
+                type="button"
+                onClick={() => setPsuType('business')}
+                className={cn(
+                  'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                  psuType === 'business'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                Företagskonto
+              </button>
+              <button
+                type="button"
+                onClick={() => setPsuType('personal')}
+                className={cn(
+                  'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                  psuType === 'personal'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                Privatkonto
+              </button>
+            </div>
+          </div>
+          {psuType === 'personal' && (
+            <p className="text-xs text-muted-foreground">
+              Välj Privatkonto om du använder ditt personliga bankkonto för din verksamhet (vanligt för enskild firma).
+            </p>
+          )}
           <BankSelector
-            onConnect={handleConnectBank}
+            onConnect={(bank) => handleConnectBank(bank, psuType)}
+            onPsuTypeDetected={setPsuType}
             isConnecting={isConnecting}
             connectingBankName={connectingBankName}
           />

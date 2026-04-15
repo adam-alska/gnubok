@@ -20,6 +20,7 @@ const POPULAR_SWEDISH_BANKS = [
 
 interface BankSelectorProps {
   onConnect: (bank: Bank) => void
+  onPsuTypeDetected?: (psuType: 'personal' | 'business') => void
   isConnecting?: boolean
   connectingBankName?: string | null
   className?: string
@@ -89,6 +90,7 @@ function BankCard({ bank, isConnecting, connectingBankName, onConnect }: {
 
 export function BankSelector({
   onConnect,
+  onPsuTypeDetected,
   isConnecting = false,
   connectingBankName = null,
   className,
@@ -111,6 +113,9 @@ export function BankSelector({
         if (data.sandbox !== undefined) {
           setIsSandbox(data.sandbox)
         }
+        if (data.psu_type && onPsuTypeDetected) {
+          onPsuTypeDetected(data.psu_type)
+        }
       } catch {
         setError('Kunde inte ladda banker')
       } finally {
@@ -118,7 +123,8 @@ export function BankSelector({
       }
     }
     fetchBanks()
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- onPsuTypeDetected is a stable setter, only run on mount
+  }, [onPsuTypeDetected])
 
   const filteredBanks = banks.filter((bank) =>
     bank.name.toLowerCase().includes(searchQuery.toLowerCase())
