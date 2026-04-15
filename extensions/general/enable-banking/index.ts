@@ -40,14 +40,27 @@ export const enableBankingExtension: Extension = {
       handler: async (_request: Request, ctx?: ExtensionContext) => {
         const log = ctx?.log ?? console
         try {
-          const aspsps = await getASPSPs('SE')
+          // Detect PSU type from company entity_type
+          let psuType: 'personal' | 'business' = 'business'
+          if (ctx?.companyId && ctx?.supabase) {
+            const { data: company } = await ctx.supabase
+              .from('companies')
+              .select('entity_type')
+              .eq('id', ctx.companyId)
+              .single()
+            if (company?.entity_type === 'enskild_firma') {
+              psuType = 'personal'
+            }
+          }
+
+          const aspsps = await getASPSPs('SE', psuType)
           const banks = aspsps.map((aspsp: ASPSP) => ({
             name: aspsp.name,
             country: aspsp.country,
             logo: aspsp.logo,
             bic: aspsp.bic,
           }))
-          return NextResponse.json({ banks, sandbox: isSandboxMode() })
+          return NextResponse.json({ banks, psu_type: psuType, sandbox: isSandboxMode() })
         } catch (error) {
           log.error('Error fetching banks:', error)
           return NextResponse.json({
@@ -74,7 +87,7 @@ export const enableBankingExtension: Extension = {
           return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { aspsp_name, aspsp_country } = await request.json()
+        const { aspsp_name, aspsp_country, psu_type: explicitPsuType } = await request.json()
 
         if (!aspsp_name || !aspsp_country) {
           return NextResponse.json(
@@ -84,9 +97,21 @@ export const enableBankingExtension: Extension = {
         }
 
         try {
-          // Always use 'business' PSU type — gnubok is accounting software,
-          // users connect business accounts regardless of entity type (AB or EF)
-          const psuType = 'business'
+          // Detect PSU type: explicit override > company entity_type > default 'business'
+          let psuType: 'personal' | 'business' = 'business'
+          if (explicitPsuType === 'personal' || explicitPsuType === 'business') {
+            psuType = explicitPsuType
+          } else {
+            const companyId = ctx?.companyId ?? user.id
+            const { data: company } = await supabase
+              .from('companies')
+              .select('entity_type')
+              .eq('id', companyId)
+              .single()
+            if (company?.entity_type === 'enskild_firma') {
+              psuType = 'personal'
+            }
+          }
 
           log.info('[enable-banking] Starting bank connection', {
             user_id: user.id,

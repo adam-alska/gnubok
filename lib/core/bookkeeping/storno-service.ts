@@ -174,6 +174,14 @@ export async function correctEntry(
       accountIdMap.set(account.account_number, account.id)
     }
 
+    // Validate all account numbers resolved to IDs
+    const missingAccounts = accountNumbers.filter(num => !accountIdMap.has(num))
+    if (missingAccounts.length > 0) {
+      throw new Error(
+        `Account(s) not found in chart of accounts: ${missingAccounts.join(', ')}`
+      )
+    }
+
     const { data: newEntry, error: correctedError } = await supabase
       .from('journal_entries')
       .insert({

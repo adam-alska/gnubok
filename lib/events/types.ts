@@ -21,6 +21,7 @@ export type CoreEvent =
   | { type: 'journal_entry.drafted'; payload: { entry: JournalEntry; userId: string; companyId: string } }
   | { type: 'journal_entry.committed'; payload: { entry: JournalEntry; userId: string; companyId: string } }
   | { type: 'journal_entry.corrected'; payload: { original: JournalEntry; storno: JournalEntry; corrected: JournalEntry; userId: string; companyId: string } }
+  | { type: 'journal_entry.reversed'; payload: { originalEntry: JournalEntry; reversalEntry: JournalEntry; userId: string; companyId: string } }
   | { type: 'journal_entry.deleted'; payload: { entryId: string; voucherSeries: string; voucherNumber: number; userId: string; companyId: string } }
   // Documents
   | { type: 'document.uploaded'; payload: { document: DocumentAttachment; userId: string; companyId: string } }

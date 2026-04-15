@@ -64,9 +64,9 @@ export async function POST(
 }
 ```
 
-## Non-Blocking Journal Entry Creation
+## Supplementary Journal Entry Creation (Non-Blocking)
 
-Journal entry failures must never block the business operation:
+When the journal entry is a side effect of the primary operation (e.g., categorizing a transaction), failures must not block:
 
 ```typescript
 try {
@@ -79,6 +79,23 @@ try {
 } catch (err) {
   console.error('Failed to create journal entry:', err)
   // Continue — don't fail the request
+}
+```
+
+## Payment Journal Entry Creation (Blocking)
+
+When the journal entry IS the accounting record (mark-paid, mark-sent for cash method), GL failure must block the operation. Without the GL entry, AP/AR diverges from GL:
+
+```typescript
+try {
+  const journalEntry = await createPaymentJournalEntry(...)
+  if (journalEntry) journalEntryId = journalEntry.id
+} catch (err) {
+  console.error('Failed to create payment journal entry:', err)
+  return NextResponse.json(
+    { error: 'Kunde inte bokföra betalningen' },
+    { status: 500 }
+  )
 }
 ```
 
@@ -112,6 +129,6 @@ if (!data) {
 1. Forgetting `ensureInitialized()` on routes that emit events — events silently won't fire
 2. Using `params.id` instead of `(await params).id` — Next.js 16 breaking change
 3. Missing `user_id` filter on queries — relies solely on RLS
-4. Blocking on journal entry failure — must wrap in try/catch
+4. Blocking on supplementary journal entry failure — must wrap in try/catch (but payment entries MUST block — see above)
 5. Returning `{ message }` instead of `{ error }` on failure — inconsistent with codebase
 6. Forgetting `await` on `createClient()` — it's async in server context
