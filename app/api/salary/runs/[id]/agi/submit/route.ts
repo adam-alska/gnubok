@@ -18,18 +18,12 @@ ensureInitialized()
  * The user then signs on Skatteverket's site. The frontend polls
  * GET /api/extensions/ext/skatteverket/agi/submitted to detect completion.
  */
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const companyId = await requireCompanyId(supabase, user.id)
+  const writeCheck = await requireWritePermission(supabase, user.id)
+  if (!writeCheck.ok) return writeCheck.response
 
-  // Load salary run
+  const companyId = await requireCompanyId(supabase, user.id)
   const { data: run, error: runError } = await supabase
     .from('salary_runs')
     .select('*')
