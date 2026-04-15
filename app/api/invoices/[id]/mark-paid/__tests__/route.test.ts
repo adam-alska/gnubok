@@ -125,8 +125,8 @@ describe('POST /api/invoices/[id]/mark-paid', () => {
     enqueue({ data: invoice, error: null })
     // Fetch company settings (now before update due to journal-first ordering)
     enqueue({ data: { accounting_method: 'accrual', entity_type: 'enskild_firma' }, error: null })
-    // Update invoice status
-    enqueue({ data: null, error: null })
+    // Update invoice status (CAS guard: returns matched row)
+    enqueue({ data: [{ id: 'inv-1' }], error: null })
 
     mockCreateInvoicePaymentJournalEntry.mockResolvedValue({ id: 'je-1' })
 
@@ -166,7 +166,8 @@ describe('POST /api/invoices/[id]/mark-paid', () => {
 
     enqueue({ data: invoice, error: null })
     enqueue({ data: { accounting_method: 'cash', entity_type: 'enskild_firma' }, error: null })
-    enqueue({ data: null, error: null })
+    // Update invoice status (CAS guard: returns matched row)
+    enqueue({ data: [{ id: 'inv-1' }], error: null })
 
     mockCreateInvoiceCashEntry.mockResolvedValue({ id: 'je-2' })
 
@@ -213,8 +214,8 @@ describe('POST /api/invoices/[id]/mark-paid', () => {
     enqueue({ data: invoice, error: null })
     // Fetch company settings (before update — journal-first ordering)
     enqueue({ data: { accounting_method: 'accrual', entity_type: 'enskild_firma' }, error: null })
-    // Update invoice status
-    enqueue({ data: null, error: null })
+    // Update invoice status (CAS guard: returns matched row)
+    enqueue({ data: [{ id: 'inv-1' }], error: null })
 
     mockFindFiscalPeriod.mockResolvedValue('fp-1')
     mockCreateJournalEntry.mockResolvedValue({ id: 'je-custom' })
@@ -314,7 +315,8 @@ describe('POST /api/invoices/[id]/mark-paid', () => {
 
     enqueue({ data: invoice, error: null })
     enqueue({ data: { accounting_method: 'accrual', entity_type: 'enskild_firma' }, error: null })
-    enqueue({ data: null, error: null })
+    // Update invoice status (CAS guard: returns matched row)
+    enqueue({ data: [{ id: 'inv-1' }], error: null })
 
     mockCreateInvoicePaymentJournalEntry.mockResolvedValue({ id: 'je-auto' })
 

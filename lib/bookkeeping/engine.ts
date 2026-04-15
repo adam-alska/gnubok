@@ -174,6 +174,15 @@ export async function createDraftEntry(
   // Resolve account IDs
   const accountIdMap = await resolveAccountIds(supabase, companyId, input.lines)
 
+  // Validate all account numbers resolved to IDs
+  const allAccountNumbers = [...new Set(input.lines.map(l => l.account_number))]
+  const missingAccounts = allAccountNumbers.filter(num => !accountIdMap.has(num))
+  if (missingAccounts.length > 0) {
+    throw new Error(
+      `Account(s) not found in chart of accounts: ${missingAccounts.join(', ')}`
+    )
+  }
+
   // Insert journal entry header as draft (voucher_number = 0, will be assigned on commit)
   const { data: entry, error: entryError } = await supabase
     .from('journal_entries')
@@ -350,6 +359,15 @@ export async function reverseEntry(
   // Resolve account IDs
   const accountIdMap = await resolveAccountIds(supabase, companyId, reversedLines)
 
+  // Validate all account numbers resolved to IDs
+  const reversalAccountNumbers = [...new Set(reversedLines.map(l => l.account_number))]
+  const missingReversalAccounts = reversalAccountNumbers.filter(num => !accountIdMap.has(num))
+  if (missingReversalAccounts.length > 0) {
+    throw new Error(
+      `Account(s) not found in chart of accounts: ${missingReversalAccounts.join(', ')}`
+    )
+  }
+
   // Create reversal entry with reverses_id link
   const { data: reversalEntry, error: reversalError } = await supabase
     .from('journal_entries')
@@ -417,6 +435,94 @@ export async function reverseEntry(
     throw new Error('Entry was already reversed by a concurrent operation')
   }
 
+  // If this was a payment entry, sync the linked invoice/supplier-invoice status
+  const paymentSourceTypes = [
+    'invoice_paid', 'invoice_cash_payment',
+    'supplier_invoice_paid', 'supplier_invoice_cash_payment',
+  ]
+
+  if (paymentSourceTypes.includes(original.source_type) && original.source_id) {
+    // The GL reversal is already handled above (line-by-line mirror of the original
+    // verifikation per BFL 5 kap 5§). Here we sync the business-level invoice state.
+    // Payment amounts come from the payments table, not from GL line inspection —
+    // this works identically for kontantmetod and faktureringsmetod.
+    const entryId = original.id
+
+    if (original.source_type.startsWith('supplier_invoice')) {
+      const { data: payment } = await supabase
+        .from('supplier_invoice_payments')
+        .select('amount')
+        .eq('journal_entry_id', entryId)
+        .single()
+
+      const { data: supplierInvoice } = await supabase
+        .from('supplier_invoices')
+        .select('paid_amount, total_amount, due_date')
+        .eq('id', original.source_id)
+        .eq('company_id', companyId)
+        .single()
+
+      if (supplierInvoice && payment) {
+        const newPaidAmount = Math.round((supplierInvoice.paid_amount - payment.amount) * 100) / 100
+        const newRemaining = Math.round((supplierInvoice.total_amount - Math.max(0, newPaidAmount)) * 100) / 100
+        let newStatus: string
+        if (newPaidAmount > 0) {
+          newStatus = 'partially_paid'
+        } else if (supplierInvoice.due_date && new Date(supplierInvoice.due_date) < new Date()) {
+          newStatus = 'overdue'
+        } else {
+          newStatus = 'approved'
+        }
+
+        await supabase
+          .from('supplier_invoices')
+          .update({
+            status: newStatus,
+            paid_amount: Math.max(0, newPaidAmount),
+            remaining_amount: newRemaining,
+            paid_at: null,
+            payment_journal_entry_id: null,
+          })
+          .eq('id', original.source_id)
+          .eq('company_id', companyId)
+      }
+    } else {
+      const { data: payment } = await supabase
+        .from('invoice_payments')
+        .select('amount')
+        .eq('journal_entry_id', entryId)
+        .single()
+
+      const { data: customerInvoice } = await supabase
+        .from('invoices')
+        .select('paid_amount, due_date')
+        .eq('id', original.source_id)
+        .eq('company_id', companyId)
+        .single()
+
+      if (customerInvoice) {
+        const paymentAmount = payment?.amount ?? customerInvoice.paid_amount
+        const newPaidAmount = Math.round((customerInvoice.paid_amount - paymentAmount) * 100) / 100
+        const revertStatus = newPaidAmount > 0
+          ? 'partially_paid'
+          : customerInvoice.due_date && new Date(customerInvoice.due_date) < new Date()
+            ? 'overdue'
+            : 'sent'
+
+        await supabase
+          .from('invoices')
+          .update({
+            status: revertStatus,
+            paid_at: null,
+            paid_amount: Math.max(0, newPaidAmount),
+          })
+          .eq('id', original.source_id)
+          .eq('company_id', companyId)
+          .in('status', ['paid', 'partially_paid'])
+      }
+    }
+  }
+
   // Fetch complete reversal entry with lines
   const { data: completeEntry } = await supabase
     .from('journal_entries')
@@ -429,6 +535,11 @@ export async function reverseEntry(
   await eventBus.emit({
     type: 'journal_entry.committed',
     payload: { entry: result, userId, companyId },
+  })
+
+  await eventBus.emit({
+    type: 'journal_entry.reversed',
+    payload: { originalEntry: original as JournalEntry, reversalEntry: result, userId, companyId },
   })
 
   return result

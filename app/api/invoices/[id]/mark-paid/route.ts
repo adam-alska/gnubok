@@ -168,8 +168,8 @@ export async function POST(
     }
   }
 
-  // Update status to paid — only after journal entry succeeds
-  const { error: updateError } = await supabase
+  // Update status to paid (CAS guard: only if still in payable status)
+  const { data: updateResult, error: updateError } = await supabase
     .from('invoices')
     .update({
       status: 'paid',
@@ -178,9 +178,42 @@ export async function POST(
     })
     .eq('id', id)
     .eq('company_id', companyId)
+    .in('status', ['sent', 'overdue'])
+    .select('id')
 
   if (updateError) {
     return NextResponse.json({ error: 'Kunde inte uppdatera status' }, { status: 500 })
+  }
+
+  // CAS guard: status changed between our read and write
+  if (!updateResult || updateResult.length === 0) {
+    if (journalEntryId) {
+      const { data: orphan } = await supabase
+        .from('journal_entries')
+        .select('fiscal_period_id, voucher_series, voucher_number')
+        .eq('id', journalEntryId)
+        .single()
+
+      await supabase
+        .from('journal_entries')
+        .update({ status: 'cancelled' })
+        .eq('id', journalEntryId)
+
+      if (orphan) {
+        await supabase.from('voucher_gap_explanations').insert({
+          company_id: companyId,
+          fiscal_period_id: orphan.fiscal_period_id,
+          voucher_series: orphan.voucher_series || 'A',
+          gap_number: orphan.voucher_number,
+          explanation: 'Automatiskt makulerad: dubblettbokning förhindrad av samtidighetsskydd',
+          created_by: user.id,
+        })
+      }
+    }
+    return NextResponse.json(
+      { error: 'Fakturan har redan betalats av en annan förfrågan' },
+      { status: 409 }
+    )
   }
 
   return NextResponse.json({
