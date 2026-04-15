@@ -54,6 +54,7 @@ export async function POST(
     originalRun.salary_entry_id,
     originalRun.avgifter_entry_id,
     originalRun.vacation_entry_id,
+    originalRun.pension_entry_id,
   ].filter(Boolean) as string[]
 
   for (const entryId of entryIds) {

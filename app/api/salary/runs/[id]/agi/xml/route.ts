@@ -110,11 +110,14 @@ export async function GET(
     }
   })
 
-  // Build totals with avgifter breakdown by category
+  // Build totals with avgifter breakdown by category (read from DB, not re-derived from rate)
   const avgifterByCategory: AGITotals['avgifterByCategory'] = {}
   for (const sre of runEmployees) {
-    const rate = sre.avgifter_rate
-    const category = rate <= 0.1022 ? 'reduced65plus' : rate <= 0.2082 ? 'youth' : 'standard'
+    const dbCategory = sre.avgifter_category as string | null
+    // Map DB category to AGI HU category; fall back to rate heuristic for legacy runs without stored category
+    const category = dbCategory
+      ? (dbCategory === 'reduced_65plus' ? 'reduced65plus' : dbCategory === 'vaxa_stod' ? 'standard' : dbCategory)
+      : (sre.avgifter_rate <= 0.1022 ? 'reduced65plus' : sre.avgifter_rate <= 0.2082 ? 'youth' : 'standard')
     const cat = avgifterByCategory[category as keyof typeof avgifterByCategory] || { basis: 0, amount: 0 }
     cat.basis += sre.avgifter_basis
     cat.amount += sre.avgifter_amount

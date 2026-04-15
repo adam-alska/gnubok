@@ -68,17 +68,17 @@ export async function POST(
   let totalVacationAccrual = 0
   let totalEmployerCost = 0
 
-  // Load YTD data from prior booked salary runs this year
+  // Load YTD data from prior booked salary runs this year (filters pushed to DB)
   const { data: priorRuns } = await supabase
     .from('salary_run_employees')
     .select('employee_id, gross_salary, tax_withheld, net_salary, salary_run:salary_runs!inner(period_year, period_month, status)')
     .eq('company_id', companyId)
+    .eq('salary_run.period_year', run.period_year)
+    .eq('salary_run.status', 'booked')
+    .lt('salary_run.period_month', run.period_month)
 
   const ytdByEmployee = new Map<string, { gross: number; tax: number; net: number }>()
   for (const prior of (priorRuns || [])) {
-    const priorRun = prior.salary_run as unknown as { period_year: number; period_month: number; status: string } | null
-    if (!priorRun || priorRun.period_year !== run.period_year || priorRun.status !== 'booked') continue
-    if (priorRun.period_month >= run.period_month) continue // Only prior months
     const current = ytdByEmployee.get(prior.employee_id) || { gross: 0, tax: 0, net: 0 }
     current.gross += prior.gross_salary
     current.tax += prior.tax_withheld
@@ -162,6 +162,7 @@ export async function POST(
         avgifter_rate: result.avgifterRate,
         avgifter_amount: result.avgifterAmount,
         avgifter_basis: result.avgifterBasis,
+        avgifter_category: result.avgifterCategory,
         vacation_accrual: result.vacationAccrual,
         vacation_accrual_avgifter: result.vacationAccrualAvgifter,
         tax_table_number: emp.tax_table_number,

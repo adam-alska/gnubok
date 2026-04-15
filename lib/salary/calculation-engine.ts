@@ -72,6 +72,7 @@ export interface SalaryCalculationResult {
   avgifterRate: number
   avgifterAmount: number
   avgifterBasis: number
+  avgifterCategory: AvgifterCalculation['category']
   vacationAccrual: number
   vacationAccrualAvgifter: number
   totalEmployerCost: number
@@ -384,6 +385,7 @@ export function calculateSalary(
     avgifterRate: avgifterCalc.rate,
     avgifterAmount,
     avgifterBasis,
+    avgifterCategory: avgifterCalc.category,
     vacationAccrual,
     vacationAccrualAvgifter,
     totalEmployerCost,

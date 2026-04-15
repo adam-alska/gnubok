@@ -97,6 +97,7 @@ export async function POST(
       entryIds.push(vacationEntry.id)
     }
     if (pensionEntry) {
+      updates.pension_entry_id = pensionEntry.id
       entryIds.push(pensionEntry.id)
     }
 
