@@ -4,6 +4,11 @@ import type {
   INK2SRutor,
   SRUSubmission,
 } from './types'
+import {
+  INK2R_ASSET_CODES,
+  INK2R_EQUITY_LIABILITY_CODES,
+  INK2R_INCOME_CODES,
+} from './types'
 
 /**
  * SRU File Generator for INK2 (Aktiebolag)
@@ -170,8 +175,12 @@ function generateBlanketterSru(declaration: INK2Declaration, now: Date): string 
   lines.push(`#UPPGIFT 7011 ${declaration.ink2['7011']}`)
   lines.push(`#UPPGIFT 7012 ${declaration.ink2['7012']}`)
 
-  // All INK2R fields — emit non-zero values only
-  const ink2rCodes: INK2RSRUCode[] = Object.keys(declaration.ink2r) as INK2RSRUCode[]
+  // All INK2R fields in canonical Skatteverket order — emit non-zero values only
+  const ink2rCodes: INK2RSRUCode[] = [
+    ...INK2R_ASSET_CODES,
+    ...INK2R_EQUITY_LIABILITY_CODES,
+    ...INK2R_INCOME_CODES,
+  ]
   for (const code of ink2rCodes) {
     const value = declaration.ink2r[code]
     if (value !== 0) {

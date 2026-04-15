@@ -20,9 +20,9 @@ function makeDeclaration(overrides?: Partial<INK2Declaration>): INK2Declaration 
     '7360': 0, '7361': 0, '7362': 0, '7363': 0, '7364': 0,
     '7365': 30000, '7366': 0, '7367': 0, '7369': 70000, '7368': 0, '7370': 0,
     '7410': 500000, '7411': 0, '7412': 0, '7413': 0,
-    '7511': 0, '7512': 0, '7513': -100000, '7514': -80000, '7515': -10000, '7516': 0, '7517': -5000,
+    '7511': 0, '7512': 0, '7513': 100000, '7514': 80000, '7515': 10000, '7516': 0, '7517': 5000,
     '7414': 0, '7415': 0, '7423': 0, '7416': 0, '7417': 0,
-    '7521': 0, '7522': -3000,
+    '7521': 0, '7522': 3000,
     '7524': 0, '7419': 0, '7420': 0, '7525': 0, '7421': 0, '7422': 0,
     '7528': 0,
     '7450': 302000, '7550': 0,
@@ -209,13 +209,31 @@ describe('INK2 SRU Generator', () => {
       }
     })
 
-    it('handles negative values correctly', () => {
+    it('reports cost fields as positive values per Skatteverket convention', () => {
       const declaration = makeDeclaration()
       const submission = generateSRUSubmission(declaration)
 
       const ink2rBlock = extractBlock(submission.blanketterSru, 'INK2R')
-      expect(ink2rBlock).toContain('#UPPGIFT 7513 -100000')
-      expect(ink2rBlock).toContain('#UPPGIFT 7522 -3000')
+      expect(ink2rBlock).toContain('#UPPGIFT 7513 100000')
+      expect(ink2rBlock).toContain('#UPPGIFT 7522 3000')
+    })
+
+    it('handles bokslutsdispositioner fields with correct sign', () => {
+      const declaration = makeDeclaration({
+        ink2r: {
+          ...makeDeclaration().ink2r,
+          '7524': 50000,  // Lämnade koncernbidrag (debit-normal cost, positive)
+          '7525': 30000,  // Avsättning periodiseringsfond (debit-normal cost, positive)
+          '7419': 20000,  // Mottagna koncernbidrag (credit-normal income, positive)
+        },
+      })
+      const submission = generateSRUSubmission(declaration)
+      const ink2rBlock = extractBlock(submission.blanketterSru, 'INK2R')
+
+      // All bokslutsdispositioner fields are positive in the SRU output
+      expect(ink2rBlock).toContain('#UPPGIFT 7524 50000')
+      expect(ink2rBlock).toContain('#UPPGIFT 7525 30000')
+      expect(ink2rBlock).toContain('#UPPGIFT 7419 20000')
     })
 
     it('includes INK2S with överskott/underskott', () => {
