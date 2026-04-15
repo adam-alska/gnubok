@@ -1,1 +1,1 @@
-{"extensions": ["ai-categorization", "ai-chat", "receipt-ocr", "invoice-inbox", "email", "push-notifications", "calendar"]}
+{"extensions": ["email", "invoice-inbox", "push-notifications", "calendar", "mcp-server"]}

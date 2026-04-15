@@ -817,4 +817,50 @@ describe('calculateVatDeclaration — reverse charge', () => {
     // Only the posted entry's invoice (5000) should count
     expect(result.rutor.ruta21).toBe(5000)
   })
+
+  it('handles zero output VAT on some rates but non-zero on others', async () => {
+    // Only 12% sales in period — no 25% or 6% activity
+    results = [
+      {
+        data: [
+          { account_number: '2621', debit_amount: 0, credit_amount: 600 },
+          { account_number: '3002', debit_amount: 0, credit_amount: 5000 },
+          { account_number: '2641', debit_amount: 200, credit_amount: 0 },
+        ],
+        error: null,
+      },
+      { data: [], error: null },
+      { data: [{ source_type: 'invoice_created' }], error: null },
+    ]
+
+    const result = await calculateVatDeclaration(supabase, 'company-1', 'monthly', 2024, 1)
+
+    expect(result.rutor.ruta10).toBe(0)   // no 25% output VAT
+    expect(result.rutor.ruta11).toBe(600)  // 12% output VAT
+    expect(result.rutor.ruta12).toBe(0)   // no 6% output VAT
+    expect(result.rutor.ruta48).toBe(200)
+    // ruta49 = (0 + 600 + 0 + 0 + 0 + 0 + 0 + 0 + 0) - 200 = 400
+    expect(result.rutor.ruta49).toBe(400)
+  })
+
+  it('includes sub-öre ledger amounts in ruta sums (no threshold filtering)', async () => {
+    results = [
+      {
+        data: [
+          // Very small amount — VAT declaration uses raw summation, no 0.005 filtering
+          { account_number: '2611', debit_amount: 0, credit_amount: 0.001 },
+          { account_number: '3001', debit_amount: 0, credit_amount: 0.004 },
+        ],
+        error: null,
+      },
+      { data: [], error: null },
+      { data: [], error: null },
+    ]
+
+    const result = await calculateVatDeclaration(supabase, 'company-1', 'monthly', 2024, 1)
+
+    // Sub-öre amounts still included in ruta sums
+    expect(result.rutor.ruta10).toBe(0)   // rounded: Math.round(0.001 * 100) / 100 = 0
+    expect(result.rutor.ruta05).toBe(0)   // rounded: Math.round(0.004 * 100) / 100 = 0
+  })
 })

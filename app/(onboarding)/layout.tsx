@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { Settings } from 'lucide-react'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { SentryIdentify } from '@/components/SentryIdentify'
 
 export default async function OnboardingLayout({
   children,
@@ -53,7 +52,6 @@ export default async function OnboardingLayout({
         </Link>
       )}
 
-      {user && <SentryIdentify userId={user.id} email={user.email} />}
     </div>
   )
 }

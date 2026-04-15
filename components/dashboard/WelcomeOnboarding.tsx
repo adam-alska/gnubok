@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/lib/supabase/client'
 import { createCompanyFromOnboarding } from '@/lib/company/actions'
 import { computeFiscalPeriod } from '@/lib/company/compute-fiscal-period'
@@ -50,10 +49,6 @@ function logError(message: string, extra?: Record<string, unknown>) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message: `welcome-onboarding: ${message}`, extra }),
   }).catch(() => {})
-  Sentry.captureMessage(`welcome-onboarding: ${message}`, {
-    level: 'error',
-    extra: { ...extra, component: 'welcome-onboarding' },
-  })
 }
 
 interface WelcomeOnboardingProps {
@@ -209,7 +204,6 @@ export default function WelcomeOnboarding({ firstName, teamId, skipWelcome, hasE
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       logError('create company action threw', { error: message })
-      Sentry.captureException(err)
       toast({ title: 'Fel', description: 'Ett oväntat fel uppstod. Försök igen.', variant: 'destructive' })
     } finally {
       setIsSaving(false)

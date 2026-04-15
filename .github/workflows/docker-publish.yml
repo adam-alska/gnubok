@@ -6,7 +6,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: erp-mafia/erp-base
+  IMAGE_NAME: erp-mafia/gnubok
 
 jobs:
   build-and-push:

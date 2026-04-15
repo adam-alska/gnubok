@@ -4,7 +4,6 @@ import { headers } from 'next/headers'
 import DashboardNav from '@/components/dashboard/DashboardNav'
 import CompanyTabSync from '@/components/dashboard/CompanyTabSync'
 import { RecaptIdentify } from '@/components/RecaptIdentify'
-import { SentryIdentify } from '@/components/SentryIdentify'
 import { SandboxBanner } from '@/components/dashboard/SandboxBanner'
 import { getExtensionNavItems } from '@/lib/extensions/sectors'
 import { CompanyProvider } from '@/contexts/CompanyContext'
@@ -102,7 +101,6 @@ export default async function DashboardLayout({
               {children}
             </div>
           </main>
-          <SentryIdentify userId={user.id} email={user.email} />
         </div>
       </CompanyProvider>
     )
@@ -150,7 +148,6 @@ export default async function DashboardLayout({
               {children}
             </div>
           </main>
-          <SentryIdentify userId={user.id} email={user.email} />
         </div>
       </CompanyProvider>
     )
@@ -225,7 +222,6 @@ export default async function DashboardLayout({
             {children}
           </div>
         </main>
-        <SentryIdentify userId={user.id} email={user.email} />
         {!isSandbox && (
           <RecaptIdentify
             userId={user.id}
