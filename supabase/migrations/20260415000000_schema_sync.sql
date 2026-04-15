@@ -860,19 +860,19 @@ DO $$
 DECLARE
   r record;
 BEGIN
-  -- Tables that use company_id IN (SELECT user_company_ids())
+  -- Tables with a direct company_id column
   FOR r IN
     SELECT unnest(ARRAY[
       'api_keys', 'bank_connections', 'bank_file_imports', 'calendar_feeds',
       'categorization_templates', 'chart_of_accounts', 'company_settings',
       'cost_centers', 'customers', 'deadlines', 'document_attachments',
-      'extension_data', 'extension_toggles', 'fiscal_periods',
-      'invoice_inbox_items', 'invoice_items', 'invoice_payments',
-      'invoice_reminders', 'invoices', 'journal_entries', 'journal_entry_lines',
-      'mapping_rules', 'notification_settings', 'projects',
-      'push_subscriptions', 'receipt_line_items', 'receipts',
+      'extension_data', 'fiscal_periods',
+      'invoice_inbox_items', 'invoice_payments',
+      'invoice_reminders', 'invoices', 'journal_entries',
+      'mapping_rules', 'projects',
+      'receipts',
       'sie_account_mappings', 'sie_imports', 'skatteverket_tokens',
-      'supplier_invoice_items', 'supplier_invoice_payments',
+      'supplier_invoice_payments',
       'supplier_invoices', 'suppliers', 'transactions'
     ]) AS tbl
   LOOP
@@ -887,7 +887,44 @@ BEGIN
     END IF;
   END LOOP;
 
-  -- Tables that use different policy patterns
+  -- Tables that join through a parent to reach company_id
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='invoice_items' AND cmd='DELETE') THEN
+    CREATE POLICY invoice_items_delete ON public.invoice_items FOR DELETE
+      USING (invoice_id IN (SELECT id FROM invoices WHERE company_id IN (SELECT user_company_ids())));
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='journal_entry_lines' AND cmd='DELETE') THEN
+    CREATE POLICY journal_entry_lines_delete ON public.journal_entry_lines FOR DELETE
+      USING (journal_entry_id IN (SELECT id FROM journal_entries WHERE company_id IN (SELECT user_company_ids())));
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='receipt_line_items' AND cmd='DELETE') THEN
+    CREATE POLICY receipt_line_items_delete ON public.receipt_line_items FOR DELETE
+      USING (receipt_id IN (SELECT id FROM receipts WHERE company_id IN (SELECT user_company_ids())));
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='supplier_invoice_items' AND cmd='DELETE') THEN
+    CREATE POLICY supplier_invoice_items_delete ON public.supplier_invoice_items FOR DELETE
+      USING (supplier_invoice_id IN (SELECT id FROM supplier_invoices WHERE company_id IN (SELECT user_company_ids())));
+  END IF;
+
+  -- User-scoped tables (no company_id — use auth.uid())
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='extension_toggles' AND cmd='DELETE') THEN
+    CREATE POLICY extension_toggles_delete ON public.extension_toggles FOR DELETE
+      USING (auth.uid() = user_id);
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='notification_settings' AND cmd='DELETE') THEN
+    CREATE POLICY notification_settings_delete ON public.notification_settings FOR DELETE
+      USING (auth.uid() = user_id);
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='push_subscriptions' AND cmd='DELETE') THEN
+    CREATE POLICY push_subscriptions_delete ON public.push_subscriptions FOR DELETE
+      USING (auth.uid() = user_id);
+  END IF;
+
+  -- Tables that use other policy patterns
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='chat_sessions' AND cmd='DELETE') THEN
     CREATE POLICY chat_sessions_delete ON public.chat_sessions FOR DELETE
       USING (company_id IN (SELECT user_company_ids()));
