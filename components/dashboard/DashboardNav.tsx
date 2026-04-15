@@ -71,14 +71,15 @@ const navItems: NavItem[] = [
   // Temporarily hidden pending module rework (see feedback #49)
   { href: '/suppliers', label: 'Leverantörer', icon: Building2, group: 'inköp', hidden: true },
   { href: '/supplier-invoices', label: 'Leverantörsfakturor', icon: FileInput, group: 'inköp', hidden: true },
-  // Personal
-  { href: '/salary', label: 'Löner', icon: HandCoins, group: 'redovisning', modes: ['aktiebolag'] },
   // General accounting
   { href: '/pending', label: 'Granskning', icon: ClipboardCheck, group: 'redovisning' },
   { href: '/transactions', label: 'Transaktioner', icon: ArrowLeftRight, group: 'redovisning' },
   { href: '/bookkeeping', label: 'Bokföring', icon: BookOpen, group: 'redovisning' },
   { href: '/reports', label: 'Rapporter', icon: BarChart3, group: 'redovisning' },
   { href: '/import', label: 'Importera', icon: Upload, group: 'redovisning' },
+  // Personal
+  { href: '/salary', label: 'Löner', icon: HandCoins, group: 'personal', modes: ['aktiebolag'] },
+  { href: '/salary/employees', label: 'Anställda', icon: Users, group: 'personal', modes: ['aktiebolag'] },
   { href: '/help', label: 'Hjälp', icon: HelpCircle, group: 'övrigt' },
   { href: '/settings', label: 'Inställningar', icon: Settings, group: 'övrigt' },
 ]
@@ -87,6 +88,7 @@ const groupLabels: Record<string, string> = {
   main: 'Huvudmeny',
   försäljning: 'Försäljning',
   inköp: 'Inköp',
+  personal: 'Personal',
   redovisning: 'Redovisning',
   övrigt: 'Övrigt',
 }
@@ -130,6 +132,11 @@ export default function DashboardNav({ companyName: _companyName, entityType, un
     if (href === '/') {
       return pathname === '/'
     }
+    // For parent routes that have a sibling sub-route in the nav (e.g. /salary vs /salary/employees),
+    // only match the parent for exact or non-overlapping sub-paths
+    if (href === '/salary') {
+      return pathname === '/salary' || pathname.startsWith('/salary/runs')
+    }
     return pathname.startsWith(href)
   }
 
@@ -158,7 +165,8 @@ export default function DashboardNav({ companyName: _companyName, entityType, un
   const sidebarGroups = [
     { key: 'försäljning', items: filteredItems.filter(i => i.group === 'försäljning'), spacing: 'mb-4' },
     { key: 'inköp', items: filteredItems.filter(i => i.group === 'inköp'), spacing: 'mb-4' },
-    { key: 'redovisning', items: filteredItems.filter(i => i.group === 'redovisning'), spacing: 'mb-6' },
+    { key: 'redovisning', items: filteredItems.filter(i => i.group === 'redovisning'), spacing: 'mb-4' },
+    { key: 'personal', items: filteredItems.filter(i => i.group === 'personal'), spacing: 'mb-6' },
   ] as const
 
   const mobileNavItems = [
@@ -228,8 +236,8 @@ export default function DashboardNav({ companyName: _companyName, entityType, un
                 </div>
               </div>
 
-              {/* AR / AP / Accounting groups */}
-              {sidebarGroups.map(({ key, items, spacing }) => (
+              {/* AR / AP / Personal / Accounting groups */}
+              {sidebarGroups.filter(({ items }) => items.length > 0).map(({ key, items, spacing }) => (
                 <div key={key} className={spacing}>
                   <p className="px-3 mb-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em]">
                     {groupLabels[key]}
@@ -553,8 +561,8 @@ export default function DashboardNav({ companyName: _companyName, entityType, un
                 })}
               </div>
 
-              {/* AR / AP / Accounting groups (mobile) */}
-              {sidebarGroups.map(({ key, items }) => (
+              {/* AR / AP / Personal / Accounting groups (mobile) */}
+              {sidebarGroups.filter(({ items }) => items.length > 0).map(({ key, items }) => (
                 <div key={key}>
                   <div className="flex items-center gap-3 my-1.5 px-3">
                     <span className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-[0.08em]">{groupLabels[key]}</span>
