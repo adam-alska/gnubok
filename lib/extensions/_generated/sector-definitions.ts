@@ -68,15 +68,5 @@ export const EXTENSION_DEFINITIONS: Record<string, ExtensionDefinition[]> = {
           "description": "Gör bokföring via Claude, Cursor eller annan MCP-klient",
           "longDescription": "Exponerar gnuboks bokföringsmotor som MCP-verktyg (Model Context Protocol). Koppla din MCP-klient med en API-nyckel och gör bokföring genom konversation: visa okategoriserade transaktioner, bokför dem, skapa fakturor."
     },
-    {
-          "slug": "skatteverket",
-          "name": "Skatteverket Integration",
-          "sector": "general",
-          "category": "operations",
-          "icon": "FileCheck",
-          "dataPattern": "core",
-          "description": "Skicka momsdeklaration direkt till Skatteverket via BankID.",
-          "longDescription": "Anslut till Skatteverket med BankID och skicka din momsdeklaration direkt från gnubok. Spara utkast, validera, lås och signera — utan att lämna appen."
-    },
   ],
 }

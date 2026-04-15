@@ -40,7 +40,6 @@ export async function POST(
     .from('salary_run_employees')
     .select('*, employee:employees(first_name, last_name, clearing_number, bank_account_number, email)')
     .eq('salary_run_id', id)
-    .eq('company_id', companyId)
 
   const validationErrors: string[] = []
   const warnings: string[] = []

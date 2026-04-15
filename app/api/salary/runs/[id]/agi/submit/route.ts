@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { ensureInitialized } from '@/lib/init'
 import { requireCompanyId } from '@/lib/company/context'
+import { requireWritePermission } from '@/lib/auth/require-write'
 import { eventBus } from '@/lib/events'
 
 ensureInitialized()
@@ -18,12 +19,21 @@ ensureInitialized()
  * The user then signs on Skatteverket's site. The frontend polls
  * GET /api/extensions/ext/skatteverket/agi/submitted to detect completion.
  */
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const writeCheck = await requireWritePermission(supabase, user.id)
   if (!writeCheck.ok) return writeCheck.response
 
   const companyId = await requireCompanyId(supabase, user.id)
+
+  // Load salary run
   const { data: run, error: runError } = await supabase
     .from('salary_runs')
     .select('*')
