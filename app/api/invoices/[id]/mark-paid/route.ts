@@ -188,10 +188,27 @@ export async function POST(
   // CAS guard: status changed between our read and write
   if (!updateResult || updateResult.length === 0) {
     if (journalEntryId) {
+      const { data: orphan } = await supabase
+        .from('journal_entries')
+        .select('fiscal_period_id, voucher_series, voucher_number')
+        .eq('id', journalEntryId)
+        .single()
+
       await supabase
         .from('journal_entries')
         .update({ status: 'cancelled' })
         .eq('id', journalEntryId)
+
+      if (orphan) {
+        await supabase.from('voucher_gap_explanations').insert({
+          company_id: companyId,
+          fiscal_period_id: orphan.fiscal_period_id,
+          voucher_series: orphan.voucher_series || 'A',
+          gap_number: orphan.voucher_number,
+          explanation: 'Automatiskt makulerad: dubblettbokning förhindrad av samtidighetsskydd',
+          created_by: user.id,
+        })
+      }
     }
     return NextResponse.json(
       { error: 'Fakturan har redan betalats av en annan förfrågan' },

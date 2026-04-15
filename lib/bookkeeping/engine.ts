@@ -443,9 +443,9 @@ export async function reverseEntry(
 
   if (paymentSourceTypes.includes(original.source_type) && original.source_id) {
     if (original.source_type.startsWith('supplier_invoice')) {
-      // Recalculate from the reversed entry's debit to 2440 (AP)
-      const reversedLines = (original.lines as JournalEntryLine[]) || []
-      const paymentAmount = reversedLines.reduce((sum, line) => {
+      // Recalculate from the original entry's debit to 2440 (AP)
+      const originalLines = (original.lines as JournalEntryLine[]) || []
+      const paymentAmount = originalLines.reduce((sum, line) => {
         return line.account_number === '2440'
           ? sum + (Number(line.debit_amount) || 0)
           : sum
@@ -453,14 +453,21 @@ export async function reverseEntry(
 
       const { data: supplierInvoice } = await supabase
         .from('supplier_invoices')
-        .select('paid_amount, total_amount')
+        .select('paid_amount, total_amount, due_date')
         .eq('id', original.source_id)
         .single()
 
       if (supplierInvoice) {
         const newPaidAmount = Math.round((supplierInvoice.paid_amount - paymentAmount) * 100) / 100
         const newRemaining = Math.round((supplierInvoice.total_amount - newPaidAmount) * 100) / 100
-        const newStatus = newPaidAmount <= 0 ? 'approved' : 'partially_paid'
+        let newStatus: string
+        if (newPaidAmount > 0) {
+          newStatus = 'partially_paid'
+        } else if (supplierInvoice.due_date && new Date(supplierInvoice.due_date) < new Date()) {
+          newStatus = 'overdue'
+        } else {
+          newStatus = 'approved'
+        }
 
         await supabase
           .from('supplier_invoices')
@@ -474,11 +481,21 @@ export async function reverseEntry(
           .eq('id', original.source_id)
       }
     } else {
-      // Customer invoice: revert from paid back to sent
+      // Customer invoice: revert from paid — check due_date to determine correct status
+      const { data: customerInvoice } = await supabase
+        .from('invoices')
+        .select('due_date')
+        .eq('id', original.source_id)
+        .single()
+
+      const revertStatus = customerInvoice?.due_date && new Date(customerInvoice.due_date) < new Date()
+        ? 'overdue'
+        : 'sent'
+
       await supabase
         .from('invoices')
         .update({
-          status: 'sent',
+          status: revertStatus,
           paid_at: null,
           paid_amount: 0,
         })
