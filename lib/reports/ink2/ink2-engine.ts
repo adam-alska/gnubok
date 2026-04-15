@@ -791,15 +791,16 @@ export async function generateINK2Declaration(
         let amount: number
 
         if (mapping.section === 'income_statement') {
-          // Income statement: supply the signed value as-is from accounting
-          // Revenue (credit normal): balance is negative (credit > debit), negate for positive revenue
-          // Cost (debit normal): balance is positive (debit > credit), keep as-is for negative cost
+          // Income statement sign convention per Skatteverket INK2R:
+          // All amounts are reported as positive values on the form.
+          // Revenue (credit normal): balance is negative in ledger, negate → positive
+          // Cost (debit normal): balance is positive in ledger, keep → positive
           // Net: negate so positive = income, negative = cost
           if (mapping.normalBalance === 'credit') {
             amount = -balance
           } else if (mapping.normalBalance === 'debit') {
-            // Costs: debit balance is positive in ledger, but on the form they appear negative
-            amount = -balance
+            // Costs: debit balance is positive in ledger, keep positive (Skatteverket convention)
+            amount = balance
           } else {
             // Net: negate to match accounting convention
             amount = -balance
@@ -847,26 +848,27 @@ export async function generateINK2Declaration(
   const totalAssets = ASSET_CODES.reduce((sum, code) => sum + ink2r[code], 0)
   const totalEquityLiabilities = EQUITY_LIABILITY_CODES.reduce((sum, code) => sum + ink2r[code], 0)
 
-  // Operating result: revenue + costs (costs are already negative)
+  // Operating result: revenue minus costs (costs are positive per Skatteverket convention)
   const operatingResult =
-    ink2r['7410'] + ink2r['7411'] + ink2r['7412'] + ink2r['7413'] +
-    ink2r['7511'] + ink2r['7512'] + ink2r['7513'] + ink2r['7514'] +
-    ink2r['7515'] + ink2r['7516'] + ink2r['7517']
+    ink2r['7410'] + ink2r['7411'] + ink2r['7412'] + ink2r['7413']
+    - ink2r['7511'] - ink2r['7512'] - ink2r['7513'] - ink2r['7514']
+    - ink2r['7515'] - ink2r['7516'] - ink2r['7517']
 
-  // Financial items
+  // Financial items: income minus costs
   const financialItems =
-    ink2r['7414'] + ink2r['7415'] + ink2r['7423'] + ink2r['7416'] + ink2r['7417'] +
-    ink2r['7521'] + ink2r['7522']
+    ink2r['7414'] + ink2r['7415'] + ink2r['7423'] + ink2r['7416'] + ink2r['7417']
+    - ink2r['7521'] - ink2r['7522']
 
-  // Bokslutsdispositioner
+  // Bokslutsdispositioner: subtract debit-normal, add credit-normal and net
   const bokslutsdispositioner =
-    ink2r['7524'] + ink2r['7419'] + ink2r['7420'] + ink2r['7525'] + ink2r['7421'] + ink2r['7422']
+    - ink2r['7524'] + ink2r['7419'] + ink2r['7420'] - ink2r['7525']
+    + ink2r['7421'] + ink2r['7422']
 
   // Result before tax
   const resultBeforeTax = operatingResult + financialItems + bokslutsdispositioner
 
-  // Result after tax
-  const resultAfterFinancial = resultBeforeTax + ink2r['7528']
+  // Result after tax (7528 is positive, subtract it)
+  const resultAfterFinancial = resultBeforeTax - ink2r['7528']
 
   // Set årets resultat: vinst (7450) or förlust (7550)
   if (resultAfterFinancial >= 0) {
@@ -888,7 +890,8 @@ export async function generateINK2Declaration(
 
   // Build INK2 (huvudblankett)
   // Auto-derive from INK2S result (simplified: result + non-deductible tax)
-  const taxAmount = Math.abs(ink2r['7528'])
+  // 7528 is already positive per Skatteverket convention
+  const taxAmount = ink2r['7528']
   const taxableResult = resultAfterFinancial + taxAmount
 
   const ink2: INK2Rutor = {
