@@ -95,7 +95,8 @@ export default function BankingSettingsPage() {
     }
 
     if (bankError) {
-      const errorMsg = decodeURIComponent(bankError)
+      let errorMsg: string
+      try { errorMsg = decodeURIComponent(bankError) } catch { errorMsg = bankError }
       const bankName = searchParams.get('bank_name')
       const errorCode = searchParams.get('bank_error_code')
       toast({
@@ -119,7 +120,7 @@ export default function BankingSettingsPage() {
             <p className="text-sm font-medium text-destructive">{bankConnectionError}</p>
             {isAccessDenied && failedBankName && (
               <p className="mt-1 text-sm text-muted-foreground">
-                Banken nekade åtkomst. Om du använder ett privatkonto kan du prova att ansluta med kontotypen &quot;Privat&quot; i bankväljaren nedan.
+                {failedBankName} nekade åtkomst. Om du använder ett privatkonto kan du prova att ansluta med kontotypen &quot;Privatkonto&quot; i bankväljaren nedan.
               </p>
             )}
             <p className="mt-1 text-sm text-muted-foreground">

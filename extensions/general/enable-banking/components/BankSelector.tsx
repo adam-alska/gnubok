@@ -123,7 +123,8 @@ export function BankSelector({
       }
     }
     fetchBanks()
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- onPsuTypeDetected is a stable setter, only run on mount
+  }, [onPsuTypeDetected])
 
   const filteredBanks = banks.filter((bank) =>
     bank.name.toLowerCase().includes(searchQuery.toLowerCase())
