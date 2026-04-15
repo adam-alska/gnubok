@@ -172,6 +172,49 @@ describe('generateBalanceSheet', () => {
     expect(report.total_equity_liabilities).toBe(32500)
   })
 
+  it('handles negative asset balance (net credit on class 1 account)', async () => {
+    mockTrialBalance.mockResolvedValue({
+      rows: [
+        makeRow({ account_number: '1930', account_name: 'Bank', account_class: 1, closing_debit: 50000, closing_credit: 0 }),
+        // Receivables with net credit (customer overpayment)
+        makeRow({ account_number: '1510', account_name: 'Kundfordringar', account_class: 1, closing_debit: 0, closing_credit: 5000 }),
+      ],
+      totalDebit: 50000,
+      totalCredit: 5000,
+      isBalanced: false,
+    })
+
+    const report = await generateBalanceSheet(supabase, 'company-1', 'period-1')
+
+    const receivables = report.asset_sections.find(s => s.rows.some(r => r.account_number === '1510'))
+    expect(receivables).toBeDefined()
+    expect(receivables!.rows.find(r => r.account_number === '1510')!.amount).toBe(-5000)
+    expect(report.total_assets).toBe(45000) // 50000 - 5000
+  })
+
+  it('rounding boundary: 0.004 rounds to 0 and is excluded, 0.005 rounds to 0.01 and is included', async () => {
+    // Amounts go through Math.round(x * 100) / 100 before the > 0.005 filter.
+    // Due to IEEE 754, 0.005 * 100 is slightly above 0.5, so Math.round rounds UP to 1,
+    // giving 0.01 which passes > 0.005. Meanwhile 0.004 rounds to 0.
+    mockTrialBalance.mockResolvedValue({
+      rows: [
+        makeRow({ account_number: '1930', account_name: 'Bank', account_class: 1, closing_debit: 1000, closing_credit: 0 }),
+        makeRow({ account_number: '1940', account_name: 'Excluded', account_class: 1, closing_debit: 0.004, closing_credit: 0 }),
+        makeRow({ account_number: '1950', account_name: 'Included', account_class: 1, closing_debit: 0.005, closing_credit: 0 }),
+      ],
+      totalDebit: 1000.009,
+      totalCredit: 0,
+      isBalanced: false,
+    })
+
+    const report = await generateBalanceSheet(supabase, 'company-1', 'period-1')
+
+    const bankSection = report.asset_sections.find(s => s.title === 'Kassa och bank')!
+    // 1930 (1000) and 1950 (0.005 → rounds to 0.01) are included; 1940 (0.004 → rounds to 0) is excluded
+    expect(bankSection.rows).toHaveLength(2)
+    expect(bankSection.rows.map(r => r.account_number)).toEqual(['1930', '1950'])
+  })
+
   it('uses Math.round for monetary precision on subtotals', async () => {
     mockTrialBalance.mockResolvedValue({
       rows: [

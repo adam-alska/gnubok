@@ -25,7 +25,6 @@ const REQUIRED_EXTENSION_VARS = [
 ] as const
 
 const OPTIONAL_VARS = [
-  'SENTRY_DSN',
   'LANGFUSE_SECRET_KEY',
   'LANGFUSE_PUBLIC_KEY',
 ] as const

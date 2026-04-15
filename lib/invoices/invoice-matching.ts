@@ -27,7 +27,7 @@ const FUZZY_TOLERANCE = 0.01
 /**
  * Check if two amounts match exactly (within rounding)
  */
-function amountsMatchExact(transactionAmount: number, invoiceTotal: number): boolean {
+export function amountsMatchExact(transactionAmount: number, invoiceTotal: number): boolean {
   // Round to 2 decimal places for comparison
   const txRounded = Math.round(transactionAmount * 100) / 100
   const invRounded = Math.round(invoiceTotal * 100) / 100
@@ -37,7 +37,7 @@ function amountsMatchExact(transactionAmount: number, invoiceTotal: number): boo
 /**
  * Check if two amounts match within fuzzy tolerance (±1%)
  */
-function amountsMatchFuzzy(transactionAmount: number, invoiceTotal: number): boolean {
+export function amountsMatchFuzzy(transactionAmount: number, invoiceTotal: number): boolean {
   if (invoiceTotal === 0) return false
   const diff = Math.abs(transactionAmount - invoiceTotal)
   // Cap fuzzy tolerance at 500 SEK to prevent false positives on large invoices
@@ -48,7 +48,7 @@ function amountsMatchFuzzy(transactionAmount: number, invoiceTotal: number): boo
 /**
  * Check if customer name appears in transaction counterparty
  */
-function customerNameMatches(
+export function customerNameMatches(
   customerName: string | undefined,
   transactionDescription: string,
   merchantName: string | null
@@ -65,7 +65,7 @@ function customerNameMatches(
 /**
  * Calculate confidence score and match reason for an invoice match
  */
-function calculateMatchScore(
+export function calculateMatchScore(
   transaction: Transaction,
   invoice: Invoice & { customer?: Customer }
 ): { confidence: number; matchReason: string } {

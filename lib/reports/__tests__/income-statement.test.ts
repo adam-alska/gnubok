@@ -171,6 +171,49 @@ describe('generateIncomeStatement', () => {
     expect(report.revenue_sections[0].title).toBe('Huvudintäkter')
   })
 
+  it('rounding boundary: 0.004 rounds to 0 and is excluded, 0.005 rounds to 0.01 and is included', async () => {
+    // Amounts go through Math.round(x * 100) / 100 before the > 0.005 filter.
+    // 0.004 → Math.round(0.4) = 0 → excluded. 0.005 → Math.round(0.5+ε) = 1 → 0.01 → included.
+    mockTrialBalance.mockResolvedValue({
+      rows: [
+        makeRow({ account_number: '3001', account_name: 'Revenue', account_class: 3, closing_credit: 10000, closing_debit: 0 }),
+        makeRow({ account_number: '3002', account_name: 'Excluded', account_class: 3, closing_credit: 0.004, closing_debit: 0 }),
+        makeRow({ account_number: '3003', account_name: 'Included', account_class: 3, closing_credit: 0.005, closing_debit: 0 }),
+      ],
+      totalDebit: 0,
+      totalCredit: 10000.009,
+      isBalanced: false,
+    })
+
+    const report = await generateIncomeStatement(supabase, 'company-1', 'period-1')
+
+    const section = report.revenue_sections.find(s => s.title === 'Huvudintäkter')!
+    // 3001 and 3003 included; 3002 excluded
+    expect(section.rows).toHaveLength(2)
+    expect(section.rows.map(r => r.account_number)).toEqual(['3001', '3003'])
+  })
+
+  it('subtotal includes sub-threshold rows that are filtered from visible rows', async () => {
+    mockTrialBalance.mockResolvedValue({
+      rows: [
+        makeRow({ account_number: '3001', account_name: 'Revenue', account_class: 3, closing_credit: 10000, closing_debit: 0 }),
+        // Amount 0.004 — below threshold, filtered from rows but included in subtotal
+        makeRow({ account_number: '3002', account_name: 'Micro', account_class: 3, closing_credit: 0.004, closing_debit: 0 }),
+      ],
+      totalDebit: 0,
+      totalCredit: 10000.004,
+      isBalanced: false,
+    })
+
+    const report = await generateIncomeStatement(supabase, 'company-1', 'period-1')
+
+    const section = report.revenue_sections.find(s => s.title === 'Huvudintäkter')!
+    // Only the 10000 row is visible
+    expect(section.rows).toHaveLength(1)
+    // But subtotal includes both rows (Math.round((10000 + 0.004) * 100) / 100 = 10000)
+    expect(section.subtotal).toBe(10000)
+  })
+
   it('ignores class 1-2 accounts (balance sheet)', async () => {
     mockTrialBalance.mockResolvedValue({
       rows: [
