@@ -84,6 +84,72 @@ export type DeclarationStatus =
   | 'signed'
   | 'decided'
 
+// ── AGI (Arbetsgivardeklaration) types ──────────────────────────
+
+/**
+ * AGI submission payload — sent to Skatteverket inlämning API.
+ *
+ * JSON property names follow the same camelCase convention as the
+ * Momsdeklaration API. Derived from Skatteverket's XML element names
+ * and FK field codes. Verify against the RAML spec on Utvecklarportalen.
+ */
+export interface SkatteverketAGIInlamning {
+  rattelse: boolean
+  huvuduppgift: SkatteverketHuvuduppgift
+  individuppgifter: SkatteverketIndividuppgift[]
+}
+
+/** Employer-level totals (Huvuduppgift) */
+export interface SkatteverketHuvuduppgift {
+  /** Ruta 001: Total avdragen skatt */
+  avdragenSkatt?: number
+  /** Ruta 020: Total underlag arbetsgivaravgifter */
+  summaArbetsgivaravgifterUnderlag?: number
+  /** Ruta 060: Avgifter — standard rate (31.42%) */
+  avgifterUnderlagStandard?: number
+  /** Ruta 061: Avgifter — ålderspension only (10.21%, 67+ from 2026) */
+  avgifterUnderlagAlderspension?: number
+  /** Ruta 062: Avgifter — youth rate (20.81%, ages 19-23, Apr 2026–Sep 2027) */
+  avgifterUnderlagUngdom?: number
+}
+
+/** Per-employee data (Individuppgift) */
+export interface SkatteverketIndividuppgift {
+  /** FK215: Personnummer/samordningsnummer (12 digits, plaintext) */
+  personnummer: string
+  /** FK570: Specifikationsnummer — MUST stay consistent per employee */
+  specifikationsnummer: number
+  /** Ruta 011: Kontant bruttolön */
+  kontantBruttoloen?: number
+  /** Ruta 001: Avdragen skatt */
+  avdragenSkatt?: number
+  /** Ruta 012: Förmån bil */
+  formanBil?: number
+  /** Ruta 013: Förmån drivmedel */
+  formanDrivmedel?: number
+  /** Ruta 014: Förmån bostad */
+  formanBostad?: number
+  /** Ruta 015: Förmån kost */
+  formanKost?: number
+  /** Ruta 019: Förmån övrigt */
+  formanOvrigt?: number
+  /** Ruta 020: Underlag arbetsgivaravgifter */
+  underlagArbetsgivaravgifter?: number
+  /** Ruta 131: Ersättning till F-skatt holder */
+  ersattningFSkatt?: number
+  /** FK821: Sjukfrånvaro dagar */
+  sjukfranvaroDagar?: number
+  /** FK822: VAB dagar */
+  vabDagar?: number
+  /** FK823: Föräldraledighet dagar */
+  foraldraledigDagar?: number
+}
+
+/** AGI validation result from Skatteverket /kontrollera */
+export interface SkatteverketAGIKontrollresultat {
+  kontroller?: SkatteverketKontroll[]
+}
+
 export interface SkatteverketSubmission {
   id: string
   user_id: string

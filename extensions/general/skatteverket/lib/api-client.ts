@@ -111,13 +111,14 @@ export async function skvRequest(
   userId: string,
   method: string,
   path: string,
-  body?: unknown
+  body?: unknown,
+  options?: { baseUrl?: string }
 ): Promise<Response> {
   const accessToken = await getValidToken(supabase, userId)
 
   await enforceRateLimit()
 
-  const url = `${getApiBaseUrl()}${path}`
+  const url = `${options?.baseUrl || getApiBaseUrl()}${path}`
   const headers: Record<string, string> = {
     'Authorization': `Bearer ${accessToken}`,
     'Client_Id': getApiGwClientId(),

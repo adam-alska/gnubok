@@ -12,13 +12,23 @@ import { ArrowLeft, Save, Trash2 } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 import { useCanWrite } from '@/lib/hooks/use-can-write'
 import { getErrorMessage } from '@/lib/errors/get-error-message'
-import { formatCurrency } from '@/lib/utils'
 import type { Employee } from '@/types'
 
 const EMPLOYMENT_LABELS: Record<string, string> = {
   employee: 'Anställd',
   company_owner: 'Företagsledare',
   board_member: 'Styrelseledamot',
+}
+
+const F_SKATT_LABELS: Record<string, string> = {
+  a_skatt: 'A-skatt',
+  f_skatt: 'F-skatt',
+  fa_skatt: 'FA-skatt',
+  not_verified: 'Ej verifierad',
+}
+
+function RequiredMark() {
+  return <span className="text-destructive ml-0.5">*</span>
 }
 
 export default function EmployeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -30,6 +40,12 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [employmentType, setEmploymentType] = useState('employee')
+  const [salaryType, setSalaryType] = useState('monthly')
+  const [fSkattStatus, setFSkattStatus] = useState('a_skatt')
+  const [isSidoinkomst, setIsSidoinkomst] = useState(false)
+  const [vacationRule, setVacationRule] = useState('procentregeln')
+
+  const requiresTaxTable = fSkattStatus === 'a_skatt' && !isSidoinkomst
 
   useEffect(() => {
     async function load() {
@@ -38,6 +54,10 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
         const { data } = await res.json()
         setEmployee(data)
         setEmploymentType(data.employment_type)
+        setSalaryType(data.salary_type || 'monthly')
+        setFSkattStatus(data.f_skatt_status || 'a_skatt')
+        setIsSidoinkomst(data.is_sidoinkomst || false)
+        setVacationRule(data.vacation_rule || 'procentregeln')
       }
       setLoading(false)
     }
@@ -49,19 +69,33 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
     setSaving(true)
 
     const form = new FormData(e.currentTarget)
-    const body = {
+    const body: Record<string, unknown> = {
       first_name: form.get('first_name') as string,
       last_name: form.get('last_name') as string,
       employment_type: employmentType,
       employment_degree: parseFloat(form.get('employment_degree') as string) || 100,
-      monthly_salary: parseFloat(form.get('monthly_salary') as string) || undefined,
-      hourly_rate: parseFloat(form.get('hourly_rate') as string) || undefined,
+      salary_type: salaryType,
+      f_skatt_status: fSkattStatus,
+      is_sidoinkomst: isSidoinkomst,
       tax_table_number: parseInt(form.get('tax_table_number') as string) || undefined,
       tax_column: parseInt(form.get('tax_column') as string) || 1,
+      tax_municipality: form.get('tax_municipality') as string || undefined,
       email: form.get('email') as string || undefined,
       phone: form.get('phone') as string || undefined,
+      address_line1: form.get('address_line1') as string || undefined,
+      postal_code: form.get('postal_code') as string || undefined,
+      city: form.get('city') as string || undefined,
       clearing_number: form.get('clearing_number') as string || undefined,
       bank_account_number: form.get('bank_account_number') as string || undefined,
+      vacation_rule: vacationRule,
+      vacation_days_per_year: parseInt(form.get('vacation_days_per_year') as string) || 25,
+    }
+
+    // Include salary field matching the current salary_type
+    if (salaryType === 'monthly') {
+      body.monthly_salary = parseFloat(form.get('monthly_salary') as string) || undefined
+    } else {
+      body.hourly_rate = parseFloat(form.get('hourly_rate') as string) || undefined
     }
 
     const res = await fetch(`/api/salary/employees/${id}`, {
@@ -134,22 +168,66 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
+        {/* Personal info */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Uppgifter</CardTitle>
+            <CardTitle className="text-base">Personuppgifter</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="first_name">Förnamn</Label>
+                <Label htmlFor="first_name">Förnamn<RequiredMark /></Label>
                 <Input id="first_name" name="first_name" defaultValue={employee.first_name} required disabled={!canWrite} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="last_name">Efternamn</Label>
+                <Label htmlFor="last_name">Efternamn<RequiredMark /></Label>
                 <Input id="last_name" name="last_name" defaultValue={employee.last_name} required disabled={!canWrite} />
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">E-post</Label>
+                <Input id="email" name="email" type="email" defaultValue={employee.email || ''} disabled={!canWrite} />
+                <p className="text-xs text-muted-foreground">Krävs för att skicka lönebesked</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Telefon</Label>
+                <Input id="phone" name="phone" defaultValue={employee.phone || ''} disabled={!canWrite} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Address */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Adress</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="address_line1">Gatuadress</Label>
+              <Input id="address_line1" name="address_line1" defaultValue={employee.address_line1 || ''} disabled={!canWrite} />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="postal_code">Postnummer</Label>
+                <Input id="postal_code" name="postal_code" defaultValue={employee.postal_code || ''} className="max-w-[160px]" disabled={!canWrite} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="city">Ort</Label>
+                <Input id="city" name="city" defaultValue={employee.city || ''} disabled={!canWrite} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Employment */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Anställning</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="employment_type">Typ</Label>
                 <Select value={employmentType} onValueChange={setEmploymentType} disabled={!canWrite}>
@@ -165,37 +243,165 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
               </div>
               <div className="space-y-2">
                 <Label htmlFor="employment_degree">Sysselsättningsgrad (%)</Label>
-                <Input id="employment_degree" name="employment_degree" type="number" defaultValue={employee.employment_degree} disabled={!canWrite} />
+                <Input id="employment_degree" name="employment_degree" type="number" defaultValue={employee.employment_degree} min="1" max="100" disabled={!canWrite} />
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Salary */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Lön</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="monthly_salary">Månadslön</Label>
-                <Input id="monthly_salary" name="monthly_salary" type="number" defaultValue={employee.monthly_salary || ''} disabled={!canWrite} />
+                <Label htmlFor="salary_type">Löneform<RequiredMark /></Label>
+                <Select value={salaryType} onValueChange={setSalaryType} disabled={!canWrite}>
+                  <SelectTrigger id="salary_type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">Månadslön</SelectItem>
+                    <SelectItem value="hourly">Timlön</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {salaryType === 'monthly' ? (
+                <div className="space-y-2">
+                  <Label htmlFor="monthly_salary">Månadslön (brutto, SEK)<RequiredMark /></Label>
+                  <Input id="monthly_salary" name="monthly_salary" type="number" step="1" min="1" defaultValue={employee.monthly_salary || ''} required disabled={!canWrite} />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="hourly_rate">Timlön (SEK)<RequiredMark /></Label>
+                  <Input id="hourly_rate" name="hourly_rate" type="number" step="0.01" min="0.01" defaultValue={employee.hourly_rate || ''} required disabled={!canWrite} />
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tax */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Skatt</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="f_skatt_status">Skatteform</Label>
+                <Select value={fSkattStatus} onValueChange={setFSkattStatus} disabled={!canWrite}>
+                  <SelectTrigger id="f_skatt_status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="a_skatt">A-skatt</SelectItem>
+                    <SelectItem value="f_skatt">F-skatt</SelectItem>
+                    <SelectItem value="fa_skatt">FA-skatt</SelectItem>
+                    <SelectItem value="not_verified">Ej verifierad</SelectItem>
+                  </SelectContent>
+                </Select>
+                {employee.f_skatt_verified_at && (
+                  <p className="text-xs text-muted-foreground">
+                    Verifierad: {new Date(employee.f_skatt_verified_at).toLocaleDateString('sv-SE')}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-end pb-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={isSidoinkomst}
+                    onChange={(e) => setIsSidoinkomst(e.target.checked)}
+                    disabled={!canWrite}
+                    className="rounded border-border"
+                  />
+                  Sidoinkomst (30% skatteavdrag)
+                </label>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="hourly_rate">Timlön</Label>
-                <Input id="hourly_rate" name="hourly_rate" type="number" step="0.01" defaultValue={employee.hourly_rate || ''} disabled={!canWrite} />
+                <Label htmlFor="tax_table_number">
+                  Skattetabell (29-42){requiresTaxTable && <RequiredMark />}
+                </Label>
+                <Input
+                  id="tax_table_number"
+                  name="tax_table_number"
+                  type="number"
+                  min="29"
+                  max="42"
+                  defaultValue={employee.tax_table_number || ''}
+                  required={requiresTaxTable}
+                  disabled={!canWrite}
+                />
+                <p className="text-xs text-muted-foreground">Baseras på folkbokföringskommun</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="tax_table_number">Skattetabell</Label>
-                <Input id="tax_table_number" name="tax_table_number" type="number" defaultValue={employee.tax_table_number || ''} disabled={!canWrite} />
+                <Label htmlFor="tax_column">Kolumn (1-6)</Label>
+                <Input id="tax_column" name="tax_column" type="number" defaultValue={employee.tax_column} min="1" max="6" disabled={!canWrite} />
+                <p className="text-xs text-muted-foreground">1 = standard under 66 år</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="tax_column">Kolumn</Label>
-                <Input id="tax_column" name="tax_column" type="number" defaultValue={employee.tax_column} disabled={!canWrite} />
+                <Label htmlFor="tax_municipality">
+                  Folkbokföringskommun{requiresTaxTable && <RequiredMark />}
+                </Label>
+                <Input
+                  id="tax_municipality"
+                  name="tax_municipality"
+                  defaultValue={employee.tax_municipality || ''}
+                  required={requiresTaxTable}
+                  disabled={!canWrite}
+                />
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Vacation */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Semester</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="email">E-post</Label>
-                <Input id="email" name="email" type="email" defaultValue={employee.email || ''} disabled={!canWrite} />
+                <Label htmlFor="vacation_rule">Semesterregel</Label>
+                <Select value={vacationRule} onValueChange={setVacationRule} disabled={!canWrite}>
+                  <SelectTrigger id="vacation_rule">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="procentregeln">Procentregeln (12%)</SelectItem>
+                    <SelectItem value="sammaloneregeln">Sammalöneregeln</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone">Telefon</Label>
-                <Input id="phone" name="phone" defaultValue={employee.phone || ''} disabled={!canWrite} />
+                <Label htmlFor="vacation_days_per_year">Semesterdagar per år</Label>
+                <Input
+                  id="vacation_days_per_year"
+                  name="vacation_days_per_year"
+                  type="number"
+                  min="25"
+                  max="40"
+                  defaultValue={employee.vacation_days_per_year}
+                  disabled={!canWrite}
+                />
+                <p className="text-xs text-muted-foreground">Lagstadgat minimum: 25 dagar</p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Bank */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Bankkonto</CardTitle>
+          </CardHeader>
+          <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="clearing_number">Clearingnummer</Label>
@@ -206,6 +412,7 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
                 <Input id="bank_account_number" name="bank_account_number" defaultValue={employee.bank_account_number || ''} disabled={!canWrite} />
               </div>
             </div>
+            <p className="text-xs text-muted-foreground mt-2">Krävs innan lönekörning kan godkännas</p>
           </CardContent>
         </Card>
 

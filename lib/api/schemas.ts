@@ -636,7 +636,8 @@ export const SalaryLineItemTypeSchema = z.enum([
   'correction', 'other',
 ])
 
-export const CreateEmployeeSchema = z.object({
+// Base employee object (no refinements — safe for .partial())
+const EmployeeSchemaBase = z.object({
   first_name: z.string().min(1).max(200),
   last_name: z.string().min(1).max(200),
   personnummer: z.string().regex(/^\d{12}$/, 'Personnummer måste vara 12 siffror (ÅÅÅÅMMDDNNNN)'),
@@ -667,7 +668,75 @@ export const CreateEmployeeSchema = z.object({
   vaxa_stod_end: isoDate.optional(),
 })
 
-export const UpdateEmployeeSchema = CreateEmployeeSchema.partial()
+export const CreateEmployeeSchema = EmployeeSchemaBase.superRefine((data, ctx) => {
+  // Salary amount required based on salary_type
+  if (data.salary_type === 'monthly' && (data.monthly_salary === undefined || data.monthly_salary === null || data.monthly_salary <= 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Månadslön krävs och måste vara större än 0 för månadslöneform',
+      path: ['monthly_salary'],
+    })
+  }
+  if (data.salary_type === 'hourly' && (data.hourly_rate === undefined || data.hourly_rate === null || data.hourly_rate <= 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Timlön krävs och måste vara större än 0 för timlöneform',
+      path: ['hourly_rate'],
+    })
+  }
+
+  // Tax table required for A-skatt employees (not sidoinkomst)
+  if (data.f_skatt_status === 'a_skatt' && !data.is_sidoinkomst && !data.tax_table_number) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Skattetabell krävs för A-skatt anställda (baseras på folkbokföringskommun)',
+      path: ['tax_table_number'],
+    })
+  }
+
+  // Tax municipality recommended when tax table is set
+  if (data.tax_table_number && !data.tax_municipality) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Folkbokföringskommun bör anges för att dokumentera skattetabellens underlag',
+      path: ['tax_municipality'],
+    })
+  }
+})
+
+export const UpdateEmployeeSchema = EmployeeSchemaBase.partial().superRefine((data, ctx) => {
+  // Only validate salary when salary_type is being changed in this update
+  if (data.salary_type === 'monthly' && data.monthly_salary !== undefined && data.monthly_salary <= 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Månadslön måste vara större än 0 för månadslöneform',
+      path: ['monthly_salary'],
+    })
+  }
+  if (data.salary_type === 'hourly' && data.hourly_rate !== undefined && data.hourly_rate <= 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Timlön måste vara större än 0 för timlöneform',
+      path: ['hourly_rate'],
+    })
+  }
+
+  // If setting salary_type, require the corresponding salary field
+  if (data.salary_type === 'monthly' && !('monthly_salary' in data)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Månadslön måste anges vid byte till månadslöneform',
+      path: ['monthly_salary'],
+    })
+  }
+  if (data.salary_type === 'hourly' && !('hourly_rate' in data)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Timlön måste anges vid byte till timlöneform',
+      path: ['hourly_rate'],
+    })
+  }
+})
 
 export const CreateSalaryRunSchema = z.object({
   period_year: z.number().int().min(2020).max(2100),

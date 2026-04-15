@@ -54,6 +54,30 @@ export async function POST(
     return NextResponse.json({ error: 'Inga anställda i lönekörningen' }, { status: 400 })
   }
 
+  // Pre-calculation validation — ensure employees have required data
+  const validationErrors: string[] = []
+  for (const sre of runEmployees) {
+    const emp = sre.employee
+    if (!emp) continue
+    const name = `${emp.first_name} ${emp.last_name}`
+
+    if (emp.salary_type === 'monthly' && (!emp.monthly_salary || emp.monthly_salary <= 0)) {
+      validationErrors.push(`${name}: Månadslön saknas eller är 0`)
+    }
+    if (emp.salary_type === 'hourly' && (!emp.hourly_rate || emp.hourly_rate <= 0)) {
+      validationErrors.push(`${name}: Timlön saknas eller är 0`)
+    }
+    if (emp.f_skatt_status === 'a_skatt' && !emp.is_sidoinkomst && !emp.tax_table_number) {
+      validationErrors.push(`${name}: Skattetabell saknas (krävs för A-skatt)`)
+    }
+  }
+  if (validationErrors.length > 0) {
+    return NextResponse.json({
+      error: 'Valideringsfel — korrigera anställda innan beräkning',
+      details: validationErrors,
+    }, { status: 400 })
+  }
+
   // Fetch tax table rates from Skatteverket API for all needed tables/columns
   const tableNumbers = [...new Set(runEmployees.filter(e => e.employee?.tax_table_number).map(e => e.employee.tax_table_number as number))]
   const columns = [...new Set(runEmployees.filter(e => e.employee?.tax_column).map(e => e.employee.tax_column as number))]

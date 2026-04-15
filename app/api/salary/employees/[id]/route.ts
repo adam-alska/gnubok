@@ -57,16 +57,33 @@ export async function PATCH(
   if (!validation.success) return validation.response
   const body = validation.data
 
-  // Check employee exists
+  // Load existing employee for merged validation
   const { data: existing, error: fetchError } = await supabase
     .from('employees')
-    .select('id')
+    .select('*')
     .eq('id', id)
     .eq('company_id', companyId)
     .single()
 
   if (fetchError || !existing) {
     return NextResponse.json({ error: 'Anställd hittades inte' }, { status: 404 })
+  }
+
+  // Merged validation: combine existing + updates to check full integrity
+  const merged = { ...existing, ...body }
+  const mergedErrors: string[] = []
+
+  if (merged.salary_type === 'monthly' && (!merged.monthly_salary || merged.monthly_salary <= 0)) {
+    mergedErrors.push('Månadslön krävs och måste vara större än 0 för månadslöneform')
+  }
+  if (merged.salary_type === 'hourly' && (!merged.hourly_rate || merged.hourly_rate <= 0)) {
+    mergedErrors.push('Timlön krävs och måste vara större än 0 för timlöneform')
+  }
+  if (merged.f_skatt_status === 'a_skatt' && !merged.is_sidoinkomst && !merged.tax_table_number) {
+    mergedErrors.push('Skattetabell krävs för A-skatt anställda')
+  }
+  if (mergedErrors.length > 0) {
+    return NextResponse.json({ error: mergedErrors.join('. ') }, { status: 400 })
   }
 
   // Build update object
