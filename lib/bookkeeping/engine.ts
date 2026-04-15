@@ -442,24 +442,29 @@ export async function reverseEntry(
   ]
 
   if (paymentSourceTypes.includes(original.source_type) && original.source_id) {
+    // The GL reversal is already handled above (line-by-line mirror of the original
+    // verifikation per BFL 5 kap 5§). Here we sync the business-level invoice state.
+    // Payment amounts come from the payments table, not from GL line inspection —
+    // this works identically for kontantmetod and faktureringsmetod.
+    const entryId = original.id
+
     if (original.source_type.startsWith('supplier_invoice')) {
-      // Recalculate from the original entry's debit to 2440 (AP)
-      const originalLines = (original.lines as JournalEntryLine[]) || []
-      const paymentAmount = originalLines.reduce((sum, line) => {
-        return line.account_number === '2440'
-          ? sum + (Number(line.debit_amount) || 0)
-          : sum
-      }, 0)
+      const { data: payment } = await supabase
+        .from('supplier_invoice_payments')
+        .select('amount')
+        .eq('journal_entry_id', entryId)
+        .single()
 
       const { data: supplierInvoice } = await supabase
         .from('supplier_invoices')
         .select('paid_amount, total_amount, due_date')
         .eq('id', original.source_id)
+        .eq('company_id', companyId)
         .single()
 
-      if (supplierInvoice) {
-        const newPaidAmount = Math.round((supplierInvoice.paid_amount - paymentAmount) * 100) / 100
-        const newRemaining = Math.round((supplierInvoice.total_amount - newPaidAmount) * 100) / 100
+      if (supplierInvoice && payment) {
+        const newPaidAmount = Math.round((supplierInvoice.paid_amount - payment.amount) * 100) / 100
+        const newRemaining = Math.round((supplierInvoice.total_amount - Math.max(0, newPaidAmount)) * 100) / 100
         let newStatus: string
         if (newPaidAmount > 0) {
           newStatus = 'partially_paid'
@@ -479,28 +484,42 @@ export async function reverseEntry(
             payment_journal_entry_id: null,
           })
           .eq('id', original.source_id)
+          .eq('company_id', companyId)
       }
     } else {
-      // Customer invoice: revert from paid — check due_date to determine correct status
-      const { data: customerInvoice } = await supabase
-        .from('invoices')
-        .select('due_date')
-        .eq('id', original.source_id)
+      const { data: payment } = await supabase
+        .from('invoice_payments')
+        .select('amount')
+        .eq('journal_entry_id', entryId)
         .single()
 
-      const revertStatus = customerInvoice?.due_date && new Date(customerInvoice.due_date) < new Date()
-        ? 'overdue'
-        : 'sent'
-
-      await supabase
+      const { data: customerInvoice } = await supabase
         .from('invoices')
-        .update({
-          status: revertStatus,
-          paid_at: null,
-          paid_amount: 0,
-        })
+        .select('paid_amount, due_date')
         .eq('id', original.source_id)
-        .eq('status', 'paid')
+        .eq('company_id', companyId)
+        .single()
+
+      if (customerInvoice) {
+        const paymentAmount = payment?.amount ?? customerInvoice.paid_amount
+        const newPaidAmount = Math.round((customerInvoice.paid_amount - paymentAmount) * 100) / 100
+        const revertStatus = newPaidAmount > 0
+          ? 'partially_paid'
+          : customerInvoice.due_date && new Date(customerInvoice.due_date) < new Date()
+            ? 'overdue'
+            : 'sent'
+
+        await supabase
+          .from('invoices')
+          .update({
+            status: revertStatus,
+            paid_at: null,
+            paid_amount: Math.max(0, newPaidAmount),
+          })
+          .eq('id', original.source_id)
+          .eq('company_id', companyId)
+          .eq('status', 'paid')
+      }
     }
   }
 
