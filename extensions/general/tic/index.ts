@@ -43,6 +43,88 @@ function bankAccountTypeLabel(type?: number): string {
   }
 }
 
+/**
+ * Translate any error from the TIC pipeline into a structured HTTP response.
+ *
+ * Status mapping:
+ *   - NOT_CONFIGURED       → 503 (proxy URL missing)
+ *   - RATE_LIMIT_EXCEEDED  → 429 (TIC quota hit)
+ *   - TIMEOUT              → 504 (TIC took longer than 15s)
+ *   - upstream 4xx         → 400 (TIC rejected the input — typically a malformed org number)
+ *   - upstream 5xx         → 502 (TIC outage)
+ *   - other / unknown      → 500
+ *
+ * Always logs the cleaned org number so we can correlate failures with input
+ * in Vercel logs.
+ */
+function handleTicError(
+  error: unknown,
+  log: { error: (msg: string, meta?: unknown) => void } | Console,
+  route: 'lookup' | 'profile',
+  orgNumber: string,
+  fallbackMessage: string
+): Response {
+  if (error instanceof TICAPIError) {
+    const meta = {
+      route,
+      orgNumber,
+      message: error.message,
+      statusCode: error.statusCode,
+      code: error.code,
+    }
+
+    if (error.code === 'NOT_CONFIGURED') {
+      log.error(`[tic] ${route}: not configured`, meta)
+      return NextResponse.json({ error: 'TIC is not configured' }, { status: 503 })
+    }
+
+    if (error.code === 'RATE_LIMIT_EXCEEDED') {
+      log.error(`[tic] ${route}: rate limit exceeded`, meta)
+      return NextResponse.json({ error: 'Rate limit exceeded, try again later' }, { status: 429 })
+    }
+
+    if (error.code === 'TIMEOUT') {
+      log.error(`[tic] ${route}: upstream timeout`, meta)
+      return NextResponse.json(
+        { error: 'TIC service did not respond in time' },
+        { status: 504 }
+      )
+    }
+
+    // Upstream returned a non-OK status we surfaced as a TICAPIError
+    if (typeof error.statusCode === 'number') {
+      if (error.statusCode >= 400 && error.statusCode < 500) {
+        log.error(`[tic] ${route}: upstream rejected request`, meta)
+        return NextResponse.json(
+          { error: 'Invalid request to TIC (upstream rejected)' },
+          { status: 400 }
+        )
+      }
+      if (error.statusCode >= 500) {
+        log.error(`[tic] ${route}: upstream error`, meta)
+        return NextResponse.json(
+          { error: 'TIC service is temporarily unavailable' },
+          { status: 502 }
+        )
+      }
+    }
+
+    // Network/DNS/parse failure surfaced as a TICAPIError without code or statusCode
+    log.error(`[tic] ${route}: upstream failure`, meta)
+    return NextResponse.json(
+      { error: 'TIC service is temporarily unavailable' },
+      { status: 502 }
+    )
+  }
+
+  log.error(`[tic] ${route}: unexpected error`, {
+    route,
+    orgNumber,
+    error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error),
+  })
+  return NextResponse.json({ error: fallbackMessage }, { status: 500 })
+}
+
 export const ticExtension: Extension = {
   id: 'tic',
   name: 'Bolagsuppgifter',
@@ -64,6 +146,8 @@ export const ticExtension: Extension = {
             { status: 400 }
           )
         }
+
+        const cleanedOrgNumber = orgNumber.replace(/[\s-]/g, '')
 
         try {
           // Phase 1: Search — returns name, address, registration flags
@@ -137,10 +221,10 @@ export const ticExtension: Extension = {
 
           // Log Phase 2 failures for debugging
           if (bankResult.status === 'rejected') {
-            log.warn('[tic] bank accounts fetch failed', { reason: String(bankResult.reason) })
+            log.warn('[tic] bank accounts fetch failed', { orgNumber: cleanedOrgNumber, companyId, reason: String(bankResult.reason) })
           }
           if (sniResult.status === 'rejected') {
-            log.warn('[tic] SNI codes fetch failed', { reason: String(sniResult.reason) })
+            log.warn('[tic] SNI codes fetch failed', { orgNumber: cleanedOrgNumber, companyId, reason: String(sniResult.reason) })
           }
 
           const result: CompanyLookupResult = {
@@ -156,33 +240,7 @@ export const ticExtension: Extension = {
 
           return NextResponse.json({ data: result })
         } catch (error) {
-          if (error instanceof TICAPIError) {
-            log.error('[tic] lookup failed', {
-              message: error.message,
-              statusCode: error.statusCode,
-              code: error.code,
-            })
-
-            if (error.code === 'NOT_CONFIGURED') {
-              return NextResponse.json(
-                { error: 'TIC is not configured' },
-                { status: 503 }
-              )
-            }
-
-            if (error.code === 'RATE_LIMIT_EXCEEDED') {
-              return NextResponse.json(
-                { error: 'Rate limit exceeded, try again later' },
-                { status: 429 }
-              )
-            }
-          }
-
-          log.error('[tic] unexpected error', { error: String(error) })
-          return NextResponse.json(
-            { error: 'Failed to look up company' },
-            { status: 500 }
-          )
+          return handleTicError(error, log, 'lookup', cleanedOrgNumber, 'Failed to look up company')
         }
       },
     },
@@ -200,6 +258,8 @@ export const ticExtension: Extension = {
             { status: 400 }
           )
         }
+
+        const cleanedOrgNumber = orgNumber.replace(/[\s-]/g, '')
 
         try {
           const doc = await searchCompanyByOrgNumber(orgNumber)
@@ -267,13 +327,13 @@ export const ticExtension: Extension = {
 
           // Log Phase 2 failures
           if (bankResult.status === 'rejected') {
-            log.warn('[tic] profile: bank accounts fetch failed', { reason: String(bankResult.reason) })
+            log.warn('[tic] profile: bank accounts fetch failed', { orgNumber: cleanedOrgNumber, companyId, reason: String(bankResult.reason) })
           }
           if (sniResult.status === 'rejected') {
-            log.warn('[tic] profile: SNI codes fetch failed', { reason: String(sniResult.reason) })
+            log.warn('[tic] profile: SNI codes fetch failed', { orgNumber: cleanedOrgNumber, companyId, reason: String(sniResult.reason) })
           }
           if (reportsResult.status === 'rejected') {
-            log.warn('[tic] profile: financial reports fetch failed', { reason: String(reportsResult.reason) })
+            log.warn('[tic] profile: financial reports fetch failed', { orgNumber: cleanedOrgNumber, companyId, reason: String(reportsResult.reason) })
           }
 
           const fin = doc.mostRecentFinancialSummary
@@ -329,33 +389,7 @@ export const ticExtension: Extension = {
 
           return NextResponse.json({ data: profile })
         } catch (error) {
-          if (error instanceof TICAPIError) {
-            log.error('[tic] profile failed', {
-              message: error.message,
-              statusCode: error.statusCode,
-              code: error.code,
-            })
-
-            if (error.code === 'NOT_CONFIGURED') {
-              return NextResponse.json(
-                { error: 'TIC is not configured' },
-                { status: 503 }
-              )
-            }
-
-            if (error.code === 'RATE_LIMIT_EXCEEDED') {
-              return NextResponse.json(
-                { error: 'Rate limit exceeded, try again later' },
-                { status: 429 }
-              )
-            }
-          }
-
-          log.error('[tic] profile unexpected error', { error: String(error) })
-          return NextResponse.json(
-            { error: 'Failed to fetch company profile' },
-            { status: 500 }
-          )
+          return handleTicError(error, log, 'profile', cleanedOrgNumber, 'Failed to fetch company profile')
         }
       },
     },
