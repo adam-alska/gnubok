@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 
 export interface SupplierLedgerEntry {
   supplier_id: string
@@ -30,13 +31,18 @@ export async function generateSupplierLedger(
   const refDate = asOfDate ? new Date(asOfDate) : new Date()
 
   // Fetch all unpaid/partially_paid supplier invoices
-  const { data: invoices, error } = await supabase
-    .from('supplier_invoices')
-    .select('*, supplier:suppliers(id, name)')
-    .eq('company_id', companyId)
-    .in('status', ['registered', 'approved', 'partially_paid', 'overdue'])
-
-  if (error || !invoices) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let invoices: any[]
+  try {
+    invoices = await fetchAllRows(({ from, to }) =>
+      supabase
+        .from('supplier_invoices')
+        .select('*, supplier:suppliers(id, name)')
+        .eq('company_id', companyId)
+        .in('status', ['registered', 'approved', 'partially_paid', 'overdue'])
+        .range(from, to)
+    )
+  } catch {
     return {
       entries: [],
       total_outstanding: 0,

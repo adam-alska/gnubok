@@ -7,6 +7,7 @@ import { findSupplierInvoiceMatch } from '@/lib/invoices/supplier-invoice-matchi
 import { tryReconcileTransaction, fetchUnlinkedGLLines } from '@/lib/reconciliation/bank-reconciliation'
 import { fetchMultipleRates } from '@/lib/currency/riksbanken'
 import { logMatchEvent } from '@/lib/invoices/match-log'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import type { UnlinkedGLLine } from '@/lib/reconciliation/bank-reconciliation'
 import type { Transaction, RawTransaction, IngestResult, IngestOptions, SupplierInvoice, Currency, ExchangeRate } from '@/types'
 
@@ -135,14 +136,15 @@ export async function ingestTransactions(
 
   // Pre-fetch unpaid supplier invoices for expense matching (non-critical)
   try {
-    const { data } = await supabase
-      .from('supplier_invoices')
-      .select('*, supplier:suppliers(*)')
-      .eq('company_id', companyId)
-      .in('status', ['registered', 'approved'])
-      .gt('remaining_amount', 0)
-
-    if (data) unpaidSupplierInvoices = data as SupplierInvoice[]
+    unpaidSupplierInvoices = await fetchAllRows<SupplierInvoice>(({ from, to }) =>
+      supabase
+        .from('supplier_invoices')
+        .select('*, supplier:suppliers(*)')
+        .eq('company_id', companyId)
+        .in('status', ['registered', 'approved'])
+        .gt('remaining_amount', 0)
+        .range(from, to)
+    )
   } catch {
     // Non-critical — supplier invoice matching will be skipped
   }
