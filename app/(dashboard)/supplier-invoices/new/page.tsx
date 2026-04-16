@@ -128,7 +128,8 @@ export default function NewSupplierInvoicePage() {
         }
       }
     }
-  }, [watchedSupplierId, suppliers])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedSupplierId, suppliers, watch, setValue, fields.length])
 
   async function fetchSuppliers() {
     const res = await fetch('/api/suppliers')
@@ -421,11 +422,18 @@ export default function NewSupplierInvoicePage() {
                         />
                       </td>
                       <td className="py-2 pr-2">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="0,00"
-                          {...register(`items.${index}.amount`, { valueAsNumber: true })}
+                        <Controller
+                          name={`items.${index}.amount`}
+                          control={control}
+                          render={({ field }) => (
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="0,00"
+                              value={field.value || ''}
+                              onChange={(e) => field.onChange(e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
+                            />
+                          )}
                         />
                       </td>
                       <td className="py-2 pr-2">
@@ -507,11 +515,18 @@ export default function NewSupplierInvoicePage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-xs text-muted-foreground">Belopp (exkl.)</label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="0,00"
-                        {...register(`items.${index}.amount`, { valueAsNumber: true })}
+                      <Controller
+                        name={`items.${index}.amount`}
+                        control={control}
+                        render={({ field }) => (
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0,00"
+                            value={field.value || ''}
+                            onChange={(e) => field.onChange(e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
+                          />
+                        )}
                       />
                     </div>
                     <div className="space-y-1">

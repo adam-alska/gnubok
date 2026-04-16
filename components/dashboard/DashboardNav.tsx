@@ -71,8 +71,6 @@ const navItems: NavItem[] = [
   // Temporarily hidden pending module rework (see feedback #49)
   { href: '/suppliers', label: 'Leverantörer', icon: Building2, group: 'inköp', hidden: true },
   { href: '/supplier-invoices', label: 'Leverantörsfakturor', icon: FileInput, group: 'inköp', hidden: true },
-  // Personal
-  { href: '/salary', label: 'Löner', icon: HandCoins, group: 'redovisning', modes: ['aktiebolag'] },
   // General accounting
   { href: '/pending', label: 'Granskning', icon: ClipboardCheck, group: 'redovisning' },
   { href: '/transactions', label: 'Transaktioner', icon: ArrowLeftRight, group: 'redovisning' },

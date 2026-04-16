@@ -3,7 +3,7 @@
   "sector": "general",
   "exportName": "invoiceInboxExtension",
   "entryPoint": "@/extensions/general/invoice-inbox",
-  "workspace": null,
+  "workspace": "@/components/extensions/general/InvoiceInboxWorkspace",
   "requiredEnvVars": ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION"],
   "optionalEnvVars": ["BEDROCK_MODEL_ID", "BEDROCK_MAX_TOKENS", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GMAIL_TOKEN_ENCRYPTION_KEY"],
   "npmDependencies": ["@aws-sdk/client-bedrock-runtime"],
