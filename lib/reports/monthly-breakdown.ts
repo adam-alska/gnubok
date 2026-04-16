@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 
 export interface MonthlyBreakdownMonth {
   label: string
@@ -42,24 +43,29 @@ export async function generateMonthlyBreakdown(
   }
 
   // Get all posted journal entry lines for this period with their entry dates
-  const { data: lines, error: linesError } = await supabase
-    .from('journal_entry_lines')
-    .select(`
-      account_number,
-      debit_amount,
-      credit_amount,
-      journal_entry:journal_entries!inner(
-        entry_date,
-        status,
-        company_id,
-        fiscal_period_id
-      )
-    `)
-    .eq('journal_entries.fiscal_period_id', fiscalPeriodId)
-    .eq('journal_entries.company_id', companyId)
-    .eq('journal_entries.status', 'posted')
-
-  if (linesError || !lines) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let lines: any[]
+  try {
+    lines = await fetchAllRows(({ from, to }) =>
+      supabase
+        .from('journal_entry_lines')
+        .select(`
+          account_number,
+          debit_amount,
+          credit_amount,
+          journal_entry:journal_entries!inner(
+            entry_date,
+            status,
+            company_id,
+            fiscal_period_id
+          )
+        `)
+        .eq('journal_entries.fiscal_period_id', fiscalPeriodId)
+        .eq('journal_entries.company_id', companyId)
+        .eq('journal_entries.status', 'posted')
+        .range(from, to)
+    )
+  } catch {
     return { months: [] }
   }
 
@@ -81,7 +87,7 @@ export async function generateMonthlyBreakdown(
   }
 
   for (const line of lines) {
-    const entry = line.journal_entry as unknown as {
+    const entry = line.journal_entry as {
       entry_date: string
       status: string
       company_id: string

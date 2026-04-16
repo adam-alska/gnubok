@@ -8,6 +8,7 @@ import { generateGeneralLedger } from './general-ledger'
 import { generateJournalRegister } from './journal-register'
 import { calculateVatDeclaration } from './vat-declaration'
 import { getAuditLog } from '@/lib/core/audit/audit-service'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import type { AuditLogEntry } from '@/types'
 
 export interface FullArchiveOptions {
@@ -117,22 +118,35 @@ export async function generateFullArchive(
     const manifest: DocumentManifestEntry[] = []
 
     // Fetch document attachments linked to journal entries in this period
-    const { data: documents } = await supabase
-      .from('document_attachments')
-      .select('id, file_name, storage_path, journal_entry_id, sha256_hash, version, digitization_date, upload_source, mime_type, file_size_bytes')
-      .eq('company_id', companyId)
-      .not('journal_entry_id', 'is', null)
-
-    if (documents && documents.length > 0) {
-      // Filter to entries in this period
-      const { data: periodEntryIds } = await supabase
-        .from('journal_entries')
-        .select('id')
+    // Wrapped in try/catch to match VAT section — a failed document fetch
+    // should not prevent the rest of the archive from being generated.
+    try {
+    const documents = await fetchAllRows<{
+      id: string; file_name: string; storage_path: string; journal_entry_id: string | null
+      sha256_hash: string; version: number; digitization_date: string | null
+      upload_source: string | null; mime_type: string | null; file_size_bytes: number | null
+    }>(({ from, to }) =>
+      supabase
+        .from('document_attachments')
+        .select('id, file_name, storage_path, journal_entry_id, sha256_hash, version, digitization_date, upload_source, mime_type, file_size_bytes')
         .eq('company_id', companyId)
-        .eq('fiscal_period_id', period_id)
-        .in('status', ['posted', 'reversed'])
+        .not('journal_entry_id', 'is', null)
+        .range(from, to)
+    )
 
-      const periodEntryIdSet = new Set((periodEntryIds || []).map((e: { id: string }) => e.id))
+    if (documents.length > 0) {
+      // Filter to entries in this period
+      const periodEntryIds = await fetchAllRows<{ id: string }>(({ from, to }) =>
+        supabase
+          .from('journal_entries')
+          .select('id')
+          .eq('company_id', companyId)
+          .eq('fiscal_period_id', period_id)
+          .in('status', ['posted', 'reversed'])
+          .range(from, to)
+      )
+
+      const periodEntryIdSet = new Set(periodEntryIds.map((e) => e.id))
       const periodDocuments = documents.filter(
         (d: { journal_entry_id: string | null }) => d.journal_entry_id && periodEntryIdSet.has(d.journal_entry_id)
       )
@@ -181,6 +195,9 @@ export async function generateFullArchive(
           })
         }
       }
+    }
+    } catch {
+      // Document fetch failed — archive will still contain reports and audit trail
     }
 
     dokument.file('manifest.json', JSON.stringify(manifest, null, 2))
