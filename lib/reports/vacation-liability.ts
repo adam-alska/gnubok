@@ -80,6 +80,12 @@ export async function generateVacationLiability(
       .range(from, to)
   )
 
+  // Client-side safety check: ensure server-side !inner filter was applied
+  const verifiedBookedForYear = bookedForYear.filter(sre => {
+    const run = sre.salary_run as unknown as { period_year: number; status: string } | null
+    return run && run.period_year === year && run.status === 'booked'
+  })
+
   // Aggregate per employee
   const accrualsByEmployee = new Map<string, {
     totalAccrual: number
@@ -88,7 +94,7 @@ export async function generateVacationLiability(
     lastRate: number
   }>()
 
-  for (const sre of bookedForYear) {
+  for (const sre of verifiedBookedForYear) {
     const current = accrualsByEmployee.get(sre.employee_id) || {
       totalAccrual: 0, totalAvgifter: 0, totalDaysTaken: 0, lastRate: 0.3142,
     }

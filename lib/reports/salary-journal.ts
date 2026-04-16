@@ -79,7 +79,8 @@ export async function generateSalaryJournal(
   const rows: SalaryJournalRow[] = data
     .filter(sre => {
       const run = sre.salary_run as { period_year: number; period_month: number; status: string } | null
-      if (!run) return false
+      if (!run || run.period_year !== year) return false
+      if (run.status !== 'booked') return false
       if (monthFrom && run.period_month < monthFrom) return false
       if (monthTo && run.period_month > monthTo) return false
       return true

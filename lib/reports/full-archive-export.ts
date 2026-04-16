@@ -118,6 +118,9 @@ export async function generateFullArchive(
     const manifest: DocumentManifestEntry[] = []
 
     // Fetch document attachments linked to journal entries in this period
+    // Wrapped in try/catch to match VAT section — a failed document fetch
+    // should not prevent the rest of the archive from being generated.
+    try {
     const documents = await fetchAllRows<{
       id: string; file_name: string; storage_path: string; journal_entry_id: string | null
       sha256_hash: string; version: number; digitization_date: string | null
@@ -192,6 +195,9 @@ export async function generateFullArchive(
           })
         }
       }
+    }
+    } catch {
+      // Document fetch failed — archive will still contain reports and audit trail
     }
 
     dokument.file('manifest.json', JSON.stringify(manifest, null, 2))
