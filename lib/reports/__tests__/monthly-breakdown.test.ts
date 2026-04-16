@@ -54,11 +54,13 @@ describe('generateMonthlyBreakdown', () => {
         select: () => ({
           eq: () => ({
             eq: () => ({
-              eq: () =>
-                Promise.resolve({
-                  data: [],
-                  error: null,
-                }),
+              eq: () => ({
+                range: () =>
+                  Promise.resolve({
+                    data: [],
+                    error: null,
+                  }),
+              }),
             }),
           }),
         }),
@@ -96,36 +98,38 @@ describe('generateMonthlyBreakdown', () => {
         select: () => ({
           eq: () => ({
             eq: () => ({
-              eq: () =>
-                Promise.resolve({
-                  data: [
-                    {
-                      account_number: '3001',
-                      debit_amount: 0,
-                      credit_amount: 10000,
-                      journal_entry: { entry_date: '2024-01-15', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
-                    },
-                    {
-                      account_number: '5010',
-                      debit_amount: 3000,
-                      credit_amount: 0,
-                      journal_entry: { entry_date: '2024-01-20', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
-                    },
-                    {
-                      account_number: '3001',
-                      debit_amount: 0,
-                      credit_amount: 5000,
-                      journal_entry: { entry_date: '2024-02-10', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
-                    },
-                    {
-                      account_number: '6200',
-                      debit_amount: 1500,
-                      credit_amount: 0,
-                      journal_entry: { entry_date: '2024-02-15', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
-                    },
-                  ],
-                  error: null,
-                }),
+              eq: () => ({
+                range: () =>
+                  Promise.resolve({
+                    data: [
+                      {
+                        account_number: '3001',
+                        debit_amount: 0,
+                        credit_amount: 10000,
+                        journal_entry: { entry_date: '2024-01-15', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
+                      },
+                      {
+                        account_number: '5010',
+                        debit_amount: 3000,
+                        credit_amount: 0,
+                        journal_entry: { entry_date: '2024-01-20', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
+                      },
+                      {
+                        account_number: '3001',
+                        debit_amount: 0,
+                        credit_amount: 5000,
+                        journal_entry: { entry_date: '2024-02-10', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
+                      },
+                      {
+                        account_number: '6200',
+                        debit_amount: 1500,
+                        credit_amount: 0,
+                        journal_entry: { entry_date: '2024-02-15', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
+                      },
+                    ],
+                    error: null,
+                  }),
+              }),
             }),
           }),
         }),
@@ -175,36 +179,38 @@ describe('generateMonthlyBreakdown', () => {
         select: () => ({
           eq: () => ({
             eq: () => ({
-              eq: () =>
-                Promise.resolve({
-                  data: [
-                    {
-                      account_number: '1930',
-                      debit_amount: 10000,
-                      credit_amount: 0,
-                      journal_entry: { entry_date: '2024-01-15', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
-                    },
-                    {
-                      account_number: '2611',
-                      debit_amount: 0,
-                      credit_amount: 2500,
-                      journal_entry: { entry_date: '2024-01-15', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
-                    },
-                    {
-                      account_number: '8400',
-                      debit_amount: 500,
-                      credit_amount: 0,
-                      journal_entry: { entry_date: '2024-01-20', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
-                    },
-                    {
-                      account_number: '8300',
-                      debit_amount: 0,
-                      credit_amount: 200,
-                      journal_entry: { entry_date: '2024-01-25', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
-                    },
-                  ],
-                  error: null,
-                }),
+              eq: () => ({
+                range: () =>
+                  Promise.resolve({
+                    data: [
+                      {
+                        account_number: '1930',
+                        debit_amount: 10000,
+                        credit_amount: 0,
+                        journal_entry: { entry_date: '2024-01-15', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
+                      },
+                      {
+                        account_number: '2611',
+                        debit_amount: 0,
+                        credit_amount: 2500,
+                        journal_entry: { entry_date: '2024-01-15', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
+                      },
+                      {
+                        account_number: '8400',
+                        debit_amount: 500,
+                        credit_amount: 0,
+                        journal_entry: { entry_date: '2024-01-20', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
+                      },
+                      {
+                        account_number: '8300',
+                        debit_amount: 0,
+                        credit_amount: 200,
+                        journal_entry: { entry_date: '2024-01-25', status: 'posted', user_id: 'user-1', fiscal_period_id: 'period-1' },
+                      },
+                    ],
+                    error: null,
+                  }),
+              }),
             }),
           }),
         }),

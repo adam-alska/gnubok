@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 
 /**
  * Semesterlöneskuld — Vacation liability report per BFNAR 2016:10.
@@ -50,32 +51,37 @@ export async function generateVacationLiability(
   const r = (x: number) => Math.round(x * 100) / 100
 
   // Load active employees
-  const { data: employees, error: empError } = await supabase
-    .from('employees')
-    .select('id, first_name, last_name, personnummer_last4, vacation_rule, vacation_days_per_year, vacation_days_saved')
-    .eq('company_id', companyId)
-    .eq('is_active', true)
-    .order('last_name')
+  const employees = await fetchAllRows(({ from, to }) =>
+    supabase
+      .from('employees')
+      .select('id, first_name, last_name, personnummer_last4, vacation_rule, vacation_days_per_year, vacation_days_saved')
+      .eq('company_id', companyId)
+      .eq('is_active', true)
+      .order('last_name')
+      .range(from, to)
+  )
 
-  if (empError) throw new Error(`Failed to load employees: ${empError.message}`)
+  // Load salary run employees for booked runs this year (server-side filtered via !inner join)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const bookedForYear: any[] = await fetchAllRows(({ from, to }) =>
+    supabase
+      .from('salary_run_employees')
+      .select(`
+        employee_id,
+        vacation_accrual,
+        vacation_accrual_avgifter,
+        avgifter_rate,
+        vacation_days_taken,
+        salary_run:salary_runs!inner(period_year, status)
+      `)
+      .eq('company_id', companyId)
+      .eq('salary_runs.period_year', year)
+      .eq('salary_runs.status', 'booked')
+      .range(from, to)
+  )
 
-  // Load all salary run employees for booked runs this year
-  const { data: runEmployees, error: sreError } = await supabase
-    .from('salary_run_employees')
-    .select(`
-      employee_id,
-      vacation_accrual,
-      vacation_accrual_avgifter,
-      avgifter_rate,
-      vacation_days_taken,
-      salary_run:salary_runs!inner(period_year, status)
-    `)
-    .eq('company_id', companyId)
-
-  if (sreError) throw new Error(`Failed to load salary run data: ${sreError.message}`)
-
-  // Filter to booked runs for the year
-  const bookedForYear = (runEmployees || []).filter(sre => {
+  // Client-side safety check: ensure server-side !inner filter was applied
+  const verifiedBookedForYear = bookedForYear.filter(sre => {
     const run = sre.salary_run as unknown as { period_year: number; status: string } | null
     return run && run.period_year === year && run.status === 'booked'
   })
@@ -88,7 +94,7 @@ export async function generateVacationLiability(
     lastRate: number
   }>()
 
-  for (const sre of bookedForYear) {
+  for (const sre of verifiedBookedForYear) {
     const current = accrualsByEmployee.get(sre.employee_id) || {
       totalAccrual: 0, totalAvgifter: 0, totalDaysTaken: 0, lastRate: 0.3142,
     }
@@ -99,7 +105,7 @@ export async function generateVacationLiability(
     accrualsByEmployee.set(sre.employee_id, current)
   }
 
-  const rows: VacationLiabilityRow[] = (employees || []).map(emp => {
+  const rows: VacationLiabilityRow[] = employees.map(emp => {
     const accruals = accrualsByEmployee.get(emp.id)
     const accruedAmount = r(accruals?.totalAccrual || 0)
     const accruedAvgifter = r(accruals?.totalAvgifter || 0)

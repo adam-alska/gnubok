@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 
 /**
  * Lönejournal — Monthly/annual per-employee salary register.
@@ -57,29 +58,29 @@ export async function generateSalaryJournal(
   monthFrom?: number,
   monthTo?: number
 ): Promise<SalaryJournalReport> {
-  const query = supabase
-    .from('salary_run_employees')
-    .select(`
-      *,
-      employee:employees(id, first_name, last_name, personnummer_last4, employment_type),
-      salary_run:salary_runs(period_year, period_month, payment_date, status)
-    `)
-    .eq('company_id', companyId)
+  // Use !inner join to filter server-side by year and status, avoiding
+  // fetching all salary_run_employees across all years.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data: any[] = await fetchAllRows(({ from, to }) =>
+    supabase
+      .from('salary_run_employees')
+      .select(`
+        *,
+        employee:employees(id, first_name, last_name, personnummer_last4, employment_type),
+        salary_run:salary_runs!inner(period_year, period_month, payment_date, status)
+      `)
+      .eq('company_id', companyId)
+      .eq('salary_runs.period_year', year)
+      .eq('salary_runs.status', 'booked')
+      .order('created_at')
+      .range(from, to)
+  )
 
-  // We need to filter by the salary_run's period_year, which requires a join filter
-  // Supabase doesn't support filtering on joined columns directly in .eq(),
-  // so we fetch all and filter client-side for the year
-  const { data, error } = await query.order('created_at')
-
-  if (error) {
-    throw new Error(`Failed to generate salary journal: ${error.message}`)
-  }
-
-  const rows: SalaryJournalRow[] = (data || [])
+  const rows: SalaryJournalRow[] = data
     .filter(sre => {
       const run = sre.salary_run as { period_year: number; period_month: number; status: string } | null
       if (!run || run.period_year !== year) return false
-      if (run.status !== 'booked') return false // Only booked runs for BFL-compliant lönejournal
+      if (run.status !== 'booked') return false
       if (monthFrom && run.period_month < monthFrom) return false
       if (monthTo && run.period_month > monthTo) return false
       return true

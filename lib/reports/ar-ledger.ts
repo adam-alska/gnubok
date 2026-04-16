@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 
 export interface ARInvoiceDetail {
   invoice_id: string
@@ -44,13 +45,18 @@ export async function generateARLedger(
   const refDate = asOfDate ? new Date(asOfDate) : new Date()
 
   // Fetch all unpaid/sent/overdue invoices with customer info
-  const { data: invoices, error } = await supabase
-    .from('invoices')
-    .select('*, customer:customers(id, name)')
-    .eq('company_id', companyId)
-    .in('status', ['sent', 'overdue'])
-
-  if (error || !invoices) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let invoices: any[]
+  try {
+    invoices = await fetchAllRows(({ from, to }) =>
+      supabase
+        .from('invoices')
+        .select('*, customer:customers(id, name)')
+        .eq('company_id', companyId)
+        .in('status', ['sent', 'overdue'])
+        .range(from, to)
+    )
+  } catch {
     return {
       entries: [],
       total_outstanding: 0,
