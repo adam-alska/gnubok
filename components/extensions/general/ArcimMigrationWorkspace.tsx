@@ -205,7 +205,8 @@ function ProviderStep({
 }) {
   const activeConsents = connectionStatus?.consents.filter(c => c.status === 1) ?? []
   const hasSieImport = (connectionStatus?.sieImports.filter(i => i.status === 'completed').length ?? 0) > 0
-  const showSieRequiredBanner = !isLoadingStatus && !hasSieImport
+  const allFortnox = activeConsents.length > 0 && activeConsents.every(c => c.provider === 'fortnox')
+  const showSieRequiredBanner = !isLoadingStatus && !hasSieImport && !allFortnox
 
   return (
     <div className="space-y-4">
