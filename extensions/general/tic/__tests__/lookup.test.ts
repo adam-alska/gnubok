@@ -17,6 +17,7 @@ import {
   getEmails,
   getPhones,
 } from '../lib/tic-client'
+import { TICAPIError } from '../lib/tic-types'
 import type { TICCompanyDocument } from '../lib/tic-types'
 
 const mockSearch = vi.mocked(searchCompanyByOrgNumber)
@@ -141,5 +142,51 @@ describe('TIC lookup route', () => {
     const res = await lookupHandler(makeRequest('556036-0793'))
     const { data } = await res.json()
     expect(data.isCeased).toBe(true)
+  })
+
+  it('returns 503 when TIC is not configured', async () => {
+    mockSearch.mockRejectedValue(
+      new TICAPIError('TIC_API_PROXY_URL is not configured', undefined, 'NOT_CONFIGURED')
+    )
+    const res = await lookupHandler(makeRequest('556036-0793'))
+    expect(res.status).toBe(503)
+  })
+
+  it('returns 429 when TIC rate-limits us', async () => {
+    mockSearch.mockRejectedValue(
+      new TICAPIError('Rate limit exceeded', 429, 'RATE_LIMIT_EXCEEDED')
+    )
+    const res = await lookupHandler(makeRequest('556036-0793'))
+    expect(res.status).toBe(429)
+  })
+
+  it('returns 504 when TIC times out', async () => {
+    mockSearch.mockRejectedValue(new TICAPIError('Request timeout', undefined, 'TIMEOUT'))
+    const res = await lookupHandler(makeRequest('556036-0793'))
+    expect(res.status).toBe(504)
+  })
+
+  it('returns 400 when upstream rejects the org number (4xx)', async () => {
+    mockSearch.mockRejectedValue(new TICAPIError('TIC API error: Bad Request', 400))
+    const res = await lookupHandler(makeRequest('1234567-1234'))
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 502 when upstream returns 5xx', async () => {
+    mockSearch.mockRejectedValue(new TICAPIError('TIC API error: Bad Gateway', 502))
+    const res = await lookupHandler(makeRequest('556036-0793'))
+    expect(res.status).toBe(502)
+  })
+
+  it('returns 502 when fetch fails (network error)', async () => {
+    mockSearch.mockRejectedValue(new TICAPIError('Failed to fetch from TIC: ECONNRESET'))
+    const res = await lookupHandler(makeRequest('556036-0793'))
+    expect(res.status).toBe(502)
+  })
+
+  it('returns 500 for non-TICAPIError unexpected errors', async () => {
+    mockSearch.mockRejectedValue(new Error('boom'))
+    const res = await lookupHandler(makeRequest('556036-0793'))
+    expect(res.status).toBe(500)
   })
 })

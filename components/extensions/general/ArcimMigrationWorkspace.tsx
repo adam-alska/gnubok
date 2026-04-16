@@ -204,9 +204,33 @@ function ProviderStep({
   isLoadingStatus: boolean
 }) {
   const activeConsents = connectionStatus?.consents.filter(c => c.status === 1) ?? []
+  const hasSieImport = (connectionStatus?.sieImports.filter(i => i.status === 'completed').length ?? 0) > 0
+  const allFortnox = activeConsents.length > 0 && activeConsents.every(c => c.provider === 'fortnox')
+  const showSieRequiredBanner = !isLoadingStatus && !hasSieImport && !allFortnox
 
   return (
     <div className="space-y-4">
+      {/* SIE-required banner (not relevant for Fortnox — it fetches SIE itself) */}
+      {showSieRequiredBanner && (
+        <div className="flex gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-500" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">SIE-import krävs först</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Bokio, Visma, Björn Lundén och Briox hämtar endast kunder, leverantörer och fakturor via API:et. Bokföringsdata (kontoplan, verifikationer och balanser) måste importeras via SIE-fil först. Gäller inte Fortnox — där hämtar vi SIE direkt via API:et.
+            </p>
+            <Link
+              href="/import?mode=sie"
+              className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'mt-3')}
+            >
+              <BookOpen className="mr-2 h-4 w-4" />
+              Ladda upp SIE-fil
+              <ExternalLink className="ml-2 h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Existing connections */}
       {activeConsents.length > 0 && (
         <Card>
