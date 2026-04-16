@@ -5,7 +5,9 @@ import { uploadDocument } from '@/lib/core/documents/document-service'
 import { classifyDocument } from './lib/classify-document'
 import { encryptState, decryptState, encryptToken, decryptToken } from './lib/gmail-helpers'
 import { scanGmailConnection } from './lib/gmail-scanner'
-import type { InvoiceExtractionResult } from '@/types'
+import { createSupplierInvoiceRegistrationEntry } from '@/lib/bookkeeping/supplier-invoice-entries'
+import { CreateSupplierInvoiceSchema } from '@/lib/api/schemas'
+import type { InvoiceExtractionResult, InvoiceInboxItem, SupplierInvoice, SupplierInvoiceItem } from '@/types'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // Match MAX_DOCUMENT_SIZE from document-service
 
@@ -28,7 +30,8 @@ async function uploadAndClassify(
   companyId: string,
   file: { name: string; buffer: ArrayBuffer; type: string },
   source: 'upload' | 'email',
-  emailMeta?: { from?: string | null; subject?: string | null; receivedAt?: string | null; messageId?: string }
+  emailMeta?: { from?: string | null; subject?: string | null; receivedAt?: string | null; messageId?: string },
+  ctx?: ExtensionContext
 ) {
   // Store in WORM archive
   const doc = await uploadDocument(supabase, userId, companyId, {
@@ -111,6 +114,25 @@ async function uploadAndClassify(
 
   if (inboxError) throw new Error(`Failed to create inbox item: ${inboxError.message}`)
 
+  // Emit events for supplier invoices (non-blocking)
+  if (ctx && inbox.document_type === 'supplier_invoice') {
+    try {
+      await ctx.emit({
+        type: 'supplier_invoice.received',
+        payload: { inboxItem: inbox as unknown as InvoiceInboxItem, userId, companyId },
+      })
+    } catch { /* non-blocking */ }
+
+    if (!classificationError && classificationResult?.confidence) {
+      try {
+        await ctx.emit({
+          type: 'supplier_invoice.extracted',
+          payload: { inboxItem: inbox as unknown as InvoiceInboxItem, confidence: classificationResult.confidence / 100, userId, companyId },
+        })
+      } catch { /* non-blocking */ }
+    }
+  }
+
   return {
     document_id: doc.id,
     inbox_item_id: inbox.id,
@@ -161,7 +183,9 @@ export const invoiceInboxExtension: Extension = {
             ctx.userId,
             ctx.companyId,
             { name: file.name, buffer, type: file.type },
-            'upload'
+            'upload',
+            undefined,
+            ctx
           )
           return NextResponse.json({ data: result })
         } catch (error) {
@@ -188,7 +212,7 @@ export const invoiceInboxExtension: Extension = {
 
         let query = ctx.supabase
           .from('invoice_inbox_items')
-          .select('id, status, document_type, confidence, source, created_at, extracted_data, matched_supplier_id, email_from, email_subject, error_message')
+          .select('id, status, document_type, confidence, source, created_at, extracted_data, matched_supplier_id, document_id, email_from, email_subject, error_message')
           .eq('company_id', ctx.companyId)
           .order('created_at', { ascending: false })
           .limit(limit)
@@ -281,18 +305,18 @@ export const invoiceInboxExtension: Extension = {
 
         if (error) {
           console.error('[gmail/callback] OAuth error:', error)
-          return NextResponse.redirect(`${appUrl}/settings/banking?error=gmail_auth_denied`)
+          return NextResponse.redirect(`${appUrl}/e/general/invoice-inbox?error=gmail_auth_denied`)
         }
         if (!code || !stateParam) {
-          return NextResponse.redirect(`${appUrl}/settings/banking?error=gmail_missing_params`)
+          return NextResponse.redirect(`${appUrl}/e/general/invoice-inbox?error=gmail_missing_params`)
         }
         if (!process.env.GMAIL_TOKEN_ENCRYPTION_KEY) {
-          return NextResponse.redirect(`${appUrl}/settings/banking?error=gmail_config_error`)
+          return NextResponse.redirect(`${appUrl}/e/general/invoice-inbox?error=gmail_config_error`)
         }
 
         const state = decryptState(stateParam) as { companyId: string; userId: string; exp: number } | null
         if (!state || Date.now() > state.exp) {
-          return NextResponse.redirect(`${appUrl}/settings/banking?error=gmail_invalid_state`)
+          return NextResponse.redirect(`${appUrl}/e/general/invoice-inbox?error=gmail_invalid_state`)
         }
 
         const { companyId, userId } = state
@@ -314,14 +338,14 @@ export const invoiceInboxExtension: Extension = {
 
           if (!tokenResponse.ok) {
             console.error('[gmail/callback] Token exchange failed:', await tokenResponse.text())
-            return NextResponse.redirect(`${appUrl}/settings/banking?error=gmail_token_exchange`)
+            return NextResponse.redirect(`${appUrl}/e/general/invoice-inbox?error=gmail_token_exchange`)
           }
 
           const tokens = await tokenResponse.json() as {
             access_token: string; refresh_token?: string
           }
           if (!tokens.refresh_token) {
-            return NextResponse.redirect(`${appUrl}/settings/banking?error=gmail_no_refresh_token`)
+            return NextResponse.redirect(`${appUrl}/e/general/invoice-inbox?error=gmail_no_refresh_token`)
           }
 
           // Get user email
@@ -329,7 +353,7 @@ export const invoiceInboxExtension: Extension = {
             headers: { Authorization: `Bearer ${tokens.access_token}` },
           })
           if (!profileResponse.ok) {
-            return NextResponse.redirect(`${appUrl}/settings/banking?error=gmail_profile_error`)
+            return NextResponse.redirect(`${appUrl}/e/general/invoice-inbox?error=gmail_profile_error`)
           }
           const profile = await profileResponse.json() as { emailAddress: string }
 
@@ -390,14 +414,14 @@ export const invoiceInboxExtension: Extension = {
 
           if (dbError) {
             console.error('[gmail/callback] DB insert failed:', dbError)
-            return NextResponse.redirect(`${appUrl}/settings/banking?error=gmail_db_error`)
+            return NextResponse.redirect(`${appUrl}/e/general/invoice-inbox?error=gmail_db_error`)
           }
 
           console.log(`[gmail/callback] Gmail connected for ${profile.emailAddress} (company ${companyId})`)
-          return NextResponse.redirect(`${appUrl}/settings/banking?gmail=connected`)
+          return NextResponse.redirect(`${appUrl}/e/general/invoice-inbox?gmail=connected`)
         } catch (err) {
           console.error('[gmail/callback] Unexpected error:', err)
-          return NextResponse.redirect(`${appUrl}/settings/banking?error=gmail_unexpected`)
+          return NextResponse.redirect(`${appUrl}/e/general/invoice-inbox?error=gmail_unexpected`)
         }
       },
     },
@@ -472,6 +496,305 @@ export const invoiceInboxExtension: Extension = {
 
         return NextResponse.json({
           data: { scanned: totalScanned, classified: totalClassified, skipped: totalSkipped, errors: totalErrors },
+        })
+      },
+    },
+
+    // ── Reject inbox item ──────────────────────────────────
+    {
+      method: 'PATCH',
+      path: '/items/:id/reject',
+      handler: async (_request: Request, ctx?: ExtensionContext) => {
+        if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        const url = new URL(_request.url)
+        const id = url.searchParams.get('_id')
+        if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+
+        const { data: item, error: fetchError } = await ctx.supabase
+          .from('invoice_inbox_items')
+          .select('id, status')
+          .eq('id', id)
+          .eq('company_id', ctx.companyId)
+          .single()
+
+        if (fetchError || !item) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+        if (item.status === 'confirmed') return NextResponse.json({ error: 'Cannot reject a confirmed item' }, { status: 409 })
+
+        const { error: updateError } = await ctx.supabase
+          .from('invoice_inbox_items')
+          .update({ status: 'rejected' })
+          .eq('id', id)
+          .eq('company_id', ctx.companyId)
+
+        if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
+        return NextResponse.json({ data: { id, status: 'rejected' } })
+      },
+    },
+
+    // ── Convert inbox item to supplier invoice ─────────────
+    {
+      method: 'POST',
+      path: '/items/:id/convert',
+      handler: async (request: Request, ctx?: ExtensionContext) => {
+        if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        const url = new URL(request.url)
+        const id = url.searchParams.get('_id')
+        if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+
+        // Fetch inbox item
+        const { data: item, error: fetchError } = await ctx.supabase
+          .from('invoice_inbox_items')
+          .select('*')
+          .eq('id', id)
+          .eq('company_id', ctx.companyId)
+          .single()
+
+        if (fetchError || !item) return NextResponse.json({ error: 'Inbox item not found' }, { status: 404 })
+        if (item.status !== 'ready') return NextResponse.json({ error: 'Item is not in ready status' }, { status: 409 })
+
+        // Validate request body
+        let body: ReturnType<typeof CreateSupplierInvoiceSchema.parse>
+        try {
+          const json = await request.json()
+          body = CreateSupplierInvoiceSchema.parse(json)
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Invalid request body'
+          return NextResponse.json({ error: message }, { status: 400 })
+        }
+
+        // Verify supplier exists
+        const { data: supplier, error: supplierError } = await ctx.supabase
+          .from('suppliers')
+          .select('*')
+          .eq('id', body.supplier_id)
+          .eq('company_id', ctx.companyId)
+          .single()
+
+        if (supplierError || !supplier) {
+          return NextResponse.json({ error: 'Supplier not found' }, { status: 404 })
+        }
+
+        // Get next arrival number
+        const { data: arrivalNum, error: arrivalError } = await ctx.supabase
+          .rpc('get_next_arrival_number', { p_company_id: ctx.companyId })
+
+        if (arrivalError) {
+          return NextResponse.json({ error: 'Failed to get arrival number' }, { status: 500 })
+        }
+
+        // Calculate totals (same logic as app/api/supplier-invoices/route.ts)
+        const items = body.items.map((bodyItem, index) => {
+          const vatRate = bodyItem.vat_rate ?? 0.25
+          const lineTotal = bodyItem.amount != null
+            ? Math.round(bodyItem.amount * 100) / 100
+            : Math.round((bodyItem.quantity ?? 1) * (bodyItem.unit_price ?? 0) * 100) / 100
+          const vatAmount = Math.round(lineTotal * vatRate * 100) / 100
+          return {
+            sort_order: index,
+            description: bodyItem.description,
+            quantity: bodyItem.amount != null ? 1 : (bodyItem.quantity ?? 1),
+            unit: bodyItem.amount != null ? 'st' : (bodyItem.unit || 'st'),
+            unit_price: bodyItem.amount != null ? lineTotal : (bodyItem.unit_price ?? 0),
+            line_total: lineTotal,
+            account_number: bodyItem.account_number,
+            vat_code: bodyItem.vat_code || null,
+            vat_rate: vatRate,
+            vat_amount: vatAmount,
+          }
+        })
+
+        const subtotal = items.reduce((sum, i) => sum + i.line_total, 0)
+        const totalVat = items.reduce((sum, i) => sum + i.vat_amount, 0)
+        const total = Math.round((subtotal + totalVat) * 100) / 100
+
+        const exchangeRate = body.exchange_rate || null
+        const subtotalSek = exchangeRate ? Math.round(subtotal * exchangeRate * 100) / 100 : null
+        const vatAmountSek = exchangeRate ? Math.round(totalVat * exchangeRate * 100) / 100 : null
+        const totalSek = exchangeRate ? Math.round(total * exchangeRate * 100) / 100 : null
+
+        // Insert supplier invoice
+        const { data: invoice, error: invoiceError } = await ctx.supabase
+          .from('supplier_invoices')
+          .insert({
+            user_id: ctx.userId,
+            company_id: ctx.companyId,
+            supplier_id: body.supplier_id,
+            arrival_number: arrivalNum,
+            supplier_invoice_number: body.supplier_invoice_number,
+            invoice_date: body.invoice_date,
+            due_date: body.due_date,
+            delivery_date: body.delivery_date || null,
+            status: 'registered',
+            currency: body.currency || 'SEK',
+            exchange_rate: exchangeRate,
+            vat_treatment: body.vat_treatment || 'standard_25',
+            reverse_charge: body.reverse_charge || false,
+            payment_reference: body.payment_reference || null,
+            subtotal: Math.round(subtotal * 100) / 100,
+            subtotal_sek: subtotalSek,
+            vat_amount: Math.round(totalVat * 100) / 100,
+            vat_amount_sek: vatAmountSek,
+            total: Math.round(total * 100) / 100,
+            total_sek: totalSek,
+            remaining_amount: Math.round(total * 100) / 100,
+            document_id: item.document_id || null,
+            notes: body.notes || null,
+          })
+          .select()
+          .single()
+
+        if (invoiceError || !invoice) {
+          return NextResponse.json({ error: invoiceError?.message || 'Failed to create invoice' }, { status: 500 })
+        }
+
+        // Insert line items
+        const itemInserts = items.map((lineItem) => ({
+          supplier_invoice_id: invoice.id,
+          ...lineItem,
+        }))
+
+        const { error: itemsError } = await ctx.supabase
+          .from('supplier_invoice_items')
+          .insert(itemInserts)
+
+        if (itemsError) {
+          await ctx.supabase.from('supplier_invoices').delete().eq('id', invoice.id)
+          return NextResponse.json({ error: itemsError.message }, { status: 500 })
+        }
+
+        // Accrual method: create registration journal entry
+        const { data: settings } = await ctx.supabase
+          .from('company_settings')
+          .select('accounting_method')
+          .eq('company_id', ctx.companyId)
+          .single()
+
+        const accountingMethod = settings?.accounting_method || 'accrual'
+        let registrationJournalEntryId: string | null = null
+
+        if (accountingMethod === 'accrual') {
+          try {
+            const journalEntry = await createSupplierInvoiceRegistrationEntry(
+              ctx.supabase,
+              ctx.companyId,
+              ctx.userId,
+              invoice as SupplierInvoice,
+              items as SupplierInvoiceItem[],
+              supplier.supplier_type,
+              supplier.name
+            )
+            if (journalEntry) {
+              registrationJournalEntryId = journalEntry.id
+              await ctx.supabase
+                .from('supplier_invoices')
+                .update({ registration_journal_entry_id: journalEntry.id })
+                .eq('id', invoice.id)
+
+              // Link the document to the journal entry
+              if (item.document_id) {
+                await ctx.supabase
+                  .from('document_attachments')
+                  .update({ journal_entry_id: journalEntry.id })
+                  .eq('id', item.document_id)
+                  .eq('company_id', ctx.companyId)
+              }
+            }
+          } catch (err) {
+            console.error('[invoice-inbox/convert] Failed to create registration journal entry:', err)
+          }
+        }
+
+        // Emit supplier_invoice.registered
+        try {
+          await ctx.emit({
+            type: 'supplier_invoice.registered',
+            payload: { supplierInvoice: invoice as SupplierInvoice, companyId: ctx.companyId, userId: ctx.userId },
+          })
+        } catch { /* non-blocking */ }
+
+        // Update inbox item to confirmed
+        await ctx.supabase
+          .from('invoice_inbox_items')
+          .update({ status: 'confirmed', created_supplier_invoice_id: invoice.id })
+          .eq('id', id)
+
+        // Emit supplier_invoice.confirmed
+        try {
+          await ctx.emit({
+            type: 'supplier_invoice.confirmed',
+            payload: {
+              inboxItem: { ...item, status: 'confirmed', created_supplier_invoice_id: invoice.id } as InvoiceInboxItem,
+              supplierInvoice: invoice as SupplierInvoice,
+              userId: ctx.userId,
+              companyId: ctx.companyId,
+            },
+          })
+        } catch { /* non-blocking */ }
+
+        // Suggest matching transaction (don't book — user confirms in UI)
+        let suggestedTransaction: { id: string; description: string; amount: number; currency: string; date: string } | null = null
+        try {
+          const invoiceTotal = Math.round(total * 100) / 100
+          const invoiceTotalSek = totalSek ? Math.round(totalSek * 100) / 100 : null
+
+          const { data: candidates } = await ctx.supabase
+            .from('transactions')
+            .select('id, description, amount, currency, date')
+            .eq('company_id', ctx.companyId)
+            .is('supplier_invoice_id', null)
+            .lt('amount', 0)
+            .order('date', { ascending: false })
+            .limit(100)
+
+          if (candidates?.length) {
+            const supplierWords = supplier.name.toLowerCase().replace(/[,.\-]/g, ' ').split(/\s+/).filter((w: string) => w.length >= 3)
+
+            const match = candidates.find((tx) => {
+              const txAmount = Math.round(Math.abs(tx.amount) * 100) / 100
+              const txDesc = tx.description?.toLowerCase() || ''
+
+              const exactMatch = txAmount === invoiceTotal
+              const sekMatch = invoiceTotalSek != null && tx.currency === 'SEK' && Math.abs(txAmount - invoiceTotalSek) / invoiceTotalSek < 0.05
+
+              const nameMatch = supplierWords.some((word: string) => {
+                if (txDesc.includes(word)) return true
+                const txWords = txDesc.split(/\s+/)
+                return txWords.some((tw: string) => {
+                  if (tw.length < 3 || word.length < 3) return false
+                  if (Math.abs(tw.length - word.length) > 1) return false
+                  let diffs = 0
+                  const longer = tw.length >= word.length ? tw : word
+                  const shorter = tw.length >= word.length ? word : tw
+                  let j = 0
+                  for (let i = 0; i < longer.length && diffs <= 1; i++) {
+                    if (longer[i] !== shorter[j]) { diffs++; if (longer.length === shorter.length) j++ }
+                    else { j++ }
+                  }
+                  return diffs <= 1
+                })
+              })
+
+              return (exactMatch || sekMatch) && nameMatch
+            })
+
+            if (match) {
+              suggestedTransaction = match as unknown as typeof suggestedTransaction
+            }
+          }
+        } catch (err) {
+          console.error('[invoice-inbox/convert] Transaction suggestion failed (non-blocking):', err)
+        }
+
+        return NextResponse.json({
+          data: {
+            ...invoice,
+            items: itemInserts,
+            registration_journal_entry_id: registrationJournalEntryId,
+            inbox_item_id: id,
+            suggested_transaction: suggestedTransaction,
+          },
         })
       },
     },

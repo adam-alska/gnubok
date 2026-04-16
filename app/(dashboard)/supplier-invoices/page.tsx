@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -62,15 +62,6 @@ export default function SupplierInvoicesPage() {
     }
   })
 
-  // Summary stats
-  const totalUnpaid = invoices
-    .filter((i) => !['paid', 'credited'].includes(i.status))
-    .reduce((sum, i) => sum + i.remaining_amount, 0)
-  const overdueAmount = invoices
-    .filter((i) => i.status === 'overdue')
-    .reduce((sum, i) => sum + i.remaining_amount, 0)
-  const overdueCount = invoices.filter((i) => i.status === 'overdue').length
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -95,62 +86,6 @@ export default function SupplierInvoicesPage() {
             <Lock className="mr-2 h-4 w-4" />
             Registrera faktura
           </Button>
-        )}
-      </div>
-
-      {/* Summary cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        {isLoading ? (
-          <>
-            {[1, 2, 3].map((i) => (
-              <Card key={i}>
-                <CardHeader className="pb-2">
-                  <div className="h-4 bg-muted rounded w-24 animate-pulse" />
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="h-7 bg-muted rounded w-32 animate-pulse" />
-                  <div className="h-3 bg-muted rounded w-16 animate-pulse" />
-                </CardContent>
-              </Card>
-            ))}
-          </>
-        ) : (
-          <>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-muted-foreground">
-                  Totalt obetalt
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="font-display text-2xl font-medium tabular-nums">{formatAmount(totalUnpaid)} kr</p>
-                <p className="text-xs text-muted-foreground">
-                  {invoices.filter((i) => !['paid', 'credited'].includes(i.status)).length} fakturor
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-muted-foreground">
-                  Förfallet
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="font-display text-2xl font-medium tabular-nums text-destructive">{formatAmount(overdueAmount)} kr</p>
-                <p className="text-xs text-muted-foreground">{overdueCount} fakturor</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-muted-foreground">
-                  Antal fakturor
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="font-display text-2xl font-medium tabular-nums">{invoices.length}</p>
-              </CardContent>
-            </Card>
-          </>
         )}
       </div>
 

@@ -12,7 +12,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { EmptyState } from '@/components/ui/empty-state'
 import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency } from '@/lib/utils'
-import { Plus, Search, Wallet, Clock, AlertCircle, Lock } from 'lucide-react'
+import { Plus, Search, Wallet, Lock } from 'lucide-react'
 import { useCompany } from '@/contexts/CompanyContext'
 import { useCanWrite } from '@/lib/hooks/use-can-write'
 import type { SupplierInvoice } from '@/types'
@@ -105,16 +105,6 @@ export default function ExpensesPage() {
     return matchesSearch && matchesTab
   })
 
-  const unpaidInvoices = invoices.filter((i) => UNPAID_STATUSES.includes(i.status))
-  const overdueInvoices = invoices.filter((i) => i.status === 'overdue')
-
-  const stats = {
-    unpaidAmount: unpaidInvoices.reduce((sum, i) => sum + i.remaining_amount, 0),
-    unpaidCount: unpaidInvoices.length,
-    overdueAmount: overdueInvoices.reduce((sum, i) => sum + i.remaining_amount, 0),
-    overdueCount: overdueInvoices.length,
-  }
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -140,46 +130,6 @@ export default function ExpensesPage() {
         }
       />
 
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center">
-                <Clock className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Att betala</p>
-                <p className="font-display text-2xl font-medium tabular-nums">{formatCurrency(stats.unpaidAmount)}</p>
-                <p className="text-xs text-muted-foreground">{stats.unpaidCount} utgifter</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center">
-                <AlertCircle className={`h-6 w-6 ${stats.overdueCount > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
-              </div>
-              <div>
-                {stats.overdueCount > 0 ? (
-                  <>
-                    <p className="text-sm text-muted-foreground">Förfallet</p>
-                    <p className="font-display text-2xl font-medium tabular-nums text-destructive">{formatCurrency(stats.overdueAmount)}</p>
-                    <p className="text-xs text-muted-foreground">{stats.overdueCount} utgifter</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm text-muted-foreground">Totalt antal</p>
-                    <p className="font-display text-2xl font-medium tabular-nums">{invoices.length}</p>
-                  </>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Search and tabs */}
       <div className="flex flex-col sm:flex-row gap-4">
