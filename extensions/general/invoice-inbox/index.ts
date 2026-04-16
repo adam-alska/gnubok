@@ -525,6 +525,7 @@ export const invoiceInboxExtension: Extension = {
           .from('invoice_inbox_items')
           .update({ status: 'rejected' })
           .eq('id', id)
+          .eq('company_id', ctx.companyId)
 
         if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
         return NextResponse.json({ data: { id, status: 'rejected' } })
@@ -697,6 +698,7 @@ export const invoiceInboxExtension: Extension = {
                   .from('document_attachments')
                   .update({ journal_entry_id: journalEntry.id })
                   .eq('id', item.document_id)
+                  .eq('company_id', ctx.companyId)
               }
             }
           } catch (err) {
@@ -754,7 +756,7 @@ export const invoiceInboxExtension: Extension = {
               const txDesc = tx.description?.toLowerCase() || ''
 
               const exactMatch = txAmount === invoiceTotal
-              const sekMatch = invoiceTotalSek != null && Math.abs(txAmount - invoiceTotalSek) / invoiceTotalSek < 0.05
+              const sekMatch = invoiceTotalSek != null && tx.currency === 'SEK' && Math.abs(txAmount - invoiceTotalSek) / invoiceTotalSek < 0.05
 
               const nameMatch = supplierWords.some((word: string) => {
                 if (txDesc.includes(word)) return true

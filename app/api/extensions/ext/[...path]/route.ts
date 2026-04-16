@@ -98,10 +98,11 @@ async function handleRequest(
       for (const [key, value] of Object.entries(extractedParams)) {
         url.searchParams.set(`_${key}`, value)
       }
+      const cloned = request.clone()
       handlerRequest = new Request(url.toString(), {
-        method: request.method,
-        headers: request.headers,
-        body: request.body,
+        method: cloned.method,
+        headers: cloned.headers,
+        body: cloned.body,
         // @ts-expect-error -- duplex needed for streaming body
         duplex: 'half',
       })
