@@ -22,6 +22,7 @@ import { calculateFileHash } from './sie-parser'
 import { getBASReference } from '@/lib/bookkeeping/bas-reference'
 import { computeSRUCode } from '@/lib/bookkeeping/bas-data/sru-mapping'
 import { populateTemplatesFromSieVouchers } from '@/lib/bookkeeping/counterparty-templates'
+import { parseDateParts } from '@/lib/bookkeeping/validate-period-duration'
 
 /**
  * Format a date to ISO date string (YYYY-MM-DD)
@@ -211,8 +212,11 @@ async function cleanupStaleImportRecords(
 /**
  * Create a fiscal period if one doesn't exist for the date range.
  * Dates are ISO strings "YYYY-MM-DD" to avoid timezone issues.
+ *
+ * Exported for unit testing of the pre-validation that mirrors the
+ * `enforce_period_start_day` DB trigger.
  */
-async function ensureFiscalPeriod(
+export async function ensureFiscalPeriod(
   supabase: SupabaseClient,
   companyId: string,
   startDate: string,
@@ -246,9 +250,38 @@ async function ensureFiscalPeriod(
     return overlapping[0].id
   }
 
+  // Pre-validate against the DB-side enforce_period_start_day trigger so the
+  // user gets an actionable Swedish error instead of a raw Postgres message.
+  // Only the company's FIRST fiscal period may start mid-month (BFL 3 kap.);
+  // any subsequent period must start on day 1. The trigger queries the same
+  // table, so "another period exists" == the overlap check above missed it,
+  // i.e. this would be a non-contiguous second period.
+  const { count: existingCount } = await supabase
+    .from('fiscal_periods')
+    .select('id', { count: 'exact', head: true })
+    .eq('company_id', companyId)
+
+  const startParts = parseDateParts(startDate)
+  const endParts = parseDateParts(endDate)
+
+  if ((existingCount ?? 0) > 0 && startParts.day !== 1) {
+    throw new Error(
+      `SIE-filens räkenskapsår börjar ${startDate} — endast företagets första räkenskapsår får börja mitt i månaden. Efterföljande räkenskapsår måste börja den 1:a i en månad (BFL 3 kap.). Kontrollera datumen i #RAR-raden eller importera filen innan du skapar fler perioder.`
+    )
+  }
+
+  // Matches the fiscal_period_end_last_of_month CHECK constraint on prod;
+  // surface it as a clean message instead of a DB error.
+  const lastDayOfEndMonth = new Date(endParts.year, endParts.month, 0).getDate()
+  if (endParts.day !== lastDayOfEndMonth) {
+    throw new Error(
+      `SIE-filens räkenskapsår slutar ${endDate} — räkenskapsår måste sluta på månadens sista dag (BFL 3 kap.). Kontrollera datumen i #RAR-raden.`
+    )
+  }
+
   // Create new fiscal period
-  const startYear = parseInt(startDate.substring(0, 4), 10)
-  const endYear = parseInt(endDate.substring(0, 4), 10)
+  const startYear = startParts.year
+  const endYear = endParts.year
   const name = startYear === endYear
     ? `Räkenskapsår ${startYear}`
     : `Räkenskapsår ${startYear}/${endYear}`
@@ -1175,7 +1208,7 @@ async function finalizeImportRecord(
   // Archive the SIE file to Supabase Storage (BFL 7 kap 1-2§ retention)
   if (result.success) {
     const storagePath = `${companyId}/${importId}.se`
-    const fileBlob = new Blob([fileContent], { type: 'text/plain; charset=cp437' })
+    const fileBlob = new Blob([fileContent], { type: 'text/plain' })
     const { error: uploadError } = await supabase.storage
       .from('sie-files')
       .upload(storagePath, fileBlob, { upsert: false })

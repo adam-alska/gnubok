@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { generateImportPreview, validateIBBalance, isBalanceSheetAccount } from '../sie-import'
+import {
+  generateImportPreview,
+  validateIBBalance,
+  isBalanceSheetAccount,
+  ensureFiscalPeriod,
+} from '../sie-import'
+import { createQueuedMockSupabase } from '@/tests/helpers'
 import type { ParsedSIEFile, AccountMapping } from '../types'
 
 // --- Helpers ---
@@ -309,6 +315,83 @@ describe('validateIBBalance', () => {
 
     expect(result.roundingAdjustment).toBe(0)
     expect(result.lines).toHaveLength(2)
+  })
+})
+
+describe('ensureFiscalPeriod validation', () => {
+  // Mirrors the `enforce_period_start_day` DB trigger so users get an
+  // actionable Swedish error instead of a raw Postgres message.
+  type Supabase = Parameters<typeof ensureFiscalPeriod>[0]
+
+  it('rejects mid-month start when another period exists for the company', async () => {
+    const { supabase, enqueueMany } = createQueuedMockSupabase()
+    enqueueMany([
+      { data: null, error: null }, // containing check — no match
+      { data: [], error: null },   // overlapping check — none
+      { data: null, error: null, count: 1 }, // count existing — 1 period already
+    ])
+
+    await expect(
+      ensureFiscalPeriod(
+        supabase as unknown as Supabase,
+        'company-id',
+        '2026-04-16',
+        '2026-12-31',
+      ),
+    ).rejects.toThrow(/endast företagets första räkenskapsår får börja mitt i månaden/)
+  })
+
+  it('rejects end date that is not the last day of the month', async () => {
+    const { supabase, enqueueMany } = createQueuedMockSupabase()
+    enqueueMany([
+      { data: null, error: null },
+      { data: [], error: null },
+      { data: null, error: null, count: 0 }, // first fiscal period
+    ])
+
+    await expect(
+      ensureFiscalPeriod(
+        supabase as unknown as Supabase,
+        'company-id',
+        '2026-01-01',
+        '2026-12-30', // not the last day of December
+      ),
+    ).rejects.toThrow(/måste sluta på månadens sista dag/)
+  })
+
+  it('allows mid-month start for the company first fiscal period', async () => {
+    const { supabase, enqueueMany } = createQueuedMockSupabase()
+    enqueueMany([
+      { data: null, error: null },
+      { data: [], error: null },
+      { data: null, error: null, count: 0 }, // no existing periods
+      { data: { id: 'new-period-id' }, error: null }, // insert result
+    ])
+
+    const id = await ensureFiscalPeriod(
+      supabase as unknown as Supabase,
+      'company-id',
+      '2026-04-16',
+      '2026-12-31',
+    )
+
+    expect(id).toBe('new-period-id')
+  })
+
+  it('reuses an existing period that contains the range (no validation needed)', async () => {
+    const { supabase, enqueueMany } = createQueuedMockSupabase()
+    enqueueMany([
+      { data: { id: 'existing-period-id' }, error: null }, // containing match
+    ])
+
+    const id = await ensureFiscalPeriod(
+      supabase as unknown as Supabase,
+      'company-id',
+      '2026-04-16',
+      '2026-12-31',
+    )
+
+    expect(id).toBe('existing-period-id')
   })
 })
 
