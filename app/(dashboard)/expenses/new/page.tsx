@@ -473,11 +473,11 @@ export default function NewExpensePage() {
                         <Controller
                           name={`items.${index}.description`}
                           control={control}
-                          render={({ field }) => (
                             <Input
                               placeholder="Beskrivning"
                               value={field.value || ''}
                               onChange={field.onChange}
+                              onBlur={field.onBlur}
                             />
                           )}
                         />
