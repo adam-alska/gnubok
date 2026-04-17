@@ -487,13 +487,10 @@ export default function NewExpensePage() {
                           name={`items.${index}.amount`}
                           control={control}
                           render={({ field }) => (
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="0,00"
-                              value={field.value || ''}
-                              onChange={(e) => field.onChange(e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
-                            />
+                              onChange={(e) => {
+                                const parsed = parseFloat(e.target.value)
+                                field.onChange(e.target.value === '' || isNaN(parsed) ? 0 : parsed)
+                              }}
                           )}
                         />
                       </td>
