@@ -470,9 +470,16 @@ export default function NewExpensePage() {
                         />
                       </td>
                       <td className="py-2 pr-2">
-                        <Input
-                          placeholder="Beskrivning"
-                          {...register(`items.${index}.description`)}
+                        <Controller
+                          name={`items.${index}.description`}
+                          control={control}
+                          render={({ field }) => (
+                            <Input
+                              placeholder="Beskrivning"
+                              value={field.value || ''}
+                              onChange={field.onChange}
+                            />
+                          )}
                         />
                       </td>
                       <td className="py-2 pr-2">
@@ -567,9 +574,16 @@ export default function NewExpensePage() {
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs text-muted-foreground">Beskrivning</Label>
-                    <Input
-                      placeholder="Beskrivning"
-                      {...register(`items.${index}.description`)}
+                    <Controller
+                      name={`items.${index}.description`}
+                      control={control}
+                      render={({ field }) => (
+                        <Input
+                          placeholder="Beskrivning"
+                          value={field.value || ''}
+                          onChange={field.onChange}
+                        />
+                      )}
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
