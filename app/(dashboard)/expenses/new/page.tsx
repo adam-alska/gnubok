@@ -470,17 +470,35 @@ export default function NewExpensePage() {
                         />
                       </td>
                       <td className="py-2 pr-2">
-                        <Input
-                          placeholder="Beskrivning"
-                          {...register(`items.${index}.description`)}
+                        <Controller
+                          name={`items.${index}.description`}
+                          control={control}
+                          render={({ field }) => (
+                            <Input
+                              placeholder="Beskrivning"
+                              value={field.value || ''}
+                              onChange={field.onChange}
+                              onBlur={field.onBlur}
+                            />
+                          )}
                         />
                       </td>
                       <td className="py-2 pr-2">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="0,00"
-                          {...register(`items.${index}.amount`, { valueAsNumber: true })}
+                        <Controller
+                          name={`items.${index}.amount`}
+                          control={control}
+                          render={({ field }) => (
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="0,00"
+                              value={field.value || ''}
+                              onChange={(e) => {
+                                const parsed = parseFloat(e.target.value)
+                                field.onChange(e.target.value === '' || isNaN(parsed) ? 0 : parsed)
+                              }}
+                            />
+                          )}
                         />
                       </td>
                       <td className="py-2 pr-2">
@@ -560,19 +578,33 @@ export default function NewExpensePage() {
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs text-muted-foreground">Beskrivning</Label>
-                    <Input
-                      placeholder="Beskrivning"
-                      {...register(`items.${index}.description`)}
+                    <Controller
+                      name={`items.${index}.description`}
+                      control={control}
+                      render={({ field }) => (
+                        <Input
+                          placeholder="Beskrivning"
+                          value={field.value || ''}
+                          onChange={field.onChange}
+                        />
+                      )}
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">Belopp (exkl.)</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="0,00"
-                        {...register(`items.${index}.amount`, { valueAsNumber: true })}
+                      <Controller
+                        name={`items.${index}.amount`}
+                        control={control}
+                        render={({ field }) => (
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0,00"
+                            value={field.value || ''}
+                            onChange={(e) => field.onChange(e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
+                          />
+                        )}
                       />
                     </div>
                     <div className="space-y-2">
