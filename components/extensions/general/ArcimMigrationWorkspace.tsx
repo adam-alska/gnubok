@@ -753,6 +753,7 @@ function OptionsStep({
   options,
   sieAvailable,
   sieData,
+  provider,
   onChange,
   onStart,
   onBack,
@@ -760,6 +761,7 @@ function OptionsStep({
   options: MigrationOptions
   sieAvailable: boolean
   sieData: SIEData | null
+  provider: ArcimProvider | null
   onChange: (options: MigrationOptions) => void
   onStart: () => void
   onBack: () => void
@@ -881,7 +883,9 @@ function OptionsStep({
           <OptionRow
             icon={<FileText className="h-4 w-4" />}
             label="Leverantörsfakturor"
-            description="Alla leverantörsfakturor (betalda och obetalda)"
+            description={provider === 'fortnox'
+              ? 'Endast obetalda leverantörsfakturor hämtas. Historiska betalda fakturor finns kvar i Fortnox.'
+              : 'Alla leverantörsfakturor (betalda och obetalda)'}
             checked={options.importSupplierInvoices}
             onChange={() => toggleOption('importSupplierInvoices')}
           />
@@ -2006,6 +2010,7 @@ export default function ArcimMigrationWorkspace(_props: WorkspaceComponentProps)
           options={migrationOptions}
           sieAvailable={preview?.sieAvailable ?? false}
           sieData={sieData}
+          provider={preview?.consent.provider ?? null}
           onChange={setMigrationOptions}
           onStart={handleStartMigration}
           onBack={() => preview?.sieAvailable ? setStep('mapping') : setStep('preview')}

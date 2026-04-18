@@ -26,7 +26,10 @@ export const FORTNOX_RESOURCE_CONFIGS: Partial<Record<ResourceType, FortnoxResou
     supportsLastModified: true,
   },
   [ResourceType.SupplierInvoices]: {
-    listEndpoint: '/supplierinvoices',
+    // Only fetch unpaid/open supplier invoices. Historic paid invoices add
+    // noise and Fortnox's list endpoint doesn't reliably expose FullyPaid,
+    // which caused paid invoices to be imported as unpaid.
+    listEndpoint: '/supplierinvoices?filter=unpaid',
     listKey: 'SupplierInvoices',
     detailEndpoint: '/supplierinvoices/{id}',
     detailKey: 'SupplierInvoice',
