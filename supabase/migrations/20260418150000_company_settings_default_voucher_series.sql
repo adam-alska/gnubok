@@ -14,6 +14,20 @@
 ALTER TABLE public.company_settings
   ADD COLUMN IF NOT EXISTS default_voucher_series text NOT NULL DEFAULT 'A';
 
+-- ADD COLUMN IF NOT EXISTS silently skips the whole column definition
+-- (including NOT NULL) when the column already exists. Re-apply the
+-- constraint explicitly so environments that received the column
+-- out-of-band still end up with the same schema.
+ALTER TABLE public.company_settings
+  ALTER COLUMN default_voucher_series SET DEFAULT 'A';
+
+UPDATE public.company_settings
+  SET default_voucher_series = 'A'
+  WHERE default_voucher_series IS NULL;
+
+ALTER TABLE public.company_settings
+  ALTER COLUMN default_voucher_series SET NOT NULL;
+
 -- Match the Zod validation in lib/api/schemas.ts so DB and app stay in sync.
 ALTER TABLE public.company_settings
   DROP CONSTRAINT IF EXISTS company_settings_default_voucher_series_check;
