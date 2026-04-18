@@ -334,7 +334,7 @@ function SIEImportWizard() {
   const [errorType, setErrorType] = useState<'duplicate' | 'duplicate_period' | 'validation' | 'parse' | undefined>()
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [validationWarnings, setValidationWarnings] = useState<string[]>([])
-  const [duplicatePeriodImportId, setDuplicatePeriodImportId] = useState<string | null>(null)
+  const [duplicateImportId, setDuplicateImportId] = useState<string | null>(null)
   const [isReplacing, setIsReplacing] = useState(false)
 
   const [file, setFile] = useState<File | null>(null)
@@ -380,8 +380,8 @@ function SIEImportWizard() {
         if (type === 'duplicate' || type === 'duplicate_period') {
           setErrorType(type)
           setError(data.message)
-          if (type === 'duplicate_period' && data.importId) {
-            setDuplicatePeriodImportId(data.importId)
+          if (data.importId) {
+            setDuplicateImportId(data.importId)
           }
           toast({ title: type === 'duplicate' ? 'Filen har redan importerats' : 'Överlappande räkenskapsår', description: data.message, variant: 'destructive' })
         } else if (type === 'validation') {
@@ -459,7 +459,7 @@ function SIEImportWizard() {
       // Clear error state and re-trigger the file upload
       setError(null)
       setErrorType(undefined)
-      setDuplicatePeriodImportId(null)
+      setDuplicateImportId(null)
 
       // Small delay so the user sees the success toast before re-upload starts
       await new Promise(resolve => setTimeout(resolve, 500))
@@ -618,7 +618,7 @@ function SIEImportWizard() {
   const handleNewImport = () => {
     setStep('upload'); setFile(null); setParsed(null); setMappings([])
     setPreview(null); setIssues([]); setImportResult(null); setError(null); setErrorType(undefined)
-    setValidationErrors([]); setValidationWarnings([]); setDuplicatePeriodImportId(null)
+    setValidationErrors([]); setValidationWarnings([]); setDuplicateImportId(null)
     setSieAccounts([]); setIsCreatingAccounts(false)
   }
 
@@ -645,7 +645,7 @@ function SIEImportWizard() {
         </CardContent>
       </Card>
 
-      {step === 'upload' && <SIEUploadStep onFileSelect={handleFileSelect} isLoading={isLoading} error={error} errorType={errorType} validationErrors={validationErrors} validationWarnings={validationWarnings} duplicatePeriodImportId={duplicatePeriodImportId} onReplace={handleReplace} isReplacing={isReplacing} />}
+      {step === 'upload' && <SIEUploadStep onFileSelect={handleFileSelect} isLoading={isLoading} error={error} errorType={errorType} validationErrors={validationErrors} validationWarnings={validationWarnings} duplicateImportId={duplicateImportId} onReplace={handleReplace} isReplacing={isReplacing} />}
       {step === 'preview' && preview && (
         <SIEPreviewStep preview={preview} issues={issues} missingAccounts={missingAccounts}
           onCreateAccounts={handleCreateAccounts} isCreatingAccounts={isCreatingAccounts}
