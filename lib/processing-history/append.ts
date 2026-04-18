@@ -26,9 +26,11 @@ import { z } from 'zod'
 // Samordningsnummer:  Same format but day +60
 // Organisationsnummer: NNNNNN-NNNN (10 digits, but we catch the pattern)
 
+// Word boundaries prevent false positives on Bankgiro (123456-7890) and
+// invoice references like 202312-1234 that share the digit shape but aren't PII.
 const PII_PATTERNS = [
-  /\d{6}-?\d{4}/,   // personnummer, samordningsnummer
-  /\d{8}-?\d{4}/,   // 12-digit variant (YYYYMMDD-NNNN) or orgnr
+  /\b\d{6}-?\d{4}\b/,   // personnummer, samordningsnummer
+  /\b\d{8}-?\d{4}\b/,   // 12-digit variant (YYYYMMDD-NNNN) or orgnr
 ]
 
 function containsPii(value: unknown): boolean {
@@ -48,6 +50,14 @@ const piiSafePayload = z.record(z.string(), z.unknown()).refine(
   (payload) => !containsPii(payload),
   { message: 'Payload contains PII (personnummer/samordningsnummer/orgnr pattern). Use pseudonymous IDs only.' }
 )
+
+function assertActorPiiSafe(actor: ProcessingHistoryActor): void {
+  if (actor.label && PII_PATTERNS.some(p => p.test(actor.label!))) {
+    throw new Error(
+      'actor.label contains PII (personnummer/samordningsnummer/orgnr pattern). Use a pseudonymous descriptor only.'
+    )
+  }
+}
 
 // ── Input type ──────────────────────────────────────────────────
 
@@ -80,8 +90,9 @@ export async function appendProcessingHistory(
   supabase: SupabaseClient,
   input: AppendEventInput
 ): Promise<string> {
-  // Validate payload contains no PII
+  // Validate payload + actor.label contain no PII
   piiSafePayload.parse(input.payload)
+  assertActorPiiSafe(input.actor)
 
   const eventId = crypto.randomUUID()
 
@@ -125,9 +136,10 @@ export async function appendProcessingHistoryBatch(
 
   const eventIds = inputs.map(() => crypto.randomUUID())
 
-  // Validate all payloads before any DB write
+  // Validate all payloads + actor labels before any DB write
   for (const input of inputs) {
     piiSafePayload.parse(input.payload)
+    assertActorPiiSafe(input.actor)
   }
 
   const rows = inputs.map((input, i) => ({
