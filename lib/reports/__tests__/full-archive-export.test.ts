@@ -215,7 +215,7 @@ describe('generateFullArchive', () => {
         'company-1',
         expect.objectContaining({
           from_date: PERIOD_2024.period_start,
-          to_date: PERIOD_2024.period_end,
+          to_date: `${PERIOD_2024.period_end}T23:59:59.999Z`,
         })
       )
     })
