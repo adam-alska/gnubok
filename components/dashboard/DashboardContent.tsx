@@ -69,8 +69,16 @@ export default function DashboardContent({ firstName, companyId, settings, summa
       setSetupGateActive(false)
       return
     }
-    const freshStart = localStorage.getItem(setupFreshStartKey(companyId)) === 'true'
-    if (freshStart) setSetupGateActive(false)
+    const scopedKey = setupFreshStartKey(companyId)
+    const freshStart = localStorage.getItem(scopedKey) === 'true'
+    const legacyFreshStart = localStorage.getItem('erp_setup_fresh_start') === 'true'
+    const legacyDismissed = localStorage.getItem('erp_checklist_dismissed') === 'true'
+    if (freshStart || legacyFreshStart || legacyDismissed) {
+      if (!freshStart) {
+        localStorage.setItem(scopedKey, 'true')
+      }
+      setSetupGateActive(false)
+    }
   }, [needsSetup, companyId])
 
   if (setupGateActive) {
