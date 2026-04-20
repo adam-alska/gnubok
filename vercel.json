@@ -27,6 +27,10 @@
     {
       "path": "/api/events/cleanup/cron",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/extensions/cloud-backup/auto-sync/cron",
+      "schedule": "0 * * * *"
     }
   ]
 }

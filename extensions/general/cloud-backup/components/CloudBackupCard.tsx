@@ -4,9 +4,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { Cloud, ExternalLink, Loader2, RefreshCw, Unplug } from 'lucide-react'
-import type { CloudBackupStatus } from '../types'
+import type { CloudBackupStatus, GoogleDriveSchedule } from '../types'
 
 const API_BASE = '/api/extensions/ext/cloud-backup'
 
@@ -186,6 +188,11 @@ export default function CloudBackupCard() {
               </p>
             )}
 
+            <ScheduleSection
+              schedule={status.schedule}
+              onUpdated={loadStatus}
+            />
+
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <Button onClick={handleSync} disabled={isSyncing}>
                 {isSyncing ? (
@@ -260,4 +267,149 @@ function formatDate(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+interface ScheduleSectionProps {
+  schedule: GoogleDriveSchedule | null
+  onUpdated: () => Promise<void> | void
+}
+
+function ScheduleSection({ schedule, onUpdated }: ScheduleSectionProps) {
+  const { toast } = useToast()
+
+  // Convert stored UTC hour to the user's local hour for display.
+  const initialLocalHour =
+    schedule && typeof schedule.hour_utc === 'number'
+      ? utcHourToLocalHour(schedule.hour_utc)
+      : utcHourToLocalHour(3)
+  const [enabled, setEnabled] = useState(schedule?.enabled ?? false)
+  const [localHour, setLocalHour] = useState(initialLocalHour)
+  const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    setEnabled(schedule?.enabled ?? false)
+    setLocalHour(
+      schedule && typeof schedule.hour_utc === 'number'
+        ? utcHourToLocalHour(schedule.hour_utc)
+        : utcHourToLocalHour(3)
+    )
+  }, [schedule?.enabled, schedule?.hour_utc])
+
+  const save = useCallback(
+    async (nextEnabled: boolean, nextLocalHour: number) => {
+      setIsSaving(true)
+      try {
+        const res = await fetch(`${API_BASE}/schedule`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            enabled: nextEnabled,
+            hour_utc: localHourToUtcHour(nextLocalHour),
+          }),
+        })
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          throw new Error(body.error || 'Kunde inte spara schema')
+        }
+        await onUpdated()
+      } catch (err) {
+        toast({
+          title: 'Kunde inte spara schema',
+          description: err instanceof Error ? err.message : 'Försök igen.',
+          variant: 'destructive',
+        })
+      } finally {
+        setIsSaving(false)
+      }
+    },
+    [onUpdated, toast]
+  )
+
+  const handleToggle = useCallback(
+    (checked: boolean) => {
+      setEnabled(checked)
+      save(checked, localHour)
+    },
+    [localHour, save]
+  )
+
+  const handleHourChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const next = Number(e.target.value)
+      setLocalHour(next)
+      if (enabled) save(enabled, next)
+    },
+    [enabled, save]
+  )
+
+  return (
+    <div className="rounded-md border border-border/60 bg-background p-3 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <Label htmlFor="auto-sync-toggle" className="text-sm font-medium">
+            Automatisk synkronisering
+          </Label>
+          <p className="text-xs text-muted-foreground">
+            Kör en daglig säkerhetsbackup till din Drive.
+          </p>
+        </div>
+        <Switch
+          id="auto-sync-toggle"
+          checked={enabled}
+          onCheckedChange={handleToggle}
+          disabled={isSaving}
+        />
+      </div>
+
+      {enabled && (
+        <div className="flex items-center gap-2">
+          <Label htmlFor="auto-sync-hour" className="text-xs text-muted-foreground">
+            Tid (din lokala tid)
+          </Label>
+          <select
+            id="auto-sync-hour"
+            value={localHour}
+            onChange={handleHourChange}
+            disabled={isSaving}
+            className="rounded-md border border-input bg-background px-2 py-1 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            {Array.from({ length: 24 }, (_, h) => (
+              <option key={h} value={h}>
+                {h.toString().padStart(2, '0')}:00
+              </option>
+            ))}
+          </select>
+          {isSaving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+        </div>
+      )}
+
+      {schedule?.last_auto_sync_at && (
+        <p className="text-xs text-muted-foreground">
+          Senaste automatiska synk: {formatDate(schedule.last_auto_sync_at)}{' '}
+          {schedule.last_auto_sync_status === 'success' ? (
+            <span className="text-emerald-600">· lyckades</span>
+          ) : schedule.last_auto_sync_status === 'error' ? (
+            <span className="text-destructive">
+              · misslyckades
+              {schedule.last_auto_sync_error ? ` (${schedule.last_auto_sync_error})` : ''}
+            </span>
+          ) : null}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** Convert a UTC hour (0-23) to the browser's local hour. */
+function utcHourToLocalHour(hourUtc: number): number {
+  const d = new Date()
+  d.setUTCHours(hourUtc, 0, 0, 0)
+  return d.getHours()
+}
+
+/** Convert a local hour (0-23) to UTC. */
+function localHourToUtcHour(localHour: number): number {
+  const d = new Date()
+  d.setHours(localHour, 0, 0, 0)
+  return d.getUTCHours()
 }
