@@ -63,17 +63,21 @@ export default function ImportReviewStep({
   })
   const [defaultSeries, setDefaultSeries] = useState<string | null>(null)
   const [existingSeries, setExistingSeries] = useState<Set<string>>(new Set())
+  const [seriesLoaded, setSeriesLoaded] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const seriesInitializedRef = useRef(false)
 
   useEffect(() => {
     if (!company?.id) return
+    setSeriesLoaded(false)
     const supabase = createClient()
 
     let cancelled = false
     ;(async () => {
-      const [{ data: settingsData }, { data: sequencesData }] = await Promise.all([
+      const [
+        { data: settingsData, error: settingsError },
+        { data: sequencesData, error: sequencesError },
+      ] = await Promise.all([
         supabase
           .from('company_settings')
           .select('default_voucher_series')
@@ -87,17 +91,23 @@ export default function ImportReviewStep({
 
       if (cancelled) return
 
+      // PGRST116 = no rows returned from .single(); expected when settings not yet created.
+      if (settingsError && settingsError.code !== 'PGRST116') {
+        console.error('Failed to load company settings for voucher series', settingsError)
+      }
+      if (sequencesError) {
+        console.error('Failed to load voucher sequences', sequencesError)
+      }
+
       const companyDefault = settingsData?.default_voucher_series || null
       const sequences = new Set<string>((sequencesData || []).map((row) => row.voucher_series))
 
       setDefaultSeries(companyDefault)
       setExistingSeries(sequences)
 
-      if (!seriesInitializedRef.current) {
-        seriesInitializedRef.current = true
-        const initial = companyDefault || (sequences.has('B') ? 'B' : Array.from(sequences).sort()[0]) || 'A'
-        setOptions((prev) => ({ ...prev, voucherSeries: initial }))
-      }
+      const initial = companyDefault || (sequences.has('B') ? 'B' : Array.from(sequences).sort()[0]) || 'A'
+      setOptions((prev) => ({ ...prev, voucherSeries: initial }))
+      setSeriesLoaded(true)
     })()
 
     return () => {
@@ -286,6 +296,7 @@ export default function ImportReviewStep({
               <Select
                 value={options.voucherSeries}
                 onValueChange={(value) => updateOption('voucherSeries', value)}
+                disabled={!seriesLoaded}
               >
                 <SelectTrigger id="voucher-series" className="w-48">
                   <SelectValue />
