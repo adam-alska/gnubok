@@ -252,22 +252,28 @@ export async function ensureFiscalPeriod(
 
   // Pre-validate against the DB-side enforce_period_start_day trigger so the
   // user gets an actionable Swedish error instead of a raw Postgres message.
-  // Only the company's FIRST fiscal period may start mid-month (BFL 3 kap.);
-  // any subsequent period must start on day 1. The trigger queries the same
-  // table, so "another period exists" == the overlap check above missed it,
-  // i.e. this would be a non-contiguous second period.
-  const { count: existingCount } = await supabase
-    .from('fiscal_periods')
-    .select('id', { count: 'exact', head: true })
-    .eq('company_id', companyId)
-
+  // Per BFL 3 kap., only the company's chronologically FIRST fiscal year may
+  // start mid-month (förlängt första räkenskapsår). Any period that comes
+  // after an earlier one must start on day 1. We check "is there a period
+  // that starts earlier?" rather than "does any period exist?" so a user can
+  // retroactively import an old first fiscal year via SIE even after an
+  // onboarding-created period already exists later in time.
   const startParts = parseDateParts(startDate)
   const endParts = parseDateParts(endDate)
 
-  if ((existingCount ?? 0) > 0 && startParts.day !== 1) {
-    throw new Error(
-      `SIE-filens räkenskapsår börjar ${startDate} — endast företagets första räkenskapsår får börja mitt i månaden. Efterföljande räkenskapsår måste börja den 1:a i en månad (BFL 3 kap.). Kontrollera datumen i #RAR-raden eller importera filen innan du skapar fler perioder.`
-    )
+  if (startParts.day !== 1) {
+    const { data: earlier } = await supabase
+      .from('fiscal_periods')
+      .select('id')
+      .eq('company_id', companyId)
+      .lt('period_start', startDate)
+      .limit(1)
+
+    if (earlier && earlier.length > 0) {
+      throw new Error(
+        `SIE-filens räkenskapsår börjar ${startDate} — endast företagets kronologiskt första räkenskapsår får börja mitt i månaden. Efterföljande räkenskapsår måste börja den 1:a i en månad (BFL 3 kap.). Kontrollera datumen i #RAR-raden.`
+      )
+    }
   }
 
   // Matches the fiscal_period_end_last_of_month CHECK constraint on prod;

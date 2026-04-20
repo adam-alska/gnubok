@@ -323,12 +323,12 @@ describe('ensureFiscalPeriod validation', () => {
   // actionable Swedish error instead of a raw Postgres message.
   type Supabase = Parameters<typeof ensureFiscalPeriod>[0]
 
-  it('rejects mid-month start when another period exists for the company', async () => {
+  it('rejects mid-month start when an earlier period already exists', async () => {
     const { supabase, enqueueMany } = createQueuedMockSupabase()
     enqueueMany([
       { data: null, error: null }, // containing check — no match
       { data: [], error: null },   // overlapping check — none
-      { data: null, error: null, count: 1 }, // count existing — 1 period already
+      { data: [{ id: 'earlier' }], error: null }, // earlier period exists
     ])
 
     await expect(
@@ -338,7 +338,7 @@ describe('ensureFiscalPeriod validation', () => {
         '2026-04-16',
         '2026-12-31',
       ),
-    ).rejects.toThrow(/endast företagets första räkenskapsår får börja mitt i månaden/)
+    ).rejects.toThrow(/kronologiskt första räkenskapsår får börja mitt i månaden/)
   })
 
   it('rejects end date that is not the last day of the month', async () => {
@@ -346,7 +346,7 @@ describe('ensureFiscalPeriod validation', () => {
     enqueueMany([
       { data: null, error: null },
       { data: [], error: null },
-      { data: null, error: null, count: 0 }, // first fiscal period
+      { data: [], error: null }, // no earlier period
     ])
 
     await expect(
@@ -364,7 +364,7 @@ describe('ensureFiscalPeriod validation', () => {
     enqueueMany([
       { data: null, error: null },
       { data: [], error: null },
-      { data: null, error: null, count: 0 }, // no existing periods
+      { data: [], error: null }, // no earlier period
       { data: { id: 'new-period-id' }, error: null }, // insert result
     ])
 
@@ -376,6 +376,29 @@ describe('ensureFiscalPeriod validation', () => {
     )
 
     expect(id).toBe('new-period-id')
+  })
+
+  it('allows mid-month start when importing a retroactive earliest period', async () => {
+    // Scenario: onboarding created a 2026 fiscal period, user now imports
+    // an SIE for their förlängt första räkenskapsår 2017-07-28 – 2018-12-31.
+    // The 2017 period is chronologically earliest, so mid-month start is
+    // legal under BFL 3 kap.
+    const { supabase, enqueueMany } = createQueuedMockSupabase()
+    enqueueMany([
+      { data: null, error: null }, // containing check — no match
+      { data: [], error: null },   // overlapping check — none (2017 vs 2026)
+      { data: [], error: null },   // no earlier period than 2017-07-28
+      { data: { id: 'retro-first-year-id' }, error: null }, // insert
+    ])
+
+    const id = await ensureFiscalPeriod(
+      supabase as unknown as Supabase,
+      'company-id',
+      '2017-07-28',
+      '2018-12-31',
+    )
+
+    expect(id).toBe('retro-first-year-id')
   })
 
   it('reuses an existing period that contains the range (no validation needed)', async () => {

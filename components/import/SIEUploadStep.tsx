@@ -20,12 +20,12 @@ interface SIEUploadStepProps {
   errorType?: 'duplicate' | 'duplicate_period' | 'validation' | 'parse'
   validationErrors?: string[]
   validationWarnings?: string[]
-  duplicatePeriodImportId?: string | null
+  duplicateImportId?: string | null
   onReplace?: (importId: string) => Promise<void>
   isReplacing?: boolean
 }
 
-export default function SIEUploadStep({ onFileSelect, isLoading, error, errorType, validationErrors, validationWarnings, duplicatePeriodImportId, onReplace, isReplacing }: SIEUploadStepProps) {
+export default function SIEUploadStep({ onFileSelect, isLoading, error, errorType, validationErrors, validationWarnings, duplicateImportId, onReplace, isReplacing }: SIEUploadStepProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [loadingPhase, setLoadingPhase] = useState(0)
@@ -192,13 +192,10 @@ export default function SIEUploadStep({ onFileSelect, isLoading, error, errorTyp
 
                   {/* Actionable guidance */}
                   <div className="text-sm text-muted-foreground pt-1 border-t border-border/50 mt-2">
-                    {errorType === 'duplicate' && (
-                      <p>Om du vill importera om filen, ta först bort den tidigare importen under Bokföring.</p>
-                    )}
-                    {errorType === 'duplicate_period' && (
+                    {(errorType === 'duplicate' || errorType === 'duplicate_period') && (
                       <div className="space-y-2">
                         <p>Den befintliga importens verifikationer kommer att makuleras (status ändras till &quot;makulerad&quot;). De finns kvar som spårbar historik.</p>
-                        {duplicatePeriodImportId && onReplace && (
+                        {duplicateImportId && onReplace && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -206,7 +203,7 @@ export default function SIEUploadStep({ onFileSelect, isLoading, error, errorTyp
                             disabled={isReplacing}
                             onClick={(e) => {
                               e.stopPropagation()
-                              onReplace(duplicatePeriodImportId)
+                              onReplace(duplicateImportId)
                             }}
                           >
                             {isReplacing ? (

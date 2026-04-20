@@ -77,6 +77,13 @@ export async function getOpeningBalances(
     )
 
     for (const line of priorLines) {
+      // P&L accounts (class 3-8) reset to zero at each year transition —
+      // their balances are absorbed into årets resultat (2099) and rolled
+      // into equity. Carrying them forward as IB causes resultatkonton to
+      // accumulate across years (BFNAR 2013:2 violation).
+      const cls = parseInt(line.account_number.charAt(0), 10)
+      if (cls >= 3 && cls <= 8) continue
+
       const existing = balances.get(line.account_number) || { debit: 0, credit: 0 }
       existing.debit += Number(line.debit_amount) || 0
       existing.credit += Number(line.credit_amount) || 0

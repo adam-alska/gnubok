@@ -111,6 +111,43 @@ export type MomsPeriod = 'monthly' | 'quarterly' | 'yearly'
 // Reconciliation method
 export type ReconciliationMethod = 'auto_exact' | 'auto_date_range' | 'auto_reference' | 'auto_fuzzy' | 'manual'
 
+// Processing history (behandlingshistorik) — event-driven audit trail per BFNAR 2013:2 kap 8
+
+export type ProcessingHistoryActorType = 'user' | 'system' | 'llm' | 'cron' | 'api_key'
+
+export interface ProcessingHistoryActor {
+  type: ProcessingHistoryActorType
+  id: string
+  label?: string
+}
+
+export type ProcessingHistoryAggregateType =
+  | 'Document'
+  | 'BankTransaction'
+  | 'MatchProposal'
+  | 'Verifikation'
+  | 'CounterpartyTemplate'
+  | 'Period'
+  | 'Migration'
+  | 'System'
+
+export interface ProcessingHistoryEvent {
+  event_id: string
+  seq: number
+  company_id: string
+  correlation_id: string
+  causation_id: string | null
+  aggregate_type: ProcessingHistoryAggregateType
+  aggregate_id: string
+  event_type: string // open type — validated at runtime against processing_event_types registry
+  payload: Record<string, unknown>
+  payload_schema_version: number
+  actor: ProcessingHistoryActor
+  rubric_version: string | null
+  occurred_at: string
+  appended_at: string
+}
+
 // Bank connection status
 export type BankConnectionStatus = 'pending' | 'active' | 'expired' | 'revoked' | 'error'
 
