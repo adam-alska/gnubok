@@ -187,8 +187,9 @@ export async function POST(
     const parentalDays = sumQuantity(['parental_leave'])
     const vacationDays = sumQuantity(['vacation'])
 
-    // Update salary_run_employee with calculated results
-    await supabase
+    // Update salary_run_employee with calculated results. If any individual
+    // update fails we abort so run totals aren't written from partial data.
+    const { error: empUpdateError } = await supabase
       .from('salary_run_employees')
       .update({
         gross_salary: result.grossSalary,
@@ -217,6 +218,10 @@ export async function POST(
         ytd_net: Math.round(((ytdByEmployee.get(sre.employee_id)?.net || 0) + result.netSalary) * 100) / 100,
       })
       .eq('id', sre.id)
+
+    if (empUpdateError) {
+      return NextResponse.json({ error: empUpdateError.message }, { status: 500 })
+    }
 
     totalGross += result.grossSalary
     totalTax += result.taxWithheld

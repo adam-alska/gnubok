@@ -96,6 +96,7 @@ export const skatteverketExtension: Extension = {
 
         // Exchange code FIRST — 5-minute expiry, do this before anything else
         const { createClient } = await import('@/lib/supabase/server')
+        const { requireCompanyId } = await import('@/lib/company/context')
         const supabase = await createClient()
 
         // Verify user session (browser should still have cookies)
@@ -106,11 +107,22 @@ export const skatteverketExtension: Extension = {
           )
         }
 
+        // Resolve the active company — state/redirect_uri were stored keyed on company_id
+        // by ctx.settings.set() in the /authorize handler.
+        let companyId: string
+        try {
+          companyId = await requireCompanyId(supabase, user.id)
+        } catch {
+          return NextResponse.redirect(
+            `${appUrl}/reports?tab=vat-declaration&skv_error=${encodeURIComponent('Inget företag valt')}`
+          )
+        }
+
         // Validate CSRF state
         const { data: settingsData } = await supabase
           .from('extension_data')
           .select('value')
-          .eq('company_id', user.id)
+          .eq('company_id', companyId)
           .eq('extension_id', 'skatteverket')
           .eq('key', 'oauth_state')
           .single()
@@ -125,7 +137,7 @@ export const skatteverketExtension: Extension = {
         const { data: redirectData } = await supabase
           .from('extension_data')
           .select('value')
-          .eq('company_id', user.id)
+          .eq('company_id', companyId)
           .eq('extension_id', 'skatteverket')
           .eq('key', 'oauth_redirect_uri')
           .single()
@@ -141,7 +153,7 @@ export const skatteverketExtension: Extension = {
           await supabase
             .from('extension_data')
             .delete()
-            .eq('company_id', user.id)
+            .eq('company_id', companyId)
             .eq('extension_id', 'skatteverket')
             .eq('key', 'oauth_state')
 

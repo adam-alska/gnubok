@@ -143,18 +143,25 @@ async function createSalaryEntry(
     // Förmånsvärden (benefits) are excluded — they affect the tax base but
     // have no cash flow and should not appear as expense lines in the journal.
     const BENEFIT_TYPES = ['benefit_car', 'benefit_housing', 'benefit_meals', 'benefit_wellness', 'benefit_other']
+    let lineItemTotal = 0
     for (const li of emp.line_items) {
       if (li.is_net_deduction || li.is_gross_deduction) continue
       if (BENEFIT_TYPES.includes(li.item_type)) continue // No cash flow for förmånsvärden
       const account = li.account_number || getLineItemAccount(li.item_type as never, emp.employment_type)
       const current = expenseByAccount.get(account) || 0
       expenseByAccount.set(account, current + li.amount)
+      lineItemTotal += li.amount
     }
 
-    // If no specific line items resolved, use gross salary on default account
-    if (emp.line_items.length === 0) {
+    // Ensure the debit side always equals gross_salary (minus gross deductions,
+    // which the credit side doesn't book either). If line items don't cover the
+    // full gross amount, book the remainder to the default salary account so the
+    // entry balances. Without this, an employee with overtime line items but no
+    // base-salary line item would fail the check_journal_entry_balance() trigger.
+    const baseRemainder = Math.round((emp.gross_salary - lineItemTotal) * 100) / 100
+    if (baseRemainder !== 0) {
       const current = expenseByAccount.get(salaryAccount) || 0
-      expenseByAccount.set(salaryAccount, current + emp.gross_salary)
+      expenseByAccount.set(salaryAccount, current + baseRemainder)
     }
   }
 

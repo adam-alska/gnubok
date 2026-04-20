@@ -40,7 +40,7 @@ export async function GET(
     return NextResponse.json({ error: 'Lönekörning hittades inte' }, { status: 404 })
   }
 
-  if (!['review', 'approved', 'paid', 'booked'].includes(run.status)) {
+  if (!['review', 'approved', 'paid', 'booked', 'corrected'].includes(run.status)) {
     return NextResponse.json({ error: 'AGI kan bara genereras efter granskning' }, { status: 400 })
   }
 
@@ -183,7 +183,10 @@ export async function GET(
   }
   const individuppgifter = buildIndividuppgifterSnapshot(employeeData)
 
-  // Store AGI declaration (upsert for corrections per unique constraint)
+  // Store AGI declaration (upsert for corrections per unique constraint).
+  // In-place update: leave corrects_agi_id null — a record must not reference
+  // itself as the declaration it corrects. When a true correction chain is
+  // needed, create a new row pointing to the original instead.
   if (existingAgi) {
     await supabase
       .from('agi_declarations')
@@ -196,7 +199,6 @@ export async function GET(
         total_avgifter: run.total_avgifter,
         employee_count: employeeData.length,
         is_correction: true,
-        corrects_agi_id: existingAgi.id,
         salary_run_id: run.id,
       })
       .eq('id', existingAgi.id)
