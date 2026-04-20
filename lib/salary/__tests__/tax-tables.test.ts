@@ -1,5 +1,12 @@
-import { describe, it, expect } from 'vitest'
-import { lookupTaxAmount, calculateJamkningTax, calculateSidoinkomstTax } from '../tax-tables'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import {
+  lookupTaxAmount,
+  calculateJamkningTax,
+  calculateSidoinkomstTax,
+  fetchTaxTableRates,
+  clearTaxTableCache,
+  TaxTableUnavailableError,
+} from '../tax-tables'
 import type { TaxTableRate } from '../tax-tables'
 
 const sampleRates: TaxTableRate[] = [
@@ -29,8 +36,9 @@ describe('lookupTaxAmount', () => {
     expect(lookupTaxAmount(33, 1, 100000, sampleRates)).toBe(16800)
   })
 
-  it('falls back to 30% when table not found', () => {
-    expect(lookupTaxAmount(99, 1, 40000, sampleRates)).toBe(12000)
+  it('throws TaxTableUnavailableError when no matching rates exist (no silent 30% fallback)', () => {
+    expect(() => lookupTaxAmount(99, 1, 40000, sampleRates)).toThrow(TaxTableUnavailableError)
+    expect(() => lookupTaxAmount(99, 1, 40000, sampleRates)).toThrow(/table 99/)
   })
 
   it('filters by correct column', () => {
@@ -59,5 +67,81 @@ describe('calculateSidoinkomstTax', () => {
 
   it('rounds to 2 decimal places', () => {
     expect(calculateSidoinkomstTax(33333)).toBe(9999.90)
+  })
+})
+
+describe('fetchTaxTableRates fallback behavior', () => {
+  const originalFetch = globalThis.fetch
+
+  beforeEach(() => {
+    clearTaxTableCache()
+  })
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+    clearTaxTableCache()
+  })
+
+  it("falls back to local data when the Skatteverket API fails for a supported year", async () => {
+    // Mock fetch to simulate API outage
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('network down'))
+
+    const result = await fetchTaxTableRates(2026, 33, 1)
+
+    expect(result.source).toBe('fallback')
+    expect(result.rates.length).toBeGreaterThan(0)
+    // Every rate should match the requested table/column/year
+    for (const r of result.rates) {
+      expect(r.tableYear).toBe(2026)
+      expect(r.tableNumber).toBe(33)
+      expect(r.columnNumber).toBe(1)
+    }
+  })
+
+  it('marks source as api when the API returns data', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        resultCount: 1,
+        results: [
+          {
+            'år': '2026',
+            'tabellnr': '33',
+            'inkomst fr.o.m.': '20001',
+            'inkomst t.o.m.': '20100',
+            'kolumn 1': '2800',
+            'kolumn 2': '0',
+            'kolumn 3': '2500',
+            'kolumn 4': '100',
+            'kolumn 5': '2800',
+            'kolumn 6': '3000',
+          },
+        ],
+      }),
+    } as Response)
+
+    const result = await fetchTaxTableRates(2026, 33, 1)
+
+    expect(result.source).toBe('api')
+    expect(result.rates[0].taxAmount).toBe(2800)
+  })
+
+  it('throws TaxTableUnavailableError when API fails and year has no fallback', async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('network down'))
+
+    await expect(fetchTaxTableRates(2020, 33, 1)).rejects.toBeInstanceOf(TaxTableUnavailableError)
+    await expect(fetchTaxTableRates(2020, 33, 1)).rejects.toThrow(/2020/)
+  })
+
+  it('caches the fallback result so repeat calls do not re-trigger the failed API', async () => {
+    const fetchSpy = vi.fn().mockRejectedValue(new Error('network down'))
+    globalThis.fetch = fetchSpy
+
+    await fetchTaxTableRates(2026, 33, 1)
+    await fetchTaxTableRates(2026, 33, 1)
+
+    // Only one API attempt despite two calls — second hit the cache
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
 })

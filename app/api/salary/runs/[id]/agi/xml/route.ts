@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { ensureInitialized } from '@/lib/init'
 import { requireCompanyId } from '@/lib/company/context'
-import { generateAGIXml, buildIndividuppgifterSnapshot } from '@/lib/salary/agi/xml-generator'
+import { generateAGIXml, buildIndividuppgifterSnapshot, AGIIncompleteDataError } from '@/lib/salary/agi/xml-generator'
 import type { AGIEmployeeData, AGICompanyData, AGITotals } from '@/lib/salary/agi/xml-generator'
 import { eventBus } from '@/lib/events'
 
@@ -40,7 +40,7 @@ export async function GET(
     return NextResponse.json({ error: 'Lönekörning hittades inte' }, { status: 404 })
   }
 
-  if (!['review', 'approved', 'paid', 'booked'].includes(run.status)) {
+  if (!['review', 'approved', 'paid', 'booked', 'corrected'].includes(run.status)) {
     return NextResponse.json({ error: 'AGI kan bara genereras efter granskning' }, { status: 400 })
   }
 
@@ -55,11 +55,20 @@ export async function GET(
     return NextResponse.json({ error: 'Företag hittades inte' }, { status: 404 })
   }
 
-  // Load company settings for contact info
+  // Load company-level phone/email/org from settings (user-editable under /settings/company).
+  // Note: the schema has `phone` and `email` — there is no separate `contact_*` column.
   const { data: settings } = await supabase
     .from('company_settings')
-    .select('contact_name, contact_phone, contact_email')
+    .select('org_number, phone, email')
     .eq('company_id', companyId)
+    .single()
+
+  // Technical contact name comes from the signed-in user's profile (the person
+  // generating the file), falling back to the company name.
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, email')
+    .eq('id', user.id)
     .single()
 
   // Load employees with their data
@@ -72,15 +81,17 @@ export async function GET(
     return NextResponse.json({ error: 'Inga anställda i lönekörningen' }, { status: 400 })
   }
 
-  // Build AGI data
+  // Build AGI data.
+  // org_number: prefer the user-editable company_settings.org_number, fall
+  // back to companies.org_number (set during onboarding).
   const companyData: AGICompanyData = {
-    orgNumber: company.org_number || '',
+    orgNumber: (settings?.org_number || company.org_number || '').trim(),
     companyName: company.name,
     periodYear: run.period_year,
     periodMonth: run.period_month,
-    contactName: settings?.contact_name || company.name,
-    contactPhone: settings?.contact_phone || '',
-    contactEmail: settings?.contact_email || '',
+    contactName: (profile?.full_name || company.name || '').trim(),
+    contactPhone: (settings?.phone || '').trim(),
+    contactEmail: (settings?.email || profile?.email || user.email || '').trim(),
   }
 
   const employeeData: AGIEmployeeData[] = runEmployees.map(sre => {
@@ -124,9 +135,29 @@ export async function GET(
     ;(avgifterByCategory as Record<string, { basis: number; amount: number }>)[category] = cat
   }
 
+  const totalAvgifterAmount = Object.values(avgifterByCategory).reduce(
+    (sum, cat) => sum + (cat?.amount ?? 0),
+    0
+  )
+
+  // FK499 TotalSjuklonekostnad — sum of sjuklön paid (days 2–14) across all
+  // employees. Day 1 is karens (unpaid); day 15+ is Försäkringskassan, so
+  // neither counts as an employer sjuklön cost.
+  let totalSjuklonekostnad = 0
+  for (const sre of runEmployees) {
+    const lineItems = (sre.line_items || []) as Array<Record<string, unknown>>
+    for (const li of lineItems) {
+      if (li.item_type === 'sick_day2_14') {
+        totalSjuklonekostnad += Math.abs((li.amount as number) || 0)
+      }
+    }
+  }
+
   const totals: AGITotals = {
     totalTax: run.total_tax,
     totalAvgifterBasis: runEmployees.reduce((s, e) => s + e.avgifter_basis, 0),
+    totalAvgifterAmount: Math.round(totalAvgifterAmount * 100) / 100,
+    totalSjuklonekostnad: Math.round(totalSjuklonekostnad * 100) / 100,
     avgifterByCategory,
   }
 
@@ -141,10 +172,21 @@ export async function GET(
 
   const isCorrection = !!existingAgi
 
-  const xml = generateAGIXml(companyData, employeeData, totals, isCorrection)
+  let xml: string
+  try {
+    xml = generateAGIXml(companyData, employeeData, totals, isCorrection)
+  } catch (err) {
+    if (err instanceof AGIIncompleteDataError) {
+      return NextResponse.json({ error: err.message, missingFields: err.missingFields }, { status: 400 })
+    }
+    throw err
+  }
   const individuppgifter = buildIndividuppgifterSnapshot(employeeData)
 
-  // Store AGI declaration (upsert for corrections per unique constraint)
+  // Store AGI declaration (upsert for corrections per unique constraint).
+  // In-place update: leave corrects_agi_id null — a record must not reference
+  // itself as the declaration it corrects. When a true correction chain is
+  // needed, create a new row pointing to the original instead.
   if (existingAgi) {
     await supabase
       .from('agi_declarations')
@@ -157,7 +199,6 @@ export async function GET(
         total_avgifter: run.total_avgifter,
         employee_count: employeeData.length,
         is_correction: true,
-        corrects_agi_id: existingAgi.id,
         salary_run_id: run.id,
       })
       .eq('id', existingAgi.id)

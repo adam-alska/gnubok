@@ -58,7 +58,8 @@ export interface CalculationStep {
   label: string
   formula: string
   input: Record<string, number | string>
-  output: number
+  /** Numeric result for the step. `null` for context-only rows (e.g. avgiftskategori) that describe a rule, not a calculation. */
+  output: number | null
 }
 
 export interface SalaryCalculationResult {
@@ -88,11 +89,34 @@ export interface AvgifterCalculation {
 }
 
 // ============================================================
-// Rounding helper
+// Rounding / formatting helpers
 // ============================================================
 
 function r(x: number): number {
   return Math.round(x * 100) / 100
+}
+
+/**
+ * Format a rate (0.2081) as a Swedish percentage string ("20,81 %").
+ * Strips trailing zeros, uses Swedish comma as decimal separator, and rounds
+ * to avoid JS floating-point noise like "20.810000000000002".
+ */
+function fmtPct(decimal: number, decimals = 2): string {
+  const pct = decimal * 100
+  const rounded = Math.round(pct * 10 ** decimals) / 10 ** decimals
+  const str = rounded
+    .toFixed(decimals)
+    .replace(/\.?0+$/, '')
+    .replace('.', ',')
+  return `${str} %`
+}
+
+/**
+ * Format an integer amount with Swedish thousand-separators and "kr" suffix,
+ * for embedding inside formula descriptions ("25 000 kr").
+ */
+function fmtKr(amount: number): string {
+  return `${Math.round(amount).toLocaleString('sv-SE')} kr`
 }
 
 // ============================================================
@@ -126,7 +150,7 @@ export function calculateSalary(
     baseSalary = r(input.monthlySalary * (input.employmentDegree / 100))
     steps.push({
       label: 'Grundlön',
-      formula: 'monthly_salary × (employment_degree / 100)',
+      formula: 'månadslön × (sysselsättningsgrad / 100)',
       input: { monthly_salary: input.monthlySalary, employment_degree: input.employmentDegree },
       output: baseSalary,
     })
@@ -136,7 +160,7 @@ export function calculateSalary(
     baseSalary = r(rate * hours)
     steps.push({
       label: 'Grundlön (timavlönad)',
-      formula: 'hourly_rate × hours_worked',
+      formula: 'timlön × arbetade timmar',
       input: { hourly_rate: rate, hours_worked: hours },
       output: baseSalary,
     })
@@ -150,7 +174,7 @@ export function calculateSalary(
   if (totalAdditions > 0) {
     steps.push({
       label: 'Tillägg (övertid, bonus, provision)',
-      formula: 'sum(additions)',
+      formula: 'summa tillägg',
       input: { count: additions.length },
       output: totalAdditions,
     })
@@ -164,7 +188,7 @@ export function calculateSalary(
   if (totalAbsence !== 0) {
     steps.push({
       label: 'Frånvaro (sjuk, VAB, semester, föräldraledig)',
-      formula: 'sum(absence_items)',
+      formula: 'summa frånvaroposter',
       input: { count: absenceItems.length },
       output: totalAbsence,
     })
@@ -176,7 +200,7 @@ export function calculateSalary(
   if (totalGrossDeductions > 0) {
     steps.push({
       label: 'Bruttolöneavdrag',
-      formula: 'sum(gross_deductions)',
+      formula: 'summa bruttoavdrag',
       input: { count: grossDeductionItems.length },
       output: -totalGrossDeductions,
     })
@@ -186,7 +210,7 @@ export function calculateSalary(
   const grossSalary = r(baseSalary + totalAdditions + totalAbsence - totalGrossDeductions)
   steps.push({
     label: 'Bruttolön',
-    formula: 'base + additions + absence - gross_deductions',
+    formula: 'grundlön + tillägg + frånvaro − bruttoavdrag',
     input: { base: baseSalary, additions: totalAdditions, absence: totalAbsence, gross_deductions: totalGrossDeductions },
     output: grossSalary,
   })
@@ -199,7 +223,7 @@ export function calculateSalary(
   if (totalBenefits > 0) {
     steps.push({
       label: 'Förmånsvärden',
-      formula: 'sum(benefit_values)',
+      formula: 'summa förmåner',
       input: { count: benefitItems.length },
       output: totalBenefits,
     })
@@ -208,7 +232,7 @@ export function calculateSalary(
   const taxableIncome = r(grossSalary + totalBenefits)
   steps.push({
     label: 'Skattegrundande inkomst',
-    formula: 'gross_salary + benefit_values',
+    formula: 'bruttolön + förmåner',
     input: { gross_salary: grossSalary, benefit_values: totalBenefits },
     output: taxableIncome,
   })
@@ -222,7 +246,7 @@ export function calculateSalary(
     taxWithheld = 0
     steps.push({
       label: 'Skatteavdrag (F-skatt)',
-      formula: '0 (F-skattsedel, inget avdrag)',
+      formula: 'F-skattsedel — inget skatteavdrag görs',
       input: {},
       output: 0,
     })
@@ -231,7 +255,7 @@ export function calculateSalary(
     taxWithheld = r(taxableIncome * 0.30)
     steps.push({
       label: 'Skatteavdrag (ej verifierad)',
-      formula: 'taxable_income × 30%',
+      formula: 'skattegrundande inkomst × 30 %',
       input: { taxable_income: taxableIncome },
       output: taxWithheld,
     })
@@ -239,8 +263,8 @@ export function calculateSalary(
     // Sidoinkomst: flat 30%
     taxWithheld = calculateSidoinkomstTax(taxableIncome)
     steps.push({
-      label: 'Skatteavdrag (sidoinkomst 30%)',
-      formula: 'taxable_income × 30%',
+      label: 'Skatteavdrag (sidoinkomst 30 %)',
+      formula: 'skattegrundande inkomst × 30 %',
       input: { taxable_income: taxableIncome },
       output: taxWithheld,
     })
@@ -248,8 +272,8 @@ export function calculateSalary(
     // Jämkning
     taxWithheld = calculateJamkningTax(taxableIncome, input.jamkningPercentage)
     steps.push({
-      label: `Skatteavdrag (jämkning ${input.jamkningPercentage}%)`,
-      formula: 'taxable_income × jamkning_percentage / 100',
+      label: `Skatteavdrag (jämkning ${input.jamkningPercentage} %)`,
+      formula: `skattegrundande inkomst × ${input.jamkningPercentage} %`,
       input: { taxable_income: taxableIncome, jamkning_percentage: input.jamkningPercentage },
       output: taxWithheld,
     })
@@ -258,7 +282,7 @@ export function calculateSalary(
     taxWithheld = lookupTaxAmount(input.taxTableNumber, input.taxColumn, taxableIncome, taxRates)
     steps.push({
       label: `Skatteavdrag (tabell ${input.taxTableNumber}, kolumn ${input.taxColumn})`,
-      formula: `lookup(table=${input.taxTableNumber}, column=${input.taxColumn}, income=${Math.round(taxableIncome)})`,
+      formula: `skattetabell ${input.taxTableNumber}, kolumn ${input.taxColumn}, inkomst ${fmtKr(taxableIncome)}`,
       input: { table: input.taxTableNumber, column: input.taxColumn, taxable_income: taxableIncome },
       output: taxWithheld,
     })
@@ -266,8 +290,8 @@ export function calculateSalary(
     // Fallback: flat 30%
     taxWithheld = r(taxableIncome * 0.30)
     steps.push({
-      label: 'Skatteavdrag (30% schablon)',
-      formula: 'taxable_income × 30%',
+      label: 'Skatteavdrag (30 % schablon)',
+      formula: 'skattegrundande inkomst × 30 %',
       input: { taxable_income: taxableIncome },
       output: taxWithheld,
     })
@@ -280,7 +304,7 @@ export function calculateSalary(
   const netSalary = r(grossSalary - taxWithheld - totalNetDeductions)
   steps.push({
     label: 'Nettolön',
-    formula: 'gross - tax - net_deductions',
+    formula: 'bruttolön − skatt − nettoavdrag',
     input: { gross: grossSalary, tax: taxWithheld, net_deductions: totalNetDeductions },
     output: netSalary,
   })
@@ -299,7 +323,7 @@ export function calculateSalary(
     steps.push(...avgifterCalc.steps)
     steps.push({
       label: 'Arbetsgivaravgifter (ungdomsrabatt med tak)',
-      formula: `${config.avgifterYouthSalaryCap} × ${avgifterCalc.rate} + ${r(avgifterBasis - config.avgifterYouthSalaryCap)} × ${config.avgifterTotal}`,
+      formula: `${fmtKr(config.avgifterYouthSalaryCap)} × ${fmtPct(avgifterCalc.rate)} + ${fmtKr(avgifterBasis - config.avgifterYouthSalaryCap)} × ${fmtPct(config.avgifterTotal)}`,
       input: { cap: config.avgifterYouthSalaryCap, reduced: reducedPart, standard: standardPart },
       output: avgifterAmount,
     })
@@ -310,7 +334,7 @@ export function calculateSalary(
     steps.push(...avgifterCalc.steps)
     steps.push({
       label: 'Arbetsgivaravgifter (växa-stöd med tak)',
-      formula: `${config.avgifterVaxaStodCap} × ${avgifterCalc.rate} + ${r(avgifterBasis - config.avgifterVaxaStodCap)} × ${config.avgifterTotal}`,
+      formula: `${fmtKr(config.avgifterVaxaStodCap)} × ${fmtPct(avgifterCalc.rate)} + ${fmtKr(avgifterBasis - config.avgifterVaxaStodCap)} × ${fmtPct(config.avgifterTotal)}`,
       input: { cap: config.avgifterVaxaStodCap, reduced: reducedPart, standard: standardPart },
       output: avgifterAmount,
     })
@@ -319,7 +343,7 @@ export function calculateSalary(
     steps.push(...avgifterCalc.steps)
     steps.push({
       label: 'Arbetsgivaravgifter',
-      formula: 'avgifter_basis × rate',
+      formula: `avgiftsunderlag × ${fmtPct(avgifterCalc.rate)}`,
       input: { avgifter_basis: avgifterBasis, rate: avgifterCalc.rate },
       output: avgifterAmount,
     })
@@ -335,8 +359,8 @@ export function calculateSalary(
     const rate = input.vacationDaysPerYear >= 30 ? 0.144 : 0.12
     vacationAccrual = r(vacationBasis * rate)
     steps.push({
-      label: `Semesteravsättning (procentregeln ${rate * 100}%)`,
-      formula: 'vacation_basis × rate',
+      label: `Semesteravsättning (procentregeln ${fmtPct(rate)})`,
+      formula: `semesterunderlag × ${fmtPct(rate)}`,
       input: { vacation_basis: vacationBasis, rate },
       output: vacationAccrual,
     })
@@ -350,8 +374,8 @@ export function calculateSalary(
     const tillagg = r(dailyRate * input.semestertillaggRate * input.vacationDaysPerYear)
     vacationAccrual = tillagg
     steps.push({
-      label: `Semesteravsättning (sammalöneregeln, tillägg ${(input.semestertillaggRate * 100).toFixed(2)}%)`,
-      formula: 'daily_rate × semestertillagg_rate × vacation_days',
+      label: `Semesteravsättning (sammalöneregeln, tillägg ${fmtPct(input.semestertillaggRate)})`,
+      formula: `dagslön × ${fmtPct(input.semestertillaggRate)} × semesterdagar`,
       input: { daily_rate: dailyRate, semestertillagg_rate: input.semestertillaggRate, vacation_days: input.vacationDaysPerYear },
       output: vacationAccrual,
     })
@@ -361,7 +385,7 @@ export function calculateSalary(
   const vacationAccrualAvgifter = r(vacationAccrual * avgifterCalc.rate)
   steps.push({
     label: 'Arbetsgivaravgifter på semesteravsättning',
-    formula: 'vacation_accrual × avgifter_rate',
+    formula: `semesteravsättning × ${fmtPct(avgifterCalc.rate)}`,
     input: { vacation_accrual: vacationAccrual, avgifter_rate: avgifterCalc.rate },
     output: vacationAccrualAvgifter,
   })
@@ -369,7 +393,7 @@ export function calculateSalary(
   const totalEmployerCost = r(grossSalary + avgifterAmount + vacationAccrual + vacationAccrualAvgifter)
   steps.push({
     label: 'Total arbetsgivarkostnad',
-    formula: 'gross + avgifter + vacation_accrual + vacation_avgifter',
+    formula: 'bruttolön + avgifter + semesteravsättning + avgifter på semester',
     input: { gross: grossSalary, avgifter: avgifterAmount, vacation_accrual: vacationAccrual, vacation_avgifter: vacationAccrualAvgifter },
     output: totalEmployerCost,
   })
@@ -418,7 +442,12 @@ export function calculateAvgifterRate(
       amount: 0,
       basis: 0,
       category: 'standard',
-      steps: [{ label: 'Avgiftskategori', formula: 'standard (personnummer ej dekrypterbart)', input: {}, output: config.avgifterTotal }],
+      steps: [{
+        label: 'Avgiftskategori',
+        formula: `Standard ${fmtPct(config.avgifterTotal)} (personnummer kunde inte dekrypteras)`,
+        input: {},
+        output: null,
+      }],
     }
   }
 
@@ -429,9 +458,9 @@ export function calculateAvgifterRate(
   if (birthYear <= 1937) {
     steps.push({
       label: 'Avgiftskategori',
-      formula: 'Född ≤1937: 0%',
+      formula: 'Född 1937 eller tidigare — inga arbetsgivaravgifter',
       input: { birth_year: birthYear },
-      output: 0,
+      output: null,
     })
     return { rate: 0, amount: 0, basis: 0, category: 'exempt', steps }
   }
@@ -440,9 +469,9 @@ export function calculateAvgifterRate(
   if (ageAtYearStart >= config.reducedAvgiftAge) {
     steps.push({
       label: 'Avgiftskategori',
-      formula: `Ålder ${ageAtYearStart} ≥ ${config.reducedAvgiftAge}: reducerad (${config.avgifterReduced65plus * 100}%)`,
+      formula: `Ålder ${ageAtYearStart} år: reducerad avgift ${fmtPct(config.avgifterReduced65plus)} (endast ålderspensionsavgift)`,
       input: { age: ageAtYearStart, threshold: config.reducedAvgiftAge },
-      output: config.avgifterReduced65plus,
+      output: null,
     })
     return { rate: config.avgifterReduced65plus, amount: 0, basis: 0, category: 'reduced_65plus', steps }
   }
@@ -453,9 +482,9 @@ export function calculateAvgifterRate(
     if (payDate >= input.vaxaStodStart && payDate <= input.vaxaStodEnd && config.avgifterVaxaStodRate !== null) {
       steps.push({
         label: 'Avgiftskategori',
-        formula: `Växa-stöd: ${(config.avgifterVaxaStodRate ?? 0) * 100}% på första ${config.avgifterVaxaStodCap} SEK`,
+        formula: `Växa-stöd ${fmtPct(config.avgifterVaxaStodRate ?? 0)} på första ${fmtKr(config.avgifterVaxaStodCap ?? 0)}`,
         input: { vaxa_cap: config.avgifterVaxaStodCap ?? 0 },
-        output: config.avgifterVaxaStodRate ?? 0,
+        output: null,
       })
       return { rate: config.avgifterVaxaStodRate ?? config.avgifterTotal, amount: 0, basis: 0, category: 'vaxa_stod', steps }
     }
@@ -470,9 +499,9 @@ export function calculateAvgifterRate(
     if (isYouthPeriod) {
       steps.push({
         label: 'Avgiftskategori',
-        formula: `Ungdomsrabatt (${ageAtYearStart} år): ${config.avgifterYouthRate * 100}% på första ${config.avgifterYouthSalaryCap} SEK`,
+        formula: `Ungdomsrabatt (${ageAtYearStart} år): ${fmtPct(config.avgifterYouthRate)} på första ${fmtKr(config.avgifterYouthSalaryCap ?? 0)}`,
         input: { age: ageAtYearStart, cap: config.avgifterYouthSalaryCap ?? 0 },
-        output: config.avgifterYouthRate,
+        output: null,
       })
       return { rate: config.avgifterYouthRate, amount: 0, basis: 0, category: 'youth', steps }
     }
@@ -481,9 +510,9 @@ export function calculateAvgifterRate(
   // Standard rate
   steps.push({
     label: 'Avgiftskategori',
-    formula: `Standard: ${config.avgifterTotal * 100}%`,
+    formula: `Standard ${fmtPct(config.avgifterTotal)}`,
     input: { age: ageAtYearStart },
-    output: config.avgifterTotal,
+    output: null,
   })
   return { rate: config.avgifterTotal, amount: 0, basis: 0, category: 'standard', steps }
 }
@@ -517,7 +546,7 @@ export function calculateSjuklon(
   const karensavdrag = calculateKarensavdrag(monthlySalary, config)
   steps.push({
     label: 'Karensavdrag',
-    formula: '20% × (monthly × 12/52 × 80%)',
+    formula: `20 % × (månadslön × 12/52 × ${fmtPct(config.sjuklonRate)})`,
     input: { monthly_salary: monthlySalary },
     output: karensavdrag,
   })
@@ -526,8 +555,8 @@ export function calculateSjuklon(
   const sjuklonDays = Math.min(Math.max(sickDays - 1, 0), 13)
   const sjuklon = r(dailyRate * config.sjuklonRate * sjuklonDays)
   steps.push({
-    label: 'Sjuklön dag 2-14',
-    formula: 'daily_rate × 80% × (sick_days - 1)',
+    label: 'Sjuklön dag 2–14',
+    formula: `dagslön × ${fmtPct(config.sjuklonRate)} × (sjukdagar − 1)`,
     input: { daily_rate: dailyRate, sjuklon_rate: config.sjuklonRate, days: sjuklonDays },
     output: sjuklon,
   })
@@ -537,7 +566,7 @@ export function calculateSjuklon(
   const totalDeduction = r(-(fullPayForPeriod - sjuklon + karensavdrag))
   steps.push({
     label: 'Netto sjukavdrag',
-    formula: '-(full_pay - sjuklon + karensavdrag)',
+    formula: '−(full lön − sjuklön + karensavdrag)',
     input: { full_pay: fullPayForPeriod, sjuklon, karensavdrag },
     output: totalDeduction,
   })
@@ -561,8 +590,8 @@ export function calculateVacationAccrual(params: {
     const rate = params.vacationDaysPerYear >= 30 ? 0.144 : 0.12
     const accrual = r(params.vacationBasis * rate)
     steps.push({
-      label: `Semesteravsättning (procentregeln ${rate * 100}%)`,
-      formula: 'vacation_basis × rate',
+      label: `Semesteravsättning (procentregeln ${fmtPct(rate)})`,
+      formula: `semesterunderlag × ${fmtPct(rate)}`,
       input: { vacation_basis: params.vacationBasis, rate },
       output: accrual,
     })
@@ -571,8 +600,8 @@ export function calculateVacationAccrual(params: {
     const dailyRate = r(params.monthlySalary / 21)
     const accrual = r(dailyRate * params.semestertillaggRate * params.vacationDaysPerYear)
     steps.push({
-      label: `Semesteravsättning (sammalöneregeln ${params.semestertillaggRate * 100}%)`,
-      formula: 'daily_rate × semestertillagg_rate × vacation_days',
+      label: `Semesteravsättning (sammalöneregeln ${fmtPct(params.semestertillaggRate)})`,
+      formula: `dagslön × ${fmtPct(params.semestertillaggRate)} × semesterdagar`,
       input: { daily_rate: dailyRate, rate: params.semestertillaggRate, days: params.vacationDaysPerYear },
       output: accrual,
     })

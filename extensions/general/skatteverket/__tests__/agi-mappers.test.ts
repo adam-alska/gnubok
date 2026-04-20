@@ -26,6 +26,7 @@ function makeTotals(overrides: Partial<AGITotals> = {}): AGITotals {
   return {
     totalTax: 8000,
     totalAvgifterBasis: 35000,
+    totalAvgifterAmount: 10997,
     avgifterByCategory: {
       standard: { basis: 35000, amount: 10997 },
     },
@@ -171,6 +172,7 @@ describe('buildAGIPayload', () => {
     const totals: AGITotals = {
       totalTax: 0,
       totalAvgifterBasis: 0,
+      totalAvgifterAmount: 0,
       avgifterByCategory: {},
     }
     const result = buildAGIPayload([makeEmployee({ grossSalary: 0, taxWithheld: 0, avgifterBasis: 0 })], totals)

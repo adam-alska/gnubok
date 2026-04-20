@@ -42,8 +42,14 @@ export async function GET(
 
   const { data: settings } = await supabase
     .from('company_settings')
-    .select('contact_name, contact_phone, contact_email')
+    .select('org_number, phone, email')
     .eq('company_id', companyId)
+    .single()
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, email')
+    .eq('id', user.id)
     .single()
 
   // Load all booked salary run employees for the year, grouped by employee
@@ -114,12 +120,12 @@ export async function GET(
   }
 
   const companyData: KU10CompanyData = {
-    orgNumber: company.org_number || '',
+    orgNumber: (settings?.org_number || company.org_number || '').trim(),
     companyName: company.name,
     year: yearNum,
-    contactName: settings?.contact_name || company.name,
-    contactPhone: settings?.contact_phone || '',
-    contactEmail: settings?.contact_email || '',
+    contactName: (profile?.full_name || company.name || '').trim(),
+    contactPhone: (settings?.phone || '').trim(),
+    contactEmail: (settings?.email || profile?.email || user.email || '').trim(),
   }
 
   const r = (x: number) => Math.round(x * 100) / 100

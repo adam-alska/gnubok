@@ -5,7 +5,7 @@ import { requireCompanyId } from '@/lib/company/context'
 import { requireWritePermission } from '@/lib/auth/require-write'
 import { calculateSalary } from '@/lib/salary/calculation-engine'
 import { loadPayrollConfig, serializePayrollConfig } from '@/lib/salary/payroll-config'
-import { fetchAllTaxTableRatesForRun } from '@/lib/salary/tax-tables'
+import { fetchAllTaxTableRatesForRun, TaxTableUnavailableError } from '@/lib/salary/tax-tables'
 import type { SalaryLineItemType } from '@/types'
 
 ensureInitialized()
@@ -81,9 +81,24 @@ export async function POST(
   // Fetch tax table rates from Skatteverket API for all needed tables/columns
   const tableNumbers = [...new Set(runEmployees.filter(e => e.employee?.tax_table_number).map(e => e.employee.tax_table_number as number))]
   const columns = [...new Set(runEmployees.filter(e => e.employee?.tax_column).map(e => e.employee.tax_column as number))]
-  const taxRates = tableNumbers.length > 0
-    ? await fetchAllTaxTableRatesForRun(paymentYear, tableNumbers, columns.length > 0 ? columns : [1])
-    : []
+  let taxRates: Awaited<ReturnType<typeof fetchAllTaxTableRatesForRun>>['rates'] = []
+  let taxTableSource: Awaited<ReturnType<typeof fetchAllTaxTableRatesForRun>>['source'] = 'api'
+  if (tableNumbers.length > 0) {
+    try {
+      const result = await fetchAllTaxTableRatesForRun(
+        paymentYear,
+        tableNumbers,
+        columns.length > 0 ? columns : [1]
+      )
+      taxRates = result.rates
+      taxTableSource = result.source
+    } catch (err) {
+      if (err instanceof TaxTableUnavailableError) {
+        return NextResponse.json({ error: err.message }, { status: 503 })
+      }
+      throw err
+    }
+  }
 
   let totalGross = 0
   let totalTax = 0
@@ -172,8 +187,9 @@ export async function POST(
     const parentalDays = sumQuantity(['parental_leave'])
     const vacationDays = sumQuantity(['vacation'])
 
-    // Update salary_run_employee with calculated results
-    await supabase
+    // Update salary_run_employee with calculated results. If any individual
+    // update fails we abort so run totals aren't written from partial data.
+    const { error: empUpdateError } = await supabase
       .from('salary_run_employees')
       .update({
         gross_salary: result.grossSalary,
@@ -203,6 +219,10 @@ export async function POST(
       })
       .eq('id', sre.id)
 
+    if (empUpdateError) {
+      return NextResponse.json({ error: empUpdateError.message }, { status: 500 })
+    }
+
     totalGross += result.grossSalary
     totalTax += result.taxWithheld
     totalNet += result.netSalary
@@ -231,5 +251,16 @@ export async function POST(
     return NextResponse.json({ error: updateError.message }, { status: 500 })
   }
 
-  return NextResponse.json({ data: updatedRun })
+  const warnings: string[] = []
+  if (taxTableSource === 'fallback') {
+    warnings.push(
+      `Skatteverkets skattetabell-API är inte nåbart — beräkningen använder lokal reservdata för ${paymentYear}. Kontrollera att Skatteverket inte publicerat ändringar innan lönekörningen bokförs.`
+    )
+  } else if (taxTableSource === 'mixed') {
+    warnings.push(
+      `Skatteverkets skattetabell-API svarade bara delvis — vissa skattetabeller kommer från lokal reservdata för ${paymentYear}. Kontrollera att Skatteverket inte publicerat ändringar innan lönekörningen bokförs.`
+    )
+  }
+
+  return NextResponse.json({ data: updatedRun, warnings })
 }

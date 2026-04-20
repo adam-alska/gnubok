@@ -1,4 +1,5 @@
 import { createJournalEntry, findFiscalPeriod } from '@/lib/bookkeeping/engine'
+import { getBASReference } from '@/lib/bookkeeping/bas-reference'
 import { createLogger } from '@/lib/logger'
 import { SALARY_ACCOUNTS, getLineItemAccount } from './account-mapping'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -77,6 +78,8 @@ export async function createSalaryRunEntries(
   const periodLabel = `${run.period_year}-${String(run.period_month).padStart(2, '0')}`
   const desc = `Lön ${periodLabel}`
 
+  await ensureSalaryAccountsExist(supabase, companyId, userId, run)
+
   // ─── Entry 1: Salary (brutto, skatt, netto) ───
   const salaryEntry = await createSalaryEntry(
     supabase, companyId, userId, run, fiscalPeriodId, desc
@@ -140,18 +143,25 @@ async function createSalaryEntry(
     // Förmånsvärden (benefits) are excluded — they affect the tax base but
     // have no cash flow and should not appear as expense lines in the journal.
     const BENEFIT_TYPES = ['benefit_car', 'benefit_housing', 'benefit_meals', 'benefit_wellness', 'benefit_other']
+    let lineItemTotal = 0
     for (const li of emp.line_items) {
       if (li.is_net_deduction || li.is_gross_deduction) continue
       if (BENEFIT_TYPES.includes(li.item_type)) continue // No cash flow for förmånsvärden
       const account = li.account_number || getLineItemAccount(li.item_type as never, emp.employment_type)
       const current = expenseByAccount.get(account) || 0
       expenseByAccount.set(account, current + li.amount)
+      lineItemTotal += li.amount
     }
 
-    // If no specific line items resolved, use gross salary on default account
-    if (emp.line_items.length === 0) {
+    // Ensure the debit side always equals gross_salary (minus gross deductions,
+    // which the credit side doesn't book either). If line items don't cover the
+    // full gross amount, book the remainder to the default salary account so the
+    // entry balances. Without this, an employee with overtime line items but no
+    // base-salary line item would fail the check_journal_entry_balance() trigger.
+    const baseRemainder = Math.round((emp.gross_salary - lineItemTotal) * 100) / 100
+    if (baseRemainder !== 0) {
       const current = expenseByAccount.get(salaryAccount) || 0
-      expenseByAccount.set(salaryAccount, current + emp.gross_salary)
+      expenseByAccount.set(salaryAccount, current + baseRemainder)
     }
   }
 
@@ -408,6 +418,91 @@ function getEmployeeSalaryAccount(employmentType: string): string {
     case 'board_member': return SALARY_ACCOUNTS.SALARY_BOARD
     default: return SALARY_ACCOUNTS.SALARY_EMPLOYEE
   }
+}
+
+/**
+ * Ensure every BAS account referenced by the salary run exists in
+ * chart_of_accounts. Users who seeded the minimal chart via
+ * seed_chart_of_accounts will be missing many 7xxx/29xx accounts — we
+ * auto-create them from BAS reference data on first salary booking.
+ */
+async function ensureSalaryAccountsExist(
+  supabase: SupabaseClient,
+  companyId: string,
+  userId: string,
+  run: SalaryRunData
+): Promise<void> {
+  const needed = new Set<string>()
+
+  for (const account of Object.values(SALARY_ACCOUNTS)) needed.add(account)
+
+  for (const emp of run.employees) {
+    needed.add(getEmployeeSalaryAccount(emp.employment_type))
+    for (const li of emp.line_items) {
+      const account = li.account_number || getLineItemAccount(li.item_type as never, emp.employment_type)
+      if (account) needed.add(account)
+    }
+  }
+
+  if (needed.size === 0) return
+
+  const { data: existing, error } = await supabase
+    .from('chart_of_accounts')
+    .select('account_number')
+    .eq('company_id', companyId)
+    .in('account_number', [...needed])
+
+  if (error) {
+    throw new Error(`Kunde inte läsa kontoplanen: ${error.message}`)
+  }
+
+  const existingSet = new Set((existing || []).map(a => a.account_number))
+  const missing = [...needed].filter(num => !existingSet.has(num))
+  if (missing.length === 0) return
+
+  const inserts = missing.map(accountNumber => {
+    const basRef = getBASReference(accountNumber)
+    if (basRef) {
+      return {
+        user_id: userId,
+        company_id: companyId,
+        account_number: accountNumber,
+        account_name: basRef.account_name,
+        account_class: basRef.account_class,
+        account_group: basRef.account_group,
+        account_type: basRef.account_type,
+        normal_balance: basRef.normal_balance,
+        sru_code: basRef.sru_code,
+        k2_excluded: basRef.k2_excluded,
+        plan_type: 'full_bas',
+        is_active: true,
+        is_system_account: false,
+      }
+    }
+    // Fallback — shouldn't happen for salary accounts, but keeps us safe.
+    const classNum = parseInt(accountNumber.charAt(0), 10)
+    const group = accountNumber.substring(0, 2)
+    return {
+      user_id: userId,
+      company_id: companyId,
+      account_number: accountNumber,
+      account_name: `Konto ${accountNumber}`,
+      account_class: classNum,
+      account_group: group,
+      account_type: classNum >= 4 ? 'expense' : classNum === 2 ? 'liability' : 'asset',
+      normal_balance: classNum <= 1 || classNum >= 4 ? 'debit' : 'credit',
+      plan_type: 'full_bas',
+      is_active: true,
+      is_system_account: false,
+    }
+  })
+
+  const { error: insertError } = await supabase.from('chart_of_accounts').insert(inserts)
+  if (insertError && !insertError.message.includes('duplicate')) {
+    throw new Error(`Kunde inte skapa saknade konton: ${insertError.message}`)
+  }
+
+  log.info(`Auto-created ${missing.length} missing salary accounts: ${missing.join(', ')}`)
 }
 
 function accountLabel(account: string): string {
