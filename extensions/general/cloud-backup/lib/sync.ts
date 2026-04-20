@@ -152,7 +152,14 @@ export async function saveExtensionData<T>(
   key: string,
   value: T
 ): Promise<void> {
-  await supabase.from('extension_data').upsert(
+export async function saveExtensionData<T>(
+  supabase: SupabaseClient,
+  companyId: string,
+  userId: string,
+  key: string,
+  value: T
+): Promise<void> {
+  const { error } = await supabase.from('extension_data').upsert(
     {
       user_id: userId,
       company_id: companyId,
@@ -162,6 +169,7 @@ export async function saveExtensionData<T>(
     },
     { onConflict: 'company_id,extension_id,key' }
   )
+  if (error) throw new Error(`Failed to save extension data: ${error.message}`)
 }
 
 async function fetchCompanyLabel(
