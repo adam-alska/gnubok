@@ -25,7 +25,11 @@ import {
 } from 'lucide-react'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import { useCanWrite } from '@/lib/hooks/use-can-write'
+import { createClient } from '@/lib/supabase/client'
+import { useCompany } from '@/contexts/CompanyContext'
 import type { ImportPreview, AccountMapping } from '@/lib/import/types'
+
+const SERIES_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
 interface ImportReviewStepProps {
   preview: ImportPreview
@@ -50,14 +54,56 @@ export default function ImportReviewStep({
   isLoading,
 }: ImportReviewStepProps) {
   const { canWrite } = useCanWrite()
+  const { company } = useCompany()
   const [options, setOptions] = useState<ImportExecuteOptions>({
     createFiscalPeriod: true,
     importOpeningBalances: true,
     importTransactions: true,
     voucherSeries: 'B',
   })
+  const [defaultSeries, setDefaultSeries] = useState<string | null>(null)
+  const [existingSeries, setExistingSeries] = useState<Set<string>>(new Set())
   const [elapsed, setElapsed] = useState(0)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const seriesInitializedRef = useRef(false)
+
+  useEffect(() => {
+    if (!company?.id) return
+    const supabase = createClient()
+
+    let cancelled = false
+    ;(async () => {
+      const [{ data: settingsData }, { data: sequencesData }] = await Promise.all([
+        supabase
+          .from('company_settings')
+          .select('default_voucher_series')
+          .eq('company_id', company.id)
+          .single(),
+        supabase
+          .from('voucher_sequences')
+          .select('voucher_series')
+          .eq('company_id', company.id),
+      ])
+
+      if (cancelled) return
+
+      const companyDefault = settingsData?.default_voucher_series || null
+      const sequences = new Set<string>((sequencesData || []).map((row) => row.voucher_series))
+
+      setDefaultSeries(companyDefault)
+      setExistingSeries(sequences)
+
+      if (!seriesInitializedRef.current) {
+        seriesInitializedRef.current = true
+        const initial = companyDefault || (sequences.has('B') ? 'B' : Array.from(sequences).sort()[0]) || 'A'
+        setOptions((prev) => ({ ...prev, voucherSeries: initial }))
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [company?.id])
 
   // Block browser close/refresh during import
   useUnsavedChanges(isLoading)
@@ -245,10 +291,20 @@ export default function ImportReviewStep({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="A">A - Huvudserie</SelectItem>
-                  <SelectItem value="B">B - Import</SelectItem>
-                  <SelectItem value="C">C - Korrigeringar</SelectItem>
-                  <SelectItem value="I">I - Import (alternativ)</SelectItem>
+                  {SERIES_LETTERS.map((letter) => {
+                    const isDefault = defaultSeries === letter
+                    const isExisting = existingSeries.has(letter)
+                    const suffix = isDefault
+                      ? ' — standard'
+                      : isExisting
+                        ? ' — används redan'
+                        : ''
+                    return (
+                      <SelectItem key={letter} value={letter}>
+                        {`Serie ${letter}${suffix}`}
+                      </SelectItem>
+                    )
+                  })}
                 </SelectContent>
               </Select>
               <p className="text-sm text-muted-foreground">
