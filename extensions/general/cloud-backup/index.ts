@@ -220,11 +220,14 @@ export const cloudBackupExtension: Extension = {
           const includeDocuments = body.include_documents !== false
 
           const estimate = await estimateArchiveSize(ctx.supabase, ctx.companyId, scope)
-          if (includeDocuments && estimate.total_bytes > SIZE_LIMIT_BYTES) {
+          const effectiveBytes = includeDocuments
+            ? estimate.total_bytes
+            : estimate.total_bytes - estimate.document_bytes
+          if (effectiveBytes > SIZE_LIMIT_BYTES) {
             return NextResponse.json(
               {
                 error: 'archive_too_large',
-                size_bytes: estimate.total_bytes,
+                size_bytes: effectiveBytes,
                 size_limit_bytes: SIZE_LIMIT_BYTES,
               },
               { status: 413 }

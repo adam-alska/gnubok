@@ -148,7 +148,10 @@ export async function generateFullArchive(
 
   const auditFilters =
     options.scope === 'period'
-      ? { from_date: periods[0].period_start, to_date: periods[0].period_end }
+      ? {
+          from_date: periods[0].period_start,
+          to_date: `${periods[0].period_end}T23:59:59.999Z`,
+        }
       : {}
   const auditEntries = await fetchAllAuditEntries(supabase, companyId, auditFilters)
   revision.file('behandlingshistorik.json', JSON.stringify(auditEntries, null, 2))

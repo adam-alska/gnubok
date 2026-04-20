@@ -103,7 +103,7 @@ export async function uploadFile(
   data: ArrayBuffer,
   contentType = 'application/zip'
 ): Promise<UploadResult> {
-  const boundary = `gnubok-${Math.random().toString(36).slice(2)}`
+  const boundary = `gnubok-${crypto.randomUUID().replace(/-/g, '')}`
   const metadata = JSON.stringify({
     name: fileName,
     parents: [folderId],
