@@ -89,7 +89,7 @@ Labels: <from: bug, feature, report, improvement, error + priority label>
 Priority: <high | medium | low>
 
 Description:
-<2–4 sentence summary of the customer's problem in your own words — do not quote the customer verbatim for more than a short phrase. State the observed behavior and expected behavior if you can infer it.>
+<2–4 sentence summary of the customer's problem in your own words. State the observed behavior and expected behavior if you can infer it.>
 
 Relevant code:
 - path/to/file.ts:line — short note on why this is relevant
@@ -101,10 +101,20 @@ Next steps:
 - Second concrete step
 - (2–4 steps total, specific not vague)
 
+Customer email (anonymized):
+<The full body of the customer's first message, with all personal names replaced by `x`. See the anonymization rules below.>
+
 Customer: <email address>
-Original thread: https://mail.google.com/mail/u/1/#inbox/<threadId>
 Gmail thread ID: <threadId>
 ```
+
+**Anonymization rules — applied to the email body before it goes into the ticket**:
+
+- **Replace personal first and last names with `x`**. Example: *"Hey this is amazing. My name is Emil and I do bla bla"* → *"Hey this is amazing. My name is x and I do bla bla"*. Handles greetings (*"Hej Anna,"* → *"Hej x,"*) and signatures (*"/Lars Andersson"* → *"/x"*).
+- **Keep company names, product names, domain terms, error messages, account numbers, SIE references, dates, and amounts.** These are operational details developers need. Only personal names get redacted.
+- **Keep the customer's email address in the `Customer:` metadata line** (outside the anonymized body). The team needs it to reply; developers generally don't read metadata to learn names.
+- **Keep the Gmail thread ID** as a plain identifier (no URL). It's used for duplicate detection across runs.
+- If unsure whether something is a personal name, redact it — false positives are harmless, leaked names aren't.
 
 **Priority label convention**: use `priority:high`, `priority:medium`, `priority:low`. If the repo already has `P0`/`P1`/`P2` labels (check in phase 4), prefer those instead.
 
@@ -125,7 +135,7 @@ If a duplicate is found, replace that ticket block with:
 ━━━ Ticket N of M ━━━ [DUPLICATE]
 Matches existing issue: #<number> — <existing title>
 URL: <issue url>
-This email: https://mail.google.com/mail/u/1/#inbox/<threadId>
+Gmail thread ID: <threadId>
 Suggested action: add a comment to the existing issue linking this new customer report.
 ```
 
@@ -168,9 +178,12 @@ cat > /tmp/issue-body-<N>.md <<'EOF'
 - Step 2
 - Step 3
 
+## Customer email (anonymized)
+
+> <Full body of the customer's first message, wrapped as a blockquote, with all personal names replaced by `x`.>
+
 ---
 **Customer:** <email>
-**Original support thread:** https://mail.google.com/mail/u/1/#inbox/<threadId>
 **Gmail thread ID:** `<threadId>`
 EOF
 
@@ -189,7 +202,7 @@ The command prints the new issue's URL on success — capture it for the summary
 ```bash
 gh issue comment <issue-number> \
   --repo erp-mafia/gnubok \
-  --body "Another customer report of this issue. Customer: \`<email>\`. Thread: https://mail.google.com/mail/u/1/#inbox/<threadId>."
+  --body "Another customer report of this issue. Customer: \`<email>\`. Gmail thread ID: \`<threadId>\`."
 ```
 
 **Label notes**:
@@ -231,5 +244,5 @@ Skipped: 0
 - Titles ≤ 80 characters. No emoji. No brackets.
 - Descriptions are ≤ 4 sentences. Describe what the customer sees and what should happen instead.
 - Next steps are concrete — "Check `importSie()` for silent catch blocks on line 142", not "Investigate the import code".
-- Never paste the customer's email body verbatim into the issue. Paraphrase and preserve the Gmail link as the receipt.
-- If the email is in Swedish, the ticket is in English. Keep domain terms that match the code (`SIE`, `verifikat` if the code uses that spelling, etc.).
+- Paste the customer's email body verbatim into the `Customer email (anonymized)` section, with personal names replaced by `x`. No Gmail link — the ticket should be self-contained.
+- If the email is in Swedish, the summary/description/next steps are in English, but the anonymized email body stays in its original language. Keep domain terms that match the code (`SIE`, `verifikat` if the code uses that spelling, etc.).
