@@ -25,7 +25,11 @@ import {
 } from 'lucide-react'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import { useCanWrite } from '@/lib/hooks/use-can-write'
+import { createClient } from '@/lib/supabase/client'
+import { useCompany } from '@/contexts/CompanyContext'
 import type { ImportPreview, AccountMapping } from '@/lib/import/types'
+
+const SERIES_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
 interface ImportReviewStepProps {
   preview: ImportPreview
@@ -50,14 +54,66 @@ export default function ImportReviewStep({
   isLoading,
 }: ImportReviewStepProps) {
   const { canWrite } = useCanWrite()
+  const { company } = useCompany()
   const [options, setOptions] = useState<ImportExecuteOptions>({
     createFiscalPeriod: true,
     importOpeningBalances: true,
     importTransactions: true,
     voucherSeries: 'B',
   })
+  const [defaultSeries, setDefaultSeries] = useState<string | null>(null)
+  const [existingSeries, setExistingSeries] = useState<Set<string>>(new Set())
+  const [seriesLoaded, setSeriesLoaded] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    if (!company?.id) return
+    setSeriesLoaded(false)
+    const supabase = createClient()
+
+    let cancelled = false
+    ;(async () => {
+      const [
+        { data: settingsData, error: settingsError },
+        { data: sequencesData, error: sequencesError },
+      ] = await Promise.all([
+        supabase
+          .from('company_settings')
+          .select('default_voucher_series')
+          .eq('company_id', company.id)
+          .single(),
+        supabase
+          .from('voucher_sequences')
+          .select('voucher_series')
+          .eq('company_id', company.id),
+      ])
+
+      if (cancelled) return
+
+      // PGRST116 = no rows returned from .single(); expected when settings not yet created.
+      if (settingsError && settingsError.code !== 'PGRST116') {
+        console.error('Failed to load company settings for voucher series', settingsError)
+      }
+      if (sequencesError) {
+        console.error('Failed to load voucher sequences', sequencesError)
+      }
+
+      const companyDefault = settingsData?.default_voucher_series || null
+      const sequences = new Set<string>((sequencesData || []).map((row) => row.voucher_series))
+
+      setDefaultSeries(companyDefault)
+      setExistingSeries(sequences)
+
+      const initial = companyDefault || (sequences.has('B') ? 'B' : Array.from(sequences).sort()[0]) || 'A'
+      setOptions((prev) => ({ ...prev, voucherSeries: initial }))
+      setSeriesLoaded(true)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [company?.id])
 
   // Block browser close/refresh during import
   useUnsavedChanges(isLoading)
@@ -240,15 +296,26 @@ export default function ImportReviewStep({
               <Select
                 value={options.voucherSeries}
                 onValueChange={(value) => updateOption('voucherSeries', value)}
+                disabled={!seriesLoaded}
               >
                 <SelectTrigger id="voucher-series" className="w-48">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="A">A - Huvudserie</SelectItem>
-                  <SelectItem value="B">B - Import</SelectItem>
-                  <SelectItem value="C">C - Korrigeringar</SelectItem>
-                  <SelectItem value="I">I - Import (alternativ)</SelectItem>
+                  {SERIES_LETTERS.map((letter) => {
+                    const isDefault = defaultSeries === letter
+                    const isExisting = existingSeries.has(letter)
+                    const suffix = isDefault
+                      ? ' — standard'
+                      : isExisting
+                        ? ' — används redan'
+                        : ''
+                    return (
+                      <SelectItem key={letter} value={letter}>
+                        {`Serie ${letter}${suffix}`}
+                      </SelectItem>
+                    )
+                  })}
                 </SelectContent>
               </Select>
               <p className="text-sm text-muted-foreground">
