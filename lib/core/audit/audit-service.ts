@@ -19,11 +19,11 @@ export interface AuditLogFilters {
 }
 
 /**
- * Get paginated audit log entries for a user
+ * Get paginated audit log entries for a company
  */
 export async function getAuditLog(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   filters: AuditLogFilters = {}
 ): Promise<{ data: AuditLogEntry[]; count: number }> {
   const page = filters.page ?? 1
@@ -33,7 +33,7 @@ export async function getAuditLog(
   let query = supabase
     .from('audit_log')
     .select('*', { count: 'exact' })
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .order('created_at', { ascending: false })
     .range(offset, offset + pageSize - 1)
 
@@ -70,7 +70,7 @@ export async function getAuditLog(
  */
 export async function getEntityHistory(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   tableName: string,
   recordId: string
 ): Promise<AuditLogEntry[]> {
@@ -78,7 +78,7 @@ export async function getEntityHistory(
   const { data, error } = await supabase
     .from('audit_log')
     .select('*')
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .eq('table_name', tableName)
     .eq('record_id', recordId)
     .order('created_at', { ascending: true })
@@ -96,7 +96,7 @@ export async function getEntityHistory(
  */
 export async function getCorrectionChain(
   supabase: SupabaseClient,
-  userId: string,
+  companyId: string,
   journalEntryId: string
 ): Promise<AuditLogEntry[]> {
 
@@ -105,7 +105,7 @@ export async function getCorrectionChain(
     .from('journal_entries')
     .select('id, reverses_id, reversed_by_id, correction_of_id')
     .eq('id', journalEntryId)
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .single()
 
   if (entryError || !entry) {
@@ -122,7 +122,7 @@ export async function getCorrectionChain(
   const { data: referencing } = await supabase
     .from('journal_entries')
     .select('id')
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .or(`reverses_id.eq.${journalEntryId},reversed_by_id.eq.${journalEntryId},correction_of_id.eq.${journalEntryId}`)
 
   for (const ref of referencing || []) {
@@ -133,7 +133,7 @@ export async function getCorrectionChain(
   const { data, error } = await supabase
     .from('audit_log')
     .select('*')
-    .eq('company_id', userId)
+    .eq('company_id', companyId)
     .eq('table_name', 'journal_entries')
     .in('record_id', Array.from(relatedIds))
     .order('created_at', { ascending: true })

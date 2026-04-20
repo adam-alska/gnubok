@@ -24,10 +24,11 @@ import { resolveIcon } from '@/lib/extensions/icon-resolver'
 import type { QuickActionDefinition } from '@/lib/extensions/types'
 import type { CompanySettings, Deadline, ReceiptQueueSummary, OnboardingProgress } from '@/types'
 
-const SETUP_FRESH_START_KEY = 'erp_setup_fresh_start'
+const setupFreshStartKey = (companyId: string) => `erp_setup_fresh_start:${companyId}`
 
 interface DashboardContentProps {
   firstName?: string | null
+  companyId: string
   settings: CompanySettings | null
   summary: {
     ytd: { income: number; expenses: number; net: number }
@@ -49,7 +50,7 @@ interface DashboardContentProps {
   onboardingProgress?: OnboardingProgress
 }
 
-export default function DashboardContent({ firstName, settings, summary, onboardingProgress }: DashboardContentProps) {
+export default function DashboardContent({ firstName, companyId, settings, summary, onboardingProgress }: DashboardContentProps) {
   const [showAllAlerts, setShowAllAlerts] = useState(false)
   const [showMore, setShowMore] = useState(false)
   const [greeting, setGreeting] = useState('Hej')
@@ -68,16 +69,23 @@ export default function DashboardContent({ firstName, settings, summary, onboard
       setSetupGateActive(false)
       return
     }
-    const freshStart = localStorage.getItem(SETUP_FRESH_START_KEY) === 'true'
-    const oldDismissed = localStorage.getItem('erp_checklist_dismissed') === 'true'
-    if (freshStart || oldDismissed) setSetupGateActive(false)
-  }, [needsSetup])
+    const scopedKey = setupFreshStartKey(companyId)
+    const freshStart = localStorage.getItem(scopedKey) === 'true'
+    const legacyFreshStart = localStorage.getItem('erp_setup_fresh_start') === 'true'
+    const legacyDismissed = localStorage.getItem('erp_checklist_dismissed') === 'true'
+    if (freshStart || legacyFreshStart || legacyDismissed) {
+      if (!freshStart) {
+        localStorage.setItem(scopedKey, 'true')
+      }
+      setSetupGateActive(false)
+    }
+  }, [needsSetup, companyId])
 
   if (setupGateActive) {
     return (
       <NewUserChecklist
         onFreshStart={() => {
-          localStorage.setItem(SETUP_FRESH_START_KEY, 'true')
+          localStorage.setItem(setupFreshStartKey(companyId), 'true')
           setSetupGateActive(false)
         }}
       />

@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { useCompany } from '@/contexts/CompanyContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,7 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { RetentionNotice } from '@/components/ui/retention-notice'
-import { ExternalLink, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 
 /**
@@ -84,13 +83,7 @@ export function CompanyDangerZone() {
 
         <RetentionNotice variant="company" />
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Button variant="outline" className="w-full sm:w-auto" asChild>
-            <Link href="/reports?type=full-archive">
-              <ExternalLink className="mr-2 h-4 w-4" />
-              Exportera fullständigt arkiv
-            </Link>
-          </Button>
+        <div className="flex justify-end">
           <Button
             variant="destructive"
             className="w-full sm:w-auto"

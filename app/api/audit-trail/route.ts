@@ -27,7 +27,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await getAuditLog(supabase, user.id, filters)
+    const result = await getAuditLog(supabase, companyId, filters)
     return NextResponse.json({ data: result.data, count: result.count })
   } catch (err) {
     return NextResponse.json(

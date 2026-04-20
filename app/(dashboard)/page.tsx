@@ -231,6 +231,7 @@ export default async function DashboardPage() {
   return (
     <DashboardContent
       firstName={firstName}
+      companyId={companyId}
       settings={settings}
       summary={{
         ytd: ytdTotals,
