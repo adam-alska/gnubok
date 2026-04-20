@@ -152,13 +152,6 @@ export async function saveExtensionData<T>(
   key: string,
   value: T
 ): Promise<void> {
-export async function saveExtensionData<T>(
-  supabase: SupabaseClient,
-  companyId: string,
-  userId: string,
-  key: string,
-  value: T
-): Promise<void> {
   const { error } = await supabase.from('extension_data').upsert(
     {
       user_id: userId,
