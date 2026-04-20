@@ -27,6 +27,7 @@ import { getErrorMessage } from '@/lib/errors/get-error-message'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import CustomerForm from '@/components/customers/CustomerForm'
 import { BankDetailsSetupDialog } from '@/components/invoices/BankDetailsSetupDialog'
+import { useCompany } from '@/contexts/CompanyContext'
 import type { Customer, Currency, CreateInvoiceInput, CreateCustomerInput, InvoiceDocumentType } from '@/types'
 
 const itemSchema = z.object({
@@ -59,6 +60,7 @@ export default function NewInvoicePage() {
   const router = useRouter()
   const { toast } = useToast()
   const { canWrite } = useCanWrite()
+  const { company } = useCompany()
   const supabase = createClient()
 
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -126,14 +128,17 @@ export default function NewInvoicePage() {
   }, [customers, setValue])
 
   useEffect(() => {
+    if (!company?.id) return
     fetchCustomers()
     fetchDefaultNotes()
-  }, [])
+  }, [company?.id])
 
   async function fetchDefaultNotes() {
+    if (!company?.id) return
     const { data } = await supabase
       .from('company_settings')
       .select('invoice_default_notes, clearing_number, account_number, bankgiro')
+      .eq('company_id', company.id)
       .single()
     if (data?.invoice_default_notes) {
       setDefaultNotes(data.invoice_default_notes)
@@ -171,9 +176,11 @@ export default function NewInvoicePage() {
   }, [watchCustomerId, customers, setValue])
 
   async function fetchCustomers() {
+    if (!company?.id) return
     const { data, error } = await supabase
       .from('customers')
       .select('*')
+      .eq('company_id', company.id)
       .order('name', { ascending: true })
 
     if (error) {
