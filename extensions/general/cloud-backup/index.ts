@@ -1,35 +1,30 @@
 import type { Extension, ExtensionContext } from '@/lib/extensions/types'
 import { NextResponse } from 'next/server'
 import {
-  generateFullArchive,
-  estimateArchiveSize,
-  type ArchiveScope,
-} from '@/lib/reports/full-archive-export'
-import {
   buildAuthorizationUrl,
   exchangeCodeForTokens,
   fetchUserEmail,
   getOAuthEnv,
-  refreshAccessToken,
   revokeToken,
 } from './lib/google-oauth'
-import { ensureFolder, uploadFile } from './lib/google-drive'
 import {
   createOAuthState,
   decryptToken,
   encryptToken,
   verifyOAuthState,
 } from './lib/crypto'
+import {
+  performSync,
+  CONNECTION_KEY,
+  LAST_SYNC_KEY,
+  SCHEDULE_KEY,
+} from './lib/sync'
 import type {
   CloudBackupStatus,
   GoogleDriveConnection,
   GoogleDriveLastSync,
+  GoogleDriveSchedule,
 } from './types'
-
-const CONNECTION_KEY = 'google_drive_connection'
-const LAST_SYNC_KEY = 'google_drive_last_sync'
-const ROOT_FOLDER_NAME = 'gnubok'
-const SIZE_LIMIT_BYTES = 80 * 1024 * 1024
 
 function jsonError(message: string, status = 500): Response {
   return NextResponse.json({ error: message }, { status })
@@ -41,26 +36,12 @@ async function loadConnection(
   return ctx.settings.get<GoogleDriveConnection>(CONNECTION_KEY)
 }
 
-async function getFreshAccessToken(
-  ctx: ExtensionContext,
-  connection: GoogleDriveConnection
-): Promise<string> {
-  const origin = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-  const env = getOAuthEnv(origin)
-  const refreshToken = decryptToken(connection.refresh_token_encrypted)
-  const { access_token } = await refreshAccessToken(env, refreshToken)
-  return access_token
-}
-
-async function fetchCompanyName(ctx: ExtensionContext): Promise<string> {
-  const { data } = await ctx.supabase
-    .from('company_settings')
-    .select('company_name, org_number')
-    .eq('company_id', ctx.companyId)
-    .single()
-  const name = (data?.company_name as string) || 'företag'
-  const org = (data?.org_number as string) || ctx.companyId.slice(0, 8)
-  return `${name} (${org})`.replace(/[\\/]/g, '-')
+const DEFAULT_SCHEDULE: GoogleDriveSchedule = {
+  enabled: false,
+  hour_utc: 3, // 05:00 Swedish summer time / 04:00 winter — low-traffic default
+  last_auto_sync_at: null,
+  last_auto_sync_status: null,
+  last_auto_sync_error: null,
 }
 
 export const cloudBackupExtension: Extension = {
@@ -154,7 +135,7 @@ export const cloudBackupExtension: Extension = {
       },
     },
 
-    // Revoke the refresh token and clear the stored connection.
+    // Revoke the refresh token and clear the stored connection + schedule.
     {
       method: 'POST',
       path: '/disconnect',
@@ -172,6 +153,7 @@ export const cloudBackupExtension: Extension = {
           }
           await ctx.settings.set(CONNECTION_KEY, null)
           await ctx.settings.set(LAST_SYNC_KEY, null)
+          await ctx.settings.set(SCHEDULE_KEY, null)
           return NextResponse.json({ ok: true })
         } catch (err) {
           ctx.log.error('disconnect failed', err)
@@ -191,13 +173,71 @@ export const cloudBackupExtension: Extension = {
         if (!ctx) return jsonError('Missing context', 500)
         const connection = await loadConnection(ctx)
         const lastSync = await ctx.settings.get<GoogleDriveLastSync>(LAST_SYNC_KEY)
+        const schedule = await ctx.settings.get<GoogleDriveSchedule>(SCHEDULE_KEY)
         const status: CloudBackupStatus = {
           connected: !!connection,
           account_email: connection?.account_email ?? null,
           connected_at: connection?.connected_at ?? null,
           last_sync: lastSync ?? null,
+          schedule: schedule ?? null,
         }
         return NextResponse.json({ data: status })
+      },
+    },
+
+    // Read the auto-sync schedule. Returns the default (disabled) shape if
+    // the user has never configured one.
+    {
+      method: 'GET',
+      path: '/schedule',
+      handler: async (_request, ctx) => {
+        if (!ctx) return jsonError('Missing context', 500)
+        const schedule = await ctx.settings.get<GoogleDriveSchedule>(SCHEDULE_KEY)
+        return NextResponse.json({ data: schedule ?? DEFAULT_SCHEDULE })
+      },
+    },
+
+    // Update the auto-sync schedule. Preserves `last_auto_sync_*` fields the
+    // cron writes — those are not user-editable.
+    {
+      method: 'PUT',
+      path: '/schedule',
+      handler: async (request, ctx) => {
+        if (!ctx) return jsonError('Missing context', 500)
+        try {
+          const body = (await request.json()) as {
+            enabled?: boolean
+            hour_utc?: number
+          }
+          if (typeof body.enabled !== 'boolean') {
+            return jsonError('enabled must be a boolean', 400)
+          }
+          if (
+            typeof body.hour_utc !== 'number' ||
+            !Number.isInteger(body.hour_utc) ||
+            body.hour_utc < 0 ||
+            body.hour_utc > 23
+          ) {
+            return jsonError('hour_utc must be an integer between 0 and 23', 400)
+          }
+
+          const existing = await ctx.settings.get<GoogleDriveSchedule>(SCHEDULE_KEY)
+          const updated: GoogleDriveSchedule = {
+            enabled: body.enabled,
+            hour_utc: body.hour_utc,
+            last_auto_sync_at: existing?.last_auto_sync_at ?? null,
+            last_auto_sync_status: existing?.last_auto_sync_status ?? null,
+            last_auto_sync_error: existing?.last_auto_sync_error ?? null,
+          }
+          await ctx.settings.set(SCHEDULE_KEY, updated)
+          return NextResponse.json({ data: updated })
+        } catch (err) {
+          ctx.log.error('update schedule failed', err)
+          return jsonError(
+            err instanceof Error ? err.message : 'Invalid request body',
+            400
+          )
+        }
       },
     },
 
@@ -208,92 +248,40 @@ export const cloudBackupExtension: Extension = {
       handler: async (request, ctx) => {
         if (!ctx) return jsonError('Missing context', 500)
         try {
-          const connection = await loadConnection(ctx)
-          if (!connection) {
-            return jsonError('not_connected', 400)
-          }
-
           const body = (await request.json().catch(() => ({}))) as {
             include_documents?: boolean
           }
-          const scope: ArchiveScope = 'all'
-          const includeDocuments = body.include_documents !== false
-
-          const estimate = await estimateArchiveSize(ctx.supabase, ctx.companyId, scope)
-          const effectiveBytes = includeDocuments
-            ? estimate.total_bytes
-            : estimate.total_bytes - estimate.document_bytes
-          if (effectiveBytes > SIZE_LIMIT_BYTES) {
-            return NextResponse.json(
-              {
-                error: 'archive_too_large',
-                size_bytes: effectiveBytes,
-                size_limit_bytes: SIZE_LIMIT_BYTES,
-              },
-              { status: 413 }
-            )
-          }
-
-          const accessToken = await getFreshAccessToken(ctx, connection)
-
-          // Ensure folder structure. Persist ids on first sync so later runs skip the lookup.
-          let rootFolderId = connection.root_folder_id
-          let companyFolderId = connection.company_folder_id
-          if (!rootFolderId) {
-            const root = await ensureFolder(accessToken, ROOT_FOLDER_NAME, null)
-            rootFolderId = root.id
-          }
-          if (!companyFolderId) {
-            const companyName = await fetchCompanyName(ctx)
-            const companyFolder = await ensureFolder(
-              accessToken,
-              companyName,
-              rootFolderId
-            )
-            companyFolderId = companyFolder.id
-          }
-          if (
-            rootFolderId !== connection.root_folder_id ||
-            companyFolderId !== connection.company_folder_id
-          ) {
-            await ctx.settings.set(CONNECTION_KEY, {
-              ...connection,
-              root_folder_id: rootFolderId,
-              company_folder_id: companyFolderId,
-            })
-          }
-
-          const archive = await generateFullArchive(ctx.supabase, ctx.companyId, {
-            scope: 'all',
-            include_documents: includeDocuments,
+          const origin =
+            process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
+          const result = await performSync({
+            supabase: ctx.supabase,
+            companyId: ctx.companyId,
+            userId: ctx.userId,
+            origin,
+            includeDocuments: body.include_documents !== false,
           })
 
-          const stamp = new Date()
-            .toISOString()
-            .replace(/[-:]/g, '')
-            .replace(/\..+/, '')
-          const fileName = `arkiv_full_${stamp}.zip`
-
-          const uploaded = await uploadFile(
-            accessToken,
-            companyFolderId,
-            fileName,
-            archive
-          )
-
-          const lastSync: GoogleDriveLastSync = {
-            at: new Date().toISOString(),
-            file_id: uploaded.id,
-            file_name: uploaded.name,
-            file_size_bytes: uploaded.size_bytes,
-            folder_id: companyFolderId,
+          if (!result.ok) {
+            if (result.reason === 'not_connected') {
+              return jsonError('not_connected', 400)
+            }
+            if (result.reason === 'archive_too_large') {
+              return NextResponse.json(
+                {
+                  error: 'archive_too_large',
+                  size_bytes: result.size_bytes,
+                  size_limit_bytes: result.size_limit_bytes,
+                },
+                { status: 413 }
+              )
+            }
+            return jsonError(result.message, 500)
           }
-          await ctx.settings.set(LAST_SYNC_KEY, lastSync)
 
           return NextResponse.json({
             data: {
-              ...lastSync,
-              web_view_link: uploaded.web_view_link,
+              ...result.lastSync,
+              web_view_link: result.webViewLink,
             },
           })
         } catch (err) {

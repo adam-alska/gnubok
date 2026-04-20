@@ -16,7 +16,22 @@ export function LogoUpload({ logoUrl, onUpdate }: LogoUploadProps) {
   const [isUploading, setIsUploading] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [preview, setPreview] = useState<string | null>(logoUrl)
+  const [isDragging, setIsDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp']
+
+  function validateAndUpload(file: File) {
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      toast({ title: 'Otillåten filtyp', description: 'PNG, JPG, SVG eller WebP.', variant: 'destructive' })
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: 'Filen är för stor (max 2 MB)', variant: 'destructive' })
+      return
+    }
+    handleUpload(file)
+  }
 
   async function handleUpload(file: File) {
     setIsUploading(true)
@@ -69,13 +84,24 @@ export function LogoUpload({ logoUrl, onUpdate }: LogoUploadProps) {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
+    validateAndUpload(file)
+  }
 
-    if (file.size > 2 * 1024 * 1024) {
-      toast({ title: 'Filen är för stor (max 2 MB)', variant: 'destructive' })
-      return
-    }
+  function handleDrop(e: React.DragEvent<HTMLButtonElement>) {
+    e.preventDefault()
+    setIsDragging(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) validateAndUpload(file)
+  }
 
-    handleUpload(file)
+  function handleDragOver(e: React.DragEvent<HTMLButtonElement>) {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  function handleDragLeave(e: React.DragEvent<HTMLButtonElement>) {
+    e.preventDefault()
+    setIsDragging(false)
   }
 
   return (
@@ -123,8 +149,14 @@ export function LogoUpload({ logoUrl, onUpdate }: LogoUploadProps) {
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragEnter={handleDragOver}
+          onDragLeave={handleDragLeave}
           disabled={isUploading}
-          className="flex flex-col items-center justify-center w-full max-w-xs rounded-lg border-2 border-dashed border-border/60 py-8 px-4 text-center transition-colors hover:border-border hover:bg-muted/20 disabled:opacity-50"
+          className={`flex flex-col items-center justify-center w-full max-w-xs rounded-lg border-2 border-dashed py-8 px-4 text-center transition-colors disabled:opacity-50 ${
+            isDragging ? 'border-foreground bg-muted/40' : 'border-border/60 hover:border-border hover:bg-muted/20'
+          }`}
         >
           {isUploading ? (
             <Loader2 className="h-6 w-6 text-muted-foreground animate-spin mb-2" />

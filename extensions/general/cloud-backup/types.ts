@@ -25,7 +25,24 @@ export interface GoogleDriveLastSync {
 }
 
 /**
- * Status returned to the UI. Mirrors the two storage shapes above in a
+ * Schedule stored under key `google_drive_schedule`. `hour_utc` is 0-23 in UTC;
+ * the UI converts to/from the user's local timezone. Runs once per day at that
+ * hour via a cron route (`app/api/extensions/cloud-backup/auto-sync/cron`).
+ */
+export interface GoogleDriveSchedule {
+  enabled: boolean
+  /** 0-23, UTC hour when the daily auto-sync should run. */
+  hour_utc: number
+  /** ISO timestamp of the last auto-sync attempt (success or failure). */
+  last_auto_sync_at: string | null
+  /** Outcome of the last auto-sync attempt. */
+  last_auto_sync_status: 'success' | 'error' | null
+  /** Short error message if the last auto-sync failed. */
+  last_auto_sync_error: string | null
+}
+
+/**
+ * Status returned to the UI. Mirrors the storage shapes above in a
  * shape safe to expose to the client (no encrypted token).
  */
 export interface CloudBackupStatus {
@@ -33,4 +50,5 @@ export interface CloudBackupStatus {
   account_email: string | null
   connected_at: string | null
   last_sync: GoogleDriveLastSync | null
+  schedule: GoogleDriveSchedule | null
 }

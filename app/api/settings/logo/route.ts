@@ -33,13 +33,23 @@ export async function POST(request: Request) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer())
-  const ext = file.name.split('.').pop() || 'png'
-  const storagePath = `logos/${companyId}/logo.${ext}`
+  const ext = (file.name.split('.').pop() || 'png').toLowerCase()
+  const storagePath = `${companyId}/logo-${Date.now()}.${ext}`
 
-  // Upload with service client to bypass storage RLS (auth already verified above)
   const serviceClient = createServiceClient()
+
+  // Remove any previous logo files for this company so we don't pile up orphans.
+  const { data: existing } = await serviceClient.storage
+    .from('logos')
+    .list(companyId)
+  if (existing && existing.length > 0) {
+    await serviceClient.storage
+      .from('logos')
+      .remove(existing.map((f) => `${companyId}/${f.name}`))
+  }
+
   const { error: uploadError } = await serviceClient.storage
-    .from('documents')
+    .from('logos')
     .upload(storagePath, buffer, {
       contentType: file.type,
       upsert: true,
@@ -49,9 +59,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `Uppladdning misslyckades: ${uploadError.message}` }, { status: 500 })
   }
 
-  // Get public URL
   const { data: urlData } = serviceClient.storage
-    .from('documents')
+    .from('logos')
     .getPublicUrl(storagePath)
 
   // Update company settings
@@ -86,12 +95,14 @@ export async function DELETE() {
     .single()
 
   if (settings?.logo_url) {
-    // Extract storage path from URL
-    const url = new URL(settings.logo_url)
-    const pathMatch = url.pathname.match(/\/object\/public\/documents\/(.+)/)
-    if (pathMatch) {
-      const serviceClient = createServiceClient()
-      await serviceClient.storage.from('documents').remove([pathMatch[1]])
+    const serviceClient = createServiceClient()
+    const { data: existing } = await serviceClient.storage
+      .from('logos')
+      .list(companyId)
+    if (existing && existing.length > 0) {
+      await serviceClient.storage
+        .from('logos')
+        .remove(existing.map((f) => `${companyId}/${f.name}`))
     }
   }
 
