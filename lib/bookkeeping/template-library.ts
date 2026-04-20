@@ -146,7 +146,7 @@ export function convertLibraryToBookingTemplate(
     name_en: lib.name,
     group: 'financial',
     direction,
-    entity_applicability: lib.entity_type,
+    entity_applicability: lib.entity_type ?? 'all',
     debit_account: debitLine.account,
     credit_account: creditLine.account,
     vat_treatment: vatTreatment,

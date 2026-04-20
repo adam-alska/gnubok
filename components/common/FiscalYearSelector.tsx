@@ -69,7 +69,12 @@ export function FiscalYearSelector({
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    if (!company?.id) return
+    if (!company?.id) {
+      // Fire onReady so consumers don't stall in a loading state while the
+      // company context hydrates. The effect re-runs once company.id arrives.
+      onReady?.()
+      return
+    }
     let cancelled = false
     ;(async () => {
       const res = await fetch('/api/bookkeeping/fiscal-periods')
