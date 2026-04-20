@@ -78,9 +78,10 @@ const navItems: NavItem[] = [
   { href: '/bookkeeping', label: 'Bokföring', icon: BookOpen, group: 'redovisning' },
   { href: '/reports', label: 'Rapporter', icon: BarChart3, group: 'redovisning' },
   { href: '/import', label: 'Importera', icon: Upload, group: 'redovisning' },
-  // Personal
-  { href: '/salary', label: 'Löner', icon: HandCoins, group: 'personal', modes: ['aktiebolag'] },
-  { href: '/salary/employees', label: 'Anställda', icon: Users, group: 'personal', modes: ['aktiebolag'] },
+  // Personal — temporarily disabled in production pending feature completion.
+  // Still clickable in local dev (NODE_ENV === 'development') so we can test.
+  { href: '/salary', label: 'Löner', icon: HandCoins, group: 'personal', modes: ['aktiebolag'], comingSoon: process.env.NODE_ENV !== 'development' },
+  { href: '/salary/employees', label: 'Anställda', icon: Users, group: 'personal', modes: ['aktiebolag'], comingSoon: process.env.NODE_ENV !== 'development' },
   { href: '/help', label: 'Hjälp', icon: HelpCircle, group: 'övrigt' },
   { href: '/settings', label: 'Inställningar', icon: Settings, group: 'övrigt' },
 ]
@@ -247,7 +248,7 @@ export default function DashboardNav({ companyName: _companyName, entityType, un
                     {items.map((item) => {
                       const Icon = item.icon
                       const active = isActive(item.href)
-                      const enabled = isItemEnabled(item.href)
+                      const enabled = isItemEnabled(item.href) && !item.comingSoon
                       const badge = item.href === '/transactions' && uncategorizedTransactionCount > 0
                         ? uncategorizedTransactionCount
                         : item.href === '/pending' && pendingOperationsCount > 0
@@ -260,7 +261,11 @@ export default function DashboardNav({ companyName: _companyName, entityType, un
                             active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
                           )} />
                           <span className="flex-1">{item.label}</span>
-                          {badge !== null && (
+                          {item.comingSoon ? (
+                            <span className="ml-auto rounded-full bg-muted/60 text-muted-foreground/70 text-[9px] font-medium uppercase tracking-wider px-1.5 py-0.5">
+                              Kommer snart
+                            </span>
+                          ) : badge !== null && (
                             <span className="ml-auto min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-primary/15 text-primary text-[10px] font-semibold px-1">
                               {badge > 99 ? '99+' : badge}
                             </span>
@@ -287,7 +292,7 @@ export default function DashboardNav({ companyName: _companyName, entityType, un
                           key={item.href}
                           className={baseClass}
                           aria-disabled="true"
-                          title="Lägg till ett företag för att aktivera"
+                          title={item.comingSoon ? 'Kommer snart' : 'Lägg till ett företag för att aktivera'}
                         >
                           {content}
                         </div>
@@ -573,7 +578,7 @@ export default function DashboardNav({ companyName: _companyName, entityType, un
                     {items.map((item) => {
                       const Icon = item.icon
                       const active = isActive(item.href)
-                      const enabled = isItemEnabled(item.href)
+                      const enabled = isItemEnabled(item.href) && !item.comingSoon
                       const badge = item.href === '/transactions' && uncategorizedTransactionCount > 0
                         ? uncategorizedTransactionCount
                         : item.href === '/pending' && pendingOperationsCount > 0
@@ -583,7 +588,11 @@ export default function DashboardNav({ companyName: _companyName, entityType, un
                         <>
                           <Icon className={cn("h-[18px] w-[18px] flex-shrink-0", active ? "text-primary" : "text-muted-foreground")} />
                           <span className="text-sm flex-1">{item.label}</span>
-                          {badge !== null && (
+                          {item.comingSoon ? (
+                            <span className="rounded-full bg-muted/60 text-muted-foreground/70 text-[9px] font-medium uppercase tracking-wider px-1.5 py-0.5">
+                              Kommer snart
+                            </span>
+                          ) : badge !== null && (
                             <span className="min-w-[20px] h-[20px] flex items-center justify-center rounded-full bg-primary/15 text-primary text-[10px] font-semibold px-1.5">
                               {badge > 99 ? '99+' : badge}
                             </span>
