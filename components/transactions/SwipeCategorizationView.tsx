@@ -11,6 +11,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { checkExpenseWarnings } from '@/lib/tax/expense-warnings'
 import { getDefaultAccountForCategory, getDefaultVatTreatmentForCategory } from '@/lib/bookkeeping/category-mapping'
 import { getTemplateById, type BookingTemplate } from '@/lib/bookkeeping/booking-templates'
+import { isLibraryTemplateId } from '@/lib/bookkeeping/template-library'
 import TemplatePicker from './TemplatePicker'
 import JournalEntryPreview from './JournalEntryPreview'
 import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
@@ -62,6 +63,7 @@ export default function SwipeCategorizationView({
 
   const [showVatDropdown, setShowVatDropdown] = useState(false)
   const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null)
+  const [pendingTemplate, setPendingTemplate] = useState<BookingTemplate | null>(null)
   const [pendingInboxItemId, setPendingInboxItemId] = useState<string | null>(null)
 
   // Clear VAT treatment when switching to a liability/equity account (class 2)
@@ -125,6 +127,7 @@ export default function SwipeCategorizationView({
     setAccountOverride(defaultAccount)
     setVatTreatment(defaultVat ?? 'none')
     setPendingTemplateId(null)
+    setPendingTemplate(null)
     setPendingInboxItemId(null)
     setShowVatDropdown(false)
     setShowCategorySelect(false)
@@ -136,7 +139,11 @@ export default function SwipeCategorizationView({
     setPendingCategory(template.fallback_category)
     setAccountOverride(template.debit_account)
     setVatTreatment(template.vat_treatment ?? 'none')
-    setPendingTemplateId(template.id)
+    // Library templates aren't in the static registry the backend validates against,
+    // so we only send the ID for static templates. The pre-filled account/VAT drive
+    // the booking for library templates.
+    setPendingTemplateId(isLibraryTemplateId(template.id) ? null : template.id)
+    setPendingTemplate(template)
     setPendingInboxItemId(null)
     setShowVatDropdown(false)
     setShowCategorySelect(false)
@@ -152,6 +159,7 @@ export default function SwipeCategorizationView({
     setAccountOverride(template.debit_account)
     setVatTreatment(template.vat_treatment ?? 'none')
     setPendingTemplateId(templateId)
+    setPendingTemplate(template)
     setPendingInboxItemId(inboxItemId ?? null)
     setShowVatDropdown(false)
     setShowCategorySelect(false)
@@ -246,6 +254,7 @@ export default function SwipeCategorizationView({
         setShowReviewStep(false)
         setPendingCategory(null)
         setPendingTemplateId(null)
+        setPendingTemplate(null)
         setPendingInboxItemId(null)
         moveToNext()
       } else {
@@ -345,7 +354,7 @@ export default function SwipeCategorizationView({
             entityType={entityType}
             suggestedTemplates={txSuggestions}
             onSelect={handlePickerTemplateSelect}
-            selectedTemplateId={pendingTemplateId ?? undefined}
+            selectedTemplateId={pendingTemplate?.id ?? pendingTemplateId ?? undefined}
           />
         </div>
 
@@ -367,7 +376,7 @@ export default function SwipeCategorizationView({
     const categoryLabel = [...expenseCategories, ...incomeCategories].find(
       (c) => c.value === pendingCategory
     )?.label || pendingCategory
-    const selectedTemplate = pendingTemplateId ? getTemplateById(pendingTemplateId) : null
+    const selectedTemplate = pendingTemplate
 
     // Auto-clear VAT when a class 2 (liability/equity) account is selected
     const isLiabilityAccount = accountOverride.startsWith('2')

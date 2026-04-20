@@ -459,16 +459,26 @@ async function createOpeningBalanceEntry(
 }
 
 /**
- * Create journal entries from vouchers using batch insert for performance
+ * Create journal entries from vouchers using batch insert for performance.
+ *
+ * Preserves per-voucher series from the source SIE file so customers migrating
+ * from systems like Fortnox (which uses B=kundfakturor, C=inbetalningar, etc.)
+ * retain traceability back to their original bookkeeping. Source voucher
+ * numbers are renumbered per target series via next_voucher_number to avoid
+ * collisions with existing entries; the source (series, number) is preserved
+ * in MigrationDocumentation.voucherNumberMapping for audit trail (BFNAR 2013:2).
+ *
+ * `defaultSeries` is used as a fallback only for vouchers that arrive with an
+ * empty series (e.g., SIE4I import files, per spec §5.15).
  */
-async function importVouchers(
+export async function importVouchers(
   supabase: SupabaseClient,
   companyId: string,
   userId: string,
   fiscalPeriodId: string,
   parsed: ParsedSIEFile,
   accountMap: Map<string, string>,
-  voucherSeries: string
+  defaultSeries: string
 ): Promise<{
   created: number
   ids: string[]
@@ -491,7 +501,8 @@ async function importVouchers(
     mappedLineCount?: number
     originalLineCount?: number
   }[]
-  voucherNumberMapping: Array<{ sourceId: string; targetNumber: number }>
+  voucherNumberMapping: Array<{ sourceId: string; series: string; targetNumber: number }>
+  seriesUsed: string[]
   retriedBatches: number
   failedBatches: number
 }> {
@@ -517,7 +528,8 @@ async function importVouchers(
       mappedLineCount?: number
       originalLineCount?: number
     }[],
-    voucherNumberMapping: [] as Array<{ sourceId: string; targetNumber: number }>,
+    voucherNumberMapping: [] as Array<{ sourceId: string; series: string; targetNumber: number }>,
+    seriesUsed: [] as string[],
     retriedBatches: 0,
     failedBatches: 0,
   }
@@ -525,6 +537,7 @@ async function importVouchers(
   // Pre-filter and prepare all valid vouchers
   interface PreparedVoucher {
     sourceId: string
+    series: string
     date: string
     description: string
     lines: { account_number: string; debit_amount: number; credit_amount: number; line_description: string | null }[]
@@ -653,8 +666,16 @@ async function importVouchers(
       }
     }
 
+    // Resolve per-voucher series from the parsed SIE record. Fall back to the
+    // caller-supplied default only when the source voucher has no series
+    // (e.g., SIE4I subsystem import files where series/verno are optional).
+    const resolvedSeries = voucher.series && voucher.series.trim()
+      ? voucher.series.trim()
+      : defaultSeries
+
     preparedVouchers.push({
       sourceId: voucherId,
+      series: resolvedSeries,
       date: formatDate(voucher.date),
       description: voucher.description || `Import: ${voucher.series}${voucher.number}`,
       lines,
@@ -689,24 +710,21 @@ async function importVouchers(
     accountIdMap.set(acc.account_number, acc.id)
   }
 
-  // Get starting voucher number
-  const { data: startNumber } = await supabase.rpc('next_voucher_number', {
-    p_company_id: companyId,
-    p_fiscal_period_id: fiscalPeriodId,
-    p_series: voucherSeries,
-  })
+  // Group prepared vouchers by series so each series' voucher numbers are
+  // reserved and assigned independently. Preserves SIE parse order within a
+  // series (Map maintains insertion order) so the first source voucher in
+  // series B becomes the first target voucher in series B.
+  const seriesGroups = new Map<string, PreparedVoucher[]>()
+  for (const v of preparedVouchers) {
+    const list = seriesGroups.get(v.series)
+    if (list) {
+      list.push(v)
+    } else {
+      seriesGroups.set(v.series, [v])
+    }
+  }
 
-  const currentVoucherNumber = (startNumber as number) || 1
-
-  // Reserve the full voucher number range upfront to prevent concurrent
-  // operations from claiming numbers in our range during batch insertion.
-  const reservedHighest = currentVoucherNumber + preparedVouchers.length - 1
-  await supabase.rpc('reserve_voucher_range', {
-    p_company_id: companyId,
-    p_fiscal_period_id: fiscalPeriodId,
-    p_series: voucherSeries,
-    p_highest_used: reservedHighest,
-  })
+  results.seriesUsed = [...seriesGroups.keys()]
 
   // Batch insert journal entries (in chunks of 100) with retry logic.
   // Retries handle transient errors (Supabase rate limits, Cloudflare 500s).
@@ -715,10 +733,35 @@ async function importVouchers(
   const INTER_BATCH_DELAY_MS = 50  // Prevent rate limiting under sustained load
   let retriedBatches = 0
   let failedBatches = 0
-  let highestInsertedVoucher = currentVoucherNumber - 1  // nothing inserted yet
 
-  for (let batchStart = 0; batchStart < preparedVouchers.length; batchStart += BATCH_SIZE) {
-    const batch = preparedVouchers.slice(batchStart, batchStart + BATCH_SIZE)
+  // Process each series as an independent mini-import. Voucher numbers must
+  // be monotonically increasing within a series; grouping first guarantees
+  // that without needing to interleave series-specific counters in one loop.
+  let seriesIndex = 0
+  for (const [series, groupVouchers] of seriesGroups) {
+    // Get starting voucher number for this series
+    const { data: startNumber } = await supabase.rpc('next_voucher_number', {
+      p_company_id: companyId,
+      p_fiscal_period_id: fiscalPeriodId,
+      p_series: series,
+    })
+
+    const currentVoucherNumber = (startNumber as number) || 1
+
+    // Reserve the full voucher number range upfront to prevent concurrent
+    // operations from claiming numbers in our range during batch insertion.
+    const reservedHighest = currentVoucherNumber + groupVouchers.length - 1
+    await supabase.rpc('reserve_voucher_range', {
+      p_company_id: companyId,
+      p_fiscal_period_id: fiscalPeriodId,
+      p_series: series,
+      p_highest_used: reservedHighest,
+    })
+
+    let highestInsertedVoucher = currentVoucherNumber - 1  // nothing inserted yet
+
+  for (let batchStart = 0; batchStart < groupVouchers.length; batchStart += BATCH_SIZE) {
+    const batch = groupVouchers.slice(batchStart, batchStart + BATCH_SIZE)
     const batchNumber = Math.floor(batchStart / BATCH_SIZE) + 1
     let batchWasRetried = false
 
@@ -728,7 +771,7 @@ async function importVouchers(
       company_id: companyId,
       fiscal_period_id: fiscalPeriodId,
       voucher_number: currentVoucherNumber + batchStart + i,
-      voucher_series: voucherSeries,
+      voucher_series: series,
       entry_date: v.date,
       description: v.description,
       source_type: 'import',
@@ -803,6 +846,7 @@ async function importVouchers(
 
       results.voucherNumberMapping.push({
         sourceId: voucher.sourceId,
+        series: voucher.series,
         targetNumber: assignedNumber,
       })
 
@@ -880,25 +924,30 @@ async function importVouchers(
     }
 
     // Small delay between batches to prevent Supabase/Cloudflare rate limiting
-    if (batchStart + BATCH_SIZE < preparedVouchers.length) {
+    const isLastBatchInSeries = batchStart + BATCH_SIZE >= groupVouchers.length
+    const isLastSeries = seriesIndex === seriesGroups.size - 1
+    if (!isLastBatchInSeries || !isLastSeries) {
       await new Promise(resolve => setTimeout(resolve, INTER_BATCH_DELAY_MS))
     }
   }
 
-  // Adjust voucher sequence after insertion.
-  // Range was pre-reserved to `reservedHighest`. If some batches failed,
-  // release the unused portion to avoid burned numbers and gap-explanation friction.
-  if (highestInsertedVoucher < reservedHighest) {
-    const releaseTarget = highestInsertedVoucher >= currentVoucherNumber
-      ? highestInsertedVoucher       // partial success: set to actual highest
-      : currentVoucherNumber - 1     // total failure: roll back fully
-    await supabase.rpc('release_voucher_range', {
-      p_company_id: companyId,
-      p_fiscal_period_id: fiscalPeriodId,
-      p_series: voucherSeries,
-      p_actual_last: releaseTarget,
-      p_reserved_highest: reservedHighest,
-    })
+    // Adjust voucher sequence after insertion for this series.
+    // Range was pre-reserved to `reservedHighest`. If some batches failed,
+    // release the unused portion to avoid burned numbers and gap-explanation friction.
+    if (highestInsertedVoucher < reservedHighest) {
+      const releaseTarget = highestInsertedVoucher >= currentVoucherNumber
+        ? highestInsertedVoucher       // partial success: set to actual highest
+        : currentVoucherNumber - 1     // total failure: roll back fully
+      await supabase.rpc('release_voucher_range', {
+        p_company_id: companyId,
+        p_fiscal_period_id: fiscalPeriodId,
+        p_series: series,
+        p_actual_last: releaseTarget,
+        p_reserved_highest: reservedHighest,
+      })
+    }
+
+    seriesIndex++
   }
 
   // Propagate batch retry stats
@@ -914,6 +963,29 @@ async function importVouchers(
 export function isBalanceSheetAccount(accountNumber: string): boolean {
   const firstDigit = parseInt(accountNumber.charAt(0), 10)
   return firstDigit >= 1 && firstDigit <= 2
+}
+
+/**
+ * Compute per-series voucher number ranges from the voucher number mapping.
+ * SIE imports can span multiple series (B, C, V, ...), each with its own
+ * independent target-number range, so the documentation records one range
+ * per series.
+ */
+export function computeVoucherNumberRanges(
+  mapping: Array<{ sourceId: string; series: string; targetNumber: number }>
+): Array<{ series: string; from: number; to: number }> {
+  if (mapping.length === 0) return []
+  const bySeries = new Map<string, { from: number; to: number }>()
+  for (const entry of mapping) {
+    const existing = bySeries.get(entry.series)
+    if (existing) {
+      if (entry.targetNumber < existing.from) existing.from = entry.targetNumber
+      if (entry.targetNumber > existing.to) existing.to = entry.targetNumber
+    } else {
+      bySeries.set(entry.series, { from: entry.targetNumber, to: entry.targetNumber })
+    }
+  }
+  return [...bySeries.entries()].map(([series, range]) => ({ series, ...range }))
 }
 
 /**
@@ -1470,7 +1542,8 @@ export async function executeSIEImport(
     let ibRoundingAdjustment = 0
     let ibExplanation: 'unallocated_result' | 'excluded_accounts' | 'rounding' | null = null
     let migrationAdjustmentInfo = { created: false, deltaAccounts: 0, entryId: null as string | null }
-    let voucherNumberMapping: Array<{ sourceId: string; targetNumber: number }> = []
+    let voucherNumberMapping: Array<{ sourceId: string; series: string; targetNumber: number }> = []
+    let voucherSeriesUsed: string[] = []
     let voucherRetryStats = { retriedBatches: 0, failedBatches: 0 }
     let voucherStats = {
       total: parsed.vouchers.length,
@@ -1480,7 +1553,9 @@ export async function executeSIEImport(
       skippedSingleLine: 0,
       skippedEmpty: 0,
     }
-    const voucherSeries = options.voucherSeries || 'B'
+    // Fallback series for vouchers that arrive without one (SIE4I subsystem files).
+    // Source series from #VER are preserved per-voucher by importVouchers.
+    const defaultSeries = options.voucherSeries || 'B'
 
     // Validate and import opening balances.
     //
@@ -1591,13 +1666,14 @@ export async function executeSIEImport(
         result.fiscalPeriodId,
         parsed,
         accountMap,
-        voucherSeries
+        defaultSeries
       )
 
       result.journalEntriesCreated += voucherResults.created
       result.journalEntryIds.push(...voucherResults.ids)
       result.errors.push(...voucherResults.errors)
       voucherNumberMapping = voucherResults.voucherNumberMapping
+      voucherSeriesUsed = voucherResults.seriesUsed
       voucherRetryStats = {
         retriedBatches: voucherResults.retriedBatches,
         failedBatches: voucherResults.failedBatches,
@@ -1694,7 +1770,7 @@ export async function executeSIEImport(
         end: fiscalYearEnd,
       },
       importedAt: new Date().toISOString(),
-      importedBy: companyId,
+      importedBy: userId,
       accountMappings: {
         total: mappingStats.total,
         exact: mappingStats.exact,
@@ -1705,13 +1781,8 @@ export async function executeSIEImport(
       vouchers: voucherStats,
       openingBalanceRounding: ibRoundingAdjustment !== 0 ? ibRoundingAdjustment : null,
       migrationAdjustment: migrationAdjustmentInfo,
-      voucherSeriesUsed: voucherSeries,
-      voucherNumberRange: voucherNumberMapping.length > 0
-        ? {
-            from: voucherNumberMapping[0].targetNumber,
-            to: voucherNumberMapping[voucherNumberMapping.length - 1].targetNumber,
-          }
-        : null,
+      voucherSeriesUsed: voucherSeriesUsed.length > 0 ? voucherSeriesUsed : [defaultSeries],
+      voucherNumberRanges: computeVoucherNumberRanges(voucherNumberMapping),
       voucherNumberMapping,
     }
 

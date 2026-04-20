@@ -383,11 +383,15 @@ export interface MigrationDocumentation {
     entryId: string | null
   }
 
-  // Voucher number mapping
-  voucherSeriesUsed: string
-  voucherNumberRange: { from: number; to: number } | null
+  // Voucher number mapping.
+  // Per-voucher series is preserved from the source SIE file (e.g., Fortnox uses
+  // B=kundfakturor, C=inbetalningar), so a single import may span multiple series
+  // and each series has its own independent target-number range.
+  voucherSeriesUsed: string[]
+  voucherNumberRanges: Array<{ series: string; from: number; to: number }>
   voucherNumberMapping: Array<{
-    sourceId: string    // e.g. "A1"
+    sourceId: string    // e.g. "B1"
+    series: string      // target series (same as source unless fallback applied)
     targetNumber: number
   }>
 }

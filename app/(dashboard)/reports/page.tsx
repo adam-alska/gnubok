@@ -10,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Download, AlertCircle, ChevronDown, ChevronRight, ArrowRight } from 'lucide-react'
 import { AccountNumber } from '@/components/ui/account-number'
 import { useCompany } from '@/contexts/CompanyContext'
+import { FiscalYearSelector } from '@/components/common/FiscalYearSelector'
 import { NEDeclarationView } from '@/components/reports/NEDeclarationView'
 import { INK2DeclarationView } from '@/components/reports/INK2DeclarationView'
 import { BankReconciliationView } from '@/components/reports/BankReconciliationView'
@@ -19,7 +20,6 @@ import { SkatteverketPanel } from '@/components/reports/SkatteverketPanel'
 import { IncomeExpenseChart } from '@/components/reports/IncomeExpenseChart'
 import type { MonthlyDataPoint } from '@/components/reports/IncomeExpenseChart'
 import type {
-  FiscalPeriod,
   TrialBalanceRow,
   IncomeStatementReport,
   BalanceSheetReport,
@@ -46,7 +46,6 @@ const TAB_LABELS: Record<string, string> = {
 }
 
 export default function ReportsPage() {
-  const [periods, setPeriods] = useState<FiscalPeriod[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState('')
   const [activeTab, setActiveTab] = useState('trial-balance')
   const [isLoadingInit, setIsLoadingInit] = useState(true)
@@ -79,22 +78,8 @@ export default function ReportsPage() {
     setDrillDownTrail(drillDownTrail.slice(0, stepIndex))
   }, [drillDownTrail])
 
-  async function fetchPeriods() {
-    const res = await fetch('/api/bookkeeping/fiscal-periods')
-    const { data } = await res.json()
-    const today = new Date().toISOString().split('T')[0]
-    const activePeriods = (data || []).filter((p: FiscalPeriod) => p.period_start <= today)
-    setPeriods(activePeriods)
-    if (activePeriods.length > 0) {
-      setSelectedPeriod(activePeriods[0].id)
-    }
-  }
-
-  useEffect(() => {
-    fetchPeriods().finally(() => {
-      setIsLoadingInit(false)
-    })
-  }, [])
+  // Period list is loaded by FiscalYearSelector; isLoadingInit flips to false
+  // via its onReady callback once the initial fetch completes.
 
   const isEnskildFirma = company?.entity_type === 'enskild_firma'
   const isAktiebolag = company?.entity_type === 'aktiebolag'
@@ -110,14 +95,29 @@ export default function ReportsPage() {
         </div>
       </div>
 
+      <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+        <FiscalYearSelector
+          value={selectedPeriod || null}
+          onChange={(id) => setSelectedPeriod(id || '')}
+          includeAllOption={false}
+          hideFuturePeriods
+          onReady={() => setIsLoadingInit(false)}
+        />
+        {selectedPeriod && (
+          <Button
+            variant="outline"
+            onClick={() => {
+              window.open(`/api/reports/sie-export?period_id=${selectedPeriod}`, '_blank')
+            }}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Ladda ner SIE-fil
+          </Button>
+        )}
+      </div>
+
       {isLoadingInit ? (
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-end gap-4">
-            <div>
-              <div className="h-4 bg-muted rounded w-24 animate-pulse mb-1" />
-              <div className="h-10 bg-muted rounded w-64 animate-pulse" />
-            </div>
-          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="space-y-2">
@@ -139,33 +139,6 @@ export default function ReportsPage() {
         </div>
       ) : (
       <>
-      <div className="flex flex-col sm:flex-row sm:items-end gap-4">
-        <div>
-          <Label>Räkenskapsår</Label>
-          <select
-            value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value)}
-            className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
-          >
-            {periods.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} ({p.period_start} — {p.period_end})
-              </option>
-            ))}
-          </select>
-        </div>
-        {selectedPeriod && (
-          <Button
-            variant="outline"
-            onClick={() => {
-              window.open(`/api/reports/sie-export?period_id=${selectedPeriod}`, '_blank')
-            }}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Ladda ner SIE-fil
-          </Button>
-        )}
-      </div>
 
       {selectedPeriod ? (
         <>

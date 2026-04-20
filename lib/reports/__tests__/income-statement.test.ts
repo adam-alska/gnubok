@@ -214,6 +214,61 @@ describe('generateIncomeStatement', () => {
     expect(section.subtotal).toBe(10000)
   })
 
+  it('excludes account 8999 (Årets resultat closing) from financial section', async () => {
+    // Regression: when a SIE import contains a year-end close voucher like
+    // Bokio's "Yearly result" (debit 8999, credit 2099), 8999 holds a debit
+    // balance equal to the computed profit. Including it as a financial item
+    // cancels the revenue-vs-expense difference and drives net_result to ~0.
+    // Matches the NE-bilaga behavior (which already ignores 8999).
+    mockTrialBalance.mockResolvedValue({
+      rows: [
+        makeRow({ account_number: '3001', account_name: 'Revenue', account_class: 3, closing_credit: 370000, closing_debit: 0 }),
+        makeRow({ account_number: '5010', account_name: 'Rent', account_class: 5, closing_debit: 149000, closing_credit: 0 }),
+        // Year-end close posted the profit on 8999
+        makeRow({ account_number: '8999', account_name: 'Årets resultat', account_class: 8, closing_debit: 221000, closing_credit: 0 }),
+      ],
+      totalDebit: 370000,
+      totalCredit: 370000,
+      isBalanced: true,
+    })
+
+    const report = await generateIncomeStatement(supabase, 'company-1', 'period-1')
+
+    expect(report.total_revenue).toBe(370000)
+    expect(report.total_expenses).toBe(149000)
+    // 8999 must not contribute — financial section should be empty
+    expect(report.financial_sections).toEqual([])
+    expect(report.total_financial).toBe(0)
+    // Computed net result equals what Bokio / NE-bilaga shows
+    expect(report.net_result).toBe(221000)
+  })
+
+  it('still includes legitimate class 8 accounts (8310 interest, 8410 interest expense)', async () => {
+    // Sanity check the 8999 exclusion is narrow — other class 8 accounts
+    // (interest income, interest expense, tax) must still appear.
+    mockTrialBalance.mockResolvedValue({
+      rows: [
+        makeRow({ account_number: '3001', account_name: 'Revenue', account_class: 3, closing_credit: 100000, closing_debit: 0 }),
+        makeRow({ account_number: '8310', account_name: 'Ränteintäkter', account_class: 8, closing_credit: 500, closing_debit: 0 }),
+        makeRow({ account_number: '8410', account_name: 'Räntekostnader', account_class: 8, closing_debit: 200, closing_credit: 0 }),
+        makeRow({ account_number: '8999', account_name: 'Årets resultat', account_class: 8, closing_debit: 100300, closing_credit: 0 }),
+      ],
+      totalDebit: 100500,
+      totalCredit: 100500,
+      isBalanced: true,
+    })
+
+    const report = await generateIncomeStatement(supabase, 'company-1', 'period-1')
+
+    const titles = report.financial_sections.map(s => s.title)
+    expect(titles).toContain('Ränteintäkter')
+    expect(titles).toContain('Räntekostnader')
+    // 89xx section would have been populated by 8999 only — excluded
+    expect(titles).not.toContain('Skatter och årets resultat')
+    expect(report.total_financial).toBe(300) // 500 - 200
+    expect(report.net_result).toBe(100300) // 100000 - 0 + 300
+  })
+
   it('ignores class 1-2 accounts (balance sheet)', async () => {
     mockTrialBalance.mockResolvedValue({
       rows: [
