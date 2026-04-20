@@ -66,6 +66,8 @@ describe('voucher number atomicity', () => {
     expect(supabase.rpc).toHaveBeenCalledWith('commit_journal_entry', {
       p_company_id: 'co-1',
       p_entry_id: 'entry-1',
+      p_commit_method: null,
+      p_rubric_version: null,
     })
 
     // from() was never called — the RPC handles everything atomically
@@ -102,6 +104,8 @@ describe('voucher number atomicity', () => {
     expect(supabase.rpc).toHaveBeenCalledWith('commit_journal_entry', {
       p_company_id: 'co-1',
       p_entry_id: 'entry-1',
+      p_commit_method: null,
+      p_rubric_version: null,
     })
     // from() called once to fetch the complete entry with lines
     expect(supabase.from).toHaveBeenCalledWith('journal_entries')

@@ -245,7 +245,9 @@ export async function commitEntry(
   supabase: SupabaseClient,
   companyId: string,
   userId: string,
-  entryId: string
+  entryId: string,
+  commitMethod?: string,
+  rubricVersion?: string
 ): Promise<JournalEntry> {
 
   // Atomic: increment voucher sequence + update status in one transaction.
@@ -253,6 +255,8 @@ export async function commitEntry(
   const { data: rpcResult, error: commitError } = await supabase.rpc('commit_journal_entry', {
     p_company_id: companyId,
     p_entry_id: entryId,
+    p_commit_method: commitMethod ?? null,
+    p_rubric_version: rubricVersion ?? null,
   })
 
   if (commitError) {
@@ -286,10 +290,12 @@ export async function createJournalEntry(
   supabase: SupabaseClient,
   companyId: string,
   userId: string,
-  input: CreateJournalEntryInput
+  input: CreateJournalEntryInput,
+  commitMethod?: string,
+  rubricVersion?: string
 ): Promise<JournalEntry> {
   const draft = await createDraftEntry(supabase, companyId, userId, input)
-  return commitEntry(supabase, companyId, userId, draft.id)
+  return commitEntry(supabase, companyId, userId, draft.id, commitMethod, rubricVersion)
 }
 
 /**

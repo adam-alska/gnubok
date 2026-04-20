@@ -33,9 +33,21 @@ const PII_PATTERNS = [
   /\b\d{8}-?\d{4}\b/,   // 12-digit variant (YYYYMMDD-NNNN) or orgnr
 ]
 
+// UUIDs (RFC 4122, 8-4-4-4-12 hex layout) frequently contain all-digit segments
+// that incorrectly match the 8+4 personnummer pattern — e.g. `57484518-3409-...`.
+// Strip UUID-shaped substrings before PII matching so legitimate identifiers
+// aren't rejected. Personnummer always sit outside the UUID shape, so this keeps
+// the original safety intent intact.
+const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
+
+function stringContainsPii(value: string): boolean {
+  const stripped = value.replace(UUID_PATTERN, '')
+  return PII_PATTERNS.some(pattern => pattern.test(stripped))
+}
+
 function containsPii(value: unknown): boolean {
   if (typeof value === 'string') {
-    return PII_PATTERNS.some(pattern => pattern.test(value))
+    return stringContainsPii(value)
   }
   if (Array.isArray(value)) {
     return value.some(containsPii)
@@ -52,7 +64,7 @@ const piiSafePayload = z.record(z.string(), z.unknown()).refine(
 )
 
 function assertActorPiiSafe(actor: ProcessingHistoryActor): void {
-  if (actor.label && PII_PATTERNS.some(p => p.test(actor.label!))) {
+  if (actor.label && stringContainsPii(actor.label)) {
     throw new Error(
       'actor.label contains PII (personnummer/samordningsnummer/orgnr pattern). Use a pseudonymous descriptor only.'
     )
