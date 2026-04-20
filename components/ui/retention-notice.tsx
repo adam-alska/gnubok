@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -23,18 +24,38 @@ export function RetentionNotice({ variant, className }: RetentionNoticeProps) {
     variant === 'company'
       ? {
           title: 'Bokföringen behålls i 7 år',
-          body:
-            'Enligt bokföringslagen (BFL 7 kap. 2§) sparas räkenskapsinformation i 7 år. ' +
-            'När du raderar företaget döljs det i gnubok, men verifikationer, dokument och ' +
-            'bokföring behålls säkert tills lagkravet löpt ut.',
+          body: (
+            <>
+              Enligt bokföringslagen (BFL 7 kap. 2§) sparas räkenskapsinformation i 7 år.
+              När du raderar företaget döljs det i gnubok, men verifikationer, dokument och
+              bokföring behålls säkert tills lagkravet löpt ut. Du kan{' '}
+              <Link
+                href="/settings/backup"
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                ladda ner en säkerhetsbackup
+              </Link>{' '}
+              innan du fortsätter.
+            </>
+          ),
         }
       : {
           title: 'Kontoraderingen är permanent',
-          body:
-            'Ditt konto avidentifieras och du loggas ut från alla enheter. Räkenskaps­information ' +
-            'från företag du ägt behålls säkert i 7 år enligt BFL 7 kap. 2§. Du kan inte skapa ett ' +
-            'nytt konto med samma e-postadress — kontakta support om du vill återaktivera kontot ' +
-            'i framtiden. Ladda gärna ner ett fullständigt arkiv innan du fortsätter.',
+          body: (
+            <>
+              Ditt konto avidentifieras och du loggas ut från alla enheter.
+              Räkenskapsinformation från företag du ägt behålls säkert i 7 år enligt BFL 7
+              kap. 2§. Du kan inte skapa ett nytt konto med samma e-postadress — kontakta
+              support om du vill återaktivera kontot i framtiden. Ladda gärna ner en{' '}
+              <Link
+                href="/settings/backup"
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                säkerhetsbackup
+              </Link>{' '}
+              innan du fortsätter.
+            </>
+          ),
         }
 
   return (

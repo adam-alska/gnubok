@@ -11,10 +11,11 @@ import { getAuditLog } from '@/lib/core/audit/audit-service'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import type { AuditLogEntry } from '@/types'
 
-export interface FullArchiveOptions {
-  period_id: string
-  include_documents?: boolean
-}
+export type FullArchiveOptions =
+  | { scope: 'period'; period_id: string; include_documents?: boolean }
+  | { scope: 'all'; include_documents?: boolean }
+
+export type ArchiveScope = FullArchiveOptions['scope']
 
 interface DocumentManifestEntry {
   document_id: string
@@ -22,6 +23,7 @@ interface DocumentManifestEntry {
   storage_path: string
   sha256_hash: string
   journal_entry_id: string | null
+  fiscal_period_id: string | null
   version: number
   digitization_date: string | null
   upload_source: string | null
@@ -31,133 +33,317 @@ interface DocumentManifestEntry {
   error?: string
 }
 
+interface FiscalPeriodRow {
+  id: string
+  period_start: string
+  period_end: string
+  opening_balance_entry_id: string | null
+}
+
+interface CompanyInfo {
+  company_name: string | null
+  trade_name: string | null
+  org_number: string | null
+  moms_period: string | null
+}
+
+interface DocumentRow {
+  id: string
+  file_name: string
+  storage_path: string
+  journal_entry_id: string | null
+  sha256_hash: string
+  version: number
+  digitization_date: string | null
+  upload_source: string | null
+  mime_type: string | null
+  file_size_bytes: number | null
+}
+
+interface PeriodReports {
+  trialBalance: unknown
+  incomeStatement: unknown
+  balanceSheet: unknown
+  generalLedger: unknown
+  journalRegister: unknown
+  vatDeclaration: unknown | null
+}
+
+const REPORT_CONCURRENCY = 3
+const ARCHIVE_OVERHEAD_BYTES = 5 * 1024 * 1024
+
 /**
- * Generate a full archive ZIP for a fiscal period.
+ * Generate a full archive ZIP for a company.
  *
- * Contains SIE4 file, all financial reports, attached documents, and audit trail.
- * This fulfills the Swedish accounting law (BFL) requirement for complete archives.
+ * `scope: 'period'` produces the single-period archive used by account/company
+ * deletion flows: `bokforing.se`, flat `rapporter/*.json`, `dokument/*`, and
+ * `revision/*`.
+ *
+ * `scope: 'all'` produces the "säkerhetsbackup" covering the entire company
+ * history: one SIE4 file per period under `sie/`, per-period `rapporter/`
+ * subfolders, a flat `dokument/` with manifest tagged by fiscal_period_id,
+ * and an unfiltered `revision/behandlingshistorik.json`.
  */
 export async function generateFullArchive(
   supabase: SupabaseClient,
   companyId: string,
   options: FullArchiveOptions
 ): Promise<ArrayBuffer> {
-  const { period_id, include_documents = true } = options
+  const company = await fetchCompany(supabase, companyId)
+  const periods =
+    options.scope === 'all'
+      ? await fetchAllPeriods(supabase, companyId)
+      : [await fetchSinglePeriod(supabase, companyId, options.period_id)]
 
-  // Fetch fiscal period
-  const { data: period } = await supabase
-    .from('fiscal_periods')
-    .select('*')
-    .eq('id', period_id)
-    .eq('company_id', companyId)
-    .single()
-
-  if (!period) {
-    throw new Error('Fiscal period not found')
+  if (periods.length === 0) {
+    throw new Error('No fiscal periods found')
   }
 
-  // Fetch company settings
-  const { data: company } = await supabase
+  const zip = new JSZip()
+
+  if (options.scope === 'all') {
+    const sieFolder = zip.folder('sie')!
+    const rapporterFolder = zip.folder('rapporter')!
+
+    for (let i = 0; i < periods.length; i += REPORT_CONCURRENCY) {
+      const batch = periods.slice(i, i + REPORT_CONCURRENCY)
+      await Promise.all(
+        batch.map(async (period) => {
+          const sie = await generateSIEExport(supabase, companyId, {
+            fiscal_period_id: period.id,
+            company_name: company.company_name || 'Unknown',
+            trade_name: company.trade_name,
+            org_number: company.org_number,
+            program_name: 'ERPBase',
+          })
+          sieFolder.file(`${periodLabel(period)}.se`, sie)
+
+          const reports = await generatePeriodReports(supabase, companyId, period)
+          const periodFolder = rapporterFolder.folder(periodLabel(period))!
+          writeReports(periodFolder, reports)
+        })
+      )
+    }
+  } else {
+    const period = periods[0]
+    const sie = await generateSIEExport(supabase, companyId, {
+      fiscal_period_id: period.id,
+      company_name: company.company_name || 'Unknown',
+      trade_name: company.trade_name,
+      org_number: company.org_number,
+      program_name: 'ERPBase',
+    })
+    zip.file('bokforing.se', sie)
+
+    const reports = await generatePeriodReports(supabase, companyId, period)
+    const rapporter = zip.folder('rapporter')!
+    writeReports(rapporter, reports)
+  }
+
+  if (options.include_documents !== false) {
+    await writeDocuments(zip, supabase, companyId, periods, options.scope)
+  }
+
+  const revision = zip.folder('revision')!
+
+  const auditFilters =
+    options.scope === 'period'
+      ? { from_date: periods[0].period_start, to_date: periods[0].period_end }
+      : {}
+  const auditEntries = await fetchAllAuditEntries(supabase, companyId, auditFilters)
+  revision.file('behandlingshistorik.json', JSON.stringify(auditEntries, null, 2))
+
+  const systemDoc = await buildSystemDoc(supabase, companyId, periods, options.scope)
+  revision.file('systemdokumentation.json', JSON.stringify(systemDoc, null, 2))
+
+  return zip.generateAsync({ type: 'arraybuffer' })
+}
+
+/**
+ * Estimate the uncompressed size of the archive in bytes.
+ *
+ * Sums `file_size_bytes` across all documents in scope plus a fixed overhead
+ * for SIE, reports, audit trail, and system documentation. Used by the API
+ * route to short-circuit generation when the payload would exceed the
+ * platform's response-size ceiling.
+ */
+export async function estimateArchiveSize(
+  supabase: SupabaseClient,
+  companyId: string,
+  scope: ArchiveScope,
+  periodId?: string
+): Promise<{ total_bytes: number; document_bytes: number; document_count: number }> {
+  let query = supabase
+    .from('document_attachments')
+    .select('file_size_bytes, journal_entry_id', { count: 'exact' })
+    .eq('company_id', companyId)
+    .not('journal_entry_id', 'is', null)
+
+  if (scope === 'period') {
+    if (!periodId) {
+      throw new Error('period_id is required for scope=period')
+    }
+    const periodEntryIds = await fetchAllRows<{ id: string }>(({ from, to }) =>
+      supabase
+        .from('journal_entries')
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('fiscal_period_id', periodId)
+        .in('status', ['posted', 'reversed'])
+        .range(from, to)
+    )
+    const ids = periodEntryIds.map((e) => e.id)
+    if (ids.length === 0) {
+      return { total_bytes: ARCHIVE_OVERHEAD_BYTES, document_bytes: 0, document_count: 0 }
+    }
+    query = query.in('journal_entry_id', ids)
+  }
+
+  const { data, error } = await query
+  if (error) {
+    throw new Error(`Failed to estimate archive size: ${error.message}`)
+  }
+
+  const rows = (data as { file_size_bytes: number | null }[]) || []
+  const documentBytes = rows.reduce((sum, r) => sum + (Number(r.file_size_bytes) || 0), 0)
+
+  return {
+    total_bytes: documentBytes + ARCHIVE_OVERHEAD_BYTES,
+    document_bytes: documentBytes,
+    document_count: rows.length,
+  }
+}
+
+async function fetchCompany(supabase: SupabaseClient, companyId: string): Promise<CompanyInfo> {
+  const { data } = await supabase
     .from('company_settings')
     .select('company_name, trade_name, org_number, moms_period')
     .eq('company_id', companyId)
     .single()
 
-  if (!company) {
+  if (!data) {
     throw new Error('Company settings not found')
   }
+  return data as CompanyInfo
+}
 
-  const zip = new JSZip()
+async function fetchSinglePeriod(
+  supabase: SupabaseClient,
+  companyId: string,
+  periodId: string
+): Promise<FiscalPeriodRow> {
+  const { data } = await supabase
+    .from('fiscal_periods')
+    .select('id, period_start, period_end, opening_balance_entry_id')
+    .eq('id', periodId)
+    .eq('company_id', companyId)
+    .single()
 
-  // 1. SIE4 export
-  const sieContent = await generateSIEExport(supabase, companyId, {
-    fiscal_period_id: period_id,
-    company_name: company.company_name || 'Unknown',
-    trade_name: company.trade_name,
-    org_number: company.org_number,
-    program_name: 'ERPBase',
-  })
-  zip.file('bokforing.se', sieContent)
+  if (!data) {
+    throw new Error('Fiscal period not found')
+  }
+  return data as FiscalPeriodRow
+}
 
-  // 2. Reports folder
-  const rapporter = zip.folder('rapporter')!
+async function fetchAllPeriods(
+  supabase: SupabaseClient,
+  companyId: string
+): Promise<FiscalPeriodRow[]> {
+  const rows = await fetchAllRows<FiscalPeriodRow>(({ from, to }) =>
+    supabase
+      .from('fiscal_periods')
+      .select('id, period_start, period_end, opening_balance_entry_id')
+      .eq('company_id', companyId)
+      .order('period_start', { ascending: true })
+      .range(from, to)
+  )
+  return rows
+}
 
+async function generatePeriodReports(
+  supabase: SupabaseClient,
+  companyId: string,
+  period: FiscalPeriodRow
+): Promise<PeriodReports> {
   const [trialBalance, incomeStatement, balanceSheet, generalLedger, journalRegister] =
     await Promise.all([
-      generateTrialBalance(supabase, companyId, period_id),
-      generateIncomeStatement(supabase, companyId, period_id),
-      generateBalanceSheet(supabase, companyId, period_id),
-      generateGeneralLedger(supabase, companyId, period_id),
-      generateJournalRegister(supabase, companyId, period_id),
+      generateTrialBalance(supabase, companyId, period.id),
+      generateIncomeStatement(supabase, companyId, period.id),
+      generateBalanceSheet(supabase, companyId, period.id),
+      generateGeneralLedger(supabase, companyId, period.id),
+      generateJournalRegister(supabase, companyId, period.id),
     ])
 
-  rapporter.file('saldobalans.json', JSON.stringify(trialBalance, null, 2))
-  rapporter.file('resultatrakning.json', JSON.stringify(incomeStatement, null, 2))
-  rapporter.file('balansrakning.json', JSON.stringify(balanceSheet, null, 2))
-  rapporter.file('huvudbok.json', JSON.stringify(generalLedger, null, 2))
-  rapporter.file('grundbok.json', JSON.stringify(journalRegister, null, 2))
-
-  // VAT declaration — calculate for the full fiscal period as yearly
+  let vatDeclaration: unknown = null
   try {
     const startDate = new Date(period.period_start)
-    const vatDeclaration = await calculateVatDeclaration(
+    vatDeclaration = await calculateVatDeclaration(
       supabase,
       companyId,
       'yearly',
       startDate.getFullYear(),
       1
     )
-    rapporter.file('momsdeklaration.json', JSON.stringify(vatDeclaration, null, 2))
   } catch {
     // VAT declaration may fail if no relevant entries exist — skip gracefully
   }
 
-  // 3. Documents folder
-  if (include_documents) {
-    const dokument = zip.folder('dokument')!
-    const manifest: DocumentManifestEntry[] = []
+  return { trialBalance, incomeStatement, balanceSheet, generalLedger, journalRegister, vatDeclaration }
+}
 
-    // Fetch document attachments linked to journal entries in this period
-    // Wrapped in try/catch to match VAT section — a failed document fetch
-    // should not prevent the rest of the archive from being generated.
-    try {
-    const documents = await fetchAllRows<{
-      id: string; file_name: string; storage_path: string; journal_entry_id: string | null
-      sha256_hash: string; version: number; digitization_date: string | null
-      upload_source: string | null; mime_type: string | null; file_size_bytes: number | null
-    }>(({ from, to }) =>
+function writeReports(folder: JSZip, reports: PeriodReports): void {
+  folder.file('saldobalans.json', JSON.stringify(reports.trialBalance, null, 2))
+  folder.file('resultatrakning.json', JSON.stringify(reports.incomeStatement, null, 2))
+  folder.file('balansrakning.json', JSON.stringify(reports.balanceSheet, null, 2))
+  folder.file('huvudbok.json', JSON.stringify(reports.generalLedger, null, 2))
+  folder.file('grundbok.json', JSON.stringify(reports.journalRegister, null, 2))
+  if (reports.vatDeclaration) {
+    folder.file('momsdeklaration.json', JSON.stringify(reports.vatDeclaration, null, 2))
+  }
+}
+
+async function writeDocuments(
+  zip: JSZip,
+  supabase: SupabaseClient,
+  companyId: string,
+  periods: FiscalPeriodRow[],
+  scope: ArchiveScope
+): Promise<void> {
+  const dokument = zip.folder('dokument')!
+  const manifest: DocumentManifestEntry[] = []
+
+  try {
+    const documents = await fetchAllRows<DocumentRow>(({ from, to }) =>
       supabase
         .from('document_attachments')
-        .select('id, file_name, storage_path, journal_entry_id, sha256_hash, version, digitization_date, upload_source, mime_type, file_size_bytes')
+        .select(
+          'id, file_name, storage_path, journal_entry_id, sha256_hash, version, digitization_date, upload_source, mime_type, file_size_bytes'
+        )
         .eq('company_id', companyId)
         .not('journal_entry_id', 'is', null)
         .range(from, to)
     )
 
     if (documents.length > 0) {
-      // Filter to entries in this period
-      const periodEntryIds = await fetchAllRows<{ id: string }>(({ from, to }) =>
-        supabase
-          .from('journal_entries')
-          .select('id')
-          .eq('company_id', companyId)
-          .eq('fiscal_period_id', period_id)
-          .in('status', ['posted', 'reversed'])
-          .range(from, to)
-      )
+      const entryIdToPeriodId = await buildEntryToPeriodMap(supabase, companyId, periods, scope)
 
-      const periodEntryIdSet = new Set(periodEntryIds.map((e) => e.id))
-      const periodDocuments = documents.filter(
-        (d: { journal_entry_id: string | null }) => d.journal_entry_id && periodEntryIdSet.has(d.journal_entry_id)
-      )
+      const inScopeDocuments =
+        scope === 'period'
+          ? documents.filter((d) => d.journal_entry_id && entryIdToPeriodId.has(d.journal_entry_id))
+          : documents.filter((d) => d.journal_entry_id) // all-mode: keep every linked doc
 
-      for (const doc of periodDocuments) {
+      for (const doc of inScopeDocuments) {
+        const fiscalPeriodId = doc.journal_entry_id
+          ? entryIdToPeriodId.get(doc.journal_entry_id) ?? null
+          : null
+
         const baseManifest = {
           document_id: doc.id,
           file_name: doc.file_name,
           storage_path: doc.storage_path,
           sha256_hash: doc.sha256_hash,
           journal_entry_id: doc.journal_entry_id,
+          fiscal_period_id: fiscalPeriodId,
           version: doc.version,
           digitization_date: doc.digitization_date,
           upload_source: doc.upload_source,
@@ -180,13 +366,9 @@ export async function generateFullArchive(
           }
 
           const buffer = await fileData.arrayBuffer()
-          // Prefix with document ID to prevent duplicate filename collisions
           const zipFileName = `${doc.id}_${doc.file_name}`
           dokument.file(zipFileName, buffer)
-          manifest.push({
-            ...baseManifest,
-            status: 'downloaded',
-          })
+          manifest.push({ ...baseManifest, status: 'downloaded' })
         } catch (err) {
           manifest.push({
             ...baseManifest,
@@ -196,50 +378,90 @@ export async function generateFullArchive(
         }
       }
     }
-    } catch {
-      // Document fetch failed — archive will still contain reports and audit trail
-    }
-
-    dokument.file('manifest.json', JSON.stringify(manifest, null, 2))
+  } catch {
+    // Document fetch failed — archive will still contain reports and audit trail
   }
 
-  // 4. Audit trail
-  const revision = zip.folder('revision')!
-  const allAuditEntries: AuditLogEntry[] = []
+  dokument.file('manifest.json', JSON.stringify(manifest, null, 2))
+}
+
+async function buildEntryToPeriodMap(
+  supabase: SupabaseClient,
+  companyId: string,
+  periods: FiscalPeriodRow[],
+  scope: ArchiveScope
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>()
+  const periodIds = periods.map((p) => p.id)
+  if (periodIds.length === 0) return map
+
+  let query = supabase
+    .from('journal_entries')
+    .select('id, fiscal_period_id')
+    .eq('company_id', companyId)
+    .in('status', ['posted', 'reversed'])
+
+  if (scope === 'period') {
+    query = query.eq('fiscal_period_id', periodIds[0])
+  } else {
+    query = query.in('fiscal_period_id', periodIds)
+  }
+
+  const entries = await fetchAllRows<{ id: string; fiscal_period_id: string }>(({ from, to }) =>
+    query.range(from, to)
+  )
+
+  for (const entry of entries) {
+    map.set(entry.id, entry.fiscal_period_id)
+  }
+  return map
+}
+
+async function fetchAllAuditEntries(
+  supabase: SupabaseClient,
+  companyId: string,
+  filters: { from_date?: string; to_date?: string }
+): Promise<AuditLogEntry[]> {
+  const all: AuditLogEntry[] = []
   let page = 1
   const pageSize = 500
 
   while (true) {
-    const result = await getAuditLog(supabase, companyId, {
-      from_date: period.period_start,
-      to_date: period.period_end,
-      page,
-      pageSize,
-    })
-    allAuditEntries.push(...result.data)
-    if (allAuditEntries.length >= result.count || result.data.length < pageSize) {
+    const result = await getAuditLog(supabase, companyId, { ...filters, page, pageSize })
+    all.push(...result.data)
+    if (all.length >= result.count || result.data.length < pageSize) {
       break
     }
     page++
   }
+  return all
+}
 
-  revision.file('behandlingshistorik.json', JSON.stringify(allAuditEntries, null, 2))
+async function buildSystemDoc(
+  supabase: SupabaseClient,
+  companyId: string,
+  periods: FiscalPeriodRow[],
+  scope: ArchiveScope
+): Promise<Record<string, unknown>> {
+  let voucherSeriesQuery = supabase
+    .from('voucher_sequences')
+    .select('voucher_series, last_number, fiscal_period_id')
+    .eq('company_id', companyId)
 
-  // 5. Systemdokumentation (BFNAR 2013:2 kap 8)
+  if (scope === 'period') {
+    voucherSeriesQuery = voucherSeriesQuery.eq('fiscal_period_id', periods[0].id)
+  }
+
   const [accountsResult, voucherSeriesResult] = await Promise.all([
     supabase
       .from('chart_of_accounts')
       .select('account_number, account_name, account_type, is_active')
       .eq('company_id', companyId)
       .order('account_number'),
-    supabase
-      .from('voucher_sequences')
-      .select('voucher_series, last_number')
-      .eq('company_id', companyId)
-      .eq('fiscal_period_id', period_id),
+    voucherSeriesQuery,
   ])
 
-  const systemdokumentation = {
+  return {
     system: {
       name: 'gnubok',
       description: 'Bokforingssystem for enskild firma och aktiebolag',
@@ -249,10 +471,13 @@ export async function generateFullArchive(
       standard: 'BAS 2026',
       accounts: accountsResult.data || [],
     },
-    verifikationsserier: (voucherSeriesResult.data || []).map((vs: { voucher_series: string; last_number: number }) => ({
-      serie: vs.voucher_series,
-      senaste_nummer: vs.last_number,
-    })),
+    verifikationsserier: (voucherSeriesResult.data || []).map(
+      (vs: { voucher_series: string; last_number: number; fiscal_period_id?: string }) => ({
+        serie: vs.voucher_series,
+        senaste_nummer: vs.last_number,
+        fiscal_period_id: vs.fiscal_period_id ?? null,
+      })
+    ),
     behorighetskontroll: {
       description: 'Rollbaserad atkomstkontroll med owner/admin/member/viewer',
       mfa_stod: true,
@@ -270,14 +495,14 @@ export async function generateFullArchive(
       export_format: 'SIE4',
     },
     generated_at: new Date().toISOString(),
-    fiscal_period: {
-      id: period.id,
-      start: period.period_start,
-      end: period.period_end,
-    },
+    fiscal_periods: periods.map((p) => ({
+      id: p.id,
+      start: p.period_start,
+      end: p.period_end,
+    })),
   }
+}
 
-  revision.file('systemdokumentation.json', JSON.stringify(systemdokumentation, null, 2))
-
-  return zip.generateAsync({ type: 'arraybuffer' })
+function periodLabel(period: FiscalPeriodRow): string {
+  return `${period.period_start}_${period.period_end}`
 }

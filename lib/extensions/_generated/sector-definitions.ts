@@ -68,5 +68,17 @@ export const EXTENSION_DEFINITIONS: Record<string, ExtensionDefinition[]> = {
           "description": "Gör bokföring via Claude, Cursor eller annan MCP-klient",
           "longDescription": "Exponerar gnuboks bokföringsmotor som MCP-verktyg (Model Context Protocol). Koppla din MCP-klient med en API-nyckel och gör bokföring genom konversation: visa okategoriserade transaktioner, bokför dem, skapa fakturor."
     },
+    {
+          "slug": "cloud-backup",
+          "name": "Molnsynkronisering",
+          "sector": "general",
+          "category": "operations",
+          "icon": "Cloud",
+          "dataPattern": "manual",
+          "description": "Synka säkerhetsbackup till din egen molnlagring",
+          "longDescription": "Koppla ditt Google Drive-konto och ladda upp en fullständig säkerhetsbackup med ett klick. Gnubok skapar en ZIP med SIE-filer, kvitton och behandlingshistorik och laddar upp till en egen mapp i din Drive. Perfekt för att uppfylla egna krav på redundans.",
+          "hasOwnData": true,
+          "subscriptionNotice": "Kräver ett Google-konto. Uppladdningar sker direkt till din Drive — ingen data lagras hos tredje part utöver Google."
+    },
   ],
 }

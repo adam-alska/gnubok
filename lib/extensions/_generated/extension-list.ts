@@ -5,6 +5,7 @@ import { emailExtension } from '@/extensions/general/email'
 import { arcimMigrationExtension } from '@/extensions/general/arcim-migration'
 import { ticExtension } from '@/extensions/general/tic'
 import { mcpServerExtension } from '@/extensions/general/mcp-server'
+import { cloudBackupExtension } from '@/extensions/general/cloud-backup'
 
 export const FIRST_PARTY_EXTENSIONS: Extension[] = [
   enableBankingExtension,
@@ -12,4 +13,5 @@ export const FIRST_PARTY_EXTENSIONS: Extension[] = [
   arcimMigrationExtension,
   ticExtension,
   mcpServerExtension,
+  cloudBackupExtension,
 ]

@@ -31,6 +31,7 @@ export function SettingsNav({ isSandbox }: { isSandbox?: boolean }) {
     { href: '/settings/banking', label: 'Bank (PSD2)', show: hasCompany && !isSandbox && hasBankingExtension },
     { href: '/settings/salary', label: 'Löner', show: hasCompany && company?.entity_type === 'aktiebolag' },
     { href: '/settings/templates', label: 'Mallar', show: hasCompany },
+    { href: '/settings/backup', label: 'Säkerhetsbackup', show: hasCompany },
     { href: '/settings/account', label: 'Konto', show: true },
     { href: '/settings/api', label: 'API', show: hasCompany && hasMcpExtension },
   ].filter(item => item.show)

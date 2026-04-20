@@ -63,7 +63,7 @@ describe('GET /api/audit-trail', () => {
     expect(body.count).toBe(2)
     expect(mockGetAuditLog).toHaveBeenCalledWith(
       expect.anything(),
-      'user-1',
+      'company-1',
       expect.objectContaining({})
     )
   })
@@ -88,7 +88,7 @@ describe('GET /api/audit-trail', () => {
 
     expect(mockGetAuditLog).toHaveBeenCalledWith(
       expect.anything(),
-      'user-1',
+      'company-1',
       {
         action: 'INSERT',
         table_name: 'journal_entries',

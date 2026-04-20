@@ -13,6 +13,9 @@ const SETTINGS_PANELS: Record<string, ComponentType> = {
   'enable-banking': dynamic(
     () => import('@/extensions/general/enable-banking/components/BankingSettingsPanel')
   ),
+  'cloud-backup': dynamic(
+    () => import('@/extensions/general/cloud-backup/components/CloudBackupCard')
+  ),
 }
 
 /**
