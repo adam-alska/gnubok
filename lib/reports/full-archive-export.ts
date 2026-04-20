@@ -70,7 +70,10 @@ interface PeriodReports {
 }
 
 const REPORT_CONCURRENCY = 3
-const ARCHIVE_OVERHEAD_BYTES = 5 * 1024 * 1024
+// 5 MB for SIE + reports + audit + system doc, +3 MB headroom for master-data
+// JSON dumps and raw imported SIE files (the bucket caps each file at 50 MB,
+// but typical SIE4 files are tens of KB so a few MB covers most companies).
+const ARCHIVE_OVERHEAD_BYTES = 8 * 1024 * 1024
 
 /**
  * Generate a full archive ZIP for a company.
@@ -142,6 +145,11 @@ export async function generateFullArchive(
 
   if (options.include_documents !== false) {
     await writeDocuments(zip, supabase, companyId, periods, options.scope)
+  }
+
+  if (options.scope === 'all') {
+    await writeSieSourceFiles(zip, supabase, companyId, options.include_documents !== false)
+    await writeMasterData(zip, supabase, companyId)
   }
 
   const revision = zip.folder('revision')!
@@ -386,6 +394,223 @@ async function writeDocuments(
   }
 
   dokument.file('manifest.json', JSON.stringify(manifest, null, 2))
+}
+
+interface SieImportRow {
+  id: string
+  filename: string | null
+  file_hash: string | null
+  file_storage_path: string | null
+  org_number: string | null
+  company_name: string | null
+  sie_type: number | null
+  fiscal_year_start: string | null
+  fiscal_year_end: string | null
+  accounts_count: number | null
+  transactions_count: number | null
+  status: string | null
+  fiscal_period_id: string | null
+  imported_at: string | null
+  created_at: string | null
+}
+
+interface SieSourceManifestEntry {
+  import_id: string
+  filename: string | null
+  storage_path: string | null
+  sha256_hash: string | null
+  sie_type: number | null
+  fiscal_year_start: string | null
+  fiscal_year_end: string | null
+  imported_at: string | null
+  status: 'downloaded' | 'missing' | 'skipped'
+  zip_file_name: string | null
+  error?: string
+}
+
+/**
+ * Copy raw imported SIE files from the `sie-files` storage bucket into the
+ * archive under `sie/original/`. Preserves the byte-identical source that the
+ * user uploaded (vs the `sie/<period>.se` files which gnubok re-generates from
+ * the current journal entries).
+ *
+ * `sie/imports.json` and `sie/account_mappings.json` are written regardless of
+ * `includeFiles` — they're small and critical for reconstructing the import
+ * history. Blob download is gated behind `includeFiles` since the files can be
+ * large and share the documents opt-out.
+ */
+async function writeSieSourceFiles(
+  zip: JSZip,
+  supabase: SupabaseClient,
+  companyId: string,
+  includeFiles: boolean
+): Promise<void> {
+  const sieFolder = zip.folder('sie') ?? zip.folder('sie')!
+
+  try {
+    const imports = await fetchAllRows<SieImportRow>(({ from, to }) =>
+      supabase
+        .from('sie_imports')
+        .select(
+          'id, filename, file_hash, file_storage_path, org_number, company_name, sie_type, fiscal_year_start, fiscal_year_end, accounts_count, transactions_count, status, fiscal_period_id, imported_at, created_at'
+        )
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: true })
+        .range(from, to)
+    )
+
+    sieFolder.file('imports.json', JSON.stringify(imports, null, 2))
+
+    const manifest: SieSourceManifestEntry[] = []
+
+    if (includeFiles && imports.length > 0) {
+      const originalFolder = sieFolder.folder('original')!
+
+      for (const imp of imports) {
+        if (!imp.file_storage_path) {
+          manifest.push({
+            import_id: imp.id,
+            filename: imp.filename,
+            storage_path: null,
+            sha256_hash: imp.file_hash,
+            sie_type: imp.sie_type,
+            fiscal_year_start: imp.fiscal_year_start,
+            fiscal_year_end: imp.fiscal_year_end,
+            imported_at: imp.imported_at,
+            status: 'skipped',
+            zip_file_name: null,
+            error: 'No storage path on record',
+          })
+          continue
+        }
+
+        const zipFileName = `${imp.id}_${sanitizeFileName(imp.filename || `${imp.id}.se`)}`
+
+        try {
+          const { data: fileData, error } = await supabase.storage
+            .from('sie-files')
+            .download(imp.file_storage_path)
+
+          if (error || !fileData) {
+            manifest.push({
+              import_id: imp.id,
+              filename: imp.filename,
+              storage_path: imp.file_storage_path,
+              sha256_hash: imp.file_hash,
+              sie_type: imp.sie_type,
+              fiscal_year_start: imp.fiscal_year_start,
+              fiscal_year_end: imp.fiscal_year_end,
+              imported_at: imp.imported_at,
+              status: 'missing',
+              zip_file_name: null,
+              error: error?.message || 'Download returned no data',
+            })
+            continue
+          }
+
+          const buffer = await fileData.arrayBuffer()
+          originalFolder.file(zipFileName, buffer)
+          manifest.push({
+            import_id: imp.id,
+            filename: imp.filename,
+            storage_path: imp.file_storage_path,
+            sha256_hash: imp.file_hash,
+            sie_type: imp.sie_type,
+            fiscal_year_start: imp.fiscal_year_start,
+            fiscal_year_end: imp.fiscal_year_end,
+            imported_at: imp.imported_at,
+            status: 'downloaded',
+            zip_file_name: zipFileName,
+          })
+        } catch (err) {
+          manifest.push({
+            import_id: imp.id,
+            filename: imp.filename,
+            storage_path: imp.file_storage_path,
+            sha256_hash: imp.file_hash,
+            sie_type: imp.sie_type,
+            fiscal_year_start: imp.fiscal_year_start,
+            fiscal_year_end: imp.fiscal_year_end,
+            imported_at: imp.imported_at,
+            status: 'missing',
+            zip_file_name: null,
+            error: err instanceof Error ? err.message : 'Unknown error',
+          })
+        }
+      }
+
+      originalFolder.file('manifest.json', JSON.stringify(manifest, null, 2))
+    }
+
+    const mappings = await fetchAllRows<Record<string, unknown>>(({ from, to }) =>
+      supabase
+        .from('sie_account_mappings')
+        .select('*')
+        .eq('company_id', companyId)
+        .range(from, to)
+    )
+    sieFolder.file('account_mappings.json', JSON.stringify(mappings, null, 2))
+  } catch {
+    // SIE metadata fetch failed — archive will still contain the re-generated SIE files
+  }
+}
+
+/**
+ * Dump structured master data as JSON under `data/`. These records are implicit
+ * in the SIE export (as journal entries) but not recoverable as domain objects
+ * without this dump — critical for disaster recovery of a company's state.
+ */
+async function writeMasterData(
+  zip: JSZip,
+  supabase: SupabaseClient,
+  companyId: string
+): Promise<void> {
+  const data = zip.folder('data')!
+
+  const tables: Array<{ name: string; file: string; orderBy?: string }> = [
+    { name: 'customers', file: 'customers.json', orderBy: 'created_at' },
+    { name: 'suppliers', file: 'suppliers.json', orderBy: 'created_at' },
+    { name: 'invoices', file: 'invoices.json', orderBy: 'invoice_date' },
+    { name: 'invoice_items', file: 'invoice_items.json' },
+    { name: 'invoice_payments', file: 'invoice_payments.json', orderBy: 'payment_date' },
+    { name: 'supplier_invoices', file: 'supplier_invoices.json', orderBy: 'invoice_date' },
+    { name: 'supplier_invoice_items', file: 'supplier_invoice_items.json' },
+    { name: 'receipts', file: 'receipts.json', orderBy: 'receipt_date' },
+    { name: 'receipt_line_items', file: 'receipt_line_items.json' },
+    { name: 'transactions', file: 'transactions.json', orderBy: 'booking_date' },
+    { name: 'mapping_rules', file: 'mapping_rules.json' },
+    { name: 'categorization_templates', file: 'categorization_templates.json' },
+    { name: 'bank_file_imports', file: 'bank_file_imports.json', orderBy: 'created_at' },
+    { name: 'company_settings', file: 'company_settings.json' },
+  ]
+
+  await Promise.all(
+    tables.map(async (t) => {
+      try {
+        const rows = await fetchAllRows<Record<string, unknown>>(({ from, to }) => {
+          let q = supabase.from(t.name).select('*').eq('company_id', companyId)
+          if (t.orderBy) {
+            q = q.order(t.orderBy, { ascending: true })
+          }
+          return q.range(from, to)
+        })
+        data.file(t.file, JSON.stringify(rows, null, 2))
+      } catch (err) {
+        data.file(
+          t.file,
+          JSON.stringify(
+            { error: err instanceof Error ? err.message : 'Fetch failed', rows: [] },
+            null,
+            2
+          )
+        )
+      }
+    })
+  )
+}
+
+function sanitizeFileName(name: string): string {
+  return name.replace(/[\\/:*?"<>|]/g, '_').slice(0, 120)
 }
 
 async function buildEntryToPeriodMap(

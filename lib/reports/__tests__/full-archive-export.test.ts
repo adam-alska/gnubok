@@ -307,6 +307,117 @@ describe('generateFullArchive', () => {
         generateFullArchive(supabase as any, 'company-1', { scope: 'all' })
       ).rejects.toThrow('No fiscal periods found')
     })
+
+    it('includes imported SIE source files and master-data dumps in all-mode', async () => {
+      const importRow = {
+        id: 'import-1',
+        filename: 'original.se',
+        file_hash: 'abc123',
+        file_storage_path: 'company-1/import-1.se',
+        org_number: '5560000000',
+        company_name: 'Test AB',
+        sie_type: 4,
+        fiscal_year_start: '2024-01-01',
+        fiscal_year_end: '2024-12-31',
+        accounts_count: 42,
+        transactions_count: 120,
+        status: 'completed',
+        fiscal_period_id: PERIOD_2024.id,
+        imported_at: '2024-11-01T10:00:00Z',
+        created_at: '2024-11-01T09:55:00Z',
+      }
+
+      enqueueMany([
+        { data: COMPANY_ROW }, // fetchCompany
+        { data: [PERIOD_2024] }, // fetchAllPeriods
+        { data: [] }, // document_attachments
+        { data: [importRow] }, // sie_imports
+        { data: [{ source_account: '9999', target_account: '1510' }] }, // sie_account_mappings
+        { data: [{ id: 'cust-1', name: 'Acme AB' }] }, // customers
+        { data: [{ id: 'sup-1', name: 'Supplier AB' }] }, // suppliers
+        { data: [{ id: 'inv-1', invoice_number: 'F-001' }] }, // invoices
+        { data: [] }, // invoice_items
+        { data: [] }, // invoice_payments
+        { data: [] }, // supplier_invoices
+        { data: [] }, // supplier_invoice_items
+        { data: [] }, // receipts
+        { data: [] }, // receipt_line_items
+        { data: [] }, // transactions
+        { data: [] }, // mapping_rules
+        { data: [] }, // categorization_templates
+        { data: [] }, // bank_file_imports
+        { data: [COMPANY_ROW] }, // company_settings
+      ])
+
+      const buffer = await generateFullArchive(supabase as any, 'company-1', {
+        scope: 'all',
+      })
+      const zip = await JSZip.loadAsync(buffer)
+
+      const originalFile = zip.file('sie/original/import-1_original.se')
+      expect(originalFile).not.toBeNull()
+
+      const manifestFile = zip.file('sie/original/manifest.json')
+      expect(manifestFile).not.toBeNull()
+      const manifest = JSON.parse(await manifestFile!.async('text'))
+      expect(manifest[0].import_id).toBe('import-1')
+      expect(manifest[0].status).toBe('downloaded')
+
+      const imports = JSON.parse(await zip.file('sie/imports.json')!.async('text'))
+      expect(imports[0].filename).toBe('original.se')
+      expect(zip.file('sie/account_mappings.json')).not.toBeNull()
+
+      expect(zip.file('data/customers.json')).not.toBeNull()
+      expect(zip.file('data/suppliers.json')).not.toBeNull()
+      expect(zip.file('data/invoices.json')).not.toBeNull()
+      expect(zip.file('data/invoice_items.json')).not.toBeNull()
+      expect(zip.file('data/invoice_payments.json')).not.toBeNull()
+      expect(zip.file('data/supplier_invoices.json')).not.toBeNull()
+      expect(zip.file('data/supplier_invoice_items.json')).not.toBeNull()
+      expect(zip.file('data/receipts.json')).not.toBeNull()
+      expect(zip.file('data/receipt_line_items.json')).not.toBeNull()
+      expect(zip.file('data/transactions.json')).not.toBeNull()
+      expect(zip.file('data/mapping_rules.json')).not.toBeNull()
+      expect(zip.file('data/categorization_templates.json')).not.toBeNull()
+      expect(zip.file('data/bank_file_imports.json')).not.toBeNull()
+      expect(zip.file('data/company_settings.json')).not.toBeNull()
+
+      const customers = JSON.parse(await zip.file('data/customers.json')!.async('text'))
+      expect(customers).toEqual([{ id: 'cust-1', name: 'Acme AB' }])
+    })
+
+    it('skips raw SIE blobs when include_documents is false but keeps metadata', async () => {
+      enqueueMany([
+        { data: COMPANY_ROW },
+        { data: [PERIOD_2024] },
+        {
+          data: [
+            {
+              id: 'import-1',
+              filename: 'x.se',
+              file_hash: 'h',
+              file_storage_path: 'company-1/import-1.se',
+              status: 'completed',
+              imported_at: '2024-11-01T10:00:00Z',
+              created_at: '2024-11-01T09:55:00Z',
+            },
+          ],
+        }, // sie_imports
+        { data: [] }, // sie_account_mappings
+      ])
+
+      const buffer = await generateFullArchive(supabase as any, 'company-1', {
+        scope: 'all',
+        include_documents: false,
+      })
+      const zip = await JSZip.loadAsync(buffer)
+
+      expect(zip.file('sie/imports.json')).not.toBeNull()
+      expect(zip.file('sie/account_mappings.json')).not.toBeNull()
+      expect(zip.file('sie/original/import-1_x.se')).toBeNull()
+      expect(zip.file('sie/original/manifest.json')).toBeNull()
+      expect(zip.file('data/customers.json')).not.toBeNull()
+    })
   })
 })
 
@@ -336,8 +447,8 @@ describe('estimateArchiveSize', () => {
 
     expect(result.document_bytes).toBe(3_500_000)
     expect(result.document_count).toBe(2)
-    // overhead is +5 MB
-    expect(result.total_bytes).toBe(3_500_000 + 5 * 1024 * 1024)
+    // overhead is +8 MB
+    expect(result.total_bytes).toBe(3_500_000 + 8 * 1024 * 1024)
   })
 
   it('returns overhead only when no documents in scope', async () => {
@@ -350,6 +461,6 @@ describe('estimateArchiveSize', () => {
 
     expect(result.document_bytes).toBe(0)
     expect(result.document_count).toBe(0)
-    expect(result.total_bytes).toBe(5 * 1024 * 1024)
+    expect(result.total_bytes).toBe(8 * 1024 * 1024)
   })
 })
