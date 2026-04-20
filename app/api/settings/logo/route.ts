@@ -33,7 +33,13 @@ export async function POST(request: Request) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer())
-  const ext = (file.name.split('.').pop() || 'png').toLowerCase()
+  const mimeToExt: Record<string, string> = {
+    'image/png': 'png',
+    'image/jpeg': 'jpg',
+    'image/svg+xml': 'svg',
+    'image/webp': 'webp',
+  }
+  const ext = mimeToExt[file.type] ?? 'png'
   const storagePath = `${companyId}/logo-${Date.now()}.${ext}`
 
   const serviceClient = createServiceClient()
