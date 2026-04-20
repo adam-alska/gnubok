@@ -445,7 +445,7 @@ async function writeSieSourceFiles(
   companyId: string,
   includeFiles: boolean
 ): Promise<void> {
-  const sieFolder = zip.folder('sie') ?? zip.folder('sie')!
+  const sieFolder = zip.folder('sie')!
 
   try {
     const imports = await fetchAllRows<SieImportRow>(({ from, to }) =>
