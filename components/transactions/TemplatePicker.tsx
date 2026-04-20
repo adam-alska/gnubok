@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Search, ChevronDown, ChevronUp, AlertTriangle, Info } from 'lucide-react'
+import { Search, ChevronDown, ChevronUp, AlertTriangle, Info, Building2 } from 'lucide-react'
 import {
   getCommonTemplates,
   getAdvancedTemplates,
@@ -14,8 +14,9 @@ import {
 } from '@/lib/bookkeeping/booking-templates'
 import { formatAccountWithName } from '@/lib/bookkeeping/client-account-names'
 import { isCounterpartyTemplateId } from '@/lib/bookkeeping/counterparty-templates'
+import { convertLibraryToBookingTemplate } from '@/lib/bookkeeping/template-library'
 import { getAccountName } from '@/lib/bookkeeping/client-account-names'
-import type { EntityType } from '@/types'
+import type { BookingTemplateLibrary, EntityType } from '@/types'
 import type { SuggestedTemplate } from '@/lib/transactions/category-suggestions'
 
 const GROUP_ORDER: TemplateGroup[] = [
@@ -150,9 +151,33 @@ export default function TemplatePicker({
 }: TemplatePickerProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [libraryTemplates, setLibraryTemplates] = useState<BookingTemplate[]>([])
 
   // Map direction to template direction filter (transfers show in both)
   const templateDirection = direction === 'income' ? 'income' : 'expense'
+
+  // Fetch user-created booking templates (company + team scope) and map
+  // convertible ones into BookingTemplate shape. System templates are
+  // already covered by the static list below, so we exclude them here.
+  useEffect(() => {
+    const controller = new AbortController()
+    ;(async () => {
+      try {
+        const res = await fetch('/api/settings/booking-templates', { signal: controller.signal })
+        if (!res.ok) return
+        const { data } = await res.json() as { data?: BookingTemplateLibrary[] }
+        if (!data) return
+        const mapped = data
+          .filter((t) => !t.is_system && t.is_active)
+          .map(convertLibraryToBookingTemplate)
+          .filter((t): t is BookingTemplate => t !== null)
+        setLibraryTemplates(mapped)
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return
+      }
+    })()
+    return () => { controller.abort() }
+  }, [])
 
   const commonTemplates = useMemo(
     () => getCommonTemplates(entityType, templateDirection),
@@ -183,14 +208,29 @@ export default function TemplatePicker({
     [advancedTemplates, advancedTransfers]
   )
 
-  // Search results
+  // User-created library templates filtered by direction + entity
+  const relevantLibraryTemplates = useMemo(() => {
+    return libraryTemplates.filter((t) => {
+      if (entityType && t.entity_applicability !== 'all' && t.entity_applicability !== entityType) {
+        return false
+      }
+      return t.direction === templateDirection || t.direction === 'transfer'
+    })
+  }, [libraryTemplates, entityType, templateDirection])
+
+  // Search results (static + library)
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return null
-    return searchTemplates(searchQuery, entityType).filter((t) => {
+    const q = searchQuery.toLowerCase()
+    const libraryMatches = relevantLibraryTemplates.filter((t) =>
+      t.name_sv.toLowerCase().includes(q) || t.description_sv.toLowerCase().includes(q)
+    )
+    const staticMatches = searchTemplates(searchQuery, entityType).filter((t) => {
       if (t.direction === templateDirection || t.direction === 'transfer') return true
       return false
     })
-  }, [searchQuery, entityType, templateDirection])
+    return [...libraryMatches, ...staticMatches]
+  }, [searchQuery, entityType, templateDirection, relevantLibraryTemplates])
 
   // Group templates by group for display
   const commonGrouped = useMemo(() => groupTemplates(allCommon), [allCommon])
@@ -246,6 +286,27 @@ export default function TemplatePicker({
           </div>
         ) : (
           <>
+            {/* User-created library templates (company + team scope) */}
+            {relevantLibraryTemplates.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+                  <Building2 className="h-3 w-3" />
+                  Mina mallar
+                </p>
+                <div className="space-y-1.5">
+                  {relevantLibraryTemplates.map((t) => (
+                    <TemplateCard
+                      key={t.id}
+                      template={t}
+                      selected={selectedTemplateId === t.id}
+                      onClick={() => handleSelect(t)}
+                      compact
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Counterparty templates — learned from history */}
             {hasCounterparty && (
               <div>

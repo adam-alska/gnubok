@@ -27,6 +27,7 @@ import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/components/transactions
 import { getDefaultAccountForCategory, getDefaultVatTreatmentForCategory } from '@/lib/bookkeeping/category-mapping'
 import { getTemplateById, type BookingTemplate } from '@/lib/bookkeeping/booking-templates'
 import { isCounterpartyTemplateId, extractCounterpartyId } from '@/lib/bookkeeping/counterparty-templates'
+import { isLibraryTemplateId } from '@/lib/bookkeeping/template-library'
 import type { TransactionWithInvoice, ViewMode, CategorizeHandler } from '@/components/transactions/transaction-types'
 import { useCompany } from '@/contexts/CompanyContext'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -681,7 +682,10 @@ export default function TransactionsPage() {
     setTemplatePickerOpen(false)
     const tx = templatePickerTransaction
     if (!tx) return
-    setQuickReview({ transaction: tx, category: template.fallback_category, label: template.name_sv, template, templateId: template.id, linePattern: null })
+    // Library templates aren't validated server-side via template_id; the
+    // template's debit/credit + VAT drive the booking through account_override.
+    const templateId = isLibraryTemplateId(template.id) ? undefined : template.id
+    setQuickReview({ transaction: tx, category: template.fallback_category, label: template.name_sv, template, templateId, linePattern: null })
     setQuickReviewOpen(true)
   }
 
@@ -942,14 +946,25 @@ export default function TransactionsPage() {
       </Dialog>
 
       <QuickReviewDialog
-        key={quickReview?.transaction.id ?? '' + String(quickReview?.category) + String(quickReview?.templateId)}
+        key={quickReview?.transaction.id ?? '' + String(quickReview?.category) + String(quickReview?.templateId) + String(quickReview?.template?.id)}
         open={quickReviewOpen}
         onOpenChange={setQuickReviewOpen}
         transaction={quickReview?.transaction ?? null}
         category={quickReview?.category ?? null}
         categoryLabel={quickReview?.label ?? ''}
-        defaultAccount={quickReview?.category ? getDefaultAccountForCategory(quickReview.category) : ''}
-        defaultVat={quickReview?.category ? (getDefaultVatTreatmentForCategory(quickReview.category) ?? 'none') : 'none'}
+        defaultAccount={
+          // For library templates (no templateId but a template object), use the
+          // template's debit account as the default; otherwise fall back to the
+          // category's default account.
+          !quickReview?.templateId && quickReview?.template
+            ? quickReview.template.debit_account
+            : quickReview?.category ? getDefaultAccountForCategory(quickReview.category) : ''
+        }
+        defaultVat={
+          !quickReview?.templateId && quickReview?.template
+            ? (quickReview.template.vat_treatment ?? 'none')
+            : quickReview?.category ? (getDefaultVatTreatmentForCategory(quickReview.category) ?? 'none') : 'none'
+        }
         entityType={entityType as EntityType}
         template={quickReview?.template ?? null}
         templateId={quickReview?.templateId}

@@ -44,12 +44,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Ingen fil bifogad. Gå tillbaka och ladda upp filen igen.' }, { status: 400 })
     }
 
-    // Parse options
-    const options = optionsJson ? JSON.parse(optionsJson) : {
+    // Parse options. The voucherSeries option is only a fallback for vouchers
+    // that arrive without a series (SIE4I subsystem files); the import engine
+    // preserves each #VER's source series per voucher.
+    const parsedOptions = optionsJson ? JSON.parse(optionsJson) : null
+    const { data: companySettings } = await supabase
+      .from('company_settings')
+      .select('default_voucher_series')
+      .eq('company_id', companyId)
+      .maybeSingle()
+    const companyDefaultSeries = companySettings?.default_voucher_series || 'B'
+
+    const options = parsedOptions ?? {
       createFiscalPeriod: true,
       importOpeningBalances: true,
       importTransactions: true,
-      voucherSeries: 'B',
+      voucherSeries: companyDefaultSeries,
     }
 
     // Read and decode file
@@ -207,7 +217,7 @@ export async function POST(request: Request) {
         createFiscalPeriod: options.createFiscalPeriod,
         importOpeningBalances: options.importOpeningBalances,
         importTransactions: options.importTransactions,
-        voucherSeries: options.voucherSeries || 'B',
+        voucherSeries: options.voucherSeries || companyDefaultSeries,
       }
     )
 
