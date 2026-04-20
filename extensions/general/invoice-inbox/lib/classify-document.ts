@@ -84,10 +84,16 @@ Kontext:
 Instruktioner:
 - Klassificera dokumenttypen
 - Extrahera alla synliga fält — returnera null för fält som inte kan utläsas
-- Belopp ska vara positiva tal med max 2 decimaler
+- Belopp med max 2 decimaler. Totaler (amount_excl_vat, amount_incl_vat, vat_amount) är alltid positiva. line_items.amount är normalt positiva men KAN vara negativa för rabattrader.
 - Datum i ISO-format (YYYY-MM-DD)
 - Momssats som heltal (0, 6, 12, eller 25)
 - Ge en confidence-poäng 0-100 för hur säker du är på klassificeringen och extraktionen
+
+KRITISKT — Totaler och rabatter:
+- amount_incl_vat MÅSTE motsvara fakturans slutbelopp ("Amount due", "Att betala", "Totalt", "Subtotal" när moms saknas). Summera ALDRIG delrader om fakturan anger ett explicit totalbelopp — använd det.
+- Om en rad har en rabatt/discount under sig (t.ex. "Discount (-$10.00)", "Rabatt -100 kr"), extrahera radens NETTO-belopp (brutto − rabatt), INTE bruttobeloppet. Exempel: en rad "Compute Hours $50.68" följd av "Discount -$10.00" → line_items.amount = 40.68, inte 50.68.
+- Summan av line_items.amount + moms MÅSTE bli lika med amount_incl_vat. Om det inte stämmer har du antingen missat en rabatt eller dubbelräknat en rad — kontrollera och justera.
+- Om du är osäker på hur rabatter ska fördelas, lägg en enskild negativ "Rabatt"-rad i line_items så summan blir rätt.
 
 Anropa ALLTID verktyget classify_document med resultatet.`
 
@@ -311,7 +317,12 @@ function mapToClassificationResult(
   if (documentType === 'supplier_invoice') {
     const extractedData = mapToInvoiceExtraction(raw)
     if (!extractedData) return null
-    return { documentType, extractedData, confidence, rawResponse: raw, usage }
+    // mapToInvoiceExtraction caps its own confidence to 50% when line items
+    // don't reconcile with amount_incl_vat. Propagate that cap to the outer
+    // confidence so invoice_inbox_items.confidence (used by the UI badge)
+    // also reflects the reconciliation failure.
+    const effectiveConfidence = Math.min(confidence, Math.round(extractedData.confidence * 100))
+    return { documentType, extractedData, confidence: effectiveConfidence, rawResponse: raw, usage }
   }
 
   if (documentType === 'receipt') {
@@ -323,9 +334,32 @@ function mapToClassificationResult(
   return null
 }
 
+// Sum of line items must approximately match the extracted subtotal.
+// Allows 0.02 * max(|subtotal|, 1) tolerance for rounding. Returns true if the extraction
+// is internally consistent; false signals the model skipped a discount or double-counted.
+function invoiceTotalsAreConsistent(raw: Record<string, unknown>): boolean {
+  const subtotal = Number(raw.amount_excl_vat)
+  const total = Number(raw.amount_incl_vat)
+  const vat = Number(raw.vat_amount) || 0
+  const items = Array.isArray(raw.line_items) ? raw.line_items : []
+  if (!items.length) return true // nothing to compare against
+  if (!isFinite(subtotal) && !isFinite(total)) return true
+
+  const sumOfLines = items.reduce((acc, item) => {
+    if (typeof item !== 'object' || item === null) return acc
+    const amount = Number((item as Record<string, unknown>).amount)
+    return acc + (isFinite(amount) ? amount : 0)
+  }, 0)
+
+  const anchor = isFinite(subtotal) ? subtotal : total - vat
+  const tolerance = Math.max(0.02, Math.abs(anchor) * 0.02)
+  return Math.abs(sumOfLines - anchor) <= tolerance
+}
+
 function mapToInvoiceExtraction(raw: Record<string, unknown>): InvoiceExtractionResult | null {
   const lineItems = mapInvoiceLineItems(raw.line_items)
   const vatBreakdown = mapVatBreakdown(raw.vat_breakdown)
+  const totalsConsistent = invoiceTotalsAreConsistent(raw)
 
   const result: InvoiceExtractionResult = {
     supplier: {
@@ -350,7 +384,11 @@ function mapToInvoiceExtraction(raw: Record<string, unknown>): InvoiceExtraction
       total: roundAmount(raw.amount_incl_vat),
     },
     vatBreakdown,
-    confidence: Math.min(1, Math.max(0, Number(raw.confidence) / 100 || 0)),
+    // If totals don't reconcile with line items, cap confidence at 50% so the UI flags it
+    confidence: (() => {
+      const raw_conf = Math.min(1, Math.max(0, Number(raw.confidence) / 100 || 0))
+      return totalsConsistent ? raw_conf : Math.min(raw_conf, 0.5)
+    })(),
   }
 
   return result
@@ -472,7 +510,7 @@ async function retryWithCorrection(
 - document_type måste vara ett av: supplier_invoice, receipt, government_letter, unknown
 - Datum i format YYYY-MM-DD
 - Momssatser måste vara 0, 6, 12, eller 25
-- Belopp ska vara positiva tal
+- Totaler: amount_incl_vat ska vara fakturans slutbelopp. Summa av line_items.amount + vat_amount MÅSTE bli lika med amount_incl_vat. Om rader har rabatt under sig, använd NETTO-beloppet per rad, eller lägg till en separat negativ rabattrad så summan stämmer.
 Försök igen med korrigerad data.`,
               },
             ],

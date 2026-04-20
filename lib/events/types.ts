@@ -74,6 +74,8 @@ export type CoreEvent =
   | { type: 'supplier_invoice.received'; payload: { inboxItem: InvoiceInboxItem; userId: string; companyId: string } }
   | { type: 'supplier_invoice.extracted'; payload: { inboxItem: InvoiceInboxItem; confidence: number; userId: string; companyId: string } }
   | { type: 'supplier_invoice.confirmed'; payload: { inboxItem: InvoiceInboxItem; supplierInvoice: SupplierInvoice; userId: string; companyId: string } }
+  // Generic inbox classification (fires for all document_types after classify)
+  | { type: 'inbox_item.classified'; payload: { inboxItem: InvoiceInboxItem; documentType: 'supplier_invoice' | 'receipt' | 'government_letter' | 'unknown'; confidence: number | null; correlationId: string; userId: string; companyId: string } }
   // Salary
   | { type: 'salary_run.created'; payload: { salaryRunId: string; periodYear: number; periodMonth: number; userId: string; companyId: string } }
   | { type: 'salary_run.approved'; payload: { salaryRunId: string; approvedBy: string; userId: string; companyId: string } }

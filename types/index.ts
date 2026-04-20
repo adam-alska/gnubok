@@ -976,6 +976,8 @@ export interface JournalEntry {
   correction_of_id: string | null
   attachment_urls: string[] | null
   notes: string | null
+  commit_method: string | null
+  rubric_version: string | null
   created_at: string
   updated_at: string
   // Relations
@@ -1559,6 +1561,19 @@ export type InboxItemSource = 'email' | 'upload'
 // Document classification type for unified inbox routing
 export type DocumentClassificationType = 'supplier_invoice' | 'receipt' | 'government_letter' | 'unknown'
 
+export type CompanyInboxStatus = 'active' | 'deprecated' | 'blocked'
+
+export interface CompanyInbox {
+  id: string
+  company_id: string
+  local_part: string
+  status: CompanyInboxStatus
+  slug_seed: string
+  created_at: string
+  updated_at: string
+  deprecated_at: string | null
+}
+
 export interface InvoiceInboxItem {
   id: string
   user_id: string
@@ -1568,6 +1583,9 @@ export interface InvoiceInboxItem {
   email_from: string | null
   email_subject: string | null
   email_received_at: string | null
+  email_body_text: string | null
+  resend_email_id: string | null
+  resend_attachment_id: string | null
   document_id: string | null
   extracted_data: Record<string, unknown> | null
   confidence: number | null
@@ -1587,7 +1605,11 @@ export interface InvoiceInboxItem {
   // Transaction matching
   matched_transaction_id: string | null
   match_confidence: number | null
-  match_method: 'payment_reference' | 'amount_date' | 'amount_merchant' | 'receipt_match' | null
+  match_method: 'payment_reference' | 'amount_date' | 'amount_merchant' | 'receipt_match' | 'llm' | 'pending_transaction' | null
+  match_reasoning: string | null
+
+  // Audit chain (processing_history correlation)
+  correlation_id: string | null
 
   created_at: string
   updated_at: string

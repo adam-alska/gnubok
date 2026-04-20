@@ -3,10 +3,23 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { uploadDocument } from '@/lib/core/documents/document-service'
 import { classifyDocument } from './lib/classify-document'
-import { encryptState, decryptState, encryptToken, decryptToken } from './lib/gmail-helpers'
-import { scanGmailConnection } from './lib/gmail-scanner'
+import {
+  verifyInboundWebhook,
+  fetchReceivingEmail,
+  fetchInboundAttachment,
+  extractLocalPartForDomain,
+  isEmailReceivedEvent,
+  ResendSignatureError,
+} from './lib/resend-inbound'
+import {
+  rotateCompanyInbox,
+  getActiveInbox,
+  composeInboxAddress,
+} from './lib/inbox-provisioning'
 import { createSupplierInvoiceRegistrationEntry } from '@/lib/bookkeeping/supplier-invoice-entries'
 import { CreateSupplierInvoiceSchema } from '@/lib/api/schemas'
+import { appendProcessingHistory } from '@/lib/processing-history/append'
+import { eventBus } from '@/lib/events/bus'
 import type { InvoiceExtractionResult, InvoiceInboxItem, SupplierInvoice, SupplierInvoiceItem } from '@/types'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // Match MAX_DOCUMENT_SIZE from document-service
@@ -20,7 +33,15 @@ const UPLOAD_ALLOWED_MIME_TYPES = new Set([
   'image/webp',
 ])
 
-const STATE_TTL_MS = 10 * 60 * 1000
+interface EmailMeta {
+  from?: string | null
+  subject?: string | null
+  receivedAt?: string | null
+  messageId?: string | null
+  bodyText?: string | null
+  resendEmailId?: string | null
+  resendAttachmentId?: string | null
+}
 
 // ── Shared helper: upload + classify + create inbox item ─────
 
@@ -30,9 +51,12 @@ async function uploadAndClassify(
   companyId: string,
   file: { name: string; buffer: ArrayBuffer; type: string },
   source: 'upload' | 'email',
-  emailMeta?: { from?: string | null; subject?: string | null; receivedAt?: string | null; messageId?: string },
+  emailMeta?: EmailMeta,
   ctx?: ExtensionContext
 ) {
+  // Correlation ID threads through ingest → classify → match → book.
+  const correlationId = crypto.randomUUID()
+
   // Store in WORM archive
   const doc = await uploadDocument(supabase, userId, companyId, {
     name: file.name,
@@ -41,6 +65,27 @@ async function uploadAndClassify(
   }, {
     upload_source: source === 'email' ? 'email' : 'file_upload',
   })
+
+  // Audit: DocumentIngested
+  try {
+    await appendProcessingHistory(supabase, {
+      companyId,
+      correlationId,
+      aggregateType: 'Document',
+      aggregateId: doc.id,
+      eventType: 'DocumentIngested',
+      payload: {
+        channel: source,
+        document_id: doc.id,
+        mime_type: file.type,
+        size_bytes: file.buffer.byteLength,
+      },
+      actor: source === 'email' ? { type: 'system', id: 'resend-inbound' } : { type: 'user', id: userId },
+      occurredAt: new Date(),
+    })
+  } catch (err) {
+    console.error('[invoice-inbox] Failed to append DocumentIngested:', err)
+  }
 
   // Classify with AI
   let classificationResult
@@ -53,6 +98,30 @@ async function uploadAndClassify(
     })
   } catch (err) {
     classificationError = err instanceof Error ? err.message : 'Classification failed'
+  }
+
+  // Audit: DocumentExtractionAttempted (fires whether classification succeeded or failed)
+  try {
+    await appendProcessingHistory(supabase, {
+      companyId,
+      correlationId,
+      aggregateType: 'Document',
+      aggregateId: doc.id,
+      eventType: 'DocumentExtractionAttempted',
+      payload: {
+        document_id: doc.id,
+        succeeded: !classificationError,
+        document_type: classificationResult?.documentType ?? null,
+        confidence: classificationResult?.confidence ? classificationResult.confidence / 100 : null,
+        llm_input_tokens: classificationResult?.usage?.inputTokens ?? 0,
+        llm_output_tokens: classificationResult?.usage?.outputTokens ?? 0,
+        error: classificationError,
+      },
+      actor: { type: 'llm', id: 'classify-document' },
+      occurredAt: new Date(),
+    })
+  } catch (err) {
+    console.error('[invoice-inbox] Failed to append DocumentExtractionAttempted:', err)
   }
 
   // Supplier matching
@@ -104,20 +173,63 @@ async function uploadAndClassify(
       email_from: emailMeta?.from || null,
       email_subject: emailMeta?.subject || null,
       email_received_at: emailMeta?.receivedAt || null,
+      email_body_text: emailMeta?.bodyText || null,
+      resend_email_id: emailMeta?.resendEmailId || null,
+      resend_attachment_id: emailMeta?.resendAttachmentId || null,
       raw_email_payload: emailMeta?.messageId
         ? { messageId: emailMeta.messageId, filename: file.name }
         : null,
       error_message: classificationError,
+      correlation_id: correlationId,
     })
-    .select('id, status, document_type, confidence, matched_supplier_id, error_message')
+    .select('*')
     .single()
 
   if (inboxError) throw new Error(`Failed to create inbox item: ${inboxError.message}`)
 
-  // Emit events for supplier invoices (non-blocking)
-  if (ctx && inbox.document_type === 'supplier_invoice') {
+  // Audit: DocumentClassified (only when classification succeeded)
+  if (!classificationError && classificationResult) {
     try {
-      await ctx.emit({
+      await appendProcessingHistory(supabase, {
+        companyId,
+        correlationId,
+        aggregateType: 'Document',
+        aggregateId: doc.id,
+        eventType: 'DocumentClassified',
+        payload: {
+          document_id: doc.id,
+          inbox_item_id: inbox.id,
+          classification: classificationResult.documentType,
+          confidence: classificationResult.confidence / 100,
+        },
+        actor: { type: 'system', id: 'invoice-inbox' },
+        occurredAt: new Date(),
+      })
+    } catch (err) {
+      console.error('[invoice-inbox] Failed to append DocumentClassified:', err)
+    }
+  }
+
+  // Emit generic classified event for all document types.
+  // Always emit via eventBus directly so the webhook path (no ExtensionContext) still triggers handlers.
+  try {
+    await eventBus.emit({
+      type: 'inbox_item.classified',
+      payload: {
+        inboxItem: inbox as unknown as InvoiceInboxItem,
+        documentType: inbox.document_type,
+        confidence: inbox.confidence,
+        correlationId,
+        userId,
+        companyId,
+      },
+    })
+  } catch { /* non-blocking */ }
+
+  // Emit supplier-invoice-specific events (kept for backward compatibility)
+  if (inbox.document_type === 'supplier_invoice') {
+    try {
+      await eventBus.emit({
         type: 'supplier_invoice.received',
         payload: { inboxItem: inbox as unknown as InvoiceInboxItem, userId, companyId },
       })
@@ -125,7 +237,7 @@ async function uploadAndClassify(
 
     if (!classificationError && classificationResult?.confidence) {
       try {
-        await ctx.emit({
+        await eventBus.emit({
           type: 'supplier_invoice.extracted',
           payload: { inboxItem: inbox as unknown as InvoiceInboxItem, confidence: classificationResult.confidence / 100, userId, companyId },
         })
@@ -145,12 +257,28 @@ async function uploadAndClassify(
   }
 }
 
+// ── Admin/owner check helper ──────────────────────────────────
+
+async function isCompanyAdmin(
+  supabase: import('@supabase/supabase-js').SupabaseClient,
+  userId: string,
+  companyId: string
+): Promise<boolean> {
+  const { data } = await supabase
+    .from('company_members')
+    .select('role')
+    .eq('company_id', companyId)
+    .eq('user_id', userId)
+    .maybeSingle()
+  return !!data && ['owner', 'admin'].includes(data.role)
+}
+
 // ── Extension definition ─────────────────────────────────────
 
 export const invoiceInboxExtension: Extension = {
   id: 'invoice-inbox',
   name: 'Dokumentinkorg',
-  version: '1.0.0',
+  version: '2.0.0',
 
   apiRoutes: [
     // ── Upload ──────────────────────────────────────────────
@@ -212,7 +340,12 @@ export const invoiceInboxExtension: Extension = {
 
         let query = ctx.supabase
           .from('invoice_inbox_items')
-          .select('id, status, document_type, confidence, source, created_at, extracted_data, matched_supplier_id, document_id, email_from, email_subject, error_message')
+          .select(`
+            id, status, document_type, confidence, source, created_at, extracted_data,
+            matched_supplier_id, document_id, email_from, email_subject, error_message,
+            matched_transaction_id, match_confidence, match_method, match_reasoning,
+            matched_transaction:transactions!matched_transaction_id(id, description, amount, currency, date)
+          `)
           .eq('company_id', ctx.companyId)
           .order('created_at', { ascending: false })
           .limit(limit)
@@ -252,251 +385,237 @@ export const invoiceInboxExtension: Extension = {
       },
     },
 
-    // ── Gmail OAuth: get auth URL ───────────────────────────
+    // ── Get this company's inbox address ────────────────────
     {
       method: 'GET',
-      path: '/gmail/auth',
+      path: '/inbox/address',
       handler: async (_request: Request, ctx?: ExtensionContext) => {
         if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const clientId = process.env.GOOGLE_CLIENT_ID
-        if (!clientId) {
-          return NextResponse.json({ error: 'Google OAuth not configured' }, { status: 500 })
+        const domain = process.env.RESEND_INBOUND_DOMAIN
+        if (!domain) {
+          return NextResponse.json({ error: 'RESEND_INBOUND_DOMAIN not configured' }, { status: 503 })
         }
-        if (!process.env.GMAIL_TOKEN_ENCRYPTION_KEY) {
-          return NextResponse.json({ error: 'GMAIL_TOKEN_ENCRYPTION_KEY is required' }, { status: 500 })
-        }
-
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-        const redirectUri = `${appUrl}/api/extensions/ext/invoice-inbox/gmail/callback`
-
-        const state = encryptState({
-          companyId: ctx.companyId,
-          userId: ctx.userId,
-          exp: Date.now() + STATE_TTL_MS,
-        })
-
-        const params = new URLSearchParams({
-          client_id: clientId,
-          redirect_uri: redirectUri,
-          response_type: 'code',
-          scope: 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.labels',
-          access_type: 'offline',
-          prompt: 'consent',
-          state,
-        })
-
-        return NextResponse.json({ data: { authUrl: `https://accounts.google.com/o/oauth2/v2/auth?${params}` } })
-      },
-    },
-
-    // ── Gmail OAuth: callback (skipAuth — redirect from Google) ─
-    {
-      method: 'GET',
-      path: '/gmail/callback',
-      skipAuth: true,
-      handler: async (request: Request) => {
-        const url = new URL(request.url)
-        const code = url.searchParams.get('code')
-        const stateParam = url.searchParams.get('state')
-        const error = url.searchParams.get('error')
-
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-
-        if (error) {
-          console.error('[gmail/callback] OAuth error:', error)
-          return NextResponse.redirect(`${appUrl}/e/general/invoice-inbox?error=gmail_auth_denied`)
-        }
-        if (!code || !stateParam) {
-          return NextResponse.redirect(`${appUrl}/e/general/invoice-inbox?error=gmail_missing_params`)
-        }
-        if (!process.env.GMAIL_TOKEN_ENCRYPTION_KEY) {
-          return NextResponse.redirect(`${appUrl}/e/general/invoice-inbox?error=gmail_config_error`)
-        }
-
-        const state = decryptState(stateParam) as { companyId: string; userId: string; exp: number } | null
-        if (!state || Date.now() > state.exp) {
-          return NextResponse.redirect(`${appUrl}/e/general/invoice-inbox?error=gmail_invalid_state`)
-        }
-
-        const { companyId, userId } = state
-        const redirectUri = `${appUrl}/api/extensions/ext/invoice-inbox/gmail/callback`
 
         try {
-          // Exchange code for tokens
-          const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-              code,
-              client_id: process.env.GOOGLE_CLIENT_ID!,
-              client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-              redirect_uri: redirectUri,
-              grant_type: 'authorization_code',
-            }),
+          const inbox = await getActiveInbox(ctx.supabase, ctx.companyId)
+          if (!inbox) {
+            return NextResponse.json({ error: 'No active inbox' }, { status: 404 })
+          }
+          return NextResponse.json({
+            data: {
+              address: composeInboxAddress(inbox.local_part, domain),
+              local_part: inbox.local_part,
+              status: inbox.status,
+              created_at: inbox.created_at,
+            },
           })
-
-          if (!tokenResponse.ok) {
-            console.error('[gmail/callback] Token exchange failed:', await tokenResponse.text())
-            return NextResponse.redirect(`${appUrl}/e/general/invoice-inbox?error=gmail_token_exchange`)
-          }
-
-          const tokens = await tokenResponse.json() as {
-            access_token: string; refresh_token?: string
-          }
-          if (!tokens.refresh_token) {
-            return NextResponse.redirect(`${appUrl}/e/general/invoice-inbox?error=gmail_no_refresh_token`)
-          }
-
-          // Get user email
-          const profileResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
-            headers: { Authorization: `Bearer ${tokens.access_token}` },
-          })
-          if (!profileResponse.ok) {
-            return NextResponse.redirect(`${appUrl}/e/general/invoice-inbox?error=gmail_profile_error`)
-          }
-          const profile = await profileResponse.json() as { emailAddress: string }
-
-          // Create gnubok-processed label
-          let gmailLabelId: string | null = null
-          try {
-            const labelsResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
-              headers: { Authorization: `Bearer ${tokens.access_token}` },
-            })
-            const labelsData = await labelsResponse.json() as { labels: { id: string; name: string }[] }
-            const existing = labelsData.labels?.find((l) => l.name === 'gnubok-processed')
-
-            if (existing) {
-              gmailLabelId = existing.id
-            } else {
-              const createLabelResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
-                method: 'POST',
-                headers: {
-                  Authorization: `Bearer ${tokens.access_token}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  name: 'gnubok-processed',
-                  labelListVisibility: 'labelShow',
-                  messageListVisibility: 'show',
-                }),
-              })
-              if (createLabelResponse.ok) {
-                const label = await createLabelResponse.json() as { id: string }
-                gmailLabelId = label.id
-              }
-            }
-          } catch (err) {
-            console.warn('[gmail/callback] Failed to create Gmail label:', err)
-          }
-
-          // Store connection (service-role — no auth cookie in callback)
-          const supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!
-          )
-
-          const { error: dbError } = await supabase
-            .from('email_connections')
-            .upsert(
-              {
-                company_id: companyId,
-                user_id: userId,
-                provider: 'gmail',
-                email_address: profile.emailAddress,
-                encrypted_token: encryptToken(tokens.refresh_token),
-                gmail_label_id: gmailLabelId,
-                status: 'active',
-                error_message: null,
-              },
-              { onConflict: 'company_id,email_address' }
-            )
-
-          if (dbError) {
-            console.error('[gmail/callback] DB insert failed:', dbError)
-            return NextResponse.redirect(`${appUrl}/e/general/invoice-inbox?error=gmail_db_error`)
-          }
-
-          console.log(`[gmail/callback] Gmail connected for ${profile.emailAddress} (company ${companyId})`)
-          return NextResponse.redirect(`${appUrl}/e/general/invoice-inbox?gmail=connected`)
         } catch (err) {
-          console.error('[gmail/callback] Unexpected error:', err)
-          return NextResponse.redirect(`${appUrl}/e/general/invoice-inbox?error=gmail_unexpected`)
+          return NextResponse.json(
+            { error: err instanceof Error ? err.message : 'Failed to load inbox' },
+            { status: 500 }
+          )
         }
       },
     },
 
-    // ── Gmail: disconnect ───────────────────────────────────
+    // ── Rotate inbox address (admin/owner only) ─────────────
     {
       method: 'POST',
-      path: '/gmail/disconnect',
+      path: '/inbox/rotate',
       handler: async (_request: Request, ctx?: ExtensionContext) => {
         if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const { error } = await ctx.supabase
-          .from('email_connections')
-          .delete()
-          .eq('company_id', ctx.companyId)
-          .eq('provider', 'gmail')
+        const domain = process.env.RESEND_INBOUND_DOMAIN
+        if (!domain) {
+          return NextResponse.json({ error: 'RESEND_INBOUND_DOMAIN not configured' }, { status: 503 })
+        }
 
-        if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-        return NextResponse.json({ data: { disconnected: true } })
+        const isAdmin = await isCompanyAdmin(ctx.supabase, ctx.userId, ctx.companyId)
+        if (!isAdmin) return NextResponse.json({ error: 'Behörighet saknas.' }, { status: 403 })
+
+        try {
+          // rotate_company_inbox is SECURITY DEFINER and does its own
+          // auth.uid() role check. Call it through the user's JWT-bearing
+          // client — a service-role client has no session, so auth.uid()
+          // returns NULL and the in-RPC check always fails with 42501.
+          const newInbox = await rotateCompanyInbox(ctx.supabase, ctx.companyId)
+          return NextResponse.json({
+            data: {
+              address: composeInboxAddress(newInbox.local_part, domain),
+              local_part: newInbox.local_part,
+              status: newInbox.status,
+            },
+          })
+        } catch (err) {
+          console.error('[invoice-inbox/inbox/rotate] Failed:', err)
+          return NextResponse.json(
+            { error: err instanceof Error ? err.message : 'Rotation failed' },
+            { status: 500 }
+          )
+        }
       },
     },
 
-    // ── Gmail: connection status ────────────────────────────
-    {
-      method: 'GET',
-      path: '/gmail/status',
-      handler: async (_request: Request, ctx?: ExtensionContext) => {
-        if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-        const { data, error } = await ctx.supabase
-          .from('email_connections')
-          .select('id, email_address, status, last_sync_at, error_message, created_at')
-          .eq('company_id', ctx.companyId)
-          .eq('provider', 'gmail')
-
-        if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-        return NextResponse.json({ data: { connections: data || [] } })
-      },
-    },
-
-    // ── Gmail: manual scan trigger ──────────────────────────
+    // ── Resend Inbound webhook (Svix-signed, no user auth) ──
     {
       method: 'POST',
-      path: '/gmail/scan',
-      handler: async (_request: Request, ctx?: ExtensionContext) => {
-        if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-        if (!process.env.GMAIL_TOKEN_ENCRYPTION_KEY) {
-          return NextResponse.json({ error: 'GMAIL_TOKEN_ENCRYPTION_KEY is required' }, { status: 500 })
+      path: '/inbound',
+      skipAuth: true,
+      handler: async (request: Request) => {
+        const domain = process.env.RESEND_INBOUND_DOMAIN
+        if (!domain) {
+          console.error('[invoice-inbox/inbound] RESEND_INBOUND_DOMAIN not configured')
+          return NextResponse.json({ error: 'Inbound not configured' }, { status: 503 })
         }
 
-        const { data: connections, error: connError } = await ctx.supabase
-          .from('email_connections')
-          .select('*')
-          .eq('company_id', ctx.companyId)
-          .eq('status', 'active')
+        const rawBody = await request.text()
 
-        if (connError) return NextResponse.json({ error: 'Failed to fetch connections' }, { status: 500 })
-        if (!connections?.length) {
-          return NextResponse.json({ data: { message: 'No active Gmail connections', scanned: 0 } })
+        // 1. Verify Svix signature
+        let event
+        try {
+          event = verifyInboundWebhook(rawBody, request.headers)
+        } catch (err) {
+          if (err instanceof ResendSignatureError) {
+            return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+          }
+          console.error('[invoice-inbox/inbound] Verification error:', err)
+          return NextResponse.json({ error: 'Verification failed' }, { status: 500 })
         }
 
-        let totalScanned = 0, totalClassified = 0, totalSkipped = 0, totalErrors = 0
-
-        for (const connection of connections) {
-          const result = await scanGmailConnection(ctx.supabase, connection, ctx.userId, ctx.companyId)
-          totalScanned += result.scanned
-          totalClassified += result.classified
-          totalSkipped += result.skipped
-          totalErrors += result.errors
+        // 2. Only process email.received events
+        if (!isEmailReceivedEvent(event)) {
+          return NextResponse.json({ data: { ignored: event.type } }, { status: 200 })
         }
 
-        return NextResponse.json({
-          data: { scanned: totalScanned, classified: totalClassified, skipped: totalSkipped, errors: totalErrors },
-        })
+        const { email_id, to, from, subject, message_id, created_at } = event.data
+
+        // 3. Find the recipient that matches our domain
+        const localPart = extractLocalPartForDomain(to, domain)
+        if (!localPart) {
+          console.warn('[invoice-inbox/inbound] No recipient matched domain', { to, domain })
+          return NextResponse.json({ error: 'No matching recipient' }, { status: 404 })
+        }
+
+        // 4. Look up company_inbox (service role — webhook has no user session)
+        const serviceSupabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        )
+
+        const { data: inbox } = await serviceSupabase
+          .from('company_inboxes')
+          .select('id, company_id, status')
+          .eq('local_part', localPart)
+          .maybeSingle()
+
+        if (!inbox) {
+          return NextResponse.json({ error: 'Address not found' }, { status: 404 })
+        }
+        if (inbox.status !== 'active') {
+          // Deprecated or blocked → hard-bounce so Resend returns a 5xx to the sender
+          return NextResponse.json({ error: 'Address no longer active' }, { status: 410 })
+        }
+
+        // 5. Resolve a user_id for the inbox item (schema requires NOT NULL).
+        //    Use company owner (companies.created_by).
+        const { data: company } = await serviceSupabase
+          .from('companies')
+          .select('created_by')
+          .eq('id', inbox.company_id)
+          .single()
+
+        if (!company?.created_by) {
+          console.error('[invoice-inbox/inbound] Company has no created_by', inbox.company_id)
+          return NextResponse.json({ error: 'Company owner missing' }, { status: 500 })
+        }
+        const userId = company.created_by
+
+        // 7. Fetch full email (body + attachment metadata)
+        let fullEmail
+        try {
+          fullEmail = await fetchReceivingEmail(email_id)
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err)
+          console.error('[invoice-inbox/inbound] Failed to fetch received email:', err)
+          return NextResponse.json({ error: `Fetch failed: ${message}` }, { status: 500 })
+        }
+
+        const bodyText = fullEmail.text ?? null
+        const attachments = fullEmail.attachments ?? []
+
+        // 8. If no attachments, still log the email as an inbox item so the user sees it
+        if (attachments.length === 0) {
+          await serviceSupabase.from('invoice_inbox_items').insert({
+            company_id: inbox.company_id,
+            user_id: userId,
+            status: 'error',
+            source: 'email',
+            email_from: from,
+            email_subject: subject,
+            email_received_at: created_at,
+            email_body_text: bodyText,
+            resend_email_id: email_id,
+            document_type: 'unknown',
+            error_message: 'Email had no attachments',
+            raw_email_payload: { messageId: message_id },
+          })
+          return NextResponse.json({ data: { processed: 0, reason: 'no_attachments' } })
+        }
+
+        // 9. Download + classify each attachment (per-attachment idempotency)
+        const results: Array<{ attachment_id: string; inbox_item_id?: string; error?: string; duplicate?: boolean }> = []
+        for (const att of attachments) {
+          try {
+            // Skip if this (email_id, attachment_id) was already processed
+            const { data: existing } = await serviceSupabase
+              .from('invoice_inbox_items')
+              .select('id')
+              .eq('resend_email_id', email_id)
+              .eq('resend_attachment_id', att.id)
+              .maybeSingle()
+            if (existing) {
+              results.push({ attachment_id: att.id, inbox_item_id: existing.id, duplicate: true })
+              continue
+            }
+
+            const download = await fetchInboundAttachment(email_id, att.id)
+            if (!UPLOAD_ALLOWED_MIME_TYPES.has(download.contentType)) {
+              results.push({ attachment_id: att.id, error: `Unsupported type ${download.contentType}` })
+              continue
+            }
+            if (download.buffer.byteLength > MAX_FILE_SIZE) {
+              results.push({ attachment_id: att.id, error: 'Attachment too large' })
+              continue
+            }
+
+            const result = await uploadAndClassify(
+              serviceSupabase,
+              userId,
+              inbox.company_id,
+              { name: download.filename, buffer: download.buffer, type: download.contentType },
+              'email',
+              {
+                from,
+                subject,
+                receivedAt: created_at,
+                messageId: message_id,
+                bodyText,
+                resendEmailId: email_id,
+                resendAttachmentId: att.id,
+              }
+            )
+            results.push({ attachment_id: att.id, inbox_item_id: result.inbox_item_id })
+          } catch (err) {
+            console.error('[invoice-inbox/inbound] Attachment processing failed:', err)
+            results.push({
+              attachment_id: att.id,
+              error: err instanceof Error ? err.message : 'Unknown error',
+            })
+          }
+        }
+
+        return NextResponse.json({ data: { processed: results.length, results } })
       },
     },
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -14,14 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import {
   Dialog,
   DialogContent,
@@ -37,6 +29,7 @@ import {
   Upload,
   Mail,
   FileText,
+  Receipt as ReceiptIcon,
   RefreshCw,
   Check,
   X,
@@ -44,10 +37,14 @@ import {
   Loader2,
   Plus,
   Trash2,
+  Copy,
+  RotateCcw,
+  ArrowRight,
+  Sparkles,
 } from 'lucide-react'
 import Link from 'next/link'
-import { useSearchParams, useRouter } from 'next/navigation'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { cn, formatCurrency } from '@/lib/utils'
+import { InfoTooltip } from '@/components/ui/info-tooltip'
 import type { WorkspaceComponentProps } from '@/lib/extensions/workspace-registry'
 import type { InvoiceExtractionResult } from '@/types'
 
@@ -66,6 +63,17 @@ interface InboxItem {
   email_from: string | null
   email_subject: string | null
   error_message: string | null
+  matched_transaction_id: string | null
+  match_confidence: number | null
+  match_method: string | null
+  match_reasoning: string | null
+  matched_transaction: {
+    id: string
+    description: string | null
+    amount: number
+    currency: string
+    date: string
+  } | null
 }
 
 interface Supplier {
@@ -129,13 +137,6 @@ const VAT_OPTIONS = [
 
 // ── Helpers ──────────────────────────────────────────────────
 
-function confidenceBadge(confidence: number | null) {
-  if (confidence === null) return null
-  if (confidence >= 0.9) return <Badge variant="success">Hög</Badge>
-  if (confidence >= 0.7) return <Badge variant="warning">Medium</Badge>
-  return <Badge variant="destructive">Låg</Badge>
-}
-
 function extractSupplierName(item: InboxItem): string | null {
   if (item.document_type !== 'supplier_invoice' || !item.extracted_data) return null
   return item.extracted_data.supplier?.name || null
@@ -153,6 +154,96 @@ function extractCurrency(item: InboxItem): string {
   const invoice = data.invoice as Record<string, unknown> | undefined
   const receipt = data.receipt as Record<string, unknown> | undefined
   return (invoice?.currency as string) || (receipt?.currency as string) || 'SEK'
+}
+
+type ConfidenceLevel = 'high' | 'medium' | 'low'
+
+function confidenceLevel(conf: number | null): ConfidenceLevel {
+  if (conf == null) return 'low'
+  if (conf >= 0.85) return 'high'
+  if (conf >= 0.6) return 'medium'
+  return 'low'
+}
+
+function MatchBlock({ item }: { item: InboxItem }) {
+  if (item.document_type !== 'receipt') return null
+
+  const isMatching = item.match_method === null && item.status === 'ready'
+  const isPending = item.match_method === 'pending_transaction'
+  const isMatched = !!item.matched_transaction_id && !!item.matched_transaction
+
+  if (isMatching) {
+    return (
+      <div className="mt-2.5 flex items-center gap-2 text-xs text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        <span>AI letar efter matchande transaktion…</span>
+      </div>
+    )
+  }
+
+  if (isPending) {
+    return (
+      <div className="mt-2.5 flex items-center gap-2 text-xs text-muted-foreground">
+        <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0" />
+        <span>Inväntar matchande banktransaktion</span>
+        {item.match_reasoning && (
+          <InfoTooltip content={item.match_reasoning} side="right" maxWidth="340px" />
+        )}
+      </div>
+    )
+  }
+
+  if (isMatched && item.matched_transaction) {
+    const tx = item.matched_transaction
+    const confidencePct = item.match_confidence != null ? Math.round(item.match_confidence * 100) : null
+    const level = confidenceLevel(item.match_confidence)
+    return (
+      <div
+        className={cn(
+          'mt-2.5 rounded-md border px-3 py-2.5',
+          level === 'high' && 'border-emerald-500/25 bg-emerald-500/5',
+          level === 'medium' && 'border-amber-500/25 bg-amber-500/5',
+          level === 'low' && 'border-red-500/25 bg-red-500/5'
+        )}
+      >
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 min-w-0 text-sm">
+            <ArrowRight className={cn(
+              'h-3.5 w-3.5 shrink-0',
+              level === 'high' && 'text-emerald-700 dark:text-emerald-400',
+              level === 'medium' && 'text-amber-700 dark:text-amber-500',
+              level === 'low' && 'text-red-700 dark:text-red-400'
+            )} />
+            <span className="truncate font-medium">{tx.description || 'Matchad transaktion'}</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="tabular-nums shrink-0">{formatCurrency(Math.abs(tx.amount), tx.currency)}</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="text-xs text-muted-foreground whitespace-nowrap">{tx.date}</span>
+          </div>
+          {confidencePct != null && (
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium tabular-nums shrink-0',
+                level === 'high' && 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+                level === 'medium' && 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+                level === 'low' && 'bg-red-500/15 text-red-700 dark:text-red-300'
+              )}
+            >
+              <Sparkles className="h-3 w-3" />
+              {confidencePct}%
+            </span>
+          )}
+        </div>
+        {item.match_reasoning && (
+          <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
+            {item.match_reasoning}
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  return null
 }
 
 function timeAgo(isoDate: string): string {
@@ -223,23 +314,22 @@ function WorkspaceSkeleton() {
 
 // ── Main Component ───────────────────────────────────────────
 
-export default function InvoiceInboxWorkspace({ userId }: WorkspaceComponentProps) {
+export default function InvoiceInboxWorkspace(_props: WorkspaceComponentProps) {
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const searchParams = useSearchParams()
-  const router = useRouter()
 
   const [items, setItems] = useState<InboxItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
-  const [isScanning, setIsScanning] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
 
-  // Gmail connection state
-  const [gmailConnection, setGmailConnection] = useState<{
-    email_address: string; status: string; last_sync_at: string | null
+  // Arcim inbox state
+  const [inboxAddress, setInboxAddress] = useState<{
+    address: string
+    local_part: string
+    status: string
   } | null>(null)
-  const [isConnectingGmail, setIsConnectingGmail] = useState(false)
+  const [isRotating, setIsRotating] = useState(false)
 
   // Convert dialog state
   const [convertItem, setConvertItem] = useState<InboxItem | null>(null)
@@ -275,55 +365,66 @@ export default function InvoiceInboxWorkspace({ userId }: WorkspaceComponentProp
     }
   }, [statusFilter, toast])
 
-  const fetchGmailStatus = useCallback(async () => {
+  const fetchInboxAddress = useCallback(async () => {
     try {
-      const res = await fetch('/api/extensions/ext/invoice-inbox/gmail/status')
-      if (!res.ok) return
+      const res = await fetch('/api/extensions/ext/invoice-inbox/inbox/address')
+      if (!res.ok) {
+        setInboxAddress(null)
+        return
+      }
       const { data } = await res.json()
-      const active = data?.connections?.find((c: { status: string }) => c.status === 'active')
-      setGmailConnection(active || null)
+      setInboxAddress(data || null)
     } catch { /* silent */ }
   }, [])
 
-  const handleConnectGmail = useCallback(async () => {
-    setIsConnectingGmail(true)
+  const handleCopyAddress = useCallback(async () => {
+    if (!inboxAddress?.address) return
     try {
-      const res = await fetch('/api/extensions/ext/invoice-inbox/gmail/auth')
-      if (!res.ok) throw new Error('Failed to get auth URL')
-      const { data } = await res.json()
-      window.location.href = data.authUrl
+      await navigator.clipboard.writeText(inboxAddress.address)
+      toast({ title: 'Adress kopierad' })
     } catch {
-      toast({ title: 'Kunde inte starta Gmail-koppling', variant: 'destructive' })
-      setIsConnectingGmail(false)
+      toast({ title: 'Kunde inte kopiera', variant: 'destructive' })
     }
-  }, [toast])
+  }, [inboxAddress, toast])
 
-  const handleDisconnectGmail = useCallback(async () => {
+  const handleRotateAddress = useCallback(async () => {
+    if (!inboxAddress) return
+    const confirmed = window.confirm(
+      'Den gamla adressen slutar ta emot e-post direkt. Leverantörer som använder den måste uppdateras. Vill du fortsätta?'
+    )
+    if (!confirmed) return
+
+    setIsRotating(true)
     try {
-      const res = await fetch('/api/extensions/ext/invoice-inbox/gmail/disconnect', { method: 'POST' })
-      if (!res.ok) throw new Error('Failed to disconnect')
-      setGmailConnection(null)
-      toast({ title: 'Gmail frånkopplad' })
-    } catch {
-      toast({ title: 'Kunde inte koppla från Gmail', variant: 'destructive' })
+      const res = await fetch('/api/extensions/ext/invoice-inbox/inbox/rotate', { method: 'POST' })
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: 'Rotation misslyckades' }))
+        throw new Error(error)
+      }
+      const { data } = await res.json()
+      setInboxAddress(data)
+      toast({ title: 'Ny adress skapad' })
+    } catch (err) {
+      toast({ title: err instanceof Error ? err.message : 'Rotation misslyckades', variant: 'destructive' })
+    } finally {
+      setIsRotating(false)
     }
-  }, [toast])
+  }, [inboxAddress, toast])
 
   useEffect(() => {
     fetchItems()
-    fetchGmailStatus()
+    fetchInboxAddress()
+  }, [fetchItems, fetchInboxAddress])
 
-    // Handle OAuth callback redirect
-    const gmailParam = searchParams.get('gmail')
-    const errorParam = searchParams.get('error')
-    if (gmailParam === 'connected') {
-      toast({ title: 'Gmail kopplad' })
-      router.replace('/e/general/invoice-inbox')
-    } else if (errorParam?.startsWith('gmail_')) {
-      toast({ title: 'Gmail-koppling misslyckades', variant: 'destructive' })
-      router.replace('/e/general/invoice-inbox')
-    }
-  }, [fetchItems, fetchGmailStatus, searchParams, router, toast])
+  // Poll while any receipt is mid-match so the UI updates when the LLM returns
+  useEffect(() => {
+    const hasInFlight = items.some(
+      (i) => i.document_type === 'receipt' && i.status === 'ready' && i.match_method === null
+    )
+    if (!hasInFlight) return
+    const interval = setInterval(() => { fetchItems() }, 3000)
+    return () => clearInterval(interval)
+  }, [items, fetchItems])
 
   const fetchSuppliers = useCallback(async () => {
     try {
@@ -358,21 +459,18 @@ export default function InvoiceInboxWorkspace({ userId }: WorkspaceComponentProp
     }
   }, [fetchItems, toast])
 
-  const handleScanGmail = useCallback(async () => {
-    setIsScanning(true)
+  const handleViewDocument = useCallback(async (documentId: string) => {
     try {
-      const res = await fetch('/api/extensions/ext/invoice-inbox/gmail/scan', { method: 'POST' })
-      if (!res.ok) throw new Error('Scan failed')
+      const res = await fetch(`/api/documents/${documentId}`)
+      if (!res.ok) throw new Error('Kunde inte hämta dokument')
       const { data } = await res.json()
-      toast({ title: `Gmail skannad: ${data.scanned} dokument, ${data.classified} klassificerade` })
-      await fetchItems()
-      await fetchGmailStatus()
-    } catch {
-      toast({ title: 'Gmail-skanning misslyckades', variant: 'destructive' })
-    } finally {
-      setIsScanning(false)
+      if (data?.download_url) {
+        window.open(data.download_url, '_blank', 'noopener,noreferrer')
+      }
+    } catch (err) {
+      toast({ title: err instanceof Error ? err.message : 'Kunde inte öppna dokumentet', variant: 'destructive' })
     }
-  }, [fetchItems, fetchGmailStatus, toast])
+  }, [toast])
 
   const handleReject = useCallback(async (itemId: string) => {
     try {
@@ -587,7 +685,6 @@ export default function InvoiceInboxWorkspace({ userId }: WorkspaceComponentProp
 
   const readyCount = items.filter((i) => i.status === 'ready').length
   const confirmedCount = items.filter((i) => i.status === 'confirmed').length
-  const errorCount = items.filter((i) => i.status === 'error').length
   const formTotal = convertForm
     ? convertForm.items.reduce((sum, item) => {
         const vatAmount = Math.round(item.amount * item.vat_rate * 100) / 100
@@ -603,69 +700,32 @@ export default function InvoiceInboxWorkspace({ userId }: WorkspaceComponentProp
 
   return (
     <div className="space-y-6">
-      {/* Gmail connection banner */}
-      {gmailConnection ? (
+      {/* Arcim inbox address */}
+      {inboxAddress && (
         <Card>
           <CardContent className="flex items-center justify-between py-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 dark:bg-green-950">
-                <Check className="h-4 w-4 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium">{gmailConnection.email_address}</p>
-                <p className="text-xs text-muted-foreground">
-                  {gmailConnection.last_sync_at
-                    ? `Senast skannad: ${timeAgo(gmailConnection.last_sync_at)}`
-                    : 'Inte skannad ännu'}
-                </p>
-              </div>
-            </div>
-            <Button variant="ghost" size="sm" onClick={handleDisconnectGmail}>
-              Koppla från
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="flex items-center justify-between py-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted shrink-0">
                 <Mail className="h-4 w-4 text-muted-foreground" />
               </div>
-              <div>
-                <p className="text-sm font-medium">Koppla Gmail</p>
-                <p className="text-xs text-muted-foreground">Hämta leverantörsfakturor automatiskt från din e-post</p>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Din fakturainkorg</p>
+                <p className="text-sm font-medium font-mono truncate">{inboxAddress.address}</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={handleConnectGmail} disabled={isConnectingGmail}>
-              {isConnectingGmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-              Koppla Gmail
-            </Button>
+            <div className="flex items-center gap-1 shrink-0">
+              <Button variant="ghost" size="sm" onClick={handleCopyAddress}>
+                <Copy className="mr-2 h-3.5 w-3.5" />
+                Kopiera
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleRotateAddress} disabled={isRotating}>
+                {isRotating ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="mr-2 h-3.5 w-3.5" />}
+                Rotera
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
-
-      {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-muted-foreground">Att granska</p>
-            <p className="text-2xl font-semibold tabular-nums">{readyCount}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-muted-foreground">Konverterade</p>
-            <p className="text-2xl font-semibold tabular-nums">{confirmedCount}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-muted-foreground">Fel</p>
-            <p className="text-2xl font-semibold tabular-nums">{errorCount}</p>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Action bar */}
       <div className="flex items-center gap-3">
@@ -689,17 +749,6 @@ export default function InvoiceInboxWorkspace({ userId }: WorkspaceComponentProp
           {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
           Ladda upp
         </Button>
-        {gmailConnection && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleScanGmail}
-            disabled={isScanning}
-          >
-            {isScanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-            Skanna Gmail
-          </Button>
-        )}
         <Button
           variant="ghost"
           size="sm"
@@ -720,119 +769,129 @@ export default function InvoiceInboxWorkspace({ userId }: WorkspaceComponentProp
         </TabsList>
       </Tabs>
 
-      {/* Items table */}
+      {/* Items list */}
       {items.length === 0 ? (
-        gmailConnection ? (
-          <EmptyState
-            icon={Inbox}
-            title="Ingen inkorg"
-            description="Skanna Gmail eller ladda upp en faktura."
-            actionLabel="Skanna Gmail"
-            onAction={handleScanGmail}
-            secondaryActionLabel="Ladda upp"
-          >
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="mr-2 h-4 w-4" />
-              Ladda upp
-            </Button>
-          </EmptyState>
-        ) : (
-          <EmptyState
-            icon={Inbox}
-            title="Ingen inkorg"
-            description="Koppla Gmail eller ladda upp en faktura för att komma igång."
-            actionLabel="Koppla Gmail"
-            onAction={handleConnectGmail}
-          >
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="mr-2 h-4 w-4" />
-              Ladda upp
-            </Button>
-          </EmptyState>
-        )
+        <EmptyState
+          icon={Inbox}
+          title="Ingen inkorg"
+          description={
+            inboxAddress
+              ? `Skicka fakturor till ${inboxAddress.address} eller ladda upp manuellt.`
+              : 'Ladda upp en faktura för att komma igång.'
+          }
+          actionLabel="Ladda upp"
+          onAction={() => fileInputRef.current?.click()}
+        />
       ) : (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10"></TableHead>
-                  <TableHead>Dokumenttyp</TableHead>
-                  <TableHead>Leverantör</TableHead>
-                  <TableHead className="text-right">Belopp</TableHead>
-                  <TableHead>Konfidensgrad</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Mottagen</TableHead>
-                  <TableHead className="text-right">Åtgärder</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item) => {
-                  const supplierName = extractSupplierName(item)
-                  const amount = extractAmount(item)
-                  const isConvertable = item.status === 'ready' && item.document_type === 'supplier_invoice'
-                  const isDismissable = item.status === 'ready'
+        <div className="overflow-hidden rounded-lg border bg-card divide-y divide-border/60">
+          {items.map((item) => {
+            const supplierName = extractSupplierName(item)
+            const amount = extractAmount(item)
+            const currency = extractCurrency(item)
+            const isReceipt = item.document_type === 'receipt'
+            const isConvertable = item.status === 'ready' && item.document_type === 'supplier_invoice'
+            const primaryLabel = supplierName
+              || item.email_from?.replace(/<.+?>$/, '').replace(/"/g, '').trim()
+              || '—'
 
-                  return (
-                    <TableRow key={item.id} className={item.document_type === 'unknown' ? 'opacity-60' : ''}>
-                      <TableCell>
-                        {item.source === 'email' ? (
-                          <Mail className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <Upload className="h-4 w-4 text-muted-foreground" />
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm">{DOC_TYPE_LABELS[item.document_type] || item.document_type}</span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm">{supplierName || '—'}</span>
-                        {item.email_from && !supplierName && (
-                          <span className="block text-xs text-muted-foreground truncate max-w-[200px]">{item.email_from}</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {amount != null ? formatCurrency(amount, extractCurrency(item)) : '—'}
-                      </TableCell>
-                      <TableCell>{confidenceBadge(item.confidence)}</TableCell>
-                      <TableCell>
-                        <Badge variant={STATUS_VARIANTS[item.status] || 'outline'}>
-                          {STATUS_LABELS[item.status] || item.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
+            return (
+              <div
+                key={item.id}
+                className={cn(
+                  'flex gap-4 px-4 py-3.5 transition-colors',
+                  item.document_type === 'unknown' && 'opacity-60',
+                  item.status === 'rejected' && 'opacity-50'
+                )}
+              >
+                {/* Document icon */}
+                <div className="flex h-9 w-9 items-center justify-center rounded-md bg-muted/60 shrink-0 mt-0.5">
+                  {isReceipt ? (
+                    <ReceiptIcon className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  {/* Header row */}
+                  <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                    <div className="flex items-baseline gap-2 min-w-0">
+                      <span className="text-sm font-medium">
+                        {DOC_TYPE_LABELS[item.document_type] || item.document_type}
+                      </span>
+                      <span className="text-muted-foreground">·</span>
+                      <span className="text-sm truncate min-w-0">{primaryLabel}</span>
+                      {item.source === 'email' && (
+                        <Mail className="h-3 w-3 text-muted-foreground shrink-0" aria-label="Från e-post" />
+                      )}
+                    </div>
+                    <div className="flex items-baseline gap-2 shrink-0">
+                      {amount != null && (
+                        <span className="text-sm font-medium tabular-nums">
+                          {formatCurrency(amount, currency)}
+                        </span>
+                      )}
+                      <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
                         {timeAgo(item.created_at)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {isConvertable && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openConvertDialog(item)}
-                            >
-                              <Eye className="mr-1 h-3.5 w-3.5" />
-                              Granska
-                            </Button>
-                          )}
-                          {isDismissable && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleReject(item.id)}
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Status chip line — only non-default states */}
+                  {(item.status === 'confirmed' || item.status === 'rejected' || item.status === 'error') && (
+                    <div className="mt-1.5">
+                      <Badge variant={STATUS_VARIANTS[item.status] || 'outline'}>
+                        {STATUS_LABELS[item.status] || item.status}
+                      </Badge>
+                      {item.error_message && (
+                        <span className="ml-2 text-xs text-muted-foreground">{item.error_message}</span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Match block (receipts only) */}
+                  <MatchBlock item={item} />
+
+                  {/* Actions */}
+                  {item.status === 'ready' && (
+                    <div className="mt-3 flex items-center justify-end gap-1">
+                      {isConvertable ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openConvertDialog(item)}
+                        >
+                          Granska
+                        </Button>
+                      ) : (
+                        item.document_id && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewDocument(item.document_id!)}
+                          >
+                            <Eye className="mr-1.5 h-3.5 w-3.5" />
+                            Visa kvitto
+                          </Button>
+                        )
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleReject(item.id)}
+                        aria-label="Avvisa"
+                        title="Avvisa"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
       )}
 
       {/* Convert dialog */}
