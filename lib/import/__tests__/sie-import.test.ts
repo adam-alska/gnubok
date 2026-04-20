@@ -1,12 +1,15 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   generateImportPreview,
   validateIBBalance,
   isBalanceSheetAccount,
   ensureFiscalPeriod,
+  importVouchers,
+  computeVoucherNumberRanges,
 } from '../sie-import'
 import { createQueuedMockSupabase } from '@/tests/helpers'
 import type { ParsedSIEFile, AccountMapping } from '../types'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // --- Helpers ---
 
@@ -440,5 +443,268 @@ describe('isBalanceSheetAccount', () => {
     expect(isBalanceSheetAccount('6211')).toBe(false)
     expect(isBalanceSheetAccount('7210')).toBe(false)
     expect(isBalanceSheetAccount('8999')).toBe(false)
+  })
+})
+
+describe('computeVoucherNumberRanges', () => {
+  it('returns empty array for no mapping', () => {
+    expect(computeVoucherNumberRanges([])).toEqual([])
+  })
+
+  it('produces one range per series with correct from/to', () => {
+    const ranges = computeVoucherNumberRanges([
+      { sourceId: 'B1', series: 'B', targetNumber: 1 },
+      { sourceId: 'B2', series: 'B', targetNumber: 2 },
+      { sourceId: 'B3', series: 'B', targetNumber: 3 },
+      { sourceId: 'C1', series: 'C', targetNumber: 1 },
+      { sourceId: 'C2', series: 'C', targetNumber: 2 },
+      { sourceId: 'V1', series: 'V', targetNumber: 1 },
+    ])
+
+    expect(ranges).toEqual([
+      { series: 'B', from: 1, to: 3 },
+      { series: 'C', from: 1, to: 2 },
+      { series: 'V', from: 1, to: 1 },
+    ])
+  })
+
+  it('handles non-contiguous target numbers per series', () => {
+    const ranges = computeVoucherNumberRanges([
+      { sourceId: 'B1', series: 'B', targetNumber: 5 },
+      { sourceId: 'B2', series: 'B', targetNumber: 9 },
+    ])
+    expect(ranges).toEqual([{ series: 'B', from: 5, to: 9 }])
+  })
+})
+
+describe('importVouchers — per-voucher series preservation', () => {
+  // Captures the rows passed to `.insert()` so the test can assert on
+  // voucher_series per inserted record. Uses a hand-rolled mock rather than
+  // createQueuedMockSupabase because we need to inspect arguments, not just
+  // return queued data.
+  function buildCapturingSupabase() {
+    const journalEntryInserts: Array<Record<string, unknown>> = []
+    const journalEntryLineInserts: Array<Record<string, unknown>> = []
+    const rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = []
+
+    // Each `next_voucher_number` RPC call auto-increments per series, matching
+    // the DB function's ON CONFLICT behavior.
+    const nextNumberBySeries = new Map<string, number>()
+
+    let syntheticEntryId = 1
+
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === 'chart_of_accounts') {
+          // Return all accounts used in test vouchers as if already active
+          return {
+            select: () => ({
+              eq: () => ({
+                in: (_col: string, accountNumbers: string[]) => ({
+                  then: (resolve: (v: { data: { id: string; account_number: string }[]; error: null }) => void) =>
+                    resolve({
+                      data: accountNumbers.map((num, i) => ({ id: `acc-${i}`, account_number: num })),
+                      error: null,
+                    }),
+                }),
+              }),
+            }),
+          }
+        }
+
+        if (table === 'journal_entries') {
+          return {
+            insert: (rows: Array<Record<string, unknown>>) => {
+              journalEntryInserts.push(...rows)
+              return {
+                select: () => ({
+                  then: (resolve: (v: { data: { id: string }[]; error: null }) => void) =>
+                    resolve({
+                      data: rows.map(() => ({ id: `entry-${syntheticEntryId++}` })),
+                      error: null,
+                    }),
+                }),
+              }
+            },
+          }
+        }
+
+        if (table === 'journal_entry_lines') {
+          return {
+            insert: (rows: Array<Record<string, unknown>>) => {
+              journalEntryLineInserts.push(...rows)
+              return Promise.resolve({ error: null })
+            },
+          }
+        }
+
+        throw new Error(`Unexpected table: ${table}`)
+      }),
+
+      rpc: vi.fn(async (name: string, args: Record<string, unknown>) => {
+        rpcCalls.push({ name, args })
+        if (name === 'next_voucher_number') {
+          const series = args.p_series as string
+          const current = nextNumberBySeries.get(series) ?? 0
+          const next = current + 1
+          nextNumberBySeries.set(series, next)
+          return { data: next, error: null }
+        }
+        if (name === 'reserve_voucher_range') {
+          const series = args.p_series as string
+          const highest = args.p_highest_used as number
+          nextNumberBySeries.set(series, highest)
+          return { data: null, error: null }
+        }
+        if (name === 'release_voucher_range') {
+          return { data: null, error: null }
+        }
+        throw new Error(`Unexpected RPC: ${name}`)
+      }),
+    }
+
+    return {
+      supabase: supabase as unknown as SupabaseClient,
+      journalEntryInserts,
+      journalEntryLineInserts,
+      rpcCalls,
+    }
+  }
+
+  function makeVoucher(
+    series: string,
+    number: number,
+    lines: Array<{ account: string; amount: number }> = [
+      { account: '1510', amount: 1000 },
+      { account: '3001', amount: -1000 },
+    ],
+  ) {
+    return {
+      series,
+      number,
+      date: new Date(2024, 0, 15),
+      description: `Voucher ${series}${number}`,
+      lines,
+    }
+  }
+
+  const baseMap = new Map([
+    ['1510', '1510'],
+    ['3001', '3001'],
+  ])
+
+  it('routes each voucher to its source series (B, C, V → B, C, V)', async () => {
+    const { supabase, journalEntryInserts, rpcCalls } = buildCapturingSupabase()
+    const parsed = makeParsedFile({
+      vouchers: [
+        makeVoucher('B', 1),
+        makeVoucher('B', 2),
+        makeVoucher('C', 1),
+        makeVoucher('V', 1),
+      ],
+    })
+
+    const result = await importVouchers(
+      supabase,
+      'company-1',
+      'user-1',
+      'period-1',
+      parsed,
+      baseMap,
+      'B', // fallback (should not be used here — all vouchers have series)
+    )
+
+    expect(result.created).toBe(4)
+    expect(new Set(result.seriesUsed)).toEqual(new Set(['B', 'C', 'V']))
+
+    const seriesInInserts = journalEntryInserts.map((r) => r.voucher_series)
+    expect(seriesInInserts).toEqual(['B', 'B', 'C', 'V'])
+
+    // Each series reserves its own voucher-number range independently
+    const reserveCalls = rpcCalls.filter((c) => c.name === 'reserve_voucher_range')
+    expect(reserveCalls.map((c) => c.args.p_series)).toEqual(['B', 'C', 'V'])
+  })
+
+  it('falls back to defaultSeries when source voucher has empty series (SIE4I)', async () => {
+    const { supabase, journalEntryInserts } = buildCapturingSupabase()
+    const parsed = makeParsedFile({
+      vouchers: [
+        { ...makeVoucher('', 1) },
+        { ...makeVoucher('', 2) },
+      ],
+    })
+
+    const result = await importVouchers(
+      supabase,
+      'company-1',
+      'user-1',
+      'period-1',
+      parsed,
+      baseMap,
+      'V', // fallback used because source series is empty
+    )
+
+    expect(result.created).toBe(2)
+    expect(result.seriesUsed).toEqual(['V'])
+    expect(journalEntryInserts.every((r) => r.voucher_series === 'V')).toBe(true)
+  })
+
+  it('records source series in voucherNumberMapping for audit trail', async () => {
+    const { supabase } = buildCapturingSupabase()
+    const parsed = makeParsedFile({
+      vouchers: [
+        makeVoucher('B', 1),
+        makeVoucher('C', 7),
+      ],
+    })
+
+    const result = await importVouchers(
+      supabase,
+      'company-1',
+      'user-1',
+      'period-1',
+      parsed,
+      baseMap,
+      'B',
+    )
+
+    expect(result.voucherNumberMapping).toEqual([
+      { sourceId: 'B1', series: 'B', targetNumber: 1 },
+      { sourceId: 'C7', series: 'C', targetNumber: 1 },
+    ])
+  })
+
+  it('assigns independent sequential target numbers per series', async () => {
+    const { supabase, journalEntryInserts } = buildCapturingSupabase()
+    const parsed = makeParsedFile({
+      vouchers: [
+        makeVoucher('B', 1),
+        makeVoucher('B', 2),
+        makeVoucher('B', 3),
+        makeVoucher('C', 1),
+        makeVoucher('C', 2),
+      ],
+    })
+
+    await importVouchers(
+      supabase,
+      'company-1',
+      'user-1',
+      'period-1',
+      parsed,
+      baseMap,
+      'B',
+    )
+
+    const bNumbers = journalEntryInserts
+      .filter((r) => r.voucher_series === 'B')
+      .map((r) => r.voucher_number)
+    const cNumbers = journalEntryInserts
+      .filter((r) => r.voucher_series === 'C')
+      .map((r) => r.voucher_number)
+
+    // Each series starts at 1 and increments independently — not globally continuous
+    expect(bNumbers).toEqual([1, 2, 3])
+    expect(cNumbers).toEqual([1, 2])
   })
 })

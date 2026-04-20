@@ -7,10 +7,13 @@ import { Button } from '@/components/ui/button'
 import JournalEntryList from '@/components/bookkeeping/JournalEntryList'
 import JournalEntryForm from '@/components/bookkeeping/JournalEntryForm'
 import ChartOfAccountsManager from '@/components/bookkeeping/ChartOfAccountsManager'
+import { FiscalYearSelector } from '@/components/common/FiscalYearSelector'
 import { Lock } from 'lucide-react'
 
 export default function BookkeepingPage() {
   const [refreshKey, setRefreshKey] = useState(0)
+  const [activeTab, setActiveTab] = useState('journal')
+  const [periodId, setPeriodId] = useState<string | null>(null)
 
   return (
     <div className="space-y-6">
@@ -29,7 +32,11 @@ export default function BookkeepingPage() {
         </Button>
       </div>
 
-      <Tabs defaultValue="journal">
+      {activeTab === 'journal' && (
+        <FiscalYearSelector value={periodId} onChange={setPeriodId} />
+      )}
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="journal">Verifikationer</TabsTrigger>
           <TabsTrigger value="new-entry">Ny verifikation</TabsTrigger>
@@ -37,7 +44,7 @@ export default function BookkeepingPage() {
         </TabsList>
 
         <TabsContent value="journal">
-          <JournalEntryList key={refreshKey} />
+          <JournalEntryList key={`${refreshKey}-${periodId ?? 'all'}`} periodId={periodId ?? undefined} />
         </TabsContent>
 
         <TabsContent value="new-entry">

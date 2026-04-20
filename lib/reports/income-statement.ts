@@ -84,9 +84,16 @@ export async function generateIncomeStatement(
     'debit' // Expenses have debit normal balance
   )
 
-  // Financial sections (class 8)
+  // Financial sections (class 8) — exclude 8999 "Årets resultat".
+  // 8999 is a closing account: when year-end posts "8999 debit → 2099 credit"
+  // to move the computed profit into equity, including 8999's debit balance
+  // here cancels out the revenue/expense difference and drives net_result to
+  // zero. The income statement shows the *computed* årets resultat as
+  // (revenue - expenses + financial), so 8999's own balance must stay out.
   const financialSections = buildSections(
-    incomeExpenseRows.filter((r) => r.account_class === 8),
+    incomeExpenseRows.filter(
+      (r) => r.account_class === 8 && r.account_number !== '8999'
+    ),
     {
       '80': 'Resultat andelar koncernföretag',
       '81': 'Resultat andelar intresseföretag',

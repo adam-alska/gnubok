@@ -109,8 +109,11 @@ export async function generateMonthlyBreakdown(
     } else if (accountClass >= 4 && accountClass <= 7) {
       // Expense accounts: debit side represents expenses
       bucket.expenses = Math.round((bucket.expenses + line.debit_amount - line.credit_amount) * 100) / 100
-    } else if (accountClass === 8) {
+    } else if (accountClass === 8 && line.account_number !== '8999') {
       // Financial items (class 8): interest, exchange gains/losses, etc.
+      // 8999 "Årets resultat" is a year-end closing account — its debit/credit
+      // mirrors the computed profit, so including it here would cancel the
+      // period's income-vs-expense signal on the month of closing.
       const amount = line.credit_amount - line.debit_amount
       if (amount >= 0) {
         bucket.income = Math.round((bucket.income + amount) * 100) / 100
