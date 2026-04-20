@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
+
+// Fixtures live in /dev_docs which is gitignored (contains anonymised real-world
+// customer exports). Skip the suite when running outside a dev machine.
+const fixtureDir = join(process.cwd(), 'dev_docs', 'example_sie')
+const fixturesAvailable = existsSync(join(fixtureDir, '8812090614_2025.se'))
 
 vi.mock('../trial-balance', () => ({
   generateTrialBalance: vi.fn(),
@@ -104,7 +109,7 @@ function buildTrialBalanceFromSIE(parsed: ParsedSIEFile): TrialBalanceRow[] {
   return rows.sort((a, b) => a.account_number.localeCompare(b.account_number))
 }
 
-describe('income statement — Bokio SIE regression (dev_docs/example_sie)', () => {
+describe.skipIf(!fixturesAvailable)('income statement — Bokio SIE regression (dev_docs/example_sie)', () => {
   it('2025: net_result matches Bokio 221 316 kr despite Yearly result closing voucher', async () => {
     // Bokio's 2025 export contains V194 "Yearly result": debit 8999 / credit 2099
     // with 221 316.27. Before the fix, treating 8999 as a regular class-8
