@@ -56,6 +56,7 @@ interface NavItem {
   group: string
   modes?: EntityType[] // If set, only visible for these entity types. If not set, visible to all.
   hidden?: boolean // Temporarily hide from sidebar
+  comingSoon?: boolean // Visible but disabled; shows "Kommer snart" badge
 }
 
 // All nav items for sidebar and mobile drawer

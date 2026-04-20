@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
-import { generateAGIXml, buildIndividuppgifterSnapshot } from '../agi/xml-generator'
+import {
+  generateAGIXml,
+  buildIndividuppgifterSnapshot,
+  AGIIncompleteDataError,
+} from '../agi/xml-generator'
 import type { AGICompanyData, AGIEmployeeData, AGITotals } from '../agi/xml-generator'
 
 // Mock personnummer decryption
@@ -28,8 +32,6 @@ const employees: AGIEmployeeData[] = [
     grossSalary: 40000,
     taxWithheld: 12000,
     avgifterBasis: 40000,
-    sickDays: 3,
-    vabDays: 2,
   },
   {
     personnummer: 'emp2_encrypted',
@@ -44,110 +46,236 @@ const employees: AGIEmployeeData[] = [
 const totals: AGITotals = {
   totalTax: 22500,
   totalAvgifterBasis: 80000,
+  totalAvgifterAmount: 24075.5,
   avgifterByCategory: {
     standard: { basis: 75000, amount: 23565 },
-    reduced65plus: { basis: 5000, amount: 510.50 },
+    reduced65plus: { basis: 5000, amount: 510.5 },
   },
 }
 
-describe('generateAGIXml', () => {
-  it('generates valid XML with correct root element', () => {
+describe('generateAGIXml — root structure', () => {
+  it('starts with XML declaration', () => {
     const xml = generateAGIXml(company, employees, totals)
     expect(xml).toContain('<?xml version="1.0" encoding="UTF-8"?>')
-    expect(xml).toContain('<Skatteverket')
+  })
+
+  it('uses the Skatteverket AGI namespace (schema 1.1)', () => {
+    const xml = generateAGIXml(company, employees, totals)
+    expect(xml).toContain('xmlns="http://xmls.skatteverket.se/se/skatteverket/da/instans/schema/1.1"')
+    // Declares the komponent namespace for shared building blocks (Avsandare etc.)
+    expect(xml).toContain('xmlns:gem="http://xmls.skatteverket.se/se/skatteverket/da/komponent/schema/1.1"')
+    // Reject the old bogus namespace
+    expect(xml).not.toContain('infoForBeskworksgiv')
+    expect(xml).not.toContain('/ai/instans/')
+  })
+
+  it('sets omrade="Arbetsgivardeklaration" on the root element', () => {
+    const xml = generateAGIXml(company, employees, totals)
+    expect(xml).toContain('<Skatteverket omrade="Arbetsgivardeklaration"')
+  })
+
+  it('closes the Skatteverket element', () => {
+    const xml = generateAGIXml(company, employees, totals)
     expect(xml).toContain('</Skatteverket>')
   })
+})
 
+describe('generateAGIXml — Avsandare', () => {
   it('includes program name "gnubok"', () => {
     const xml = generateAGIXml(company, employees, totals)
-    expect(xml).toContain('<Programnamn>gnubok</Programnamn>')
+    expect(xml).toContain('<gem:Programnamn>gnubok</gem:Programnamn>')
   })
 
-  it('includes correct period', () => {
+  it('emits Organisationsnummer in IDENTITET format (16 + 10-digit AB orgnr)', () => {
     const xml = generateAGIXml(company, employees, totals)
-    expect(xml).toContain('<Period>202604</Period>')
-  })
-
-  it('includes org number without dash', () => {
-    const xml = generateAGIXml(company, employees, totals)
-    expect(xml).toContain('5561234567')
+    expect(xml).toContain('<gem:Organisationsnummer>165561234567</gem:Organisationsnummer>')
     expect(xml).not.toContain('556123-4567')
   })
 
-  it('includes huvuduppgift with total tax (Ruta 001)', () => {
+  it('includes technical contact (name, phone, email)', () => {
     const xml = generateAGIXml(company, employees, totals)
-    expect(xml).toContain('<AvdragenSkatt faltkod="001">22500</AvdragenSkatt>')
+    expect(xml).toContain('<gem:Namn>Anna Admin</gem:Namn>')
+    expect(xml).toContain('<gem:Telefon>0701234567</gem:Telefon>')
+    expect(xml).toContain('<gem:Epostadress>anna@test.se</gem:Epostadress>')
   })
 
-  it('includes avgifter categories (Ruta 060, 061)', () => {
+  it('emits Avsandare in the komponent namespace (gem: prefix)', () => {
     const xml = generateAGIXml(company, employees, totals)
-    expect(xml).toContain('faltkod="060"')
-    expect(xml).toContain('faltkod="061"')
+    expect(xml).toContain('<gem:Avsandare>')
+    expect(xml).toContain('</gem:Avsandare>')
+  })
+})
+
+describe('generateAGIXml — Blankettgemensamt', () => {
+  it('includes AgRegistreradId for the employer in IDENTITET format', () => {
+    const xml = generateAGIXml(company, employees, totals)
+    expect(xml).toContain('<gem:AgRegistreradId>165561234567</gem:AgRegistreradId>')
   })
 
-  it('decrypts personnummer for FK215', () => {
+  it('emits Blankettgemensamt in the komponent namespace', () => {
     const xml = generateAGIXml(company, employees, totals)
-    expect(xml).toContain('<Personnummer faltkod="215">199001011234</Personnummer>')
-    expect(xml).toContain('<Personnummer faltkod="215">198506159876</Personnummer>')
+    expect(xml).toContain('<gem:Blankettgemensamt>')
+    expect(xml).toContain('</gem:Blankettgemensamt>')
+  })
+})
+
+describe('generateAGIXml — Huvuduppgift (HU)', () => {
+  it('includes AgRegistreradId with FK201 inside HU (IDENTITET format)', () => {
+    const xml = generateAGIXml(company, employees, totals)
+    expect(xml).toContain('<gem:AgRegistreradId faltkod="201">165561234567</gem:AgRegistreradId>')
   })
 
-  it('includes consistent FK570 specifikationsnummer', () => {
+  it('includes RedovisningsPeriod with FK006 inside HU', () => {
     const xml = generateAGIXml(company, employees, totals)
-    expect(xml).toContain('<Specifikationsnummer faltkod="570">1</Specifikationsnummer>')
-    expect(xml).toContain('<Specifikationsnummer faltkod="570">2</Specifikationsnummer>')
+    expect(xml).toContain('<gem:RedovisningsPeriod faltkod="006">202604</gem:RedovisningsPeriod>')
   })
 
-  it('includes gross salary (Ruta 011) per employee', () => {
+  it('emits total tax as SummaSkatteavdr FK497 (not AvdragenSkatt FK001)', () => {
     const xml = generateAGIXml(company, employees, totals)
-    expect(xml).toContain('<KontantBruttoloen faltkod="011">40000</KontantBruttoloen>')
-    expect(xml).toContain('<KontantBruttoloen faltkod="011">35000</KontantBruttoloen>')
+    expect(xml).toContain('<gem:SummaSkatteavdr faltkod="497">22500</gem:SummaSkatteavdr>')
+    // Legacy incorrect HU element must not appear
+    expect(xml).not.toMatch(/<gem:HU>[\s\S]*<AvdragenSkatt[\s\S]*<\/gem:HU>/)
   })
 
-  it('includes tax withheld (Ruta 001) per employee', () => {
+  it('emits total employer contributions as SummaArbAvgSlf FK487', () => {
     const xml = generateAGIXml(company, employees, totals)
-    // Both HU and IU have AvdragenSkatt
-    const matches = xml.match(/AvdragenSkatt/g)
-    expect(matches!.length).toBeGreaterThanOrEqual(3) // 1 HU + 2 IU
+    expect(xml).toContain('<gem:SummaArbAvgSlf faltkod="487">24076</gem:SummaArbAvgSlf>')
   })
 
-  it('includes benefit values (Ruta 012 for car)', () => {
+  it('does NOT emit FK060/061/062 — those field codes do not exist in HU', () => {
     const xml = generateAGIXml(company, employees, totals)
-    expect(xml).toContain('<FormanBil faltkod="012">5000</FormanBil>')
+    // Look for those faltkoder inside the HU section
+    const huMatch = xml.match(/<gem:HU>[\s\S]*?<\/gem:HU>/)
+    expect(huMatch).not.toBeNull()
+    const hu = huMatch![0]
+    expect(hu).not.toContain('faltkod="060"')
+    expect(hu).not.toContain('faltkod="061"')
+    expect(hu).not.toContain('faltkod="062"')
   })
 
-  it('includes absence fields FK821-FK823', () => {
-    const xml = generateAGIXml(company, employees, totals)
-    expect(xml).toContain('<SjukfranvaroDagar faltkod="821">3</SjukfranvaroDagar>')
-    expect(xml).toContain('<VabDagar faltkod="822">2</VabDagar>')
+  it('emits TotalSjuklonekostnad FK499 when sjuklön cost is reported', () => {
+    const withSjuklon = { ...totals, totalSjuklonekostnad: 4200 }
+    const xml = generateAGIXml(company, employees, withSjuklon)
+    expect(xml).toContain('<gem:TotalSjuklonekostnad faltkod="499">4200</gem:TotalSjuklonekostnad>')
   })
 
-  it('omits zero/undefined fields', () => {
+  it('omits TotalSjuklonekostnad when zero or undefined', () => {
     const xml = generateAGIXml(company, employees, totals)
-    // Employee 1 has no car benefit
-    // Employee 2 has no sick days
-    // Check that we don't emit empty tags
+    expect(xml).not.toContain('TotalSjuklonekostnad')
+    const zero = { ...totals, totalSjuklonekostnad: 0 }
+    expect(generateAGIXml(company, employees, zero)).not.toContain('TotalSjuklonekostnad')
+  })
+})
+
+describe('generateAGIXml — Individuppgift (IU)', () => {
+  it('uses BetalningsmottagarId FK215 (not Personnummer) for the payment recipient', () => {
+    const xml = generateAGIXml(company, employees, totals)
+    expect(xml).toContain('<gem:BetalningsmottagarId faltkod="215">199001011234</gem:BetalningsmottagarId>')
+    expect(xml).toContain('<gem:BetalningsmottagarId faltkod="215">198506159876</gem:BetalningsmottagarId>')
+    expect(xml).not.toContain('<Personnummer faltkod="215">')
+  })
+
+  it('wraps BetalningsmottagarId in BetalningsmottagareIUGROUP → BetalningsmottagareIDChoice', () => {
+    const xml = generateAGIXml(company, employees, totals)
+    expect(xml).toContain('<gem:BetalningsmottagareIUGROUP>')
+    expect(xml).toContain('<gem:BetalningsmottagareIDChoice>')
+    expect(xml).toContain('</gem:BetalningsmottagareIDChoice>')
+    expect(xml).toContain('</gem:BetalningsmottagareIUGROUP>')
+    // Ensure correct nesting order (IUGROUP contains IDChoice which contains the id)
+    expect(xml).toMatch(/<gem:BetalningsmottagareIUGROUP>\s*<gem:BetalningsmottagareIDChoice>\s*<gem:BetalningsmottagarId/)
+  })
+
+  it('wraps AgRegistreradId in ArbetsgivareIUGROUP inside IU', () => {
+    const xml = generateAGIXml(company, employees, totals)
+    expect(xml).toContain('<gem:ArbetsgivareIUGROUP>')
+    expect(xml).toContain('</gem:ArbetsgivareIUGROUP>')
+  })
+
+  it('preserves Specifikationsnummer FK570 per employee', () => {
+    const xml = generateAGIXml(company, employees, totals)
+    expect(xml).toContain('<gem:Specifikationsnummer faltkod="570">1</gem:Specifikationsnummer>')
+    expect(xml).toContain('<gem:Specifikationsnummer faltkod="570">2</gem:Specifikationsnummer>')
+  })
+
+  it('uses KontantErsattningUlagAG FK011 (not KontantBruttoloen) for gross salary', () => {
+    const xml = generateAGIXml(company, employees, totals)
+    expect(xml).toContain('<gem:KontantErsattningUlagAG faltkod="011">40000</gem:KontantErsattningUlagAG>')
+    expect(xml).toContain('<gem:KontantErsattningUlagAG faltkod="011">35000</gem:KontantErsattningUlagAG>')
+    expect(xml).not.toContain('KontantBruttoloen')
+  })
+
+  it('uses AvdrPrelSkatt FK001 (not AvdragenSkatt) for withheld tax in IU', () => {
+    const xml = generateAGIXml(company, employees, totals)
+    expect(xml).toContain('<gem:AvdrPrelSkatt faltkod="001">12000</gem:AvdrPrelSkatt>')
+    expect(xml).toContain('<gem:AvdrPrelSkatt faltkod="001">10500</gem:AvdrPrelSkatt>')
+  })
+
+  it('includes AgRegistreradId and RedovisningsPeriod in every IU', () => {
+    const xml = generateAGIXml(company, employees, totals)
+    // 1 HU + 2 IU = 3 occurrences each
+    const agRegMatches = xml.match(/AgRegistreradId faltkod="201"/g)
+    const periodMatches = xml.match(/RedovisningsPeriod faltkod="006"/g)
+    expect(agRegMatches?.length).toBe(3)
+    expect(periodMatches?.length).toBe(3)
+  })
+
+  it('maps benefit_car to SkatteplBilformanUlagAG FK013 (not FormanBil FK012)', () => {
+    const xml = generateAGIXml(company, employees, totals)
+    expect(xml).toContain('<gem:SkatteplBilformanUlagAG faltkod="013">5000</gem:SkatteplBilformanUlagAG>')
+    expect(xml).not.toContain('FormanBil')
+  })
+
+  it('omits empty/zero fields', () => {
+    const xml = generateAGIXml(company, employees, totals)
     const lines = xml.split('\n')
     for (const line of lines) {
       if (line.includes('faltkod')) {
-        expect(line).not.toContain('>0</')
+        expect(line).not.toMatch(/>0<\//)
       }
     }
   })
 
-  it('marks corrections with Rattelse flag', () => {
-    const xml = generateAGIXml(company, employees, totals, true)
-    expect(xml).toContain('<Rattelse>J</Rattelse>')
-  })
-
-  it('does not include Rattelse flag for initial filing', () => {
-    const xml = generateAGIXml(company, employees, totals, false)
-    expect(xml).not.toContain('Rattelse')
-  })
-
-  it('escapes XML special characters in company name', () => {
-    const specialCompany = { ...company, companyName: 'Test & <Co>' }
+  it('escapes XML special characters in contact info', () => {
+    const specialCompany = { ...company, contactName: 'A&B <Admin>' }
     const xml = generateAGIXml(specialCompany, employees, totals)
-    expect(xml).not.toContain('Test & <Co>')
+    expect(xml).not.toContain('A&B <Admin>')
+    expect(xml).toContain('A&amp;B &lt;Admin&gt;')
+  })
+})
+
+describe('generateAGIXml — fail-fast on missing data', () => {
+  it('throws AGIIncompleteDataError when org number is missing', () => {
+    const bad = { ...company, orgNumber: '' }
+    expect(() => generateAGIXml(bad, employees, totals)).toThrow(AGIIncompleteDataError)
+    expect(() => generateAGIXml(bad, employees, totals)).toThrow(/organisationsnummer/)
+  })
+
+  it('throws when org number has too few digits', () => {
+    const bad = { ...company, orgNumber: '12345' }
+    expect(() => generateAGIXml(bad, employees, totals)).toThrow(AGIIncompleteDataError)
+  })
+
+  it('throws when contact phone is missing', () => {
+    const bad = { ...company, contactPhone: '' }
+    expect(() => generateAGIXml(bad, employees, totals)).toThrow(/telefon/)
+  })
+
+  it('throws when contact email is missing', () => {
+    const bad = { ...company, contactEmail: '' }
+    expect(() => generateAGIXml(bad, employees, totals)).toThrow(/e-post/)
+  })
+
+  it('lists all missing fields on the error', () => {
+    const bad = { ...company, orgNumber: '', contactPhone: '', contactEmail: '' }
+    try {
+      generateAGIXml(bad, employees, totals)
+      throw new Error('should have thrown')
+    } catch (err) {
+      expect(err).toBeInstanceOf(AGIIncompleteDataError)
+      expect((err as AGIIncompleteDataError).missingFields).toEqual(
+        expect.arrayContaining(['organisationsnummer', 'telefon', 'e-post'])
+      )
+    }
   })
 })
 
@@ -170,7 +298,5 @@ describe('buildIndividuppgifterSnapshot', () => {
     expect(snapshot[0]).toHaveProperty('ruta011', 40000)
     expect(snapshot[0]).toHaveProperty('ruta001', 12000)
     expect(snapshot[0]).toHaveProperty('ruta020', 40000)
-    expect(snapshot[0]).toHaveProperty('fk821', 3)
-    expect(snapshot[0]).toHaveProperty('fk822', 2)
   })
 })

@@ -5,6 +5,9 @@ import { requireCompanyId } from '@/lib/company/context'
 import { requireWritePermission } from '@/lib/auth/require-write'
 import { createSalaryRunEntries } from '@/lib/salary/salary-entries'
 import { eventBus } from '@/lib/events'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('salary-book-route')
 
 ensureInitialized()
 
@@ -120,6 +123,7 @@ export async function POST(
     return NextResponse.json({ data: bookedRun })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Bokföring misslyckades'
+    log.error(`Booking failed for salary run ${id}: ${message}`, err instanceof Error ? err.stack : err)
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

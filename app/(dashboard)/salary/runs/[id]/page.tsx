@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   ArrowLeft, Plus, Calculator, Eye, Check, CreditCard, BookOpen,
-  ArrowLeftCircle, Loader2,
+  ArrowLeftCircle, Loader2, Download, Send, CheckCircle2,
 } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 import { useCanWrite } from '@/lib/hooks/use-can-write'
@@ -22,6 +22,7 @@ const STATUS_LABELS: Record<string, string> = {
   approved: 'Godkänd',
   paid: 'Betald',
   booked: 'Bokförd',
+  corrected: 'Korrigerad',
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -30,6 +31,7 @@ const STATUS_COLORS: Record<string, string> = {
   approved: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
   paid: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
   booked: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  corrected: 'bg-muted text-muted-foreground',
 }
 
 interface EntryPreview {
@@ -138,6 +140,73 @@ export default function SalaryRunDetailPage({ params }: { params: Promise<{ id: 
     if (res.ok) {
       const { data } = await res.json()
       setPreview(data)
+    }
+    setActionLoading(null)
+  }
+
+  async function handleDownloadAgi() {
+    setActionLoading('agi-download')
+    const res = await fetch(`/api/salary/runs/${id}/agi/xml`)
+    if (!res.ok) {
+      const result = await res.json().catch(() => ({ error: 'Kunde inte generera AGI-fil' }))
+      toast({
+        title: 'AGI-fil kunde inte genereras',
+        description: getErrorMessage(result, { context: 'salary', statusCode: res.status }),
+        variant: 'destructive',
+      })
+      setActionLoading(null)
+      return
+    }
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const periodLabel = `${run!.period_year}${String(run!.period_month).padStart(2, '0')}`
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `AGI_${periodLabel}.xml`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    await loadRun()
+    toast({ title: 'AGI-fil nedladdad' })
+    setActionLoading(null)
+  }
+
+  async function handleSubmitAgi() {
+    setActionLoading('agi-submit')
+
+    // Generate AGI XML first if it hasn't been generated yet.
+    if (!run?.agi_generated_at) {
+      const xmlRes = await fetch(`/api/salary/runs/${id}/agi/xml`)
+      if (!xmlRes.ok) {
+        const result = await xmlRes.json().catch(() => ({ error: 'Kunde inte generera AGI-fil' }))
+        toast({
+          title: 'AGI kunde inte genereras',
+          description: getErrorMessage(result, { context: 'salary', statusCode: xmlRes.status }),
+          variant: 'destructive',
+        })
+        setActionLoading(null)
+        return
+      }
+    }
+
+    const res = await fetch(`/api/salary/runs/${id}/agi/submit`, { method: 'POST' })
+    const payload = await res.json().catch(() => ({}))
+
+    if (res.ok) {
+      await loadRun()
+      toast({
+        title: 'AGI skickad till Skatteverket',
+        description:
+          (payload?.data?.message as string | undefined) ??
+          'Signera med BankID hos Skatteverket för att slutföra inlämningen.',
+      })
+    } else {
+      toast({
+        title: 'Kunde inte skicka till Skatteverket',
+        description: getErrorMessage(payload, { context: 'salary', statusCode: res.status }),
+        variant: 'destructive',
+      })
     }
     setActionLoading(null)
   }
@@ -269,7 +338,7 @@ export default function SalaryRunDetailPage({ params }: { params: Promise<{ id: 
           </CardHeader>
           <CardContent className="space-y-4">
             {employees.filter(e => e.calculation_breakdown).map(sre => {
-              const breakdown = sre.calculation_breakdown as { steps?: Array<{ label: string; formula: string; output: number }> }
+              const breakdown = sre.calculation_breakdown as { steps?: Array<{ label: string; formula: string; output: number | null }> }
               return (
                 <div key={sre.id} className="space-y-2">
                   <h4 className="text-sm font-medium">
@@ -279,9 +348,13 @@ export default function SalaryRunDetailPage({ params }: { params: Promise<{ id: 
                   </h4>
                   <div className="text-xs space-y-1 bg-muted/50 rounded-lg p-3">
                     {(breakdown?.steps || []).map((step, i) => (
-                      <div key={i} className="flex justify-between">
-                        <span className="text-muted-foreground">{step.label}: <span className="font-mono">{step.formula}</span></span>
-                        <span className="font-medium tabular-nums">{formatCurrency(step.output)}</span>
+                      <div key={i} className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">
+                          {step.label}: <span className="font-mono">{step.formula}</span>
+                        </span>
+                        {step.output !== null && (
+                          <span className="font-medium tabular-nums">{formatCurrency(step.output)}</span>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -324,6 +397,72 @@ export default function SalaryRunDetailPage({ params }: { params: Promise<{ id: 
                 </table>
               </div>
             ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* AGI (Arbetsgivardeklaration) — available once the run is booked */}
+      {run.status === 'booked' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Arbetsgivardeklaration (AGI)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-1.5 text-sm">
+              <div className="flex items-center gap-2">
+                {run.agi_generated_at ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <span className="text-muted-foreground">
+                      AGI-fil genererad {new Date(run.agi_generated_at).toLocaleString('sv-SE')}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">AGI-fil har inte genererats ännu.</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {run.agi_submitted_at ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <span className="text-muted-foreground">
+                      Skickad till Skatteverket {new Date(run.agi_submitted_at).toLocaleString('sv-SE')}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">
+                    Inte skickad till Skatteverket ännu. Deadline: 12:e i månaden efter utbetalning.
+                  </span>
+                )}
+              </div>
+            </div>
+            {canWrite && (
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  variant="outline"
+                  onClick={handleDownloadAgi}
+                  disabled={!!actionLoading}
+                >
+                  {actionLoading === 'agi-download' ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="mr-2 h-4 w-4" />
+                  )}
+                  Ladda ner AGI-fil
+                </Button>
+                <Button
+                  onClick={handleSubmitAgi}
+                  disabled={!!actionLoading || !!run.agi_submitted_at}
+                >
+                  {actionLoading === 'agi-submit' ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="mr-2 h-4 w-4" />
+                  )}
+                  Skicka till Skatteverket
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

@@ -80,5 +80,15 @@ export const EXTENSION_DEFINITIONS: Record<string, ExtensionDefinition[]> = {
           "hasOwnData": true,
           "subscriptionNotice": "Kräver ett Google-konto. Uppladdningar sker direkt till din Drive — ingen data lagras hos tredje part utöver Google."
     },
+    {
+          "slug": "skatteverket",
+          "name": "Skatteverket Integration",
+          "sector": "general",
+          "category": "operations",
+          "icon": "FileCheck",
+          "dataPattern": "core",
+          "description": "Skicka momsdeklaration direkt till Skatteverket via BankID.",
+          "longDescription": "Anslut till Skatteverket med BankID och skicka din momsdeklaration direkt från gnubok. Spara utkast, validera, lås och signera — utan att lämna appen."
+    },
   ],
 }

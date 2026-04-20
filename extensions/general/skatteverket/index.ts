@@ -1082,9 +1082,27 @@ async function parseAGIRequest(
     ;(avgifterByCategory as Record<string, { basis: number; amount: number }>)[category] = cat
   }
 
+  const totalAvgifterAmount = Object.values(avgifterByCategory).reduce(
+    (sum, cat) => sum + (cat?.amount ?? 0),
+    0
+  )
+
+  // FK499 — sjuklönekostnad summed from sick_day2_14 line items
+  let totalSjuklonekostnad = 0
+  for (const sre of runEmployees) {
+    const lineItems = (sre.line_items || []) as Array<Record<string, unknown>>
+    for (const li of lineItems) {
+      if (li.item_type === 'sick_day2_14') {
+        totalSjuklonekostnad += Math.abs((li.amount as number) || 0)
+      }
+    }
+  }
+
   const totals: AGITotals = {
     totalTax: run.total_tax,
     totalAvgifterBasis: runEmployees.reduce((s: number, e: { avgifter_basis: number }) => s + e.avgifter_basis, 0),
+    totalAvgifterAmount: Math.round(totalAvgifterAmount * 100) / 100,
+    totalSjuklonekostnad: Math.round(totalSjuklonekostnad * 100) / 100,
     avgifterByCategory,
   }
 
