@@ -37,7 +37,6 @@ import AccountMappingStep from '@/components/import/AccountMappingStep'
 import ImportReviewStep, { type ImportExecuteOptions } from '@/components/import/ImportReviewStep'
 import ImportResultStep from '@/components/import/ImportResultStep'
 import { applyMappingOverride } from '@/lib/import/account-mapper'
-import { getCSVHeaders, getCSVPreview } from '@/lib/import/bank-file/formats/generic-csv'
 import type { BankFileParseResult, BankFileFormatId, GenericCSVColumnMapping } from '@/lib/import/bank-file/types'
 import type { IngestResult } from '@/lib/transactions/ingest'
 import type {
@@ -64,7 +63,7 @@ const MigrationWizard = dynamic(
 type BankFileStep = 'upload' | 'preview' | 'column_mapping' | 'confirm' | 'result'
 
 const BANK_STEPS: BankFileStep[] = ['upload', 'preview', 'confirm', 'result']
-const BANK_STEPS_WITH_MAPPING: BankFileStep[] = ['upload', 'preview', 'column_mapping', 'confirm', 'result']
+const BANK_STEPS_WITH_MAPPING: BankFileStep[] = ['upload', 'column_mapping', 'confirm', 'result']
 
 const BANK_STEP_LABELS: Record<BankFileStep, string> = {
   upload: 'Ladda upp',
@@ -88,10 +87,6 @@ function BankFileImportWizard() {
   const [fileHash, setFileHash] = useState<string>('')
   const [filename, setFilename] = useState<string>('')
   const [rawFileContent, setRawFileContent] = useState<string>('')
-
-  // Column mapping for generic CSV
-  const [csvHeaders, setCsvHeaders] = useState<string[]>([])
-  const [csvPreview, setCsvPreview] = useState<string[][]>([])
 
   // Import result
   const [ingestResult, setIngestResult] = useState<IngestResult | null>(null)
@@ -132,28 +127,22 @@ function BankFileImportWizard() {
       setDetectedFormatName(data.data.detected_format_name)
       setFileHash(data.data.file_hash)
       setFilename(data.data.filename)
-      // Store headers for generic CSV mapping
-      if (data.data.headers) {
-        setCsvHeaders(data.data.headers)
-      }
 
       // Read raw file content for CSV preview
       const text = await file.text()
       setRawFileContent(text)
-      if (data.data.parse_result.format === 'generic_csv') {
-        setCsvHeaders(getCSVHeaders(text))
-        setCsvPreview(getCSVPreview(text, ',', 6))
-      }
 
       const txCount = data.data.parse_result.transactions.length
-      if (txCount > 0) {
+      if (data.data.parse_result.format === 'generic_csv') {
+        // Auto-detect failed or user picked "Annan CSV" — always route to manual column mapping.
+        // Default mapping rarely matches, so advance regardless of tx count.
+        setBankStep('column_mapping')
+      } else if (txCount > 0) {
         setBankStep('preview')
         toast({
           title: 'Fil analyserad',
           description: `${txCount} transaktioner hittades`,
         })
-      } else if (data.data.parse_result.format === 'generic_csv' || !data.data.detected_format) {
-        setBankError('Kunde inte identifiera bankformatet. Välj bank manuellt eller använd "Annan CSV".')
       } else {
         // Format detected but no transactions parsed — parser couldn't extract rows
         setBankError('Filen kunde läsas men inga transaktioner hittades. Kontrollera att filen innehåller transaktionsdata och inte bara rubriker.')
@@ -222,8 +211,6 @@ function BankFileImportWizard() {
     setFilename('')
     setIngestResult(null)
     setBankError(null)
-    setCsvHeaders([])
-    setCsvPreview([])
     setRawFileContent('')
   }
 
@@ -281,10 +268,9 @@ function BankFileImportWizard() {
 
       {bankStep === 'column_mapping' && (
         <BankFileColumnMappingStep
-          headers={csvHeaders}
-          previewRows={csvPreview}
+          rawFileContent={rawFileContent}
           onConfirm={handleColumnMappingConfirm}
-          onBack={() => setBankStep('preview')}
+          onBack={() => setBankStep('upload')}
         />
       )}
 
