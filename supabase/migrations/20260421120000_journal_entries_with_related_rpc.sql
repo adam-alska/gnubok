@@ -110,12 +110,7 @@ AS $$
         'out_of_period', (p.fiscal_period_id IS DISTINCT FROM p_period_id)
       ) AS entry,
     p.total AS total_count
-  FROM paged p
-  ORDER BY
-    CASE WHEN p_sort_date = 'asc'  THEN p.entry_date END ASC  NULLS LAST,
-    CASE WHEN p_sort_date = 'desc' THEN p.entry_date END DESC NULLS LAST,
-    p.voucher_series,
-    p.voucher_number;
+  FROM paged p;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.list_fiscal_period_entries_with_related(
