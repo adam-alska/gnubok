@@ -68,7 +68,7 @@ async function uploadAndClassify(
 
   // Audit: DocumentIngested
   try {
-    await appendProcessingHistory(supabase, {
+    await appendProcessingHistory({
       companyId,
       correlationId,
       aggregateType: 'Document',
@@ -102,7 +102,7 @@ async function uploadAndClassify(
 
   // Audit: DocumentExtractionAttempted (fires whether classification succeeded or failed)
   try {
-    await appendProcessingHistory(supabase, {
+    await appendProcessingHistory({
       companyId,
       correlationId,
       aggregateType: 'Document',
@@ -190,7 +190,7 @@ async function uploadAndClassify(
   // Audit: DocumentClassified (only when classification succeeded)
   if (!classificationError && classificationResult) {
     try {
-      await appendProcessingHistory(supabase, {
+      await appendProcessingHistory({
         companyId,
         correlationId,
         aggregateType: 'Document',

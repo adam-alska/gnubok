@@ -68,7 +68,7 @@ export async function processInboxItemMatch(
   // Append DeterministicMatch event — records that the narrowing ran
   let deterministicEventId: string
   try {
-    deterministicEventId = await appendProcessingHistory(ctx.supabase, {
+    deterministicEventId = await appendProcessingHistory({
       companyId: ctx.companyId,
       correlationId,
       aggregateType: 'MatchProposal',
@@ -121,7 +121,7 @@ export async function processInboxItemMatch(
 
   // Record the LLM attempt in processing_history
   try {
-    await appendProcessingHistory(ctx.supabase, {
+    await appendProcessingHistory({
       companyId: ctx.companyId,
       correlationId,
       causationId: deterministicEventId,

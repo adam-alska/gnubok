@@ -1,9 +1,10 @@
 /**
  * Processing history (behandlingshistorik) — append helper.
  *
- * Appends events to the processing_history table within the caller's
- * database transaction. Throws on failure so that the table writes
- * and the audit trail are atomically consistent.
+ * Uses a service-role client internally (no INSERT RLS policy on
+ * processing_history — matching the event_log pattern). Company scoping
+ * is enforced by companyId in the event payload, not by RLS.
+ * Throws on failure.
  *
  * PII BOUNDARY: payload MUST contain pseudonymous IDs only (user UUIDs,
  * company UUIDs, counterparty IDs). Never names, emails, personnummer,
@@ -13,11 +14,11 @@
  * reference, which is the required behavior per v0.2 §10.
  */
 
-import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   ProcessingHistoryAggregateType,
   ProcessingHistoryActor,
 } from '@/types'
+import { createServiceClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 
 // ── PII validator ───────────────────────────────────────────────
@@ -90,16 +91,15 @@ export interface AppendEventInput {
 // ── Append functions ────────────────────────────────────────────
 
 /**
- * Append a single event to processing_history within the caller's transaction.
+ * Append a single event to processing_history.
  *
- * Uses the provided SupabaseClient (which should be the same client used for
- * table writes in the command handler). Throws on failure so that both the
- * table writes and the audit trail roll back together.
+ * Uses a service-role client internally (bypasses RLS) since processing_history
+ * has no INSERT policy — matching the event_log pattern. Company scoping is
+ * enforced by the companyId in the event payload, not by RLS.
  *
  * Returns the generated event_id (pre-generated client-side for causation chaining).
  */
 export async function appendProcessingHistory(
-  supabase: SupabaseClient,
   input: AppendEventInput
 ): Promise<string> {
   // Validate payload + actor.label contain no PII
@@ -107,6 +107,7 @@ export async function appendProcessingHistory(
   assertActorPiiSafe(input.actor)
 
   const eventId = crypto.randomUUID()
+  const supabase = createServiceClient()
 
   const { error } = await supabase
     .from('processing_history')
@@ -135,13 +136,12 @@ export async function appendProcessingHistory(
 }
 
 /**
- * Append multiple events atomically within the caller's transaction.
+ * Append multiple events atomically (single INSERT).
  * Used for batch operations (e.g., migration commits, multi-event command handlers).
  *
  * Returns array of generated event_ids in input order.
  */
 export async function appendProcessingHistoryBatch(
-  supabase: SupabaseClient,
   inputs: AppendEventInput[]
 ): Promise<string[]> {
   if (inputs.length === 0) return []
@@ -168,6 +168,8 @@ export async function appendProcessingHistoryBatch(
     rubric_version: input.rubricVersion ?? null,
     occurred_at: input.occurredAt.toISOString(),
   }))
+
+  const supabase = createServiceClient()
 
   const { error } = await supabase
     .from('processing_history')
