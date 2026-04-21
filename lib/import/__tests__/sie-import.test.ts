@@ -525,7 +525,15 @@ describe('companyHasPriorActivity', () => {
             return chain
           },
           neq: (col: string, val: unknown) => {
-            capturedFilters[`neq:${col}`] = val
+            const key = `neq:${col}`
+            const existing = capturedFilters[key]
+            if (Array.isArray(existing)) {
+              existing.push(val)
+            } else if (existing !== undefined) {
+              capturedFilters[key] = [existing, val]
+            } else {
+              capturedFilters[key] = val
+            }
             return chain
           },
           in: (col: string, val: unknown) => {
@@ -557,13 +565,13 @@ describe('companyHasPriorActivity', () => {
     expect(result).toBe(true)
   })
 
-  it('excludes opening_balance entries from the count', async () => {
+  it('excludes opening_balance and storno entries, and only counts posted', async () => {
     const { supabase, capturedFilters } = buildCountingSupabase(0)
 
     await companyHasPriorActivity(supabase as unknown as Supabase, 'company-1')
 
-    expect(capturedFilters['neq:source_type']).toBe('opening_balance')
-    expect(capturedFilters['in:status']).toEqual(['posted', 'reversed'])
+    expect(capturedFilters['neq:source_type']).toEqual(['opening_balance', 'storno'])
+    expect(capturedFilters['eq:status']).toBe('posted')
     expect(capturedFilters['eq:company_id']).toBe('company-1')
   })
 
@@ -573,9 +581,11 @@ describe('companyHasPriorActivity', () => {
         select: () => ({
           eq: () => ({
             neq: () => ({
-              in: () => ({
-                then: (resolve: (v: { count: null; error: null }) => void) =>
-                  resolve({ count: null, error: null }),
+              neq: () => ({
+                eq: () => ({
+                  then: (resolve: (v: { count: null; error: null }) => void) =>
+                    resolve({ count: null, error: null }),
+                }),
               }),
             }),
           }),

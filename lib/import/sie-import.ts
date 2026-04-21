@@ -473,12 +473,18 @@ export async function companyHasPriorActivity(
   supabase: SupabaseClient,
   companyId: string
 ): Promise<boolean> {
+  // Only count currently-effective real activity. Excluding 'reversed' drops
+  // cancelled originals; excluding source_type 'storno' drops their matching
+  // reversal entries so a fully-cancelled pair contributes nothing. Without
+  // this, repair scripts that storno duplicate IB entries would leave storno
+  // artifacts that trip the guard on a freshly-repaired company.
   const { count } = await supabase
     .from('journal_entries')
     .select('id', { count: 'exact', head: true })
     .eq('company_id', companyId)
     .neq('source_type', 'opening_balance')
-    .in('status', ['posted', 'reversed'])
+    .neq('source_type', 'storno')
+    .eq('status', 'posted')
 
   return (count ?? 0) > 0
 }
