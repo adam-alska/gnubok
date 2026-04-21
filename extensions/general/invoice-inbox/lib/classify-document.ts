@@ -68,6 +68,45 @@ const MIME_TO_IMAGE_FORMAT: Record<string, string> = {
   'image/gif': 'gif',
 }
 
+// Bedrock rejects image bytes > 5 MB. Keep headroom under that ceiling.
+const BEDROCK_IMAGE_BYTE_LIMIT = 4_500_000
+
+// Shrink an image until it fits Bedrock's 5 MB cap. Steps down the longest edge
+// and JPEG quality in sequence — preserves legibility of receipt text while
+// guaranteeing we stay under the limit (or throwing if a photo is so dense it
+// can't be compressed enough, which in practice never happens below 500px).
+async function fitImageForBedrock(
+  buffer: Buffer,
+  mimeType: string
+): Promise<{ buffer: Buffer; format: 'jpeg' | 'png' | 'webp' | 'gif' }> {
+  const originalFormat = MIME_TO_IMAGE_FORMAT[mimeType] as 'jpeg' | 'png' | 'webp' | 'gif'
+
+  if (buffer.byteLength <= BEDROCK_IMAGE_BYTE_LIMIT) {
+    return { buffer, format: originalFormat }
+  }
+
+  // Re-encode to JPEG while shrinking. PNG at receipt-scale is usually 3-5×
+  // larger than an equivalent JPEG, so JPEG is the right target format even
+  // for PNG input.
+  const dimensionSteps = [2400, 1800, 1400, 1000, 800]
+  const qualitySteps = [85, 75, 60]
+
+  for (const maxDim of dimensionSteps) {
+    for (const quality of qualitySteps) {
+      const candidate = await sharp(buffer)
+        .rotate() // respect EXIF orientation
+        .resize({ width: maxDim, height: maxDim, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality, mozjpeg: true })
+        .toBuffer()
+      if (candidate.byteLength <= BEDROCK_IMAGE_BYTE_LIMIT) {
+        return { buffer: candidate, format: 'jpeg' }
+      }
+    }
+  }
+
+  throw new Error('Bilden kunde inte komprimeras tillräckligt för AI-tolkning.')
+}
+
 // ── System prompt ────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `Du är en svensk bokföringsdokumentklassificerare och dataextraktor.
@@ -260,24 +299,26 @@ async function buildContentBlock(input: ClassificationInput): Promise<ContentBlo
     }
   }
 
-  // HEIC → convert to JPEG via sharp
+  // HEIC → convert to JPEG via sharp, then fit to Bedrock's byte limit
   if (mimeType === 'image/heic' || mimeType === 'image/heif') {
-    const jpegBuffer = await sharp(fileBuffer).jpeg({ quality: 90 }).toBuffer()
+    const jpegBuffer = await sharp(fileBuffer).rotate().jpeg({ quality: 90, mozjpeg: true }).toBuffer()
+    const fitted = await fitImageForBedrock(jpegBuffer, 'image/jpeg')
     return {
       image: {
-        format: 'jpeg',
-        source: { bytes: new Uint8Array(jpegBuffer) },
+        format: fitted.format,
+        source: { bytes: new Uint8Array(fitted.buffer) },
       },
     }
   }
 
-  // Standard image formats
+  // Standard image formats — downscale if the buffer exceeds Bedrock's 5 MB cap
   const imageFormat = MIME_TO_IMAGE_FORMAT[mimeType]
   if (imageFormat) {
+    const fitted = await fitImageForBedrock(fileBuffer, mimeType)
     return {
       image: {
-        format: imageFormat as 'jpeg' | 'png' | 'webp' | 'gif',
-        source: { bytes: new Uint8Array(fileBuffer) },
+        format: fitted.format,
+        source: { bytes: new Uint8Array(fitted.buffer) },
       },
     }
   }

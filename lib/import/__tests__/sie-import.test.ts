@@ -707,4 +707,56 @@ describe('importVouchers — per-voucher series preservation', () => {
     expect(bNumbers).toEqual([1, 2, 3])
     expect(cNumbers).toEqual([1, 2])
   })
+
+  it('preserves original source series/number on each imported entry, even across skipped vouchers', async () => {
+    const { supabase, journalEntryInserts } = buildCapturingSupabase()
+    // A2 is an empty voucher (no lines) — will be skipped. A1 and A3 survive.
+    // Gnubok assigns target numbers 1 and 2 (contiguous), but source_voucher_number
+    // must preserve the SIE originals (1 and 3) so traceability is not lost.
+    const parsed = makeParsedFile({
+      vouchers: [
+        makeVoucher('A', 1),
+        { ...makeVoucher('A', 2), lines: [] },
+        makeVoucher('A', 3),
+      ],
+    })
+
+    const result = await importVouchers(
+      supabase,
+      'company-1',
+      'user-1',
+      'period-1',
+      parsed,
+      baseMap,
+      'A',
+    )
+
+    expect(result.created).toBe(2)
+    expect(result.skippedEmpty).toBe(1)
+    expect(journalEntryInserts.map((r) => r.voucher_number)).toEqual([1, 2])
+    expect(journalEntryInserts.map((r) => r.source_voucher_series)).toEqual(['A', 'A'])
+    expect(journalEntryInserts.map((r) => r.source_voucher_number)).toEqual([1, 3])
+  })
+
+  it('stores NULL source series/number when the source voucher has no series (SIE4I subsystem import)', async () => {
+    const { supabase, journalEntryInserts } = buildCapturingSupabase()
+    const parsed = makeParsedFile({
+      vouchers: [
+        { ...makeVoucher('', 1) },
+      ],
+    })
+
+    await importVouchers(
+      supabase,
+      'company-1',
+      'user-1',
+      'period-1',
+      parsed,
+      baseMap,
+      'V',
+    )
+
+    expect(journalEntryInserts[0].source_voucher_series).toBeNull()
+    expect(journalEntryInserts[0].source_voucher_number).toBe(1)
+  })
 })

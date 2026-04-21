@@ -16,6 +16,7 @@ import {
   getActiveInbox,
   composeInboxAddress,
 } from './lib/inbox-provisioning'
+import { toSwedishInboxError } from './lib/error-messages'
 import { createSupplierInvoiceRegistrationEntry } from '@/lib/bookkeeping/supplier-invoice-entries'
 import { CreateSupplierInvoiceSchema } from '@/lib/api/schemas'
 import { appendProcessingHistory } from '@/lib/processing-history/append'
@@ -97,7 +98,9 @@ async function uploadAndClassify(
       fileName: file.name,
     })
   } catch (err) {
-    classificationError = err instanceof Error ? err.message : 'Classification failed'
+    // Keep the technical message in the server log; present Swedish to users.
+    console.error('[invoice-inbox/classify] Bedrock classify failed:', err)
+    classificationError = toSwedishInboxError(err)
   }
 
   // Audit: DocumentExtractionAttempted (fires whether classification succeeded or failed)
@@ -343,6 +346,7 @@ export const invoiceInboxExtension: Extension = {
           .select(`
             id, status, document_type, confidence, source, created_at, extracted_data,
             matched_supplier_id, document_id, email_from, email_subject, error_message,
+            resend_email_id,
             matched_transaction_id, match_confidence, match_method, match_reasoning,
             matched_transaction:transactions!matched_transaction_id(id, description, amount, currency, date)
           `)
@@ -357,6 +361,44 @@ export const invoiceInboxExtension: Extension = {
         if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
         return NextResponse.json({ data: { items: data, count: data?.length ?? 0 } })
+      },
+    },
+
+    // ── Get processing_history timeline for an inbox item ───
+    {
+      method: 'GET',
+      path: '/items/:id/history',
+      handler: async (request: Request, ctx?: ExtensionContext) => {
+        if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+        const url = new URL(request.url)
+        const id = url.searchParams.get('_id')
+        if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+
+        // Resolve correlation_id via the inbox item (also enforces company scope)
+        const { data: item } = await ctx.supabase
+          .from('invoice_inbox_items')
+          .select('id, correlation_id, company_id')
+          .eq('id', id)
+          .eq('company_id', ctx.companyId)
+          .maybeSingle()
+
+        if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+        if (!item.correlation_id) {
+          // Legacy rows created before the correlation_id column have no history
+          return NextResponse.json({ data: { events: [] } })
+        }
+
+        const { data: events, error } = await ctx.supabase
+          .from('processing_history')
+          .select('event_id, event_type, occurred_at, payload, actor, causation_id')
+          .eq('company_id', ctx.companyId)
+          .eq('correlation_id', item.correlation_id)
+          .order('occurred_at', { ascending: true })
+          .limit(100)
+
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+        return NextResponse.json({ data: { events: events ?? [] } })
       },
     },
 

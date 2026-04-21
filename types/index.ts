@@ -978,6 +978,8 @@ export interface JournalEntry {
   notes: string | null
   commit_method: string | null
   rubric_version: string | null
+  source_voucher_series: string | null
+  source_voucher_number: number | null
   created_at: string
   updated_at: string
   // Relations
