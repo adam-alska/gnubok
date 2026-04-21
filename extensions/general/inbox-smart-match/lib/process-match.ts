@@ -5,9 +5,9 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { InvoiceInboxItem, ReceiptExtractionResult } from '@/types'
+import type { InvoiceInboxItem } from '@/types'
 import { appendProcessingHistory } from '@/lib/processing-history/append'
-import { fetchCandidateTransactions } from './fetch-candidates'
+import { fetchCandidateTransactions, type ExtractedDocument } from './fetch-candidates'
 import { matchReceiptToCandidate } from './match-receipt'
 
 export interface MatchContext {
@@ -36,8 +36,10 @@ export async function processInboxItemMatch(
 ): Promise<MatchOutcome> {
   const tag = `[inbox-smart-match] item=${item.id} trigger=${ctx.triggerReason}`
 
-  // We only operate on receipts for v1
-  if (item.document_type !== 'receipt') {
+  // Match both receipts and supplier invoices — both have comparable anchors
+  // (date, amount, counterparty, currency) and the downstream LLM prompt is
+  // shape-agnostic.
+  if (item.document_type !== 'receipt' && item.document_type !== 'supplier_invoice') {
     return { status: 'skipped', transactionId: null, confidence: 0, reasoning: '' }
   }
   if (item.status !== 'ready') {
@@ -62,7 +64,7 @@ export async function processInboxItemMatch(
     }
   }
 
-  const extracted = item.extracted_data as unknown as ReceiptExtractionResult
+  const extracted = item.extracted_data as unknown as ExtractedDocument
   const candidates = await fetchCandidateTransactions(ctx.supabase, ctx.companyId, extracted)
 
   // Append DeterministicMatch event — records that the narrowing ran

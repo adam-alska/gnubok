@@ -233,6 +233,8 @@ export function makeJournalEntry(overrides: Partial<JournalEntry> = {}): Journal
     description: 'Test entry',
     source_type: 'manual',
     source_id: null,
+    source_voucher_series: null,
+    source_voucher_number: null,
     status: 'posted',
     committed_at: '2024-06-15T14:30:00Z',
     reversed_by_id: null,

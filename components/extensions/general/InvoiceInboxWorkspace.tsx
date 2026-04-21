@@ -41,6 +41,8 @@ import {
   RotateCcw,
   ArrowRight,
   Sparkles,
+  Globe,
+  Info,
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn, formatCurrency } from '@/lib/utils'
@@ -63,6 +65,7 @@ interface InboxItem {
   email_from: string | null
   email_subject: string | null
   error_message: string | null
+  resend_email_id: string | null
   matched_transaction_id: string | null
   match_confidence: number | null
   match_method: string | null
@@ -99,6 +102,9 @@ interface ConvertFormItem {
   amount: number
   account_number: string
   vat_rate: number
+  // True when the rate was inferred from the document's totals rather than
+  // read off this specific line — surfaces "needs review" UI affordances.
+  vat_inferred?: boolean
 }
 
 // ── Constants ────────────────────────────────────────────────
@@ -246,6 +252,47 @@ function MatchBlock({ item }: { item: InboxItem }) {
   return null
 }
 
+// One-line payload summary per processing_history event_type — keeps the
+// timeline scannable without dumping raw JSON on the user.
+function formatHistorySummary(eventType: string, payload: Record<string, unknown>): string {
+  const mime = payload.mime_type as string | undefined
+  const size = typeof payload.size_bytes === 'number' ? payload.size_bytes : null
+  const tokensIn = typeof payload.llm_input_tokens === 'number' ? payload.llm_input_tokens : null
+  const tokensOut = typeof payload.llm_output_tokens === 'number' ? payload.llm_output_tokens : null
+  const conf = typeof payload.confidence === 'number' ? payload.confidence : null
+  const cls = payload.classification as string | undefined
+  const matched = payload.matched as boolean | undefined
+  const candidates = typeof payload.candidate_count === 'number' ? payload.candidate_count : null
+  const errMsg = payload.error as string | null | undefined
+
+  switch (eventType) {
+    case 'DocumentIngested':
+      return `${mime || 'okänd'}${size ? ` · ${(size / 1024).toFixed(1)} kB` : ''}`
+    case 'DocumentExtractionAttempted':
+      if (errMsg) return `fel: ${errMsg.slice(0, 80)}`
+      return [
+        tokensIn != null && tokensOut != null ? `${tokensIn} + ${tokensOut} tokens` : null,
+        conf != null ? `${Math.round(conf * 100)}%` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    case 'DocumentClassified':
+      return [cls, conf != null ? `${Math.round(conf * 100)}%` : null].filter(Boolean).join(' · ')
+    case 'MatchAttemptedDeterministic':
+      return `${candidates ?? 0} kandidater`
+    case 'MatchAttemptedLlm':
+      return [
+        matched === true ? 'matchad' : matched === false ? 'ingen match' : null,
+        conf != null ? `${Math.round(conf * 100)}%` : null,
+        tokensIn != null && tokensOut != null ? `${tokensIn} + ${tokensOut} tokens` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    default:
+      return ''
+  }
+}
+
 function timeAgo(isoDate: string): string {
   const diff = Date.now() - new Date(isoDate).getTime()
   const minutes = Math.floor(diff / 60000)
@@ -257,9 +304,78 @@ function timeAgo(isoDate: string): string {
   return `${days} dag${days > 1 ? 'ar' : ''} sedan`
 }
 
+// Infer a default VAT rate (as decimal, e.g. 0.25) from the document's own
+// totals and vatBreakdown so null-rate line items don't silently default to 25%.
+// Rules, in order:
+//   1. If vatAmount total is 0 → 0% (document has no VAT)
+//   2. If vatBreakdown has exactly one entry → that rate
+//   3. If all non-null line rates agree → that rate
+//   4. Else → 25% fallback
+// Mirror of the server-side reconciliation check in classify-document.ts so the
+// UI can show the same math that drove the confidence cap. Returns null when
+// there's nothing to compare against (no lines or no totals).
+function computeReconciliation(data: InvoiceExtractionResult | null): {
+  sumOfLines: number
+  subtotal: number | null
+  vatAmount: number
+  total: number | null
+  anchor: number
+  delta: number
+  tolerance: number
+  reconciles: boolean
+} | null {
+  if (!data?.lineItems?.length) return null
+  const subtotal = data.totals?.subtotal ?? null
+  const total = data.totals?.total ?? null
+  const vatAmount = data.totals?.vatAmount ?? 0
+  if (subtotal == null && total == null) return null
+
+  const sumOfLines = data.lineItems.reduce((acc, li) => acc + (li.lineTotal ?? 0), 0)
+  const anchor = subtotal != null ? subtotal : (total ?? 0) - vatAmount
+  const tolerance = Math.max(0.02, Math.abs(anchor) * 0.02)
+  const delta = sumOfLines - anchor
+
+  return {
+    sumOfLines: Math.round(sumOfLines * 100) / 100,
+    subtotal,
+    vatAmount,
+    total,
+    anchor: Math.round(anchor * 100) / 100,
+    delta: Math.round(delta * 100) / 100,
+    tolerance: Math.round(tolerance * 100) / 100,
+    reconciles: Math.abs(delta) <= tolerance,
+  }
+}
+
+function inferDocumentDefaultVat(data: InvoiceExtractionResult | null): number {
+  if (!data) return 0.25
+
+  const vatAmount = data.totals?.vatAmount
+  if (vatAmount === 0) return 0
+
+  const breakdown = data.vatBreakdown ?? []
+  if (breakdown.length === 1) {
+    return (breakdown[0].rate ?? 25) / 100
+  }
+
+  const explicitRates = (data.lineItems ?? [])
+    .map((li) => li.vatRate)
+    .filter((r): r is number => r != null)
+
+  if (explicitRates.length > 0) {
+    const unique = new Set(explicitRates)
+    if (unique.size === 1) {
+      return explicitRates[0] / 100
+    }
+  }
+
+  return 0.25
+}
+
 function buildInitialForm(item: InboxItem, defaultExpenseAccount?: string): ConvertForm {
   const data = item.extracted_data
   const fallbackAccount = defaultExpenseAccount || '5410'
+  const inferredDefault = inferDocumentDefaultVat(data)
 
   let formItems: ConvertFormItem[]
   if (data?.lineItems?.length) {
@@ -267,7 +383,8 @@ function buildInitialForm(item: InboxItem, defaultExpenseAccount?: string): Conv
       description: li.description,
       amount: li.lineTotal ?? 0,
       account_number: li.accountSuggestion || fallbackAccount,
-      vat_rate: li.vatRate != null ? li.vatRate / 100 : 0.25,
+      vat_rate: li.vatRate != null ? li.vatRate / 100 : inferredDefault,
+      vat_inferred: li.vatRate == null,
     }))
 
     // If all line item amounts are 0 but we have a total, distribute evenly
@@ -345,6 +462,22 @@ export default function InvoiceInboxWorkspace(_props: WorkspaceComponentProps) {
     transaction: { id: string; description: string; amount: number; currency: string; date: string }
   } | null>(null)
   const [isConfirmingMatch, setIsConfirmingMatch] = useState(false)
+
+  // Exchange rate for non-SEK invoices, fetched when the convert dialog opens.
+  // null = not yet fetched, undefined = SEK (rate=1 implicit), number = resolved.
+  const [exchangeRate, setExchangeRate] = useState<number | null>(null)
+  const [exchangeRateDate, setExchangeRateDate] = useState<string | null>(null)
+
+  // processing_history events for the open inbox item, shown as a diagnostic
+  // timeline inside the convert dialog. Empty array = fetched but no events.
+  const [historyEvents, setHistoryEvents] = useState<Array<{
+    event_id: string
+    event_type: string
+    occurred_at: string
+    payload: Record<string, unknown> | null
+    actor: { type?: string; id?: string } | null
+  }> | null>(null)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   // ── Data fetching ────────────────────────────────────────
 
@@ -489,11 +622,32 @@ export default function InvoiceInboxWorkspace(_props: WorkspaceComponentProps) {
     const matchedSupplier = item.matched_supplier_id
       ? suppliers.find((s) => s.id === item.matched_supplier_id)
       : null
-    setConvertForm(buildInitialForm(item, matchedSupplier?.default_expense_account || undefined))
+    const initialForm = buildInitialForm(item, matchedSupplier?.default_expense_account || undefined)
+    setConvertForm(initialForm)
     setFormErrors({})
     setDocumentUrl(null)
     setDocumentMimeType(null)
+    setExchangeRate(null)
+    setExchangeRateDate(null)
+    setHistoryEvents(null)
+    setHistoryOpen(false)
     fetchSuppliers()
+
+    // Fetch processing_history timeline (diagnostic panel inside dialog).
+    // Runs in parallel with the preview/rate fetches below.
+    void (async () => {
+      try {
+        const res = await fetch(`/api/extensions/ext/invoice-inbox/items/${item.id}/history`)
+        if (res.ok) {
+          const { data } = await res.json()
+          setHistoryEvents(data?.events ?? [])
+        } else {
+          setHistoryEvents([])
+        }
+      } catch {
+        setHistoryEvents([])
+      }
+    })()
 
     // Fetch document preview URL
     if (item.document_id) {
@@ -505,6 +659,26 @@ export default function InvoiceInboxWorkspace(_props: WorkspaceComponentProps) {
           setDocumentMimeType(data.mime_type)
         }
       } catch { /* silent */ }
+    }
+
+    // Prefill Riksbanken exchange rate for foreign-currency invoices. The
+    // supplier-invoice create handler only populates *_sek columns when
+    // exchange_rate is sent, so without this the SEK-equivalent audit fields
+    // stay null on foreign invoices.
+    const currency = initialForm.currency
+    if (currency && currency !== 'SEK' && initialForm.invoice_date) {
+      try {
+        const res = await fetch(
+          `/api/currency/rate?currency=${encodeURIComponent(currency)}&date=${encodeURIComponent(initialForm.invoice_date)}`
+        )
+        if (res.ok) {
+          const { data } = await res.json()
+          if (data?.rate) {
+            setExchangeRate(Number(data.rate))
+            setExchangeRateDate(typeof data.date === 'string' ? data.date : null)
+          }
+        }
+      } catch { /* silent — SEK conversion is a nice-to-have, not required */ }
     }
   }, [fetchSuppliers, suppliers])
 
@@ -559,7 +733,9 @@ export default function InvoiceInboxWorkspace(_props: WorkspaceComponentProps) {
     setConvertForm((prev) => {
       if (!prev) return prev
       const items = [...prev.items]
-      items[index] = { ...items[index], [field]: value }
+      // Editing the VAT rate promotes an inferred guess to user-confirmed.
+      const clearInferred = field === 'vat_rate' ? { vat_inferred: false } : {}
+      items[index] = { ...items[index], [field]: value, ...clearInferred }
       return { ...prev, items }
     })
     setFormErrors((prev) => {
@@ -614,6 +790,10 @@ export default function InvoiceInboxWorkspace(_props: WorkspaceComponentProps) {
         invoice_date: convertForm.invoice_date,
         due_date: convertForm.due_date,
         currency: convertForm.currency || 'SEK',
+        exchange_rate:
+          convertForm.currency && convertForm.currency !== 'SEK' && exchangeRate
+            ? exchangeRate
+            : undefined,
         payment_reference: convertForm.payment_reference || undefined,
         notes: convertForm.notes || undefined,
         items: convertForm.items.map((item) => ({
@@ -657,7 +837,7 @@ export default function InvoiceInboxWorkspace(_props: WorkspaceComponentProps) {
     } finally {
       setIsConverting(false)
     }
-  }, [convertItem, convertForm, validateForm, toast])
+  }, [convertItem, convertForm, validateForm, toast, exchangeRate])
 
   const handleConfirmMatch = useCallback(async () => {
     if (!suggestedMatch) return
@@ -682,6 +862,39 @@ export default function InvoiceInboxWorkspace(_props: WorkspaceComponentProps) {
   }, [suggestedMatch, toast])
 
   // ── Computed ─────────────────────────────────────────────
+
+  // Collapse same-email rows: emails often ship both an invoice PDF and a
+  // receipt PDF for the same transaction. Prefer the supplier_invoice as the
+  // primary row and surface the rest as a "+N dokument" chip. Rows without a
+  // resend_email_id (manual uploads, legacy rows) pass through unchanged.
+  const visibleItems = (() => {
+    const groups = new Map<string, InboxItem[]>()
+    const standalone: InboxItem[] = []
+    for (const item of items) {
+      if (!item.resend_email_id) {
+        standalone.push(item)
+        continue
+      }
+      const existing = groups.get(item.resend_email_id)
+      if (existing) existing.push(item)
+      else groups.set(item.resend_email_id, [item])
+    }
+
+    const collapsed: Array<{ primary: InboxItem; hiddenCount: number }> = []
+    for (const group of groups.values()) {
+      const primary =
+        group.find((g) => g.document_type === 'supplier_invoice') ??
+        group.find((g) => g.document_type === 'receipt') ??
+        group[0]
+      collapsed.push({ primary, hiddenCount: group.length - 1 })
+    }
+    for (const item of standalone) {
+      collapsed.push({ primary: item, hiddenCount: 0 })
+    }
+    // Re-sort by primary.created_at desc to preserve the original ordering.
+    collapsed.sort((a, b) => b.primary.created_at.localeCompare(a.primary.created_at))
+    return collapsed
+  })()
 
   const readyCount = items.filter((i) => i.status === 'ready').length
   const confirmedCount = items.filter((i) => i.status === 'confirmed').length
@@ -784,7 +997,7 @@ export default function InvoiceInboxWorkspace(_props: WorkspaceComponentProps) {
         />
       ) : (
         <div className="overflow-hidden rounded-lg border bg-card divide-y divide-border/60">
-          {items.map((item) => {
+          {visibleItems.map(({ primary: item, hiddenCount }) => {
             const supplierName = extractSupplierName(item)
             const amount = extractAmount(item)
             const currency = extractCurrency(item)
@@ -824,6 +1037,14 @@ export default function InvoiceInboxWorkspace(_props: WorkspaceComponentProps) {
                       <span className="text-sm truncate min-w-0">{primaryLabel}</span>
                       {item.source === 'email' && (
                         <Mail className="h-3 w-3 text-muted-foreground shrink-0" aria-label="Från e-post" />
+                      )}
+                      {hiddenCount > 0 && (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full bg-muted/80 px-2 py-0.5 text-[10px] font-medium text-muted-foreground shrink-0"
+                          title="Fler bilagor från samma e-post"
+                        >
+                          +{hiddenCount} dokument
+                        </span>
                       )}
                     </div>
                     <div className="flex items-baseline gap-2 shrink-0">
@@ -931,6 +1152,64 @@ export default function InvoiceInboxWorkspace(_props: WorkspaceComponentProps) {
                   {convertItem.extracted_data.supplier.orgNumber && (
                     <span className="text-muted-foreground"> ({convertItem.extracted_data.supplier.orgNumber})</span>
                   )}
+                </div>
+              )}
+
+              {/* Low-confidence reconciliation hint — surfaces the math that drove the 50% cap */}
+              {convertItem.confidence != null && convertItem.confidence <= 0.5 && (() => {
+                const recon = computeReconciliation(convertItem.extracted_data)
+                if (recon && !recon.reconciles) {
+                  const currency = convertForm.currency || 'SEK'
+                  return (
+                    <div className="flex items-start gap-2.5 rounded-md border border-amber-500/25 bg-amber-500/5 p-3">
+                      <Info className="h-4 w-4 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
+                      <div className="space-y-1.5 text-xs">
+                        <p className="font-medium text-amber-900 dark:text-amber-200">
+                          AI är osäker — summan av raderna stämmer inte med totalen
+                        </p>
+                        <div className="space-y-0.5 text-amber-900/80 dark:text-amber-200/80 tabular-nums leading-relaxed">
+                          <p>
+                            Summa rader: <span className="font-medium">{formatCurrency(recon.sumOfLines, currency)}</span>
+                          </p>
+                          <p>
+                            Dokumentets nettosumma: <span className="font-medium">{formatCurrency(recon.anchor, currency)}</span>
+                          </p>
+                          <p>
+                            Differens: <span className="font-medium">{formatCurrency(recon.delta, currency)}</span>
+                            {' '}(tillåten avvikelse {formatCurrency(recon.tolerance, currency)})
+                          </p>
+                        </div>
+                        <p className="text-amber-900/80 dark:text-amber-200/80 leading-relaxed pt-0.5">
+                          En rad kan saknas, dubblerats, eller haft fel tecken på rabatten. Kontrollera raderna nedan.
+                        </p>
+                      </div>
+                    </div>
+                  )
+                }
+                return (
+                  <div className="flex items-start gap-2.5 rounded-md border border-amber-500/25 bg-amber-500/5 p-3 text-xs">
+                    <Info className="h-4 w-4 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <p className="text-amber-900 dark:text-amber-200 leading-relaxed">
+                      AI är osäker på extraktionen ({Math.round(convertItem.confidence! * 100)}%). Gå igenom fälten innan du bokför.
+                    </p>
+                  </div>
+                )
+              })()}
+
+              {/* Foreign-supplier hint — informational only, never auto-overrides VAT */}
+              {convertForm.currency && convertForm.currency !== 'SEK' && (
+                <div className="flex items-start gap-2.5 rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-sm">
+                  <Globe className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1 text-xs">
+                    <p className="font-medium text-blue-900 dark:text-blue-200">
+                      Utländsk leverantör ({convertForm.currency}
+                      {convertItem.extracted_data?.supplier?.address ? ` · ${convertItem.extracted_data.supplier.address}` : ''})
+                    </p>
+                    <p className="text-blue-900/80 dark:text-blue-200/80 leading-relaxed">
+                      Kontrollera momsbehandlingen: använd den sats fakturan anger (t.ex. 25% om leverantören är OSS-registrerad),
+                      0% vid export, eller omvänd skattskyldighet för EU-tjänster. Bokföringen ändrar inte det AI läste.
+                    </p>
+                  </div>
                 </div>
               )}
 
@@ -1060,7 +1339,9 @@ export default function InvoiceInboxWorkspace(_props: WorkspaceComponentProps) {
                         value={String(lineItem.vat_rate)}
                         onValueChange={(v) => updateLineItem(index, 'vat_rate', parseFloat(v))}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger
+                          className={lineItem.vat_inferred ? 'border-amber-500/40 bg-amber-500/5' : ''}
+                        >
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1069,6 +1350,9 @@ export default function InvoiceInboxWorkspace(_props: WorkspaceComponentProps) {
                           ))}
                         </SelectContent>
                       </Select>
+                      {lineItem.vat_inferred && (
+                        <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-tight">Uppskattad — kontrollera</p>
+                      )}
                     </div>
                     <div className="col-span-1 space-y-1">
                       {index === 0 && <Label className="text-xs text-muted-foreground">&nbsp;</Label>}
@@ -1087,8 +1371,57 @@ export default function InvoiceInboxWorkspace(_props: WorkspaceComponentProps) {
                 <div className="text-right">
                   <p className="text-xs text-muted-foreground">Totalt inkl. moms</p>
                   <p className="text-lg font-semibold tabular-nums">{formatCurrency(formTotal, convertForm.currency)}</p>
+                  {convertForm.currency && convertForm.currency !== 'SEK' && exchangeRate && (
+                    <p className="text-xs text-muted-foreground tabular-nums mt-0.5">
+                      ≈ {formatCurrency(Math.round(formTotal * exchangeRate * 100) / 100, 'SEK')}
+                      <span className="ml-1 opacity-70">
+                        ({exchangeRate.toFixed(4)}
+                        {exchangeRateDate ? ` · ${exchangeRateDate}` : ''})
+                      </span>
+                    </p>
+                  )}
                 </div>
               </div>
+
+              {/* Processing history timeline (behandlingshistorik) */}
+              {historyEvents && historyEvents.length > 0 && (
+                <div className="border-t pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setHistoryOpen((v) => !v)}
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    <span>Behandlingshistorik ({historyEvents.length})</span>
+                    <span className="ml-1">{historyOpen ? '▾' : '▸'}</span>
+                  </button>
+                  {historyOpen && (
+                    <ul className="mt-2 space-y-1 text-xs font-mono">
+                      {historyEvents.map((evt, i) => {
+                        const prev = i > 0 ? historyEvents[i - 1] : null
+                        const delta = prev
+                          ? Math.round(
+                              (new Date(evt.occurred_at).getTime() -
+                                new Date(prev.occurred_at).getTime()) /
+                                10
+                            ) / 100
+                          : 0
+                        const payload = evt.payload ?? {}
+                        const summary = formatHistorySummary(evt.event_type, payload)
+                        return (
+                          <li key={evt.event_id} className="flex items-baseline gap-2 text-muted-foreground">
+                            <span className="tabular-nums opacity-60 w-14 shrink-0">
+                              {i === 0 ? 'start' : `+${delta.toFixed(2)}s`}
+                            </span>
+                            <span className="text-foreground shrink-0 font-medium">{evt.event_type}</span>
+                            {summary && <span className="truncate">{summary}</span>}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

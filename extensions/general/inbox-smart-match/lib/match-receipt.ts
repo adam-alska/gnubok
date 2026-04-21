@@ -12,8 +12,8 @@ import {
   type Message,
   type ToolConfiguration,
 } from '@aws-sdk/client-bedrock-runtime'
-import type { ReceiptExtractionResult } from '@/types'
-import type { CandidateTransaction } from './fetch-candidates'
+import type { CandidateTransaction, ExtractedDocument } from './fetch-candidates'
+import { getMatchAnchors } from './fetch-candidates'
 
 export interface ReceiptMatchResult {
   matched: boolean
@@ -38,19 +38,18 @@ function getClient(): BedrockRuntimeClient {
   return _client
 }
 
-const SYSTEM_PROMPT = `Du är en expert på att matcha svenska kvitton mot banktransaktioner.
+const SYSTEM_PROMPT = `Du är en expert på att matcha svenska bokföringsdokument (kvitton, fakturor) mot banktransaktioner.
 
 Du får:
-- Kvittodata (handlare, belopp, valuta, datum) från AI-extraktion
-- En lista med kandidat-banktransaktioner (id, beskrivning, belopp, valuta, datum, MCC)
+- Dokumentdata (handlare/leverantör, belopp, valuta, datum) från AI-extraktion
+- En lista med kandidat-banktransaktioner (id, beskrivning, belopp, valuta, datum)
 
-Uppgift: identifiera vilken (om någon) banktransaktion som motsvarar kvittot.
+Uppgift: identifiera vilken (om någon) banktransaktion som motsvarar dokumentet.
 
 Resonera utifrån:
 - Belopp: bör vara identiskt eller mycket nära (ta hänsyn till valutaväxling om olika valutor)
-- Datum: banktransaktion bokförs ofta 0-3 dagar efter kvittot
-- Handlare: bankens beskrivning är ofta förkortad/versaler ("WILLYS SÖDERM" = "Willys Hemma Södermalm"). Matcha semantiskt, inte bokstavligt
-- MCC-koder kan bekräfta branschtyp
+- Datum: för kvitton bokförs banktransaktionen ofta 0-3 dagar efter köpet; för leverantörsfakturor kan betalningen ske flera dagar till veckor efter fakturadatum
+- Handlare/leverantör: bankens beskrivning är ofta förkortad/versaler ("WILLYS SÖDERM" = "Willys Hemma Södermalm"). Matcha semantiskt, inte bokstavligt
 
 Om inget förslag är trovärdigt — returnera matched=false.
 Anropa ALLTID verktyget match_receipt med resultatet.
@@ -95,7 +94,7 @@ const MATCH_TOOL: ToolConfiguration = {
 }
 
 export interface MatchReceiptInput {
-  extracted: ReceiptExtractionResult
+  extracted: ExtractedDocument
   candidates: CandidateTransaction[]
 }
 
@@ -107,11 +106,12 @@ export interface MatchReceiptInput {
 export async function matchReceiptToCandidate(
   input: MatchReceiptInput
 ): Promise<ReceiptMatchResult> {
+  const anchors = getMatchAnchors(input.extracted)
   const receiptBrief = {
-    merchant: input.extracted.merchant?.name ?? null,
-    amount: input.extracted.totals?.total ?? null,
-    currency: input.extracted.receipt?.currency ?? 'SEK',
-    date: input.extracted.receipt?.date ?? null,
+    merchant: anchors?.counterpartyName ?? null,
+    amount: anchors?.amount ?? null,
+    currency: anchors?.currency ?? 'SEK',
+    date: anchors?.date ?? null,
     vat_amount: input.extracted.totals?.vatAmount ?? null,
   }
 
@@ -125,13 +125,13 @@ export async function matchReceiptToCandidate(
     merchant_name: c.merchant_name,
   }))
 
-  const userPrompt = `Kvitto:
+  const userPrompt = `Dokument:
 ${JSON.stringify(receiptBrief, null, 2)}
 
 Kandidat-transaktioner:
 ${JSON.stringify(candidateLines, null, 2)}
 
-Vilken transaktion matchar kvittot? Om ingen matchar, returnera matched=false.`
+Vilken transaktion matchar dokumentet? Om ingen matchar, returnera matched=false.`
 
   const messages: Message[] = [
     {

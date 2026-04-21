@@ -230,6 +230,14 @@ export default function JournalEntryDetailPage({ params }: { params: Promise<{ i
               <span className="text-muted-foreground">Typ</span>
               <span>{sourceTypeLabels[entry.source_type] || entry.source_type}</span>
             </div>
+            {entry.source_voucher_series && entry.source_voucher_number != null && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Ursprungligt verifikat</span>
+                <span className="font-mono tabular-nums">
+                  {entry.source_voucher_series}{entry.source_voucher_number}
+                </span>
+              </div>
+            )}
             {/* Notes — always editable (internal metadata, not BFL verifikation content) */}
             <div className="border-t pt-2 mt-2">
               <div className="flex items-center justify-between mb-1">

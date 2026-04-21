@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { fetchCandidateTransactions } from '@/extensions/general/inbox-smart-match/lib/fetch-candidates'
+import {
+  fetchCandidateTransactions,
+  getMatchAnchors,
+} from '@/extensions/general/inbox-smart-match/lib/fetch-candidates'
 import { createQueuedMockSupabase } from '@/tests/helpers'
-import type { ReceiptExtractionResult } from '@/types'
+import type { InvoiceExtractionResult, ReceiptExtractionResult } from '@/types'
 
 function makeReceipt(overrides?: Partial<ReceiptExtractionResult>): ReceiptExtractionResult {
   return {
@@ -72,6 +75,46 @@ describe('fetchCandidateTransactions', () => {
     const ids = result.map((c) => c.id)
     expect(ids).not.toContain('t2')
     expect(ids).toContain('t3')
+  })
+
+  it('anchors invoices on dueDate with a ±14d window', () => {
+    const invoice: InvoiceExtractionResult = {
+      supplier: { name: 'Acme AB', orgNumber: null, vatNumber: null, address: null, bankgiro: null, plusgiro: null },
+      invoice: { invoiceNumber: 'INV-1', invoiceDate: '2026-03-01', dueDate: '2026-03-31', paymentReference: null, currency: 'SEK' },
+      lineItems: [],
+      totals: { subtotal: 800, vatAmount: 200, total: 1000 },
+      vatBreakdown: [],
+      confidence: 0.9,
+    }
+    const anchors = getMatchAnchors(invoice)
+    expect(anchors).not.toBeNull()
+    expect(anchors!.date).toBe('2026-03-31')
+    expect(anchors!.windowDaysBefore).toBe(14)
+    expect(anchors!.windowDaysAfter).toBe(14)
+  })
+
+  it('anchors invoices without dueDate on invoiceDate with a -7/+45 day window', () => {
+    const invoice: InvoiceExtractionResult = {
+      supplier: { name: 'Acme AB', orgNumber: null, vatNumber: null, address: null, bankgiro: null, plusgiro: null },
+      invoice: { invoiceNumber: 'INV-1', invoiceDate: '2026-03-01', dueDate: null, paymentReference: null, currency: 'SEK' },
+      lineItems: [],
+      totals: { subtotal: 800, vatAmount: 200, total: 1000 },
+      vatBreakdown: [],
+      confidence: 0.9,
+    }
+    const anchors = getMatchAnchors(invoice)
+    expect(anchors).not.toBeNull()
+    expect(anchors!.date).toBe('2026-03-01')
+    expect(anchors!.windowDaysBefore).toBe(7)
+    expect(anchors!.windowDaysAfter).toBe(45)
+  })
+
+  it('anchors receipts on receipt date with a ±7d window', () => {
+    const anchors = getMatchAnchors(makeReceipt())
+    expect(anchors).not.toBeNull()
+    expect(anchors!.date).toBe('2026-04-15')
+    expect(anchors!.windowDaysBefore).toBe(7)
+    expect(anchors!.windowDaysAfter).toBe(7)
   })
 
   it('uses amount_sek when receipt is foreign currency', async () => {

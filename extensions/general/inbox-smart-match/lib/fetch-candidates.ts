@@ -1,15 +1,20 @@
 /**
  * Candidate transaction fetcher — deterministic narrowing before the LLM call.
  *
- * Pulls unbooked expense transactions within ±7 days of the receipt date,
- * ordered by how close their amount is to the receipt total. Limits to top 5
+ * Pulls unbooked expense transactions near the document's payment date,
+ * ordered by how close their amount is to the document total. Limits to top 5
  * so the LLM has a focused candidate set and the token cost stays bounded.
+ *
+ * Anchor date selection:
+ *   - Receipts: receipt date ±7 days (paid on the spot)
+ *   - Invoices with dueDate: dueDate ±14 days (covers early and late payments)
+ *   - Invoices without dueDate: invoiceDate, window shifted forward to cover
+ *     standard 30-day terms (invoiceDate-7 .. invoiceDate+45)
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { ReceiptExtractionResult } from '@/types'
+import type { InvoiceExtractionResult, ReceiptExtractionResult } from '@/types'
 
-const DATE_WINDOW_DAYS = 7
 const MAX_CANDIDATES = 5
 
 export interface CandidateTransaction {
@@ -22,40 +27,80 @@ export interface CandidateTransaction {
   merchant_name: string | null
 }
 
-/**
- * Extract the reference date and absolute amount from a classified receipt's
- * extracted data. Returns null if required fields are missing.
- */
-function getReceiptMatchAnchors(
-  extracted: ReceiptExtractionResult | null
-): { date: string; amount: number; currency: string } | null {
-  if (!extracted) return null
-  const date = extracted.receipt?.date ?? null
-  const amount = extracted.totals?.total ?? null
-  const currency = extracted.receipt?.currency ?? 'SEK'
-  if (!date || amount == null || amount <= 0) return null
-  return { date, amount, currency }
+export type ExtractedDocument = ReceiptExtractionResult | InvoiceExtractionResult
+
+export interface MatchAnchors {
+  date: string
+  amount: number
+  currency: string
+  counterpartyName: string | null
+  windowDaysBefore: number
+  windowDaysAfter: number
+}
+
+function isInvoiceExtraction(e: ExtractedDocument): e is InvoiceExtractionResult {
+  return 'invoice' in e && typeof (e as InvoiceExtractionResult).invoice === 'object'
 }
 
 /**
- * Fetch up to MAX_CANDIDATES unbooked expense transactions near the receipt's
+ * Extract the reference date and absolute amount from a classified document's
+ * extracted data. Returns null if required fields are missing.
+ */
+export function getMatchAnchors(extracted: ExtractedDocument | null): MatchAnchors | null {
+  if (!extracted) return null
+
+  let date: string | null
+  let currency: string
+  let counterpartyName: string | null
+  let windowDaysBefore: number
+  let windowDaysAfter: number
+
+  if (isInvoiceExtraction(extracted)) {
+    const dueDate = extracted.invoice?.dueDate ?? null
+    const invoiceDate = extracted.invoice?.invoiceDate ?? null
+    if (dueDate) {
+      date = dueDate
+      windowDaysBefore = 14
+      windowDaysAfter = 14
+    } else {
+      date = invoiceDate
+      windowDaysBefore = 7
+      windowDaysAfter = 45
+    }
+    currency = extracted.invoice?.currency ?? 'SEK'
+    counterpartyName = extracted.supplier?.name ?? null
+  } else {
+    date = extracted.receipt?.date ?? null
+    currency = extracted.receipt?.currency ?? 'SEK'
+    counterpartyName = extracted.merchant?.name ?? null
+    windowDaysBefore = 7
+    windowDaysAfter = 7
+  }
+
+  const amount = extracted.totals?.total ?? null
+  if (!date || amount == null || amount <= 0) return null
+  return { date, amount, currency, counterpartyName, windowDaysBefore, windowDaysAfter }
+}
+
+/**
+ * Fetch up to MAX_CANDIDATES unbooked expense transactions near the document's
  * date + amount. Ordering prefers exact amount matches first.
  */
 export async function fetchCandidateTransactions(
   supabase: SupabaseClient,
   companyId: string,
-  extracted: ReceiptExtractionResult | null
+  extracted: ExtractedDocument | null
 ): Promise<CandidateTransaction[]> {
-  const anchors = getReceiptMatchAnchors(extracted)
+  const anchors = getMatchAnchors(extracted)
   if (!anchors) return []
 
-  const receiptDate = new Date(anchors.date)
-  if (isNaN(receiptDate.getTime())) return []
+  const anchorDate = new Date(anchors.date)
+  if (isNaN(anchorDate.getTime())) return []
 
-  const windowStart = new Date(receiptDate)
-  windowStart.setUTCDate(windowStart.getUTCDate() - DATE_WINDOW_DAYS)
-  const windowEnd = new Date(receiptDate)
-  windowEnd.setUTCDate(windowEnd.getUTCDate() + DATE_WINDOW_DAYS)
+  const windowStart = new Date(anchorDate)
+  windowStart.setUTCDate(windowStart.getUTCDate() - anchors.windowDaysBefore)
+  const windowEnd = new Date(anchorDate)
+  windowEnd.setUTCDate(windowEnd.getUTCDate() + anchors.windowDaysAfter)
 
   // Exclude transactions already claimed by any other inbox item in this
   // company. The partial unique index on (company_id, matched_transaction_id)
@@ -99,14 +144,14 @@ export async function fetchCandidateTransactions(
     : data
   if (filtered.length === 0) return []
 
-  // Rank candidates by amount proximity. For SEK receipts we compare directly,
-  // for other currencies we prefer amount_sek if the receipt amount has been converted.
-  const receiptAbs = Math.abs(anchors.amount)
+  // Rank candidates by amount proximity. For SEK documents we compare directly,
+  // for other currencies we prefer amount_sek if the document amount has been converted.
+  const anchorAbs = Math.abs(anchors.amount)
   const scored = filtered.map((tx) => {
     const txAmount = Math.abs(Number(tx.amount) || 0)
     const txSek = tx.amount_sek == null ? null : Math.abs(Number(tx.amount_sek))
-    const primaryDiff = Math.abs(txAmount - receiptAbs)
-    const sekDiff = txSek == null ? Infinity : Math.abs(txSek - receiptAbs)
+    const primaryDiff = Math.abs(txAmount - anchorAbs)
+    const sekDiff = txSek == null ? Infinity : Math.abs(txSek - anchorAbs)
     const bestDiff = Math.min(primaryDiff, sekDiff)
     return { tx, diff: bestDiff }
   })

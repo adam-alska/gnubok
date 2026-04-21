@@ -540,6 +540,11 @@ export async function importVouchers(
     series: string
     date: string
     description: string
+    // Original series/number as written in the source SIE file. NULL for SIE4I
+    // subsystem imports where series/verno are optional. Stored per-entry for
+    // traceability alongside the aggregate sie_imports.migration_documentation.
+    sourceSeries: string | null
+    sourceNumber: number | null
     lines: { account_number: string; debit_amount: number; credit_amount: number; line_description: string | null }[]
   }
 
@@ -673,11 +678,16 @@ export async function importVouchers(
       ? voucher.series.trim()
       : defaultSeries
 
+    const rawSourceSeries = voucher.series && voucher.series.trim() ? voucher.series.trim() : null
+    const rawSourceNumber = Number.isFinite(voucher.number) ? voucher.number : null
+
     preparedVouchers.push({
       sourceId: voucherId,
       series: resolvedSeries,
       date: formatDate(voucher.date),
       description: voucher.description || `Import: ${voucher.series}${voucher.number}`,
+      sourceSeries: rawSourceSeries,
+      sourceNumber: rawSourceNumber,
       lines,
     })
   }
@@ -775,6 +785,8 @@ export async function importVouchers(
       entry_date: v.date,
       description: v.description,
       source_type: 'import',
+      source_voucher_series: v.sourceSeries,
+      source_voucher_number: v.sourceNumber,
       status: 'posted',
       committed_at: new Date().toISOString(),
     }))

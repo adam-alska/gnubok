@@ -30,8 +30,11 @@ export const inboxSmartMatchExtension: Extension = {
     {
       eventType: 'inbox_item.classified',
       handler: async (payload: EventPayload<'inbox_item.classified'>) => {
-        // Only act on receipts for v1
-        if (payload.documentType !== 'receipt') return
+        // Match both receipts and supplier invoices — other document types
+        // (government letters, unknown) have nothing to match against.
+        if (payload.documentType !== 'receipt' && payload.documentType !== 'supplier_invoice') {
+          return
+        }
 
         const supabase = getServiceSupabase()
 
@@ -64,14 +67,14 @@ export const inboxSmartMatchExtension: Extension = {
 
         const supabase = getServiceSupabase()
 
-        // Find receipts in pending state for this company.
-        // Cap at 10 per sync so one big bank import doesn't time out the
-        // handler; leftover pending items pick up on the next sync.
+        // Find pending receipts/invoices for this company. Cap at 10 per sync
+        // so one big bank import doesn't time out the handler; leftover pending
+        // items pick up on the next sync.
         const { data: pendingItems, error } = await supabase
           .from('invoice_inbox_items')
           .select('*')
           .eq('company_id', payload.companyId)
-          .eq('document_type', 'receipt')
+          .in('document_type', ['receipt', 'supplier_invoice'])
           .eq('status', 'ready')
           .eq('match_method', 'pending_transaction')
           .order('created_at', { ascending: false })
