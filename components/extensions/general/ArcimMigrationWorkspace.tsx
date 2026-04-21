@@ -1702,10 +1702,13 @@ export default function ArcimMigrationWorkspace(_props: WorkspaceComponentProps)
       await loadPreview(callbackConsentId)
     } else if (migrationStatus === 'error') {
       const callbackProvider = url.searchParams.get('provider') as ArcimProvider | null
+      const reason = url.searchParams.get('reason') || 'OAuth-anslutningen misslyckades. Försök igen.'
       url.searchParams.delete('migration')
       url.searchParams.delete('provider')
+      url.searchParams.delete('reason')
       window.history.replaceState({}, '', url.pathname)
-      setError('OAuth-anslutningen misslyckades. Försök igen.')
+      setError(reason)
+      toast({ title: 'Anslutning misslyckades', description: reason, variant: 'destructive' })
       if (callbackProvider) {
         setSelectedProvider(callbackProvider)
         setStep('connect')
@@ -1713,7 +1716,7 @@ export default function ArcimMigrationWorkspace(_props: WorkspaceComponentProps)
         setStep('provider')
       }
     }
-  }, [loadPreview])
+  }, [loadPreview, toast])
 
   // Check for OAuth callback on mount (fallback for non-popup flow)
   useEffect(() => {
@@ -1728,12 +1731,16 @@ export default function ArcimMigrationWorkspace(_props: WorkspaceComponentProps)
       if (event.data?.type === 'arcim-oauth-success' && event.data.consentId) {
         loadPreview(event.data.consentId)
       } else if (event.data?.type === 'arcim-oauth-error') {
-        setError('OAuth-anslutningen misslyckades. Försök igen.')
+        const reason = typeof event.data.reason === 'string' && event.data.reason
+          ? event.data.reason
+          : 'OAuth-anslutningen misslyckades. Försök igen.'
+        setError(reason)
+        toast({ title: 'Anslutning misslyckades', description: reason, variant: 'destructive' })
       }
     }
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [loadPreview])
+  }, [loadPreview, toast])
 
   // Load SIE data when entering mapping step
   const loadSIEData = useCallback(async () => {

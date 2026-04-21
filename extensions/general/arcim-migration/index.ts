@@ -314,9 +314,64 @@ export const arcimMigrationExtension: Extension = {
         const url = new URL(request.url)
         const code = url.searchParams.get('code')
         const stateRaw = url.searchParams.get('state')
+        const oauthError = url.searchParams.get('error')
+        const oauthErrorDescription = url.searchParams.get('error_description')
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+
+        // JSON-encode for safe embedding inside <script>. Escapes quotes/unicode
+        // and `</` so the value can't break out of the script tag.
+        const jsLiteral = (value: unknown) =>
+          JSON.stringify(value ?? '').replace(/</g, '\\u003c')
+
+        const respondWithError = (reason: string) => {
+          const fallbackUrl = new URL(`${appUrl}/import`)
+          fallbackUrl.searchParams.set('migration', 'error')
+          fallbackUrl.searchParams.set('reason', reason)
+
+          const escapedReason = reason
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+
+          const html = `<!DOCTYPE html><html><body><script>
+            if (window.opener) {
+              window.opener.postMessage({ type: 'arcim-oauth-error', reason: ${jsLiteral(reason)} }, ${jsLiteral(appUrl)});
+              window.close();
+            } else {
+              window.location.href = ${jsLiteral(fallbackUrl.toString())};
+            }
+          </script><p>Anslutningen misslyckades: ${escapedReason}</p></body></html>`
+
+          return new Response(html, {
+            status: 200,
+            headers: { 'Content-Type': 'text/html' },
+          })
+        }
+
+        // Provider returned an OAuth error (user cancelled, missing API
+        // subscription on the Fortnox side, invalid scope, etc.)
+        if (oauthError) {
+          log.error('OAuth callback returned provider error', {
+            error: oauthError,
+            errorDescription: oauthErrorDescription,
+            hasCode: !!code,
+            hasState: !!stateRaw,
+          })
+          const reason = oauthErrorDescription
+            ? `${oauthError}: ${oauthErrorDescription}`
+            : oauthError === 'access_denied'
+              ? 'Anslutningen avbröts hos leverantören.'
+              : oauthError
+          return respondWithError(reason)
+        }
 
         if (!code || !stateRaw) {
-          return NextResponse.json({ error: 'Missing code or state' }, { status: 400 })
+          log.error('OAuth callback missing code or state', {
+            hasCode: !!code,
+            hasState: !!stateRaw,
+            queryKeys: Array.from(url.searchParams.keys()),
+          })
+          return respondWithError('Återanropet saknade code eller state. Försök igen.')
         }
 
         try {
@@ -343,22 +398,26 @@ export const arcimMigrationExtension: Extension = {
           }
 
           if (!consentId || !provider) {
-            return NextResponse.json({ error: 'No active migration session' }, { status: 400 })
+            log.error('OAuth callback could not resolve consent or provider', {
+              hasConsentId: !!consentId,
+              hasProvider: !!provider,
+            })
+            return respondWithError('Ingen aktiv migrationssession hittades. Starta om anslutningen.')
           }
 
-          const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
           const redirectUri = `${appUrl}/api/extensions/ext/arcim-migration/callback`
 
           // Exchange OAuth code directly with the provider
           await exchangeAuthToken(consentId, provider, code, redirectUri)
 
           // Return an HTML page that notifies the opener tab and closes itself
+          const successUrl = `${appUrl}/import?migration=connected&consentId=${encodeURIComponent(consentId)}`
           const html = `<!DOCTYPE html><html><body><script>
             if (window.opener) {
-              window.opener.postMessage({ type: 'arcim-oauth-success', consentId: '${consentId}' }, '${appUrl}');
+              window.opener.postMessage({ type: 'arcim-oauth-success', consentId: ${jsLiteral(consentId)} }, ${jsLiteral(appUrl)});
               window.close();
             } else {
-              window.location.href = '${appUrl}/import?migration=connected&consentId=${consentId}';
+              window.location.href = ${jsLiteral(successUrl)};
             }
           </script><p>Anslutningen lyckades. Du kan stänga denna flik.</p></body></html>`
 
@@ -367,22 +426,9 @@ export const arcimMigrationExtension: Extension = {
             headers: { 'Content-Type': 'text/html' },
           })
         } catch (error) {
-          log.error('OAuth callback error:', error)
-          const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
-
-          const html = `<!DOCTYPE html><html><body><script>
-            if (window.opener) {
-              window.opener.postMessage({ type: 'arcim-oauth-error' }, '${appUrl}');
-              window.close();
-            } else {
-              window.location.href = '${appUrl}/import?migration=error';
-            }
-          </script><p>Något gick fel. Du kan stänga denna flik.</p></body></html>`
-
-          return new Response(html, {
-            status: 200,
-            headers: { 'Content-Type': 'text/html' },
-          })
+          log.error('OAuth callback exchange failed', error)
+          const reason = error instanceof Error ? error.message : 'Okänt fel vid tokenutbyte.'
+          return respondWithError(reason)
         }
       },
     },
