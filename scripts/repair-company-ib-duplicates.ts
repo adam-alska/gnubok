@@ -201,6 +201,7 @@ async function listSieOriginEntries(periodIds: string[]): Promise<{ id: string; 
     .eq('company_id', COMPANY_ID!)
     .in('fiscal_period_id', periodIds)
     .eq('status', 'posted')
+    .in('source_type', ['import', 'opening_balance'])
 
   if (error) throw new Error(`Failed to list SIE-origin entries: ${error.message}`)
   return (data as { id: string; voucher_number: number | null; entry_date: string }[]) ?? []

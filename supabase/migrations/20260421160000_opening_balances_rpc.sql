@@ -34,6 +34,12 @@ STABLE
 SECURITY INVOKER
 SET search_path = public
 AS $$
+  -- Dedup is per-account, not per-entry. If the same account appears in multiple
+  -- IB entries (duplicate opening balances from multi-year imports), we keep only
+  -- the earliest line for that account. Accounts that appear only in a later IB
+  -- (e.g. a new account introduced in year N with no prior-year IB) are still
+  -- included — they represent a genuine pre-system starting balance for that
+  -- account, not a duplicate.
   WITH ib_lines_ranked AS (
     SELECT
       jel.account_number,
