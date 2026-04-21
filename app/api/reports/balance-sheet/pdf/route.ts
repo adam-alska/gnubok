@@ -96,7 +96,9 @@ export async function GET(request: Request) {
       })
     )
 
-    const filename = `balansrakning-${report.period.start}.pdf`
+    // "-utkast" suffix keeps the draft status visible even after the file
+    // leaves the browser — complements the in-document ÅRL 2:7 disclaimer.
+    const filename = `balansrakning-${report.period.start}-utkast.pdf`
 
     return new Response(new Uint8Array(pdfBuffer), {
       headers: {

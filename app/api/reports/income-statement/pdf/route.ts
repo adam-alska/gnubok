@@ -7,12 +7,21 @@ import { requireCompanyId } from '@/lib/company/context'
 import type { CompanySettings } from '@/types'
 
 // K2/K3 uppställningsform (ÅRL bilaga 2, kostnadsslagsindelad) splits class 8
-// into three blocks that must be rendered separately with named subtotals:
+// into three named blocks with subtotals:
 //   80–84 → Finansiella poster (followed by "Resultat efter finansiella poster")
 //   88   → Bokslutsdispositioner
 //   89   → Skatt på årets resultat
 // The generator lumps these together under financial_sections, so we split
 // here by the first row's account prefix.
+const FINANSIELLA_POSTER_PREFIXES = ['80', '81', '82', '83', '84']
+const BOKSLUTSDISPOSITIONER_PREFIXES = ['88']
+const SKATT_PREFIXES = ['89']
+const KNOWN_CLASS_8_PREFIXES = [
+  ...FINANSIELLA_POSTER_PREFIXES,
+  ...BOKSLUTSDISPOSITIONER_PREFIXES,
+  ...SKATT_PREFIXES,
+]
+
 function sectionPrefix(section: FinancialStatementSection, prefixes: string[]): boolean {
   if (section.rows.length === 0) return false
   const acc = section.rows[0].account_number
@@ -68,15 +77,21 @@ export async function GET(request: Request) {
 
     const operatingResult = Math.round((report.total_revenue - report.total_expenses) * 100) / 100
 
-    // Split class 8 into its three K2/K3 blocks.
+    // Split class 8 into its three K2/K3 blocks plus a catch-all for any
+    // prefix the generator emits but we haven't explicitly mapped. If a future
+    // generator change adds sections for 85/86/87 or similar, this keeps them
+    // visible and arithmetically accounted for rather than silently dropped.
     const finansiellaPosterSections = report.financial_sections.filter((s) =>
-      sectionPrefix(s, ['80', '81', '82', '83', '84']),
+      sectionPrefix(s, FINANSIELLA_POSTER_PREFIXES),
     )
     const bokslutsdispositionerSections = report.financial_sections.filter((s) =>
-      sectionPrefix(s, ['88']),
+      sectionPrefix(s, BOKSLUTSDISPOSITIONER_PREFIXES),
     )
     const skattSections = report.financial_sections.filter((s) =>
-      sectionPrefix(s, ['89']),
+      sectionPrefix(s, SKATT_PREFIXES),
+    )
+    const ovrigaFinansiellaPosterSections = report.financial_sections.filter(
+      (s) => !sectionPrefix(s, KNOWN_CLASS_8_PREFIXES),
     )
 
     const totalFinansiellaPoster = Math.round(
@@ -88,8 +103,13 @@ export async function GET(request: Request) {
     const totalSkatt = Math.round(
       skattSections.reduce((sum, s) => sum + s.subtotal, 0) * 100,
     ) / 100
+    const totalOvrigaFinansiellaPoster = Math.round(
+      ovrigaFinansiellaPosterSections.reduce((sum, s) => sum + s.subtotal, 0) * 100,
+    ) / 100
+    // Catch-all is treated as part of "finansiella poster" for the subtotal —
+    // 85-87 accounts in BAS are financial-adjacent (not tax, not bokslut).
     const resultatEfterFinansiellaPoster = Math.round(
-      (operatingResult + totalFinansiellaPoster) * 100,
+      (operatingResult + totalFinansiellaPoster + totalOvrigaFinansiellaPoster) * 100,
     ) / 100
 
     const groups: FinancialStatementGroup[] = [
@@ -114,6 +134,14 @@ export async function GET(request: Request) {
         sections: finansiellaPosterSections,
         totalLabel: 'Summa finansiella poster',
         total: totalFinansiellaPoster,
+      })
+    }
+    if (ovrigaFinansiellaPosterSections.length > 0) {
+      groups.push({
+        heading: 'Övriga finansiella poster',
+        sections: ovrigaFinansiellaPosterSections,
+        totalLabel: 'Summa övriga finansiella poster',
+        total: totalOvrigaFinansiellaPoster,
       })
     }
     if (bokslutsdispositionerSections.length > 0) {
@@ -142,7 +170,10 @@ export async function GET(request: Request) {
     const summary: FinancialStatementSummaryRow[] = [
       { label: 'Rörelseresultat', amount: operatingResult },
     ]
-    if (finansiellaPosterSections.length > 0) {
+    if (
+      finansiellaPosterSections.length > 0 ||
+      ovrigaFinansiellaPosterSections.length > 0
+    ) {
       summary.push({
         label: 'Resultat efter finansiella poster',
         amount: resultatEfterFinansiellaPoster,
@@ -165,7 +196,9 @@ export async function GET(request: Request) {
       })
     )
 
-    const filename = `resultatrakning-${report.period.start}.pdf`
+    // "-utkast" suffix keeps the draft status visible even after the file
+    // leaves the browser — complements the in-document ÅRL 2:7 disclaimer.
+    const filename = `resultatrakning-${report.period.start}-utkast.pdf`
 
     return new Response(new Uint8Array(pdfBuffer), {
       headers: {
