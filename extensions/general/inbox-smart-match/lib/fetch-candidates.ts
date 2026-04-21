@@ -1,19 +1,20 @@
 /**
  * Candidate transaction fetcher — deterministic narrowing before the LLM call.
  *
- * Pulls unbooked expense transactions within ±7 days of the document date,
+ * Pulls unbooked expense transactions near the document's payment date,
  * ordered by how close their amount is to the document total. Limits to top 5
  * so the LLM has a focused candidate set and the token cost stays bounded.
  *
- * Works for both `ReceiptExtractionResult` and `InvoiceExtractionResult` — the
- * match anchors (date, amount, currency, counterparty name) are structurally
- * identical even if the field names differ.
+ * Anchor date selection:
+ *   - Receipts: receipt date ±7 days (paid on the spot)
+ *   - Invoices with dueDate: dueDate ±14 days (covers early and late payments)
+ *   - Invoices without dueDate: invoiceDate, window shifted forward to cover
+ *     standard 30-day terms (invoiceDate-7 .. invoiceDate+45)
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { InvoiceExtractionResult, ReceiptExtractionResult } from '@/types'
 
-const DATE_WINDOW_DAYS = 7
 const MAX_CANDIDATES = 5
 
 export interface CandidateTransaction {
@@ -33,6 +34,8 @@ export interface MatchAnchors {
   amount: number
   currency: string
   counterpartyName: string | null
+  windowDaysBefore: number
+  windowDaysAfter: number
 }
 
 function isInvoiceExtraction(e: ExtractedDocument): e is InvoiceExtractionResult {
@@ -49,20 +52,34 @@ export function getMatchAnchors(extracted: ExtractedDocument | null): MatchAncho
   let date: string | null
   let currency: string
   let counterpartyName: string | null
+  let windowDaysBefore: number
+  let windowDaysAfter: number
 
   if (isInvoiceExtraction(extracted)) {
-    date = extracted.invoice?.invoiceDate ?? null
+    const dueDate = extracted.invoice?.dueDate ?? null
+    const invoiceDate = extracted.invoice?.invoiceDate ?? null
+    if (dueDate) {
+      date = dueDate
+      windowDaysBefore = 14
+      windowDaysAfter = 14
+    } else {
+      date = invoiceDate
+      windowDaysBefore = 7
+      windowDaysAfter = 45
+    }
     currency = extracted.invoice?.currency ?? 'SEK'
     counterpartyName = extracted.supplier?.name ?? null
   } else {
     date = extracted.receipt?.date ?? null
     currency = extracted.receipt?.currency ?? 'SEK'
     counterpartyName = extracted.merchant?.name ?? null
+    windowDaysBefore = 7
+    windowDaysAfter = 7
   }
 
   const amount = extracted.totals?.total ?? null
   if (!date || amount == null || amount <= 0) return null
-  return { date, amount, currency, counterpartyName }
+  return { date, amount, currency, counterpartyName, windowDaysBefore, windowDaysAfter }
 }
 
 /**
@@ -81,9 +98,9 @@ export async function fetchCandidateTransactions(
   if (isNaN(anchorDate.getTime())) return []
 
   const windowStart = new Date(anchorDate)
-  windowStart.setUTCDate(windowStart.getUTCDate() - DATE_WINDOW_DAYS)
+  windowStart.setUTCDate(windowStart.getUTCDate() - anchors.windowDaysBefore)
   const windowEnd = new Date(anchorDate)
-  windowEnd.setUTCDate(windowEnd.getUTCDate() + DATE_WINDOW_DAYS)
+  windowEnd.setUTCDate(windowEnd.getUTCDate() + anchors.windowDaysAfter)
 
   // Exclude transactions already claimed by any other inbox item in this
   // company. The partial unique index on (company_id, matched_transaction_id)
