@@ -15,6 +15,7 @@ import { JournalEntryReviewContent } from '@/components/bookkeeping/JournalEntry
 import { proposeSendLines } from '@/lib/bookkeeping/propose-send-lines'
 import { formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { useCompany } from '@/contexts/CompanyContext'
 import { Loader2, Mail, Send } from 'lucide-react'
 import type { Invoice, InvoiceItem, Customer, EntityType } from '@/types'
 
@@ -41,6 +42,7 @@ export default function SendInvoiceDialog({
 }: SendInvoiceDialogProps) {
   const { toast } = useToast()
   const supabase = createClient()
+  const { company } = useCompany()
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [accountingMethod, setAccountingMethod] = useState<'accrual' | 'cash'>('accrual')
@@ -58,11 +60,14 @@ export default function SendInvoiceDialog({
 
     async function init() {
       try {
+        if (!company?.id) throw new Error('Inget aktivt företag')
+
         // Fetch company settings
         const { data: settings, error } = await supabase
           .from('company_settings')
           .select('accounting_method, entity_type')
-          .single()
+          .eq('company_id', company.id)
+          .maybeSingle()
 
         if (error) throw new Error('Kunde inte ladda företagsinställningar')
         if (cancelled) return
@@ -71,9 +76,10 @@ export default function SendInvoiceDialog({
         const { data: period } = await supabase
           .from('fiscal_periods')
           .select('name')
+          .eq('company_id', company.id)
           .lte('start_date', invoice.invoice_date)
           .gte('end_date', invoice.invoice_date)
-          .single()
+          .maybeSingle()
 
         if (cancelled) return
 
@@ -94,7 +100,7 @@ export default function SendInvoiceDialog({
 
     init()
     return () => { cancelled = true }
-  }, [open, invoice.id, invoice.invoice_date])
+  }, [open, invoice.id, invoice.invoice_date, company?.id])
 
   const proposedLines = useMemo(() => {
     if (!isInitialized || accountingMethod !== 'accrual') return []

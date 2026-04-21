@@ -18,6 +18,7 @@ import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
 import { proposePaymentLines } from '@/lib/bookkeeping/propose-payment-lines'
 import { formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { useCompany } from '@/contexts/CompanyContext'
 import { Plus, Trash2, Loader2 } from 'lucide-react'
 import type { FormLine } from '@/components/bookkeeping/JournalEntryForm'
 import type { Invoice, InvoiceItem, Customer, BASAccount, EntityType } from '@/types'
@@ -44,6 +45,7 @@ export default function PaymentBookingDialog({
 }: PaymentBookingDialogProps) {
   const { toast } = useToast()
   const supabase = createClient()
+  const { company } = useCompany()
 
   const [accounts, setAccounts] = useState<BASAccount[]>([])
   const [lines, setLines] = useState<FormLine[]>([])
@@ -68,11 +70,14 @@ export default function PaymentBookingDialog({
         const accountsData = await accountsRes.json()
         const fetchedAccounts: BASAccount[] = accountsData.data || []
 
+        if (!company?.id) throw new Error('Inget aktivt företag')
+
         // Fetch company settings
         const { data: settings, error: settingsError } = await supabase
           .from('company_settings')
           .select('accounting_method, entity_type')
-          .single()
+          .eq('company_id', company.id)
+          .maybeSingle()
 
         if (settingsError) throw new Error('Kunde inte ladda företagsinställningar')
         if (cancelled) return
@@ -116,7 +121,7 @@ export default function PaymentBookingDialog({
 
     init()
     return () => { cancelled = true }
-  }, [open, invoice.id])
+  }, [open, invoice.id, company?.id])
 
   // Balance computation
   const { totalDebit, totalCredit, isBalanced } = useMemo(() => {
