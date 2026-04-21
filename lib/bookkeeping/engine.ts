@@ -285,6 +285,10 @@ export async function commitEntry(
  * Convenience wrapper: creates draft + commits in one step.
  * The voucher number is only assigned after lines are successfully inserted,
  * preventing gaps in the voucher sequence (BFL 5 kap. 7§).
+ *
+ * If commitEntry fails (e.g. balance trigger rejection, period lock, RPC error),
+ * the orphan draft is cancelled so callers don't leave an undeletable stuck draft.
+ * The commit RPC is atomic — no voucher number is burned on failure.
  */
 export async function createJournalEntry(
   supabase: SupabaseClient,
@@ -295,7 +299,23 @@ export async function createJournalEntry(
   rubricVersion?: string
 ): Promise<JournalEntry> {
   const draft = await createDraftEntry(supabase, companyId, userId, input)
-  return commitEntry(supabase, companyId, userId, draft.id, commitMethod, rubricVersion)
+  try {
+    return await commitEntry(supabase, companyId, userId, draft.id, commitMethod, rubricVersion)
+  } catch (commitError) {
+    // CAS guard: only cancel if still in draft. If the RPC actually posted
+    // before failing downstream, immutability trigger blocks draft→cancelled
+    // on a posted row anyway — the filter just avoids firing the trigger.
+    try {
+      await supabase
+        .from('journal_entries')
+        .update({ status: 'cancelled' })
+        .eq('id', draft.id)
+        .eq('status', 'draft')
+    } catch {
+      // Swallow rollback failure — surface the original commit error
+    }
+    throw commitError
+  }
 }
 
 /**
