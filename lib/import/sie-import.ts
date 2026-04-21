@@ -460,6 +460,36 @@ async function createOpeningBalanceEntry(
 }
 
 /**
+ * Returns true when the company already has at least one posted (or reversed)
+ * non-IB journal entry — i.e. this is a continuation import, not the first
+ * ever SIE upload for the company.
+ *
+ * Used to gate IB-entry creation: when a company is already live, each year's
+ * #IB equals the prior year's UB, which is the sum of already-imported
+ * journal lines. Creating a new IB entry would double-count one year's
+ * movements against every balance-sheet account.
+ */
+export async function companyHasPriorActivity(
+  supabase: SupabaseClient,
+  companyId: string
+): Promise<boolean> {
+  // Only count currently-effective real activity. Excluding 'reversed' drops
+  // cancelled originals; excluding source_type 'storno' drops their matching
+  // reversal entries so a fully-cancelled pair contributes nothing. Without
+  // this, repair scripts that storno duplicate IB entries would leave storno
+  // artifacts that trip the guard on a freshly-repaired company.
+  const { count } = await supabase
+    .from('journal_entries')
+    .select('id', { count: 'exact', head: true })
+    .eq('company_id', companyId)
+    .neq('source_type', 'opening_balance')
+    .neq('source_type', 'storno')
+    .eq('status', 'posted')
+
+  return (count ?? 0) > 0
+}
+
+/**
  * Link an opening-balance journal entry to its fiscal period so balance-sheet
  * reports use the explicit IB path in getOpeningBalances() (reads only that
  * entry's lines for IB) instead of falling through to summing all prior
@@ -1621,6 +1651,24 @@ export async function executeSIEImport(
       if (period?.opening_balances_set || period?.opening_balance_entry_id) {
         result.warnings.push('Ingående balanser finns redan för denna period — hoppar över IB-import')
       } else {
+        // Continuation-import guard: if the company already has any posted
+        // non-IB journal entries from a prior import or manual bookkeeping,
+        // do NOT create a new IB entry. Each year's #IB equals the prior
+        // year's UB, which is already the sum of the prior year's posted
+        // transactions — so importing another IB entry double-counts one
+        // year of activity against every balance-sheet account. The
+        // first-ever import creates the legitimate pre-system IB; subsequent
+        // imports must rely on the prior entries to derive opening balances
+        // on the fly (via getOpeningBalances() fallback).
+        const isContinuationImport = await companyHasPriorActivity(supabase, companyId)
+
+        if (isContinuationImport) {
+          result.warnings.push(
+            'Ingående balanser hoppades över eftersom bolaget redan har bokförda verifikationer. ' +
+            'Ingående balans för denna period härleds från föregående periods utgående balans. ' +
+            'Stäm av mot SIE-filens #IB om du är osäker.'
+          )
+        } else {
         const ibValidation = validateIBBalance(parsed, accountMap)
 
         if (ibValidation.lines.length > 0) {
@@ -1675,6 +1723,7 @@ export async function executeSIEImport(
               result.openingBalanceEntryId
             )
           }
+        }
         }
       }
     }

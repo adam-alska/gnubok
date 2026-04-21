@@ -132,6 +132,19 @@ export async function POST(request: Request) {
     )
   }
 
+  // Resolve previous_period_id for forward chaining so the new period is
+  // linked to the period it follows. Without this, balance-sheet/trial-balance
+  // reports fall back to scanning every prior journal line (BFNAR 2013:2
+  // continuity chain is broken). Backward chaining sets previous_period_id
+  // on the old earliest period instead (see below), not on the new one.
+  let previousPeriodId: string | null = null
+  if (allPeriods && allPeriods.length > 0) {
+    const latest = allPeriods[allPeriods.length - 1]
+    if (body.period_start > latest.period_end) {
+      previousPeriodId = latest.id
+    }
+  }
+
   const { data, error } = await supabase
     .from('fiscal_periods')
     .insert({
@@ -140,6 +153,7 @@ export async function POST(request: Request) {
       name: body.name,
       period_start: body.period_start,
       period_end: body.period_end,
+      previous_period_id: previousPeriodId,
     })
     .select()
     .single()

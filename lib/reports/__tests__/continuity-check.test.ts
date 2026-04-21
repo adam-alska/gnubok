@@ -23,8 +23,14 @@ function makeBuilder(tableName: string) {
 }
 
 function makeClient() {
+  const rpc = vi.fn().mockImplementation(async (fn: string) => {
+    const queue = mockResults[`rpc:${fn}`]
+    if (!queue || queue.length === 0) return { data: [], error: null }
+    return queue.shift()!
+  })
   return {
     from: vi.fn().mockImplementation((table: string) => makeBuilder(table)),
+    rpc,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any
 }
@@ -66,9 +72,7 @@ describe('validateBalanceContinuity', () => {
         { data: { period_start: '2024-01-01', opening_balance_entry_id: null } },
       ],
       journal_entry_lines: [
-        // Previous period OB (fallback — no OB entry)
-        { data: [] },
-        // Previous period lines (trial balance)
+        // Previous period lines (trial balance — prior OB comes from RPC, defaults empty)
         {
           data: [
             { account_number: '1930', debit_amount: 50000, credit_amount: 0 },
@@ -113,7 +117,6 @@ describe('validateBalanceContinuity', () => {
         { data: { period_start: '2024-01-01', opening_balance_entry_id: null } },
       ],
       journal_entry_lines: [
-        { data: [] },
         // Previous UB: 1930 = 50000 debit
         {
           data: [
@@ -157,7 +160,6 @@ describe('validateBalanceContinuity', () => {
         { data: { period_start: '2024-01-01', opening_balance_entry_id: null } },
       ],
       journal_entry_lines: [
-        { data: [] },
         // Previous UB has 1510 and 2440
         {
           data: [
@@ -199,7 +201,6 @@ describe('validateBalanceContinuity', () => {
         { data: { period_start: '2024-01-01', opening_balance_entry_id: null } },
       ],
       journal_entry_lines: [
-        { data: [] },
         // Previous UB: only 1930
         {
           data: [
@@ -240,7 +241,6 @@ describe('validateBalanceContinuity', () => {
         { data: { period_start: '2024-01-01', opening_balance_entry_id: null } },
       ],
       journal_entry_lines: [
-        { data: [] },
         {
           data: [
             { account_number: '1930', debit_amount: 50000.005, credit_amount: 0 },
