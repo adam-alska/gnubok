@@ -62,5 +62,10 @@ export function validatePeriodDuration(start: string, end: string, options?: Val
     return `Period duration ${months} months exceeds maximum 18 months (BFL 3 kap.)`
   }
 
+  // First fiscal period must be at least 6 months per BFL 3 kap.
+  if (options?.isFirstPeriod && months < 6) {
+    return `First fiscal period must be at least 6 months (BFL 3 kap.)`
+  }
+
   return null
 }

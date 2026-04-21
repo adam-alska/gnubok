@@ -64,12 +64,12 @@ describe('validatePeriodDuration', () => {
     expect(validatePeriodDuration('2025-03-25', '2025-12-31', { isFirstPeriod: true })).toBeNull()
   })
 
-  it('allows mid-month start for first period (October)', () => {
-    expect(validatePeriodDuration('2025-10-15', '2025-12-31', { isFirstPeriod: true })).toBeNull()
+  it('allows mid-month start for first period (July)', () => {
+    expect(validatePeriodDuration('2025-07-15', '2025-12-31', { isFirstPeriod: true })).toBeNull()
   })
 
-  it('still allows day-1 start for first period', () => {
-    expect(validatePeriodDuration('2025-10-01', '2025-12-31', { isFirstPeriod: true })).toBeNull()
+  it('still allows day-1 start for first period (6 months)', () => {
+    expect(validatePeriodDuration('2025-07-01', '2025-12-31', { isFirstPeriod: true })).toBeNull()
   })
 
   it('enforces end-of-month even for first period', () => {
@@ -82,6 +82,26 @@ describe('validatePeriodDuration', () => {
     const result = validatePeriodDuration('2025-01-15', '2026-12-31', { isFirstPeriod: true })
     expect(result).toContain('months')
     expect(result).toContain('18 months')
+  })
+
+  it('enforces 6-month minimum for first period (2 months)', () => {
+    expect(validatePeriodDuration('2026-03-25', '2026-05-31', { isFirstPeriod: true })).toBe(
+      'First fiscal period must be at least 6 months (BFL 3 kap.)'
+    )
+  })
+
+  it('enforces 6-month minimum for first period (5 months)', () => {
+    expect(validatePeriodDuration('2026-08-01', '2026-12-31', { isFirstPeriod: true })).toBe(
+      'First fiscal period must be at least 6 months (BFL 3 kap.)'
+    )
+  })
+
+  it('allows exactly 6 months for first period', () => {
+    expect(validatePeriodDuration('2026-07-01', '2026-12-31', { isFirstPeriod: true })).toBeNull()
+  })
+
+  it('realistic customer case: 2026-03-25 to 2027-02-28', () => {
+    expect(validatePeriodDuration('2026-03-25', '2027-02-28', { isFirstPeriod: true })).toBeNull()
   })
 
   it('returns error when end is not last day of month', () => {
