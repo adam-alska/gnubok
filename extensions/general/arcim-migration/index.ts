@@ -31,6 +31,29 @@ const ALLOWED_FISCAL_YEARS = new Set([2024, 2025, 2026])
 const fortnoxClient = new FortnoxClient()
 
 /**
+ * Map known OAuth error codes from providers (Fortnox, Visma) to actionable
+ * Swedish guidance. Falls back to the raw provider message so we never hide
+ * unknown errors from the user.
+ */
+function translateOAuthError(error: string, description: string | null): string {
+  const haystack = `${error} ${description ?? ''}`.toLowerCase()
+
+  if (haystack.includes('missing license') || haystack.includes('not have enough licenses')) {
+    return 'Du behöver aktivera tilläggstjänsten "Fortnox Integration" (~149 kr/mån) på ditt Fortnox-konto innan du kan ansluta. Aktivera den under Inställningar → Tilläggstjänster i Fortnox och försök igen.'
+  }
+
+  if (error === 'access_denied') {
+    return 'Du avbröt anslutningen i leverantörens inloggning. Försök igen om du vill koppla kontot.'
+  }
+
+  if (error === 'invalid_scope') {
+    return 'Tredjepartsappen har inte rätt behörigheter för ditt konto. Kontakta supporten.'
+  }
+
+  return description ? `${error}: ${description}` : error
+}
+
+/**
  * Provider Migration extension
  *
  * Migrates bookkeeping data from external Swedish accounting systems
@@ -357,12 +380,7 @@ export const arcimMigrationExtension: Extension = {
             hasCode: !!code,
             hasState: !!stateRaw,
           })
-          const reason = oauthErrorDescription
-            ? `${oauthError}: ${oauthErrorDescription}`
-            : oauthError === 'access_denied'
-              ? 'Anslutningen avbröts hos leverantören.'
-              : oauthError
-          return respondWithError(reason)
+          return respondWithError(translateOAuthError(oauthError, oauthErrorDescription))
         }
 
         if (!code || !stateRaw) {
