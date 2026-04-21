@@ -234,4 +234,114 @@ describe('POST /api/bookkeeping/fiscal-periods', () => {
     const res = await POST(req)
     expect(res.status).toBe(400)
   })
+
+  it('sets previous_period_id when chaining forward', async () => {
+    // Build a mock that captures the insert payload.
+    const insertSpy = vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({
+          data: { id: 'new-period', name: 'FY 2026' },
+          error: null,
+        }),
+      }),
+    })
+
+    let fpCallIndex = 0
+    const supabase = {
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }) },
+      from: vi.fn().mockImplementation(() => {
+        fpCallIndex++
+        const callNum = fpCallIndex
+        return {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          select: vi.fn().mockImplementation((_sel: string, opts?: any) => {
+            if (opts?.count === 'exact') {
+              return { eq: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ count: 0 }) }) }
+            }
+            if (callNum === 1) {
+              return {
+                eq: vi.fn().mockReturnValue({
+                  order: vi.fn().mockResolvedValue({
+                    data: [{ id: 'prior-period-id', period_start: '2025-01-01', period_end: '2025-12-31', is_closed: true, closing_entry_id: null }],
+                    error: null,
+                  }),
+                }),
+              }
+            }
+            return {
+              eq: vi.fn().mockReturnValue({
+                lte: vi.fn().mockReturnValue({
+                  gte: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue({ data: [], error: null }) }),
+                }),
+              }),
+            }
+          }),
+          insert: insertSpy,
+          update: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }) }),
+        }
+      }),
+    }
+    ;(createClient as ReturnType<typeof vi.fn>).mockResolvedValue(supabase)
+
+    const req = createMockRequest({ name: 'FY 2026', period_start: '2026-01-01', period_end: '2026-12-31' })
+    const res = await POST(req)
+
+    expect(res.status).toBe(200)
+    expect(insertSpy).toHaveBeenCalledTimes(1)
+    const insertArg = insertSpy.mock.calls[0][0]
+    expect(insertArg.previous_period_id).toBe('prior-period-id')
+    expect(insertArg.period_start).toBe('2026-01-01')
+  })
+
+  it('does not set previous_period_id for the first period', async () => {
+    const insertSpy = vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({
+          data: { id: 'new-period', name: 'FY 2025' },
+          error: null,
+        }),
+      }),
+    })
+
+    let fpCallIndex = 0
+    const supabase = {
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }) },
+      from: vi.fn().mockImplementation(() => {
+        fpCallIndex++
+        const callNum = fpCallIndex
+        return {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          select: vi.fn().mockImplementation((_sel: string, opts?: any) => {
+            if (opts?.count === 'exact') {
+              return { eq: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ count: 0 }) }) }
+            }
+            if (callNum === 1) {
+              return {
+                eq: vi.fn().mockReturnValue({
+                  order: vi.fn().mockResolvedValue({ data: [], error: null }),
+                }),
+              }
+            }
+            return {
+              eq: vi.fn().mockReturnValue({
+                lte: vi.fn().mockReturnValue({
+                  gte: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue({ data: [], error: null }) }),
+                }),
+              }),
+            }
+          }),
+          insert: insertSpy,
+          update: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }) }),
+        }
+      }),
+    }
+    ;(createClient as ReturnType<typeof vi.fn>).mockResolvedValue(supabase)
+
+    const req = createMockRequest({ name: 'FY 2025', period_start: '2025-01-01', period_end: '2025-12-31' })
+    const res = await POST(req)
+
+    expect(res.status).toBe(200)
+    expect(insertSpy).toHaveBeenCalledTimes(1)
+    expect(insertSpy.mock.calls[0][0].previous_period_id).toBeNull()
+  })
 })

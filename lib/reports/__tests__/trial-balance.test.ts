@@ -25,8 +25,14 @@ function makeBuilder(tableName: string) {
 }
 
 function makeClient() {
+  const rpc = vi.fn().mockImplementation(async (fn: string) => {
+    const queue = mockResults[`rpc:${fn}`]
+    if (!queue || queue.length === 0) return { data: [], error: null }
+    return queue.shift()!
+  })
   return {
     from: vi.fn().mockImplementation((table: string) => makeBuilder(table)),
+    rpc,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any
 }
@@ -68,9 +74,7 @@ describe('generateTrialBalance', () => {
         { data: { period_start: '2024-01-01', opening_balance_entry_id: null }, error: null },
       ],
       journal_entry_lines: [
-        // prior lines (from getOpeningBalances fallback) — empty for first year
-        { data: [], error: null },
-        // period lines
+        // period lines (prior lines now come from RPC — defaults to empty)
         {
           data: [
             { account_number: '3001', debit_amount: 0, credit_amount: 500 },
@@ -114,15 +118,16 @@ describe('generateTrialBalance', () => {
       fiscal_periods: [
         { data: { period_start: '2025-01-01', opening_balance_entry_id: null }, error: null },
       ],
-      journal_entry_lines: [
-        // prior lines (from getOpeningBalances fallback)
+      'rpc:compute_prior_opening_balances': [
         {
           data: [
-            { account_number: '1930', debit_amount: 10000, credit_amount: 0 },
-            { account_number: '2099', debit_amount: 0, credit_amount: 10000 },
+            { account_number: '1930', debit: 10000, credit: 0 },
+            { account_number: '2099', debit: 0, credit: 10000 },
           ],
           error: null,
         },
+      ],
+      journal_entry_lines: [
         // period lines
         {
           data: [
@@ -232,7 +237,6 @@ describe('generateTrialBalance', () => {
         { data: { period_start: '2024-01-01', opening_balance_entry_id: null }, error: null },
       ],
       journal_entry_lines: [
-        { data: [], error: null },
         {
           data: [
             { account_number: '9999', debit_amount: 100, credit_amount: 0 },
@@ -256,7 +260,6 @@ describe('generateTrialBalance', () => {
         { data: { period_start: '2024-01-01', opening_balance_entry_id: null }, error: null },
       ],
       journal_entry_lines: [
-        { data: [], error: null },
         {
           data: [
             { account_number: '5410', debit_amount: 200, credit_amount: 0 },
@@ -280,7 +283,6 @@ describe('generateTrialBalance', () => {
         { data: { period_start: '2024-01-01', opening_balance_entry_id: null }, error: null },
       ],
       journal_entry_lines: [
-        { data: [], error: null },
         {
           data: [
             { account_number: '1930', debit_amount: 33.33, credit_amount: 0 },
@@ -316,7 +318,6 @@ describe('generateTrialBalance', () => {
         { data: { period_start: '2024-01-01', opening_balance_entry_id: null }, error: null },
       ],
       journal_entry_lines: [
-        { data: [], error: null },
         {
           data: [
             { account_number: '1930', debit_amount: 1000, credit_amount: 0 },
@@ -349,7 +350,6 @@ describe('generateTrialBalance', () => {
         { data: { period_start: '2024-01-01', opening_balance_entry_id: null }, error: null },
       ],
       journal_entry_lines: [
-        { data: [], error: null },
         { data: null, error: { message: 'DB error' } },
       ],
     }
@@ -363,7 +363,6 @@ describe('generateTrialBalance', () => {
         { data: { period_start: '2024-01-01', opening_balance_entry_id: null }, error: null },
       ],
       journal_entry_lines: [
-        { data: [], error: null },
         {
           data: [
             { account_number: '1930', debit_amount: 5000, credit_amount: 0 },

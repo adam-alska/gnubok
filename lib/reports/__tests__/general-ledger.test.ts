@@ -23,8 +23,14 @@ function makeBuilder(tableName: string) {
 }
 
 function makeClient() {
+  const rpc = vi.fn().mockImplementation(async (fn: string) => {
+    const queue = mockResults[`rpc:${fn}`]
+    if (!queue || queue.length === 0) return { data: [], error: null }
+    return queue.shift()!
+  })
   return {
     from: vi.fn().mockImplementation((table: string) => makeBuilder(table)),
+    rpc,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any
 }
@@ -56,9 +62,7 @@ describe('generateGeneralLedger', () => {
         { data: { period_start: '2024-01-01', period_end: '2024-12-31', opening_balance_entry_id: null }, error: null },
       ],
       journal_entry_lines: [
-        // prior lines (from getOpeningBalances fallback) — empty
-        { data: [], error: null },
-        // period lines — empty
+        // period lines — empty (prior lines come from RPC, defaults to empty)
         { data: [], error: null },
       ],
     }
@@ -74,8 +78,6 @@ describe('generateGeneralLedger', () => {
         { data: { period_start: '2024-01-01', period_end: '2024-12-31', opening_balance_entry_id: null }, error: null },
       ],
       journal_entry_lines: [
-        // prior lines — empty (first year)
-        { data: [], error: null },
         // period lines (joined with entry data)
         {
           data: [
@@ -127,14 +129,13 @@ describe('generateGeneralLedger', () => {
       fiscal_periods: [
         { data: { period_start: '2025-01-01', period_end: '2025-12-31', opening_balance_entry_id: null }, error: null },
       ],
-      journal_entry_lines: [
-        // prior lines (from getOpeningBalances fallback)
+      'rpc:compute_prior_opening_balances': [
         {
-          data: [
-            { account_number: '1930', debit_amount: 10000, credit_amount: 0 },
-          ],
+          data: [{ account_number: '1930', debit: 10000, credit: 0 }],
           error: null,
         },
+      ],
+      journal_entry_lines: [
         // period lines
         {
           data: [
@@ -169,8 +170,6 @@ describe('generateGeneralLedger', () => {
         { data: { period_start: '2024-01-01', period_end: '2024-12-31', opening_balance_entry_id: null }, error: null },
       ],
       journal_entry_lines: [
-        // prior lines — empty
-        { data: [], error: null },
         // period lines across multiple accounts
         {
           data: [
@@ -198,8 +197,6 @@ describe('generateGeneralLedger', () => {
         { data: { period_start: '2024-01-01', period_end: '2024-12-31', opening_balance_entry_id: null }, error: null },
       ],
       journal_entry_lines: [
-        // prior lines — empty
-        { data: [], error: null },
         // period lines — out of order
         {
           data: [
@@ -230,7 +227,6 @@ describe('generateGeneralLedger', () => {
         { data: { period_start: '2024-01-01', period_end: '2024-12-31', opening_balance_entry_id: null }, error: null },
       ],
       journal_entry_lines: [
-        { data: [], error: null },
         {
           data: [
             { account_number: '1930', debit_amount: 33.33, credit_amount: 0, journal_entries: { entry_date: '2024-01-15', voucher_number: 1, voucher_series: 'A', description: 'Precision', source_type: 'manual' } },

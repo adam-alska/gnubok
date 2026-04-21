@@ -5,9 +5,10 @@ import { fetchAllRows } from '@/lib/supabase/fetch-all'
  * Get opening balances (ingående balans) for a fiscal period.
  *
  * Uses the opening_balance_entry set by year-end closing when available
- * (O(accounts) — typically ~50 rows). Falls back to summing all entries
- * prior to the period start date via a joined query (O(all_prior_lines) —
- * expensive for companies that haven't run year-end closing).
+ * (O(accounts) — typically ~50 rows). Falls back to a server-side
+ * aggregate via the compute_prior_opening_balances RPC when no OB entry
+ * is set, which returns one row per balance-sheet account (class 1-2)
+ * regardless of how many prior journal lines there are.
  *
  * Returns per-account debit/credit opening balances and the OB entry ID
  * (if any) so the caller can exclude it from period queries to prevent
@@ -59,35 +60,28 @@ export async function getOpeningBalances(
       balances.set(line.account_number, existing)
     }
   } else {
-    // Fallback: compute from all entries dated before this period's start.
-    // This is expensive for multi-year companies that haven't run year-end
-    // closing — consider prompting the user to close prior periods.
-    const priorLines = await fetchAllRows<{
+    // Fallback: server-side aggregate of all prior posted/reversed lines.
+    // The RPC filters to balance-sheet accounts (class 1-2) and returns
+    // one row per account. P&L accounts (class 3-8) reset to zero at each
+    // year transition — their balances are absorbed into årets resultat
+    // (2099) and rolled into equity, so carrying them forward as IB would
+    // violate BFNAR 2013:2. Filtering them in SQL keeps the payload small
+    // and the round-trip count at one regardless of history size.
+    const { data: priorRows, error } = await supabase.rpc('compute_prior_opening_balances', {
+      p_company_id: companyId,
+      p_period_start: period.period_start,
+    })
+    if (error) throw new Error(error.message)
+
+    for (const row of (priorRows ?? []) as Array<{
       account_number: string
-      debit_amount: number
-      credit_amount: number
-    }>(({ from, to }) =>
-      supabase
-        .from('journal_entry_lines')
-        .select('account_number, debit_amount, credit_amount, journal_entries!inner(company_id, status, entry_date)')
-        .eq('journal_entries.company_id', companyId)
-        .in('journal_entries.status', ['posted', 'reversed'])
-        .lt('journal_entries.entry_date', period.period_start)
-        .range(from, to)
-    )
-
-    for (const line of priorLines) {
-      // P&L accounts (class 3-8) reset to zero at each year transition —
-      // their balances are absorbed into årets resultat (2099) and rolled
-      // into equity. Carrying them forward as IB causes resultatkonton to
-      // accumulate across years (BFNAR 2013:2 violation).
-      const cls = parseInt(line.account_number.charAt(0), 10)
-      if (cls >= 3 && cls <= 8) continue
-
-      const existing = balances.get(line.account_number) || { debit: 0, credit: 0 }
-      existing.debit += Number(line.debit_amount) || 0
-      existing.credit += Number(line.credit_amount) || 0
-      balances.set(line.account_number, existing)
+      debit: number | string
+      credit: number | string
+    }>) {
+      balances.set(row.account_number, {
+        debit: Number(row.debit) || 0,
+        credit: Number(row.credit) || 0,
+      })
     }
   }
 
