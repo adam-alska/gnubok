@@ -6,7 +6,7 @@ vi.mock('@/lib/events', () => ({
   eventBus: { emit: vi.fn().mockResolvedValue([]) },
 }))
 
-import { commitEntry, getNextVoucherNumber } from '../engine'
+import { commitEntry, getNextVoucherNumber, createJournalEntry } from '../engine'
 
 describe('voucher number atomicity', () => {
   beforeEach(() => {
@@ -131,5 +131,197 @@ describe('voucher number atomicity', () => {
       p_fiscal_period_id: 'fp-1',
       p_series: 'B',
     })
+  })
+})
+
+describe('createJournalEntry orphan draft cleanup', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  /**
+   * Regression test for #292: when commit_journal_entry RPC fails (e.g. overload
+   * ambiguity, balance trigger, period lock), the draft created by createDraftEntry
+   * must be cancelled so it doesn't linger as an undeletable stuck draft.
+   */
+  it('cancels the draft when commit RPC fails', async () => {
+    const draftId = 'entry-1'
+    const cancelUpdate = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      }),
+    })
+
+    const supabase = {
+      from: vi.fn().mockImplementation((table: string) => {
+        if (table === 'fiscal_periods') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({
+                    data: { name: 'FY 2025', period_start: '2025-01-01', period_end: '2025-12-31' },
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+          }
+        }
+        if (table === 'chart_of_accounts') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                in: vi.fn().mockResolvedValue({
+                  data: [
+                    { account_number: '1930', id: 'acc-1930' },
+                    { account_number: '1510', id: 'acc-1510' },
+                  ],
+                  error: null,
+                }),
+              }),
+            }),
+          }
+        }
+        if (table === 'journal_entries') {
+          return {
+            insert: vi.fn().mockReturnValue({
+              select: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: { id: draftId, status: 'draft' as JournalEntryStatus },
+                  error: null,
+                }),
+              }),
+            }),
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: { id: draftId, status: 'draft', lines: [] },
+                  error: null,
+                }),
+              }),
+            }),
+            update: cancelUpdate,
+          }
+        }
+        if (table === 'journal_entry_lines') {
+          return {
+            insert: vi.fn().mockResolvedValue({ error: null }),
+          }
+        }
+        return {}
+      }),
+      // commit_journal_entry RPC fails — simulates overload ambiguity or balance error
+      rpc: vi.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'Could not choose the best candidate function' },
+      }),
+    }
+
+    await expect(
+      createJournalEntry(supabase as never, 'co-1', 'user-1', {
+        fiscal_period_id: 'fp-1',
+        entry_date: '2025-06-15',
+        description: 'Payment',
+        source_type: 'invoice_paid',
+        lines: [
+          { account_number: '1930', debit_amount: 1000, credit_amount: 0 },
+          { account_number: '1510', debit_amount: 0, credit_amount: 1000 },
+        ],
+      })
+    ).rejects.toThrow('Failed to commit journal entry')
+
+    // The orphan draft must have been cancelled with CAS guard (status='draft')
+    expect(cancelUpdate).toHaveBeenCalledWith({ status: 'cancelled' })
+    const firstEq = cancelUpdate.mock.results[0].value.eq
+    expect(firstEq).toHaveBeenCalledWith('id', draftId)
+    const secondEq = firstEq.mock.results[0].value.eq
+    expect(secondEq).toHaveBeenCalledWith('status', 'draft')
+  })
+
+  it('surfaces original commit error even if cleanup update fails', async () => {
+    const draftId = 'entry-1'
+
+    const supabase = {
+      from: vi.fn().mockImplementation((table: string) => {
+        if (table === 'fiscal_periods') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({
+                    data: { name: 'FY 2025', period_start: '2025-01-01', period_end: '2025-12-31' },
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+          }
+        }
+        if (table === 'chart_of_accounts') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                in: vi.fn().mockResolvedValue({
+                  data: [
+                    { account_number: '1930', id: 'acc-1930' },
+                    { account_number: '1510', id: 'acc-1510' },
+                  ],
+                  error: null,
+                }),
+              }),
+            }),
+          }
+        }
+        if (table === 'journal_entries') {
+          return {
+            insert: vi.fn().mockReturnValue({
+              select: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: { id: draftId, status: 'draft' as JournalEntryStatus },
+                  error: null,
+                }),
+              }),
+            }),
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: { id: draftId, status: 'draft', lines: [] },
+                  error: null,
+                }),
+              }),
+            }),
+            // Cleanup throws — original error should still propagate
+            update: vi.fn().mockImplementation(() => {
+              throw new Error('Network error during rollback')
+            }),
+          }
+        }
+        if (table === 'journal_entry_lines') {
+          return {
+            insert: vi.fn().mockResolvedValue({ error: null }),
+          }
+        }
+        return {}
+      }),
+      rpc: vi.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'Period is locked' },
+      }),
+    }
+
+    await expect(
+      createJournalEntry(supabase as never, 'co-1', 'user-1', {
+        fiscal_period_id: 'fp-1',
+        entry_date: '2025-06-15',
+        description: 'Payment',
+        source_type: 'invoice_paid',
+        lines: [
+          { account_number: '1930', debit_amount: 1000, credit_amount: 0 },
+          { account_number: '1510', debit_amount: 0, credit_amount: 1000 },
+        ],
+      })
+      // Original commit error surfaces, not the cleanup error
+    ).rejects.toThrow('Period is locked')
   })
 })
