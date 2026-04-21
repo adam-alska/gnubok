@@ -124,7 +124,12 @@ export function FiscalPeriodEditor() {
 
     setIsSaving(true)
     try {
-      const newName = `Räkenskapsår ${parseDateParts(endDate).year}`
+      const startYear = parseDateParts(startDate).year
+      const endYear = parseDateParts(endDate).year
+      const newName =
+        startYear === endYear
+          ? `Räkenskapsår ${startYear}`
+          : `Räkenskapsår ${startYear}/${endYear}`
       const res = await fetch(`/api/bookkeeping/fiscal-periods/${period.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },

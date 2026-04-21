@@ -21,10 +21,9 @@ function formatSwedishDate(dateStr: string): string {
   return `${day} ${monthNames[month - 1]} ${year}`
 }
 
-function isCalendarYear(start: string, end: string): boolean {
-  const s = parseDateParts(start)
+function endsOnDec31(end: string): boolean {
   const e = parseDateParts(end)
-  return s.month === 1 && s.day === 1 && e.month === 12 && e.day === 31
+  return e.month === 12 && e.day === 31
 }
 
 /**
@@ -77,9 +76,9 @@ export function validateFirstPeriod(
     }
   }
 
-  if (entityType === 'enskild_firma' && !isCalendarYear(startDate, endDate)) {
+  if (entityType === 'enskild_firma' && !endsOnDec31(endDate)) {
     return {
-      error: 'Enskild firma måste använda kalenderår (1 januari – 31 december).',
+      error: 'Enskild firma måste ha slutdatum 31 december (BFL 3 kap.).',
       months: monthsBetween(startDate, endDate),
       canSummarise: true,
     }

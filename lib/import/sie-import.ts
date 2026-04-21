@@ -207,6 +207,7 @@ async function cleanupStaleImportRecords(
     .eq('company_id', companyId)
     .eq('file_hash', fileHash)
     .in('status', ['pending', 'failed'])
+    .lt('created_at', oneHourAgo)
 }
 
 /**

@@ -130,7 +130,7 @@ function getABFirstYearEndDates(
   // Try ending in the same year or next year
   for (const endYear of [startYear, startYear + 1, startYear + 2]) {
     const months = (endYear - startYear) * 12 + (endMonth - startMonth) + 1
-    if (months >= 1 && months <= 18) {
+    if (months >= 6 && months <= 18) {
       const day = lastDayOfMonth(endYear, endMonth)
       const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`
       options.push({
