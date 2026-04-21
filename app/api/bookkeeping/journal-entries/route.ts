@@ -27,8 +27,38 @@ export async function GET(request: Request) {
   const dateFrom = searchParams.get('date_from')
   const dateTo = searchParams.get('date_to')
   const sortDate = searchParams.get('sort_date') // 'asc' | 'desc'
+  // Default on: when a fiscal period is selected, include follow-up entries
+  // booked in later periods whose source aggregate (invoice, supplier invoice)
+  // is dated inside the selected period. Pass include_related=false to
+  // restore strict fiscal_period_id filtering.
+  const includeRelated = searchParams.get('include_related') !== 'false'
 
   const dateAscending = sortDate === 'asc'
+  const sortDateParam = sortDate === 'asc' || sortDate === 'desc' ? sortDate : 'desc'
+
+  if (periodId && includeRelated) {
+    const { data, error } = await supabase.rpc('list_fiscal_period_entries_with_related', {
+      p_company_id: companyId,
+      p_period_id: periodId,
+      p_include_related: true,
+      p_status: status,
+      p_date_from: dateFrom,
+      p_date_to: dateTo,
+      p_sort_date: sortDateParam,
+      p_limit: limit,
+      p_offset: offset,
+    })
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    const rows = data ?? []
+    const entries = rows.map((r: { entry: unknown }) => r.entry)
+    const count = rows.length > 0 ? Number((rows[0] as { total_count: number | string }).total_count) : 0
+
+    return NextResponse.json({ data: entries, count })
+  }
 
   let query = supabase
     .from('journal_entries')

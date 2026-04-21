@@ -309,6 +309,15 @@ export default function JournalEntryList({ periodId }: Props) {
                   <span className="text-sm text-muted-foreground w-24">
                     {entry.entry_date}
                   </span>
+                  {entry.out_of_period && (
+                    <Badge
+                      variant="outline"
+                      className="text-xs font-normal shrink-0"
+                      title="Bokförd i ett senare räkenskapsår, men avser det valda året (t.ex. betalning av en faktura utställd i det valda året)."
+                    >
+                      Efterföljande
+                    </Badge>
+                  )}
                   {(entry.status === 'reversed' || entry.source_type === 'storno' || entry.source_type === 'correction') && (
                     <JournalEntryStatusBadge entry={entry} showStatus={entry.status === 'reversed'} />
                   )}
@@ -344,6 +353,15 @@ export default function JournalEntryList({ periodId }: Props) {
                     <span className="text-sm text-muted-foreground">
                       {entry.entry_date}
                     </span>
+                    {entry.out_of_period && (
+                      <Badge
+                        variant="outline"
+                        className="text-xs font-normal shrink-0"
+                        title="Bokförd i ett senare räkenskapsår, men avser det valda året."
+                      >
+                        Efterföljande
+                      </Badge>
+                    )}
                     <span className="ml-auto flex items-center gap-1">
                       {attachmentCounts[entry.id] ? (
                         <span className="flex items-center gap-0.5 text-muted-foreground" title={`${attachmentCounts[entry.id]} underlag`}>

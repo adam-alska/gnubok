@@ -418,7 +418,7 @@ export default function NewInvoicePage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 pb-28 md:pb-0">
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Main content */}
           <div className="lg:col-span-2 space-y-6">
@@ -771,10 +771,10 @@ export default function NewInvoicePage() {
               </CardContent>
             </Card>
 
-            {/* Actions — desktop only */}
+            {/* Actions — desktop/tablet only */}
             <Button
               type="submit"
-              className="w-full hidden lg:block"
+              className="w-full hidden md:block"
               size="lg"
               disabled={isSubmitting || !canWrite}
               title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
@@ -786,7 +786,7 @@ export default function NewInvoicePage() {
         </div>
 
         {/* Mobile sticky total bar */}
-        <div className="lg:hidden fixed left-0 right-0 z-40 bg-card/98 backdrop-blur-sm border-t border-border/40 px-5 py-3" style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}>
+        <div className="md:hidden fixed left-0 right-0 z-40 bg-card/98 backdrop-blur-sm border-t border-border/40 px-5 py-3" style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}>
           <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
             <div>
               <p className="text-xs text-muted-foreground">Totalt</p>
