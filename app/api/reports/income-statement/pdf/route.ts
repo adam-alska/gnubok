@@ -40,12 +40,18 @@ export async function GET(request: Request) {
   if (!companyRow) {
     return NextResponse.json({ error: 'Företagsinställningar saknas' }, { status: 404 })
   }
+  // An identifiable period is part of räkenskapsinformation (BFL 7 kap). Refuse
+  // to render a PDF that can't be archived with the period it refers to.
+  if (!period) {
+    return NextResponse.json(
+      { error: 'Räkenskapsperioden kunde inte läsas. Välj en befintlig period innan du genererar PDF.' },
+      { status: 400 }
+    )
+  }
 
   try {
     const report = await generateIncomeStatement(supabase, companyId, periodId)
-    if (period) {
-      report.period = { start: period.period_start, end: period.period_end }
-    }
+    report.period = { start: period.period_start, end: period.period_end }
 
     const operatingResult = Math.round((report.total_revenue - report.total_expenses) * 100) / 100
 
@@ -79,6 +85,11 @@ export async function GET(request: Request) {
     ]
     if (report.financial_sections.length > 0) {
       summary.push({ label: 'Finansiella poster', amount: report.total_financial })
+      // K2/K3 uppställningsform (ÅRL bilaga 2) requires the explicit
+      // "Resultat efter finansiella poster" subtotal when financial items
+      // are present.
+      const afterFinancial = Math.round((operatingResult + report.total_financial) * 100) / 100
+      summary.push({ label: 'Resultat efter finansiella poster', amount: afterFinancial })
     }
     summary.push({ label: 'Årets resultat', amount: report.net_result, emphasis: true })
 
@@ -93,7 +104,7 @@ export async function GET(request: Request) {
       })
     )
 
-    const filename = `resultatrakning-${report.period.start || 'period'}.pdf`
+    const filename = `resultatrakning-${report.period.start}.pdf`
 
     return new Response(new Uint8Array(pdfBuffer), {
       headers: {

@@ -76,10 +76,16 @@ export async function GET() {
 
   // Stable-sort: templates with last_used_at come first (most-recent first).
   // Templates without usage keep their category/name order from the query.
+  // ISO 8601 timestamps are fixed-width ASCII — plain relational comparison
+  // is correct and avoids any locale-dependent behaviour from localeCompare.
   decorated.sort((a, b) => {
     const aUsed = a.last_used_at
     const bUsed = b.last_used_at
-    if (aUsed && bUsed) return bUsed.localeCompare(aUsed)
+    if (aUsed && bUsed) {
+      if (bUsed > aUsed) return -1
+      if (bUsed < aUsed) return 1
+      return 0
+    }
     if (aUsed) return -1
     if (bUsed) return 1
     return 0

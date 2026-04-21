@@ -9,19 +9,25 @@ import JournalEntryForm, { type FormLine } from '@/components/bookkeeping/Journa
 import ChartOfAccountsManager from '@/components/bookkeeping/ChartOfAccountsManager'
 import { FiscalYearSelector } from '@/components/common/FiscalYearSelector'
 import { useToast } from '@/components/ui/use-toast'
-import { Lock, Loader2 } from 'lucide-react'
+import { Lock, Loader2, Copy } from 'lucide-react'
 import type { JournalEntry, JournalEntryLine } from '@/types'
 
 interface CopyPrefill {
   sourceId: string
+  sourceVoucherLabel: string
   lines: FormLine[]
   description: string
   notes: string
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 function readCopyFromParam(): string | null {
   if (typeof window === 'undefined') return null
-  return new URLSearchParams(window.location.search).get('copy_from')
+  const raw = new URLSearchParams(window.location.search).get('copy_from')
+  if (!raw) return null
+  // Guard against path-traversal or other malformed input in the fetch URL.
+  return UUID_RE.test(raw) ? raw : null
 }
 
 export default function BookkeepingPage() {
@@ -64,6 +70,7 @@ export default function BookkeepingPage() {
         })
         setCopyPrefill({
           sourceId: copyFromId,
+          sourceVoucherLabel: `${data.voucher_series ?? ''}${data.voucher_number ?? ''}`,
           lines,
           description: data.description || '',
           notes: data.notes || '',
@@ -122,16 +129,33 @@ export default function BookkeepingPage() {
               <span className="text-sm">Laddar källverifikat...</span>
             </div>
           ) : (
-            <JournalEntryForm
-              key={copyPrefill?.sourceId ?? 'fresh'}
-              onCreated={() => {
-                setRefreshKey((k) => k + 1)
-                setCopyPrefill(null)
-              }}
-              initialLines={copyPrefill?.lines}
-              initialDescription={copyPrefill?.description}
-              initialNotes={copyPrefill?.notes}
-            />
+            <>
+              {copyPrefill && (
+                <div className="mb-4 flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-3 text-sm">
+                  <Copy className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+                  <div className="flex-1">
+                    <p className="font-medium">
+                      Kopia av verifikat {copyPrefill.sourceVoucherLabel || '(okänt nummer)'}
+                    </p>
+                    <p className="text-muted-foreground mt-0.5">
+                      Ett nytt, fristående verifikat skapas med egen verifikationsserie och nummer.
+                      Detta är <strong>inte</strong> en rättelse eller storno av originalet — använd
+                      &quot;Skapa ändringsverifikation&quot; om du vill korrigera källverifikatet.
+                    </p>
+                  </div>
+                </div>
+              )}
+              <JournalEntryForm
+                key={copyPrefill?.sourceId ?? 'fresh'}
+                onCreated={() => {
+                  setRefreshKey((k) => k + 1)
+                  setCopyPrefill(null)
+                }}
+                initialLines={copyPrefill?.lines}
+                initialDescription={copyPrefill?.description}
+                initialNotes={copyPrefill?.notes}
+              />
+            </>
           )}
         </TabsContent>
 

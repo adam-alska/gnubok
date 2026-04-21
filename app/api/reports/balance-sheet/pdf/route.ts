@@ -40,16 +40,35 @@ export async function GET(request: Request) {
   if (!companyRow) {
     return NextResponse.json({ error: 'Företagsinställningar saknas' }, { status: 404 })
   }
+  // An identifiable period is part of räkenskapsinformation (BFL 7 kap). Refuse
+  // to render a PDF that can't be archived with the period it refers to.
+  if (!period) {
+    return NextResponse.json(
+      { error: 'Räkenskapsperioden kunde inte läsas. Välj en befintlig period innan du genererar PDF.' },
+      { status: 400 }
+    )
+  }
 
   try {
     const report = await generateBalanceSheet(supabase, companyId, periodId)
-    if (period) {
-      report.period = { start: period.period_start, end: period.period_end }
-    }
+    report.period = { start: period.period_start, end: period.period_end }
 
     const totalAssets = report.total_assets
     const totalEquityLiab = report.total_equity_liabilities
     const diff = Math.round((totalAssets - totalEquityLiab) * 100) / 100
+
+    // ÅRL 3 kap / K2 / K3 require balansräkningen to balance exactly. Never
+    // produce a signed-looking PDF with a differens row — fix the data first.
+    // The on-screen view already surfaces a "Balanserar ej" warning.
+    if (Math.abs(diff) > 0.005) {
+      return NextResponse.json(
+        {
+          error:
+            'Balansräkningen balanserar inte (tillgångar ≠ eget kapital och skulder). Åtgärda differensen innan du genererar PDF.',
+        },
+        { status: 400 }
+      )
+    }
 
     const pdfBuffer = await renderToBuffer(
       FinancialStatementPDF({
@@ -68,16 +87,13 @@ export async function GET(request: Request) {
             total: totalEquityLiab,
           },
         ],
-        summary: Math.abs(diff) > 0.005
-          ? [{ label: 'Differens (tillgångar − skulder)', amount: diff, emphasis: true }]
-          : undefined,
         period: report.period,
         company: companyRow as CompanySettings,
         generatedAt: new Date().toISOString(),
       })
     )
 
-    const filename = `balansrakning-${report.period.start || 'period'}.pdf`
+    const filename = `balansrakning-${report.period.start}.pdf`
 
     return new Response(new Uint8Array(pdfBuffer), {
       headers: {
