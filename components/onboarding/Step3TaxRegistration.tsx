@@ -14,6 +14,10 @@ import { Loader2, ArrowRight, ArrowLeft, Check, CalendarDays } from 'lucide-reac
 import { cn } from '@/lib/utils'
 import { useToast } from '@/components/ui/use-toast'
 import { monthsBetween, parseDateParts } from '@/lib/bookkeeping/validate-period-duration'
+import {
+  DestructiveConfirmDialog,
+  useDestructiveConfirm,
+} from '@/components/ui/destructive-confirm-dialog'
 import type { EntityType } from '@/types'
 
 const schema = z.object({
@@ -149,6 +153,7 @@ export default function Step3TaxRegistration({
 }: Step3Props) {
   const isEF = entityType === 'enskild_firma'
   const { toast } = useToast()
+  const { dialogProps, confirm } = useDestructiveConfirm()
 
   const {
     handleSubmit,
@@ -215,7 +220,7 @@ export default function Step3TaxRegistration({
     return getABFirstYearEndDates(parsedStart.year, parsedStart.month, abEndMonth)
   }, [parsedStart, isEF, abEndMonth])
 
-  const onSubmit = (data: FormData) => {
+  const onSubmit = async (data: FormData) => {
     let fiscalYearStartMonth: number
     let firstStart: string | undefined
     let firstEnd: string | undefined
@@ -235,6 +240,22 @@ export default function Step3TaxRegistration({
       fiscalYearStartMonth = endMonth === 12 ? 1 : endMonth + 1
     }
 
+    // Warn on non-calendar fiscal year for AB (EF is always calendar year)
+    if (!isEF && fiscalYearStartMonth !== 1) {
+      const endMonth = fiscalYearStartMonth === 1 ? 12 : fiscalYearStartMonth - 1
+      const endLabel = firstEnd
+        ? `${parseDateParts(firstEnd).day} ${monthNames[parseDateParts(firstEnd).month - 1].toLowerCase()} ${parseDateParts(firstEnd).year}`
+        : monthNames[endMonth - 1].toLowerCase()
+      const ok = await confirm({
+        title: 'Är du säker på brutet räkenskapsår?',
+        description: `Du har valt ett räkenskapsår som inte följer kalenderåret (slutar ${endLabel}). De flesta svenska företag använder kalenderår (1 januari – 31 december). Du kan ändra detta senare i inställningarna, men endast innan du har bokfört något.`,
+        confirmLabel: 'Ja, fortsätt',
+        cancelLabel: 'Ändra val',
+        variant: 'warning',
+      })
+      if (!ok) return
+    }
+
     const output: Step3Output = {
       f_skatt: data.f_skatt,
       fiscal_year_start_month: fiscalYearStartMonth,
@@ -248,6 +269,7 @@ export default function Step3TaxRegistration({
 
   return (
     <div className="space-y-6">
+      <DestructiveConfirmDialog {...dialogProps} />
       <Card>
         <CardHeader>
           <CardTitle>F-skatt och räkenskapsår</CardTitle>
