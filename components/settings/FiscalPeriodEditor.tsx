@@ -96,6 +96,13 @@ export function FiscalPeriodEditor() {
     return monthsBetween(startDate, endDate)
   }, [startDate, endDate])
 
+  const efCalendarYearInvalid = useMemo(() => {
+    if (!isEF || !startDate || !endDate) return false
+    return !isCalendarYear({ period_start: startDate, period_end: endDate })
+  }, [isEF, startDate, endDate])
+
+  const exceedsMaxDuration = durationMonths !== null && durationMonths > 18
+
   const isBlocked =
     !!period && (period.locked_at || period.is_closed || (postedCount ?? 0) > 0)
 
@@ -231,9 +238,14 @@ export function FiscalPeriodEditor() {
                   {formatSwedishDate(startDate)} &ndash; {formatSwedishDate(endDate)}
                 </p>
                 {durationMonths !== null && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className={`text-xs ${exceedsMaxDuration ? 'text-destructive' : 'text-muted-foreground'}`}>
                     {durationMonths} månader
-                    {durationMonths > 18 && ' — över 18 månader är inte tillåtet'}
+                    {exceedsMaxDuration && ' — över 18 månader är inte tillåtet (BFL 3 kap.)'}
+                  </p>
+                )}
+                {efCalendarYearInvalid && (
+                  <p className="text-xs text-destructive">
+                    Enskild firma måste använda kalenderår (1 januari &ndash; 31 december).
                   </p>
                 )}
               </div>
@@ -251,7 +263,15 @@ export function FiscalPeriodEditor() {
               <Button
                 type="button"
                 onClick={handleSave}
-                disabled={!isDirty || isSaving || !startDate || !endDate || endDate <= startDate}
+                disabled={
+                  !isDirty ||
+                  isSaving ||
+                  !startDate ||
+                  !endDate ||
+                  endDate <= startDate ||
+                  exceedsMaxDuration ||
+                  efCalendarYearInvalid
+                }
               >
                 {isSaving ? (
                   <>

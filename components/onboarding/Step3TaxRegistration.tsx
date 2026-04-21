@@ -612,7 +612,7 @@ export default function Step3TaxRegistration({
                           <p className="text-sm text-muted-foreground">
                             {fiscalYearEndMonth === 12
                               ? `1 januari \u2013 31 december (kalenderår)`
-                              : `1 ${monthNames[fiscalYearEndMonth].toLowerCase()} \u2013 ${lastDayOfMonth(2025, fiscalYearEndMonth)} ${monthNames[fiscalYearEndMonth - 1].toLowerCase()}`}
+                              : `1 ${monthNames[fiscalYearEndMonth].toLowerCase()} \u2013 ${lastDayOfMonth(new Date().getFullYear(), fiscalYearEndMonth)} ${monthNames[fiscalYearEndMonth - 1].toLowerCase()}`}
                           </p>
                           <p className="text-xs text-muted-foreground">12 månader</p>
                         </div>

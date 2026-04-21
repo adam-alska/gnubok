@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { validateBody } from '@/lib/api/validate'
-import { validatePeriodDuration } from '@/lib/bookkeeping/validate-period-duration'
+import { validatePeriodDuration, parseDateParts } from '@/lib/bookkeeping/validate-period-duration'
 import { requireCompanyId } from '@/lib/company/context'
 import { requireWritePermission } from '@/lib/auth/require-write'
 import { z } from 'zod'
@@ -71,6 +71,24 @@ export async function PATCH(
 
     const newStart = body.period_start || period.period_start
     const newEnd = body.period_end || period.period_end
+
+    // Enskild firma must use calendar year per BFL 3 kap.
+    const { data: companyRow } = await supabase
+      .from('companies')
+      .select('entity_type')
+      .eq('id', companyId)
+      .single()
+
+    if (companyRow?.entity_type === 'enskild_firma') {
+      const s = parseDateParts(newStart)
+      const e = parseDateParts(newEnd)
+      if (s.month !== 1 || s.day !== 1 || e.month !== 12 || e.day !== 31) {
+        return NextResponse.json(
+          { error: 'Enskild firma måste använda kalenderår (1 januari – 31 december) enligt BFL 3 kap.' },
+          { status: 400 }
+        )
+      }
+    }
 
     // First period for this company may start on any day (BFL 3 kap.)
     const { count: earlierCount } = await supabase
