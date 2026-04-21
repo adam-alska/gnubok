@@ -2,9 +2,22 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { generateIncomeStatement } from '@/lib/reports/income-statement'
-import { FinancialStatementPDF, type FinancialStatementGroup, type FinancialStatementSummaryRow } from '@/lib/reports/financial-statement-pdf-template'
+import { FinancialStatementPDF, type FinancialStatementGroup, type FinancialStatementSection, type FinancialStatementSummaryRow } from '@/lib/reports/financial-statement-pdf-template'
 import { requireCompanyId } from '@/lib/company/context'
 import type { CompanySettings } from '@/types'
+
+// K2/K3 uppställningsform (ÅRL bilaga 2, kostnadsslagsindelad) splits class 8
+// into three blocks that must be rendered separately with named subtotals:
+//   80–84 → Finansiella poster (followed by "Resultat efter finansiella poster")
+//   88   → Bokslutsdispositioner
+//   89   → Skatt på årets resultat
+// The generator lumps these together under financial_sections, so we split
+// here by the first row's account prefix.
+function sectionPrefix(section: FinancialStatementSection, prefixes: string[]): boolean {
+  if (section.rows.length === 0) return false
+  const acc = section.rows[0].account_number
+  return prefixes.some((p) => acc.startsWith(p))
+}
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -55,6 +68,30 @@ export async function GET(request: Request) {
 
     const operatingResult = Math.round((report.total_revenue - report.total_expenses) * 100) / 100
 
+    // Split class 8 into its three K2/K3 blocks.
+    const finansiellaPosterSections = report.financial_sections.filter((s) =>
+      sectionPrefix(s, ['80', '81', '82', '83', '84']),
+    )
+    const bokslutsdispositionerSections = report.financial_sections.filter((s) =>
+      sectionPrefix(s, ['88']),
+    )
+    const skattSections = report.financial_sections.filter((s) =>
+      sectionPrefix(s, ['89']),
+    )
+
+    const totalFinansiellaPoster = Math.round(
+      finansiellaPosterSections.reduce((sum, s) => sum + s.subtotal, 0) * 100,
+    ) / 100
+    const totalBokslutsdispositioner = Math.round(
+      bokslutsdispositionerSections.reduce((sum, s) => sum + s.subtotal, 0) * 100,
+    ) / 100
+    const totalSkatt = Math.round(
+      skattSections.reduce((sum, s) => sum + s.subtotal, 0) * 100,
+    ) / 100
+    const resultatEfterFinansiellaPoster = Math.round(
+      (operatingResult + totalFinansiellaPoster) * 100,
+    ) / 100
+
     const groups: FinancialStatementGroup[] = [
       {
         heading: 'Rörelseintäkter',
@@ -71,26 +108,50 @@ export async function GET(request: Request) {
       },
     ]
 
-    if (report.financial_sections.length > 0) {
+    if (finansiellaPosterSections.length > 0) {
       groups.push({
         heading: 'Finansiella poster',
-        sections: report.financial_sections,
+        sections: finansiellaPosterSections,
         totalLabel: 'Summa finansiella poster',
-        total: report.total_financial,
+        total: totalFinansiellaPoster,
+      })
+    }
+    if (bokslutsdispositionerSections.length > 0) {
+      groups.push({
+        heading: 'Bokslutsdispositioner',
+        sections: bokslutsdispositionerSections,
+        totalLabel: 'Summa bokslutsdispositioner',
+        total: totalBokslutsdispositioner,
+      })
+    }
+    if (skattSections.length > 0) {
+      groups.push({
+        heading: 'Skatter',
+        sections: skattSections,
+        totalLabel: 'Summa skatter',
+        total: totalSkatt,
       })
     }
 
+    // K2/K3 uppställningsform (ÅRL bilaga 2) summary structure:
+    //   Rörelseresultat
+    //   Resultat efter finansiella poster (only if finansiella poster present)
+    //   Bokslutsdispositioner (only if present)
+    //   Skatt på årets resultat (always, so the reader can verify the tax calc)
+    //   Årets resultat
     const summary: FinancialStatementSummaryRow[] = [
       { label: 'Rörelseresultat', amount: operatingResult },
     ]
-    if (report.financial_sections.length > 0) {
-      summary.push({ label: 'Finansiella poster', amount: report.total_financial })
-      // K2/K3 uppställningsform (ÅRL bilaga 2) requires the explicit
-      // "Resultat efter finansiella poster" subtotal when financial items
-      // are present.
-      const afterFinancial = Math.round((operatingResult + report.total_financial) * 100) / 100
-      summary.push({ label: 'Resultat efter finansiella poster', amount: afterFinancial })
+    if (finansiellaPosterSections.length > 0) {
+      summary.push({
+        label: 'Resultat efter finansiella poster',
+        amount: resultatEfterFinansiellaPoster,
+      })
     }
+    if (bokslutsdispositionerSections.length > 0) {
+      summary.push({ label: 'Bokslutsdispositioner', amount: totalBokslutsdispositioner })
+    }
+    summary.push({ label: 'Skatt på årets resultat', amount: totalSkatt })
     summary.push({ label: 'Årets resultat', amount: report.net_result, emphasis: true })
 
     const pdfBuffer = await renderToBuffer(

@@ -55,12 +55,15 @@ export async function GET(request: Request) {
 
     const totalAssets = report.total_assets
     const totalEquityLiab = report.total_equity_liabilities
-    const diff = Math.round((totalAssets - totalEquityLiab) * 100) / 100
 
-    // ÅRL 3 kap / K2 / K3 require balansräkningen to balance exactly. Never
-    // produce a signed-looking PDF with a differens row — fix the data first.
-    // The on-screen view already surfaces a "Balanserar ej" warning.
-    if (Math.abs(diff) > 0.005) {
+    // ÅRL 3 kap / K2 / K3 require balansräkningen to balance. Compare rounded
+    // to whole kronor — matches SFL 22:1's truncation convention for statutory
+    // reports and is immune to floating-point accumulation across hundreds of
+    // ledger lines (öresavrundning noise under half a krona is never a real
+    // accounting error). The on-screen view still surfaces a "Balanserar ej"
+    // warning at öre precision so users can diagnose smaller discrepancies.
+    const diffInKronor = Math.abs(Math.round(totalAssets) - Math.round(totalEquityLiab))
+    if (diffInKronor >= 1) {
       return NextResponse.json(
         {
           error:

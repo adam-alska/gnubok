@@ -9,7 +9,10 @@ import type { CompanySettings } from '@/types'
 
 const styles = StyleSheet.create({
   page: {
-    padding: 40,
+    paddingTop: 40,
+    paddingHorizontal: 40,
+    // Leave room for the fixed disclaimer + footer at the bottom of every page.
+    paddingBottom: 120,
     fontSize: 10,
     fontFamily: 'Helvetica',
   },
@@ -163,6 +166,30 @@ const styles = StyleSheet.create({
     fontFamily: 'Courier',
     fontWeight: 'bold',
     fontSize: 12,
+  },
+  disclaimer: {
+    position: 'absolute',
+    bottom: 52,
+    left: 40,
+    right: 40,
+    paddingTop: 6,
+    paddingBottom: 6,
+    paddingHorizontal: 10,
+    borderWidth: 0.8,
+    borderColor: '#b45309',
+    backgroundColor: '#fef3c7',
+    borderRadius: 3,
+  },
+  disclaimerTitle: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    color: '#78350f',
+    marginBottom: 2,
+  },
+  disclaimerText: {
+    fontSize: 7.5,
+    color: '#78350f',
+    lineHeight: 1.3,
   },
   footer: {
     position: 'absolute',
@@ -328,6 +355,16 @@ export function FinancialStatementPDF({
             ))}
           </View>
         )}
+
+        <View style={styles.disclaimer} fixed>
+          <Text style={styles.disclaimerTitle}>Arbetsutkast – ej undertecknat</Text>
+          <Text style={styles.disclaimerText}>
+            Detta dokument är ett internt arbetsutkast och utgör inte en godkänd
+            årsredovisning enligt ÅRL 2 kap 7 §. Den formella årsredovisningen ska
+            undertecknas av samtliga styrelseledamöter och, i förekommande fall, VD
+            innan den lämnas in till Bolagsverket.
+          </Text>
+        </View>
 
         <View style={styles.footer} fixed>
           <Text style={styles.footerText}>
