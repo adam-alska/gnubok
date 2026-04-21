@@ -11,15 +11,13 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Loader2 } from 'lucide-react'
-import type { CreateTransactionInput, TransactionCategory, Currency } from '@/types'
+import type { CreateTransactionInput, Currency } from '@/types'
 
 const schema = z.object({
   date: z.string().min(1, 'Datum krävs'),
   description: z.string().min(1, 'Beskrivning krävs'),
   amount: z.number().refine((n) => n !== 0, 'Belopp måste anges'),
   currency: z.enum(['SEK', 'EUR', 'USD', 'GBP', 'NOK', 'DKK']),
-  category: z.string().optional(),
-  is_business: z.boolean().optional(),
   notes: z.string().optional(),
 })
 
@@ -30,21 +28,6 @@ interface TransactionFormProps {
   isLoading: boolean
 }
 
-const categories: { value: TransactionCategory; label: string; isIncome?: boolean }[] = [
-  { value: 'income_services', label: 'Intäkt: Tjänster', isIncome: true },
-  { value: 'income_products', label: 'Intäkt: Produkter', isIncome: true },
-  { value: 'income_other', label: 'Intäkt: Övrigt', isIncome: true },
-  { value: 'expense_equipment', label: 'Kostnad: Utrustning' },
-  { value: 'expense_software', label: 'Kostnad: Programvara' },
-  { value: 'expense_travel', label: 'Kostnad: Resor' },
-  { value: 'expense_office', label: 'Kostnad: Kontor' },
-  { value: 'expense_marketing', label: 'Kostnad: Marknadsföring' },
-  { value: 'expense_professional_services', label: 'Kostnad: Konsulter' },
-  { value: 'expense_education', label: 'Kostnad: Utbildning' },
-  { value: 'expense_other', label: 'Kostnad: Övrigt' },
-  { value: 'private', label: 'Privat (ej avdragsgillt)' },
-]
-
 const currencies: Currency[] = ['SEK', 'EUR', 'USD', 'GBP', 'NOK', 'DKK']
 
 export default function TransactionForm({ onSubmit, isLoading }: TransactionFormProps) {
@@ -52,7 +35,6 @@ export default function TransactionForm({ onSubmit, isLoading }: TransactionForm
     register,
     handleSubmit,
     control,
-    watch,
     setValue,
     formState: { errors },
   } = useForm<FormData>({
@@ -62,8 +44,6 @@ export default function TransactionForm({ onSubmit, isLoading }: TransactionForm
       description: '',
       amount: 0,
       currency: 'SEK',
-      category: undefined,
-      is_business: undefined,
       notes: '',
     },
   })
@@ -73,18 +53,12 @@ export default function TransactionForm({ onSubmit, isLoading }: TransactionForm
     setValue('date', format(new Date(), 'yyyy-MM-dd'))
   }, [])
 
-  const watchCategory = watch('category')
-  const isPrivate = watchCategory === 'private'
-  const isIncome = categories.find((c) => c.value === watchCategory)?.isIncome
-
   const onFormSubmit = (data: FormData) => {
     onSubmit({
       date: data.date,
       description: data.description,
       amount: data.amount,
       currency: data.currency,
-      category: data.category as TransactionCategory,
-      is_business: undefined,
       notes: data.notes,
     })
   }
@@ -149,28 +123,6 @@ export default function TransactionForm({ onSubmit, isLoading }: TransactionForm
         <p className="text-xs text-muted-foreground">
           Ange positivt belopp för intäkter, negativt för kostnader
         </p>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Kategori (valfritt)</Label>
-        <Controller
-          name="category"
-          control={control}
-          render={({ field }) => (
-            <Select value={field.value} onValueChange={field.onChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Välj kategori" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((category) => (
-                  <SelectItem key={category.value} value={category.value}>
-                    {category.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        />
       </div>
 
       <div className="space-y-2">
