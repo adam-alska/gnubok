@@ -101,6 +101,8 @@ export default function BookingTemplatePicker({ onApply, entityType }: Props) {
       return
     }
     const lines = applyTemplate(selected.lines, totalAmount)
+    // Fire-and-forget MRU bump so this template surfaces at the top next time.
+    fetch(`/api/settings/booking-templates/${selected.id}/touch`, { method: 'POST' }).catch(() => {})
     onApply(lines, selected.name)
     setOpen(false)
     setSelectedId(null)

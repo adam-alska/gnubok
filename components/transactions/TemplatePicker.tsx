@@ -14,7 +14,7 @@ import {
 } from '@/lib/bookkeeping/booking-templates'
 import { formatAccountWithName } from '@/lib/bookkeeping/client-account-names'
 import { isCounterpartyTemplateId } from '@/lib/bookkeeping/counterparty-templates'
-import { convertLibraryToBookingTemplate } from '@/lib/bookkeeping/template-library'
+import { convertLibraryToBookingTemplate, LIBRARY_TEMPLATE_PREFIX, isLibraryTemplateId } from '@/lib/bookkeeping/template-library'
 import { getAccountName } from '@/lib/bookkeeping/client-account-names'
 import type { BookingTemplateLibrary, EntityType } from '@/types'
 import type { SuggestedTemplate } from '@/lib/transactions/category-suggestions'
@@ -237,6 +237,11 @@ export default function TemplatePicker({
   const advancedGrouped = useMemo(() => groupTemplates(allAdvanced), [allAdvanced])
 
   const handleSelect = (template: BookingTemplate) => {
+    // For library-backed templates, bump MRU so they surface at the top next time.
+    if (isLibraryTemplateId(template.id)) {
+      const libraryId = template.id.slice(LIBRARY_TEMPLATE_PREFIX.length)
+      fetch(`/api/settings/booking-templates/${libraryId}/touch`, { method: 'POST' }).catch(() => {})
+    }
     onSelect(template)
   }
 

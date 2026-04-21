@@ -31,24 +31,67 @@ const CreateBookingTemplateSchema = z.object({
  * GET /api/settings/booking-templates
  * Returns all templates visible to the current user:
  * system + company + team templates.
+ *
+ * Ordering: most recently used (per current company) first, then by category
+ * and name for never-used templates. Usage is tracked in
+ * booking_template_usage via POST /[id]/touch.
  */
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const companyId = await requireCompanyId(supabase, user.id)
+
   // RLS handles scoping (system OR company OR team)
-  const { data, error } = await supabase
-    .from('booking_template_library')
-    .select('*')
-    .eq('is_active', true)
-    .order('is_system', { ascending: false })
-    .order('category')
-    .order('name')
+  const [templatesRes, usageRes] = await Promise.all([
+    supabase
+      .from('booking_template_library')
+      .select('*')
+      .eq('is_active', true)
+      .order('category')
+      .order('name'),
+    supabase
+      .from('booking_template_usage')
+      .select('template_id, last_used_at')
+      .eq('company_id', companyId),
+  ])
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (templatesRes.error) {
+    return NextResponse.json({ error: templatesRes.error.message }, { status: 500 })
+  }
+  // usage lookup failing is non-fatal — we just fall back to default ordering
+  const usageByTemplate = new Map<string, string>()
+  if (!usageRes.error && usageRes.data) {
+    for (const row of usageRes.data) {
+      usageByTemplate.set(row.template_id, row.last_used_at)
+    }
+  }
 
-  return NextResponse.json({ data })
+  const templates = templatesRes.data ?? []
+  const decorated = templates.map((t) => ({
+    ...t,
+    last_used_at: usageByTemplate.get(t.id) ?? null,
+  }))
+
+  // Stable-sort: templates with last_used_at come first (most-recent first).
+  // Templates without usage keep their category/name order from the query.
+  // ISO 8601 timestamps are fixed-width ASCII — plain relational comparison
+  // is correct and avoids any locale-dependent behaviour from localeCompare.
+  decorated.sort((a, b) => {
+    const aUsed = a.last_used_at
+    const bUsed = b.last_used_at
+    if (aUsed && bUsed) {
+      if (bUsed > aUsed) return -1
+      if (bUsed < aUsed) return 1
+      return 0
+    }
+    if (aUsed) return -1
+    if (bUsed) return 1
+    return 0
+  })
+
+  return NextResponse.json({ data: decorated })
 }
 
 /**

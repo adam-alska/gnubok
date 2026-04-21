@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { AccountNumber } from '@/components/ui/account-number'
 import { Textarea } from '@/components/ui/textarea'
-import { Loader2, ArrowLeft, Paperclip, AlertTriangle, Lock, MessageSquare, Pencil, Check, X } from 'lucide-react'
+import { Loader2, ArrowLeft, Paperclip, AlertTriangle, Lock, MessageSquare, Pencil, Check, X, Copy } from 'lucide-react'
 import { useCanWrite } from '@/lib/hooks/use-can-write'
 import JournalEntryAttachments from '@/components/bookkeeping/JournalEntryAttachments'
 import JournalEntryStatusBadge, { sourceTypeLabels } from '@/components/bookkeeping/JournalEntryStatusBadge'
@@ -205,6 +205,17 @@ export default function JournalEntryDetailPage({ params }: { params: Promise<{ i
                 Skapa ändringsverifikation
               </Button>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full sm:w-auto"
+              onClick={() => router.push(`/bookkeeping?copy_from=${entry.id}`)}
+              disabled={!canWrite}
+              title={!canWrite ? 'Du har endast läsbehörighet i detta företag' : undefined}
+            >
+              {!canWrite ? <Lock className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+              Kopiera verifikat
+            </Button>
           </div>
         )}
       </div>
