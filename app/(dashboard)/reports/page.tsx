@@ -617,6 +617,17 @@ function IncomeStatementView({ periodId, onNavigateToAccount }: { periodId: stri
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => window.open(`/api/reports/income-statement/pdf?period_id=${periodId}`, '_blank')}
+        >
+          <Download className="h-4 w-4 mr-2" />
+          Ladda ner PDF
+        </Button>
+      </div>
+
       {!monthlyLoading && monthlyData.length > 0 && (
         <IncomeExpenseChart months={monthlyData} />
       )}
@@ -751,6 +762,17 @@ function BalanceSheetView({ periodId, onNavigateToAccount }: { periodId: string;
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => window.open(`/api/reports/balance-sheet/pdf?period_id=${periodId}`, '_blank')}
+        >
+          <Download className="h-4 w-4 mr-2" />
+          Ladda ner PDF
+        </Button>
+      </div>
+
       {/* Assets */}
       <Card>
         <CardHeader>
