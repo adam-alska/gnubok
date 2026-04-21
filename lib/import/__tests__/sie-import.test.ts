@@ -7,6 +7,7 @@ import {
   importVouchers,
   computeVoucherNumberRanges,
   linkOpeningBalanceEntryToPeriod,
+  companyHasPriorActivity,
 } from '../sie-import'
 import { createQueuedMockSupabase } from '@/tests/helpers'
 import type { ParsedSIEFile, AccountMapping } from '../types'
@@ -497,6 +498,94 @@ describe('linkOpeningBalanceEntryToPeriod', () => {
         'ob-entry-1',
       ),
     ).rejects.toThrow(/Failed to link opening balance entry.*permission denied/)
+  })
+})
+
+describe('companyHasPriorActivity', () => {
+  // Guards multi-year SIE imports: when the company already has posted
+  // non-IB journal entries, creating another IB entry would double-count
+  // one year's movements against every balance-sheet account.
+  type Supabase = Parameters<typeof companyHasPriorActivity>[0]
+
+  function buildCountingSupabase(count: number) {
+    const capturedFilters: Record<string, unknown> = {}
+
+    const supabase = {
+      from: (table: string) => {
+        if (table !== 'journal_entries') {
+          throw new Error(`Unexpected table: ${table}`)
+        }
+        const chain = {
+          select: (_cols: string, opts?: { count?: string; head?: boolean }) => {
+            capturedFilters['_opts'] = opts
+            return chain
+          },
+          eq: (col: string, val: unknown) => {
+            capturedFilters[`eq:${col}`] = val
+            return chain
+          },
+          neq: (col: string, val: unknown) => {
+            capturedFilters[`neq:${col}`] = val
+            return chain
+          },
+          in: (col: string, val: unknown) => {
+            capturedFilters[`in:${col}`] = val
+            return chain
+          },
+          then: (resolve: (v: { count: number; error: null }) => void) =>
+            resolve({ count, error: null }),
+        }
+        return chain
+      },
+    }
+    return { supabase, capturedFilters }
+  }
+
+  it('returns false when the company has no prior posted entries', async () => {
+    const { supabase } = buildCountingSupabase(0)
+
+    const result = await companyHasPriorActivity(supabase as unknown as Supabase, 'company-1')
+
+    expect(result).toBe(false)
+  })
+
+  it('returns true when the company has prior posted non-IB entries', async () => {
+    const { supabase } = buildCountingSupabase(42)
+
+    const result = await companyHasPriorActivity(supabase as unknown as Supabase, 'company-1')
+
+    expect(result).toBe(true)
+  })
+
+  it('excludes opening_balance entries from the count', async () => {
+    const { supabase, capturedFilters } = buildCountingSupabase(0)
+
+    await companyHasPriorActivity(supabase as unknown as Supabase, 'company-1')
+
+    expect(capturedFilters['neq:source_type']).toBe('opening_balance')
+    expect(capturedFilters['in:status']).toEqual(['posted', 'reversed'])
+    expect(capturedFilters['eq:company_id']).toBe('company-1')
+  })
+
+  it('treats null/undefined count as zero', async () => {
+    const supabase = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            neq: () => ({
+              in: () => ({
+                then: (resolve: (v: { count: null; error: null }) => void) =>
+                  resolve({ count: null, error: null }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    }
+
+    const result = await companyHasPriorActivity(supabase as unknown as Supabase, 'company-1')
+
+    expect(result).toBe(false)
   })
 })
 

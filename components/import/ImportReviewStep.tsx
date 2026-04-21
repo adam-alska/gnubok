@@ -82,7 +82,7 @@ export default function ImportReviewStep({
           .from('company_settings')
           .select('default_voucher_series')
           .eq('company_id', company.id)
-          .single(),
+          .maybeSingle(),
         supabase
           .from('voucher_sequences')
           .select('voucher_series')
@@ -91,8 +91,7 @@ export default function ImportReviewStep({
 
       if (cancelled) return
 
-      // PGRST116 = no rows returned from .single(); expected when settings not yet created.
-      if (settingsError && settingsError.code !== 'PGRST116') {
+      if (settingsError) {
         console.error('Failed to load company settings for voucher series', settingsError)
       }
       if (sequencesError) {

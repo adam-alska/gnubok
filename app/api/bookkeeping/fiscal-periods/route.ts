@@ -5,7 +5,6 @@ import { validateBody } from '@/lib/api/validate'
 import { CreateFiscalPeriodSchema } from '@/lib/api/schemas'
 import { requireCompanyId } from '@/lib/company/context'
 import { requireWritePermission } from '@/lib/auth/require-write'
-import { generateOpeningBalances } from '@/lib/core/bookkeeping/year-end-service'
 
 export async function GET() {
   const supabase = await createClient()
@@ -50,7 +49,7 @@ export async function POST(request: Request) {
   // Fetch all existing periods to determine direction
   const { data: allPeriods } = await supabase
     .from('fiscal_periods')
-    .select('id, period_start, period_end, is_closed, closing_entry_id')
+    .select('id, period_start, period_end, is_closed')
     .eq('company_id', companyId)
     .order('period_start', { ascending: true })
 
@@ -139,12 +138,10 @@ export async function POST(request: Request) {
   // continuity chain is broken). Backward chaining sets previous_period_id
   // on the old earliest period instead (see below), not on the new one.
   let previousPeriodId: string | null = null
-  let forwardPriorPeriod: { id: string; closing_entry_id: string | null } | null = null
   if (allPeriods && allPeriods.length > 0) {
     const latest = allPeriods[allPeriods.length - 1]
     if (body.period_start > latest.period_end) {
       previousPeriodId = latest.id
-      forwardPriorPeriod = { id: latest.id, closing_entry_id: latest.closing_entry_id ?? null }
     }
   }
 
@@ -174,21 +171,6 @@ export async function POST(request: Request) {
         .update({ previous_period_id: data.id })
         .eq('id', earliest.id)
         .eq('company_id', companyId)
-    }
-  }
-
-  // If the prior period was properly year-end-closed, carry its closing
-  // balances forward as the new period's opening balance entry. Without
-  // the closing entry there is nothing to carry — the efficient RPC
-  // fallback in getOpeningBalances handles that case for reports.
-  if (forwardPriorPeriod && forwardPriorPeriod.closing_entry_id) {
-    try {
-      await generateOpeningBalances(supabase, companyId, user.id, forwardPriorPeriod.id, data.id)
-    } catch (e) {
-      // Don't fail the period creation if OB generation stumbles (e.g. no
-      // non-zero balance sheet accounts). The period exists and chains
-      // correctly via previous_period_id; OB can be generated later.
-      console.error('[fiscal-periods] generateOpeningBalances failed after create:', e)
     }
   }
 
