@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useCompany } from '@/contexts/CompanyContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,8 +10,12 @@ import {
   DestructiveConfirmDialog,
   useDestructiveConfirm,
 } from '@/components/ui/destructive-confirm-dialog'
-import { Loader2, CalendarDays, Info, Lock } from 'lucide-react'
-import { monthsBetween, parseDateParts } from '@/lib/bookkeeping/validate-period-duration'
+import { Loader2, Info, Lock } from 'lucide-react'
+import { parseDateParts } from '@/lib/bookkeeping/validate-period-duration'
+import {
+  FiscalPeriodDateFields,
+  validateFirstPeriod,
+} from '@/components/bookkeeping/FiscalPeriodDateFields'
 import type { FiscalPeriod } from '@/types'
 
 function formatSwedishDate(dateStr: string): string {
@@ -91,17 +95,11 @@ export function FiscalPeriodEditor() {
     }
   }, [company])
 
-  const durationMonths = useMemo(() => {
-    if (!startDate || !endDate || endDate <= startDate) return null
-    return monthsBetween(startDate, endDate)
-  }, [startDate, endDate])
-
-  const efCalendarYearInvalid = useMemo(() => {
-    if (!isEF || !startDate || !endDate) return false
-    return !isCalendarYear({ period_start: startDate, period_end: endDate })
-  }, [isEF, startDate, endDate])
-
-  const exceedsMaxDuration = durationMonths !== null && durationMonths > 18
+  const validation = validateFirstPeriod(
+    startDate,
+    endDate,
+    company?.entity_type,
+  )
 
   const isBlocked =
     !!period && (period.locked_at || period.is_closed || (postedCount ?? 0) > 0)
@@ -201,55 +199,27 @@ export function FiscalPeriodEditor() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="fp_start">Startdatum</Label>
-                <Input
-                  id="fp_start"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Första räkenskapsåret kan börja valfri dag.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="fp_end">Slutdatum</Label>
-                <Input
-                  id="fp_end"
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Måste vara sista dagen i en månad.
-                </p>
-              </div>
-            </div>
-
-            {startDate && endDate && endDate > startDate && (
-              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-1">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <CalendarDays className="h-4 w-4 text-primary" />
-                  Föreslaget räkenskapsår
+            <FiscalPeriodDateFields
+              startDate={startDate}
+              onStartDateChange={setStartDate}
+              endDate={endDate}
+              entityType={company?.entity_type}
+              summaryTitle="Föreslaget räkenskapsår"
+              endDateSlot={
+                <div className="space-y-2">
+                  <Label htmlFor="fp_end">Slutdatum</Label>
+                  <Input
+                    id="fp_end"
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Måste vara sista dagen i en månad.
+                  </p>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {formatSwedishDate(startDate)} &ndash; {formatSwedishDate(endDate)}
-                </p>
-                {durationMonths !== null && (
-                  <p className={`text-xs ${exceedsMaxDuration ? 'text-destructive' : 'text-muted-foreground'}`}>
-                    {durationMonths} månader
-                    {exceedsMaxDuration && ' — över 18 månader är inte tillåtet (BFL 3 kap.)'}
-                  </p>
-                )}
-                {efCalendarYearInvalid && (
-                  <p className="text-xs text-destructive">
-                    Enskild firma måste använda kalenderår (1 januari &ndash; 31 december).
-                  </p>
-                )}
-              </div>
-            )}
+              }
+            />
 
             <div className="flex justify-end gap-2">
               <Button
@@ -268,9 +238,7 @@ export function FiscalPeriodEditor() {
                   isSaving ||
                   !startDate ||
                   !endDate ||
-                  endDate <= startDate ||
-                  exceedsMaxDuration ||
-                  efCalendarYearInvalid
+                  validation.error !== null
                 }
               >
                 {isSaving ? (

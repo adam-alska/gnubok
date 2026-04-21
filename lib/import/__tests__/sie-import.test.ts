@@ -6,6 +6,7 @@ import {
   ensureFiscalPeriod,
   importVouchers,
   computeVoucherNumberRanges,
+  linkOpeningBalanceEntryToPeriod,
 } from '../sie-import'
 import { createQueuedMockSupabase } from '@/tests/helpers'
 import type { ParsedSIEFile, AccountMapping } from '../types'
@@ -418,6 +419,84 @@ describe('ensureFiscalPeriod validation', () => {
     )
 
     expect(id).toBe('existing-period-id')
+  })
+})
+
+describe('linkOpeningBalanceEntryToPeriod', () => {
+  // Regression: SIE import created the opening-balance entry but never wrote
+  // its ID back to fiscal_periods. Without the link, getOpeningBalances falls
+  // through to summing all prior journal lines, which inflates balance-sheet
+  // accounts across multi-year imports (each year's IB double-counted against
+  // the prior year's UB).
+  type Supabase = Parameters<typeof linkOpeningBalanceEntryToPeriod>[0]
+
+  it('writes opening_balance_entry_id and opening_balances_set to the fiscal period', async () => {
+    const updates: Array<{ payload: Record<string, unknown>; filters: Record<string, unknown> }> = []
+
+    const supabase = {
+      from: (table: string) => {
+        if (table !== 'fiscal_periods') {
+          throw new Error(`Unexpected table: ${table}`)
+        }
+        let pendingPayload: Record<string, unknown> = {}
+        const filters: Record<string, unknown> = {}
+        const chain = {
+          update: (payload: Record<string, unknown>) => {
+            pendingPayload = payload
+            return chain
+          },
+          eq: (col: string, val: unknown) => {
+            filters[col] = val
+            return chain
+          },
+          then: (resolve: (v: unknown) => void) => {
+            updates.push({ payload: pendingPayload, filters: { ...filters } })
+            resolve({ data: null, error: null })
+          },
+        }
+        return chain
+      },
+    }
+
+    await linkOpeningBalanceEntryToPeriod(
+      supabase as unknown as Supabase,
+      'company-1',
+      'period-1',
+      'ob-entry-1',
+    )
+
+    expect(updates).toHaveLength(1)
+    expect(updates[0].payload).toEqual({
+      opening_balance_entry_id: 'ob-entry-1',
+      opening_balances_set: true,
+    })
+    expect(updates[0].filters).toEqual({
+      id: 'period-1',
+      company_id: 'company-1',
+    })
+  })
+
+  it('throws a descriptive error when the update fails', async () => {
+    const supabase = {
+      from: () => {
+        const chain = {
+          update: () => chain,
+          eq: () => chain,
+          then: (resolve: (v: unknown) => void) =>
+            resolve({ data: null, error: { message: 'permission denied' } }),
+        }
+        return chain
+      },
+    }
+
+    await expect(
+      linkOpeningBalanceEntryToPeriod(
+        supabase as unknown as Supabase,
+        'company-1',
+        'period-1',
+        'ob-entry-1',
+      ),
+    ).rejects.toThrow(/Failed to link opening balance entry.*permission denied/)
   })
 })
 

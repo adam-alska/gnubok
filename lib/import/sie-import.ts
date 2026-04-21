@@ -459,6 +459,36 @@ async function createOpeningBalanceEntry(
 }
 
 /**
+ * Link an opening-balance journal entry to its fiscal period so balance-sheet
+ * reports use the explicit IB path in getOpeningBalances() (reads only that
+ * entry's lines for IB) instead of falling through to summing all prior
+ * journal lines — which inflates multi-year imports, because each year's IB
+ * is double-counted against the prior year's UB.
+ *
+ * Mirrors the pattern used by the Excel-based OB import at
+ * app/api/import/opening-balance/execute/route.ts:224-231.
+ */
+export async function linkOpeningBalanceEntryToPeriod(
+  supabase: SupabaseClient,
+  companyId: string,
+  fiscalPeriodId: string,
+  openingBalanceEntryId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('fiscal_periods')
+    .update({
+      opening_balance_entry_id: openingBalanceEntryId,
+      opening_balances_set: true,
+    })
+    .eq('id', fiscalPeriodId)
+    .eq('company_id', companyId)
+
+  if (error) {
+    throw new Error(`Failed to link opening balance entry to fiscal period: ${error.message}`)
+  }
+}
+
+/**
  * Create journal entries from vouchers using batch insert for performance.
  *
  * Preserves per-voucher series from the source SIE file so customers migrating
@@ -1636,6 +1666,13 @@ export async function executeSIEImport(
           if (result.openingBalanceEntryId) {
             result.journalEntriesCreated++
             result.journalEntryIds.push(result.openingBalanceEntryId)
+
+            await linkOpeningBalanceEntryToPeriod(
+              supabase,
+              companyId,
+              result.fiscalPeriodId,
+              result.openingBalanceEntryId
+            )
           }
         }
       }

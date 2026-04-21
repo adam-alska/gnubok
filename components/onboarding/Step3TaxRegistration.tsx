@@ -13,11 +13,15 @@ import { InfoTooltip } from '@/components/ui/info-tooltip'
 import { Loader2, ArrowRight, ArrowLeft, Check, CalendarDays } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/components/ui/use-toast'
-import { monthsBetween, parseDateParts } from '@/lib/bookkeeping/validate-period-duration'
+import { parseDateParts } from '@/lib/bookkeeping/validate-period-duration'
 import {
   DestructiveConfirmDialog,
   useDestructiveConfirm,
 } from '@/components/ui/destructive-confirm-dialog'
+import {
+  FiscalPeriodDateFields,
+  validateFirstPeriod,
+} from '@/components/bookkeeping/FiscalPeriodDateFields'
 import type { EntityType } from '@/types'
 
 const schema = z.object({
@@ -70,11 +74,6 @@ const monthNames = [
   'Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni',
   'Juli', 'Augusti', 'September', 'Oktober', 'November', 'December',
 ]
-
-function formatSwedishDate(dateStr: string): string {
-  const { year, month, day } = parseDateParts(dateStr)
-  return `${day} ${monthNames[month - 1].toLowerCase()} ${year}`
-}
 
 /**
  * Get the last day of a given month (1-indexed).
@@ -176,25 +175,7 @@ export default function Step3TaxRegistration({
 
   const isFirstYear = watch('is_first_fiscal_year')
   const firstYearStart = watch('first_year_start')
-  const firstYearEnd = watch('first_year_end')
   const fiscalYearEndMonth = watch('fiscal_year_end_month')
-
-  // State for first-year start date selectors (day/month/year)
-  const [startDay, setStartDay] = useState<number>(
-    initialData.first_year_start
-      ? parseDateParts(initialData.first_year_start).day
-      : 1
-  )
-  const [startMonth, setStartMonth] = useState<number>(
-    initialData.first_year_start
-      ? parseDateParts(initialData.first_year_start).month
-      : 0
-  )
-  const [startYear, setStartYear] = useState<number>(
-    initialData.first_year_start
-      ? parseDateParts(initialData.first_year_start).year
-      : 0
-  )
 
   // State for AB first-year end month selector
   const [abEndMonth, setAbEndMonth] = useState<number>(
@@ -226,6 +207,20 @@ export default function Step3TaxRegistration({
     let firstEnd: string | undefined
 
     if (data.is_first_fiscal_year && data.first_year_start && data.first_year_end) {
+      // Validate the 6–18 month BFL 3 kap. window + EF calendar-year rule
+      const validation = validateFirstPeriod(
+        data.first_year_start,
+        data.first_year_end,
+        entityType,
+      )
+      if (validation.error) {
+        toast({
+          title: 'Räkenskapsåret är inte giltigt',
+          description: validation.error,
+          variant: 'destructive',
+        })
+        return
+      }
       // Derive start month from end date
       const endMonth = parseDateParts(data.first_year_end).month
       fiscalYearStartMonth = endMonth === 12 ? 1 : endMonth + 1
@@ -395,173 +390,94 @@ export default function Step3TaxRegistration({
               {/* First fiscal year options */}
               {isFirstYear && (
                 <div className="space-y-4 rounded-lg bg-muted/50 p-4">
-                  <div className="space-y-2">
-                    <Label>Startdatum</Label>
-                    <Controller
-                      name="first_year_start"
-                      control={control}
-                      render={({ field }) => {
-                        const currentYear = new Date().getFullYear()
-                        const years = Array.from({ length: 7 }, (_, i) => currentYear - 5 + i)
-
-                        const updateField = (day: number, month: number, year: number) => {
-                          if (month && year) {
-                            const maxDay = lastDayOfMonth(year, month)
-                            const clampedDay = Math.min(day, maxDay)
-                            field.onChange(`${year}-${String(month).padStart(2, '0')}-${String(clampedDay).padStart(2, '0')}`)
-                          }
-                        }
-
-                        const handleYearChange = (year: number) => {
-                          setStartYear(year)
-                          updateField(startDay, startMonth, year)
-                        }
-
-                        const handleMonthChange = (month: number) => {
-                          setStartMonth(month)
-                          // Clamp day if needed when month changes
-                          if (startYear) {
-                            const maxDay = lastDayOfMonth(startYear, month)
-                            if (startDay > maxDay) setStartDay(maxDay)
-                          }
-                          updateField(startDay, month, startYear)
-                        }
-
-                        const handleDayChange = (day: number) => {
-                          setStartDay(day)
-                          updateField(day, startMonth, startYear)
-                        }
-
-                        const maxDays = startMonth && startYear
-                          ? lastDayOfMonth(startYear, startMonth)
-                          : 31
-
-                        return (
-                          <div className="grid grid-cols-3 gap-2">
-                            <Select
-                              value={startYear ? startYear.toString() : ''}
-                              onValueChange={(v) => { if (v) handleYearChange(parseInt(v)) }}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="År" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {years.map((y) => (
-                                  <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Select
-                              value={startMonth ? startMonth.toString() : ''}
-                              onValueChange={(v) => { if (v) handleMonthChange(parseInt(v)) }}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Månad" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {monthNames.map((name, i) => (
-                                  <SelectItem key={i + 1} value={(i + 1).toString()}>{name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Select
-                              value={startDay.toString()}
-                              onValueChange={(v) => { if (v) handleDayChange(parseInt(v)) }}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Dag" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {Array.from({ length: maxDays }, (_, i) => i + 1).map((d) => (
-                                  <SelectItem key={d} value={d.toString()}>{d}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )
-                      }}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Datumet företaget registrerades. Första räkenskapsåret kan börja valfri dag.
-                    </p>
-                    {errors.first_year_start && (
-                      <p className="text-xs text-destructive">{errors.first_year_start.message}</p>
-                    )}
-                  </div>
-
-                  {/* AB: end month selector */}
-                  {!isEF && parsedStart && (
-                    <div className="space-y-2">
-                      <Label>Räkenskapsåret slutar (månad)</Label>
-                      <Select
-                        value={abEndMonth.toString()}
-                        onValueChange={(v) => { if (v) setAbEndMonth(parseInt(v)) }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Välj månad" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {monthNames.map((name, i) => (
-                            <SelectItem key={i + 1} value={(i + 1).toString()}>
-                              {name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  {/* End date selector (options depend on entity type + start) */}
-                  {parsedStart && firstYearEndOptions.length > 0 && (
-                    <div className="space-y-2">
-                      <Label>Slutdatum</Label>
+                  <Controller
+                    name="first_year_start"
+                    control={control}
+                    render={({ field: startField }) => (
                       <Controller
                         name="first_year_end"
                         control={control}
-                        render={({ field }) => (
-                          <Select
-                            value={field.value || ''}
-                            onValueChange={(v) => { if (v) field.onChange(v) }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Välj slutdatum" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {firstYearEndOptions.map((opt) => (
-                                <SelectItem key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                        render={({ field: endField }) => (
+                          <FiscalPeriodDateFields
+                            startDate={startField.value || ''}
+                            onStartDateChange={(v) => {
+                              startField.onChange(v)
+                              // Reset end when start changes — its valid options depend on start
+                              if (endField.value) endField.onChange('')
+                            }}
+                            startHelpText="Datumet företaget registrerades. Första räkenskapsåret kan börja valfri dag."
+                            endDate={endField.value || ''}
+                            entityType={entityType}
+                            endDateSlot={
+                              <>
+                                {/* AB: end month selector */}
+                                {!isEF && parsedStart && (
+                                  <div className="space-y-2">
+                                    <Label>Räkenskapsåret slutar (månad)</Label>
+                                    <Select
+                                      value={abEndMonth.toString()}
+                                      onValueChange={(v) => {
+                                        if (v) {
+                                          setAbEndMonth(parseInt(v))
+                                          if (endField.value) endField.onChange('')
+                                        }
+                                      }}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Välj månad" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {monthNames.map((name, i) => (
+                                          <SelectItem key={i + 1} value={(i + 1).toString()}>
+                                            {name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                )}
+
+                                {/* End date selector (options depend on entity type + start) */}
+                                {parsedStart && firstYearEndOptions.length > 0 && (
+                                  <div className="space-y-2">
+                                    <Label>Slutdatum</Label>
+                                    <Select
+                                      value={endField.value || ''}
+                                      onValueChange={(v) => { if (v) endField.onChange(v) }}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Välj slutdatum" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {firstYearEndOptions.map((opt) => (
+                                          <SelectItem key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    {errors.first_year_end && (
+                                      <p className="text-xs text-destructive">{errors.first_year_end.message}</p>
+                                    )}
+                                  </div>
+                                )}
+
+                                {parsedStart && firstYearEndOptions.length === 0 && (
+                                  <p className="text-sm text-destructive">
+                                    Ingen giltig slutperiod hittades. Kontrollera startdatumet.
+                                  </p>
+                                )}
+
+                                {errors.first_year_start && (
+                                  <p className="text-xs text-destructive">{errors.first_year_start.message}</p>
+                                )}
+                              </>
+                            }
+                          />
                         )}
                       />
-                      {errors.first_year_end && (
-                        <p className="text-xs text-destructive">{errors.first_year_end.message}</p>
-                      )}
-                    </div>
-                  )}
-
-                  {parsedStart && firstYearEndOptions.length === 0 && (
-                    <p className="text-sm text-destructive">
-                      Ingen giltig slutperiod hittades. Kontrollera startdatumet.
-                    </p>
-                  )}
-
-                  {firstYearStart && firstYearEnd && (
-                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-1">
-                      <div className="flex items-center gap-2 text-sm font-medium">
-                        <CalendarDays className="h-4 w-4 text-primary" />
-                        Ditt första räkenskapsår
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {formatSwedishDate(firstYearStart)} &ndash; {formatSwedishDate(firstYearEnd)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {monthsBetween(firstYearStart, firstYearEnd)} månader
-                      </p>
-                    </div>
-                  )}
+                    )}
+                  />
                 </div>
               )}
 
