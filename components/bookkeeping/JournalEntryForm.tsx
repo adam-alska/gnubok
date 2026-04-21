@@ -221,9 +221,29 @@ export default function JournalEntryForm({
     setLines(updated)
   }
 
-  const totalDebit = lines.reduce((sum, l) => sum + (parseFloat(l.debit_amount) || 0), 0)
-  const totalCredit = lines.reduce((sum, l) => sum + (parseFloat(l.credit_amount) || 0), 0)
-  const isBalanced = Math.round((totalDebit - totalCredit) * 100) === 0 && totalDebit > 0
+  // Only lines with both an account and a non-zero amount end up in the submit
+  // payload (see the filter in handleConfirm). Compute totals and balance from
+  // those same lines so the enable-gate matches what the API will actually see.
+  const submittableLines = lines.filter((l) => {
+    const d = parseFloat(l.debit_amount) || 0
+    const c = parseFloat(l.credit_amount) || 0
+    return !!l.account_number && (d > 0 || c > 0)
+  })
+  const incompleteLineCount = lines.filter((l) => {
+    const d = parseFloat(l.debit_amount) || 0
+    const c = parseFloat(l.credit_amount) || 0
+    const hasAmount = d > 0 || c > 0
+    const hasAccount = !!l.account_number
+    // Row counts as incomplete if exactly one of (account, amount) is present.
+    return hasAccount !== hasAmount
+  }).length
+  const totalDebit = submittableLines.reduce((sum, l) => sum + (parseFloat(l.debit_amount) || 0), 0)
+  const totalCredit = submittableLines.reduce((sum, l) => sum + (parseFloat(l.credit_amount) || 0), 0)
+  const isBalanced =
+    Math.round((totalDebit - totalCredit) * 100) === 0
+    && totalDebit > 0
+    && submittableLines.length >= 2
+    && incompleteLineCount === 0
 
   const rate = parseFloat(exchangeRate) || 0
   // If user has manually entered a foreign amount, use that; otherwise derive from SEK total
@@ -734,12 +754,18 @@ export default function JournalEntryForm({
           {!canWrite && <Lock className="mr-2 h-4 w-4" />}
           Granska & skapa
         </Button>
-        {(!description || !selectedPeriod || isUploading || periodMismatch) && (
+        {(!description || !selectedPeriod || isUploading || periodMismatch || incompleteLineCount > 0 || (!isBalanced && submittableLines.length < 2)) && (
           <div className="text-xs text-muted-foreground space-y-0.5 text-right">
             {!description && <p>Ange en beskrivning</p>}
             {!selectedPeriod && <p>Välj en räkenskapsperiod</p>}
             {periodMismatch === 'no_period' && <p>Skapa ett räkenskapsår som matchar datumet</p>}
             {isUploading && <p>Vänta tills filerna laddats upp</p>}
+            {incompleteLineCount > 0 && (
+              <p>Alla rader med belopp måste ha ett konto (och tvärtom)</p>
+            )}
+            {submittableLines.length < 2 && incompleteLineCount === 0 && (
+              <p>Minst två rader med konto och belopp krävs</p>
+            )}
           </div>
         )}
       </div>

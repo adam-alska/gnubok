@@ -148,7 +148,21 @@ function tryParseZodErrors(error: unknown): string | null {
     if (messages.length > 0) return messages.join('. ')
   }
 
-  // Check for { errors: { field: ["msg"] } } shape from validateBody
+  // Check for { errors: [{ field, message, code }] } shape from validateBody
+  if (Array.isArray(obj.errors)) {
+    const items = obj.errors as Array<{ field?: string; message?: string }>
+    const messages = items
+      .slice(0, 3)
+      .map((it) => {
+        const field = it.field || ''
+        const msg = it.message || 'ogiltigt värde'
+        return field ? `${field}: ${msg}` : msg
+      })
+      .filter(Boolean)
+    if (messages.length > 0) return messages.join('. ')
+  }
+
+  // Check for { errors: { field: ["msg"] } } shape (legacy)
   if (typeof obj.errors === 'object' && obj.errors !== null) {
     const fieldErrors = obj.errors as Record<string, string[]>
     const messages: string[] = []

@@ -76,6 +76,8 @@ describe('GET /api/bookkeeping/journal-entries', () => {
         date_to: '2024-12-31',
         limit: '10',
         offset: '5',
+        // Strict period filtering — exercises the PostgREST path, not the RPC.
+        include_related: 'false',
       },
     })
     const response = await GET(request)
@@ -83,6 +85,42 @@ describe('GET /api/bookkeeping/journal-entries', () => {
 
     expect(status).toBe(200)
     expect(mockSupabase.from).toHaveBeenCalledWith('journal_entries')
+  })
+
+  it('uses RPC with include_related when period_id is set', async () => {
+    const rpcRows = [
+      {
+        entry: { ...makeJournalEntry({ id: 'je-1' }), out_of_period: false },
+        total_count: 2,
+      },
+      {
+        entry: { ...makeJournalEntry({ id: 'je-2' }), out_of_period: true },
+        total_count: 2,
+      },
+    ]
+    enqueue({ data: rpcRows, error: null })
+
+    const request = createMockRequest('/api/bookkeeping/journal-entries', {
+      searchParams: { period_id: 'period-1' },
+    })
+    const response = await GET(request)
+    const { status, body } = await parseJsonResponse<{
+      data: Array<{ id: string; out_of_period?: boolean }>
+      count: number
+    }>(response)
+
+    expect(status).toBe(200)
+    expect(mockSupabase.rpc).toHaveBeenCalledWith(
+      'list_fiscal_period_entries_with_related',
+      expect.objectContaining({
+        p_company_id: 'company-1',
+        p_period_id: 'period-1',
+        p_include_related: true,
+      })
+    )
+    expect(body.data).toHaveLength(2)
+    expect(body.data[1].out_of_period).toBe(true)
+    expect(body.count).toBe(2)
   })
 
   it('returns 500 on database error', async () => {

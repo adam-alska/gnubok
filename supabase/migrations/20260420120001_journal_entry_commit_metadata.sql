@@ -8,10 +8,10 @@
 
 -- 1. Add columns (nullable — existing rows get NULL)
 ALTER TABLE public.journal_entries
-  ADD COLUMN commit_method TEXT CHECK (commit_method IS NULL OR commit_method IN (
+  ADD COLUMN IF NOT EXISTS commit_method TEXT CHECK (commit_method IS NULL OR commit_method IN (
     'user_accept', 'bulk_accept', 'timing_ceiling', 'migration', 'legacy'
   )),
-  ADD COLUMN rubric_version TEXT;
+  ADD COLUMN IF NOT EXISTS rubric_version TEXT;
 
 -- 2. Update commit RPC to accept and set the new columns atomically
 CREATE OR REPLACE FUNCTION public.commit_journal_entry(

@@ -982,6 +982,10 @@ export interface JournalEntry {
   updated_at: string
   // Relations
   lines?: JournalEntryLine[]
+  // Set by list_fiscal_period_entries_with_related when the entry was
+  // returned as a follow-up from a different fiscal period than the one
+  // being viewed. Absent from plain PostgREST responses.
+  out_of_period?: boolean
 }
 
 // Journal Entry Line
