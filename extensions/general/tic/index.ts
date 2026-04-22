@@ -24,9 +24,44 @@ import type { CompanyLookupResult } from '@/lib/company-lookup/types'
 import { hashPersonalNumber, encryptPersonalNumber } from '@/lib/auth/bankid'
 import { createServiceClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/logger'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 
 const log = createLogger('tic/bankid')
+
+/**
+ * Request SPAR + CompanyRoles enrichment for a completed BankID session and
+ * cache the result in `extension_data` so /select-company and the onboarding
+ * wizard can pre-fill from it. Non-blocking: any failure is logged and
+ * swallowed — BankID auth must still succeed even if enrichment is down.
+ */
+async function fetchAndStoreEnrichment(
+  sessionId: string,
+  userId: string,
+  supabase: SupabaseClient,
+): Promise<void> {
+  try {
+    const enrichment = await requestEnrichment(sessionId, ['SPAR', 'CompanyRoles'])
+    if (enrichment.status === 'Completed' && enrichment.secureUrl) {
+      const enrichmentData = await fetchEnrichmentData(enrichment.secureUrl)
+      log.info('enrichment success', {
+        hasSpar: !!enrichmentData.spar,
+        companyCount: enrichmentData.companyRoles?.length ?? 0,
+      })
+
+      await supabase
+        .from('extension_data')
+        .upsert({
+          user_id: userId,
+          extension_id: 'tic',
+          key: 'bankid_enrichment',
+          value: enrichmentData,
+        }, { onConflict: 'user_id,extension_id,key' })
+    }
+  } catch (enrichError) {
+    log.warn('enrichment failed (non-blocking)', enrichError)
+  }
+}
 
 // Server-side per-IP rate limit for /bankid/start (each call = billable TIC session)
 const bankIdStartCooldowns = new Map<string, number>()
@@ -560,6 +595,9 @@ export const ticExtension: Extension = {
               )
             }
 
+            // Refresh enrichment so /select-company sees current Bolagsverket roles.
+            await fetchAndStoreEnrichment(sessionId, existing.user_id, supabase)
+
             return NextResponse.json({
               data: {
                 tokenHash: link.properties.hashed_token,
@@ -655,30 +693,8 @@ export const ticExtension: Extension = {
             )
           }
 
-          // Attempt enrichment and store for onboarding pre-fill
-          try {
-            const enrichment = await requestEnrichment(sessionId, ['SPAR', 'CompanyRoles'])
-            if (enrichment.status === 'Completed' && enrichment.secureUrl) {
-              const enrichmentData = await fetchEnrichmentData(enrichment.secureUrl)
-              log.info('enrichment success', {
-                hasSpar: !!enrichmentData.spar,
-                companyCount: enrichmentData.companyRoles?.length ?? 0,
-              })
-
-              // Store enrichment data in extension_data for the onboarding page to read
-              await supabase
-                .from('extension_data')
-                .upsert({
-                  user_id: userId,
-                  extension_id: 'tic',
-                  key: 'bankid_enrichment',
-                  value: enrichmentData,
-                }, { onConflict: 'user_id,extension_id,key' })
-            }
-          } catch (enrichError) {
-            // Enrichment is optional — don't fail signup
-            log.warn('enrichment failed (non-blocking)', enrichError)
-          }
+          // Enrichment (SPAR + CompanyRoles) — pre-fills /select-company picker.
+          await fetchAndStoreEnrichment(sessionId, userId, supabase)
 
           return NextResponse.json({
             data: {

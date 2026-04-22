@@ -3,6 +3,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { setActiveCompany } from '@/lib/company/context'
 import { revalidatePath } from 'next/cache'
+import { computeFiscalPeriod } from '@/lib/company/compute-fiscal-period'
+import { mapEntityType } from '@/lib/company-lookup/entity-type-map'
+import type { CompanyLookupResult } from '@/lib/company-lookup/types'
 
 export async function switchCompany(companyId: string): Promise<{ error?: string }> {
   const supabase = await createClient()
@@ -143,6 +146,108 @@ export async function createCompanyFromOnboarding(params: {
     console.error('[createCompanyFromOnboarding] setActiveCompany failed', err)
   }
 
+  // 6. Consume the one-time BankID enrichment row (SPAR + CompanyRoles) now
+  // that a company has been successfully provisioned. Keeping it around would
+  // cause /select-company to re-offer companies the user has already set up.
+  // Non-fatal: if the row is missing or the delete fails, nothing breaks.
+  await supabase
+    .from('extension_data')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('extension_id', 'tic')
+    .eq('key', 'bankid_enrichment')
+
   revalidatePath('/')
   return { companyId: newCompanyId }
+}
+
+/**
+ * One-click company setup from a TIC/Bolagsverket company role.
+ *
+ * The picker page at /select-company passes a `CompanyLookupResult` already
+ * fetched from `/api/extensions/ext/tic/lookup`, plus the `EnrichmentCompanyRole`
+ * minimums (org number, legal name, legal entity type). This action derives
+ * sensible defaults (accrual, quarterly moms for VAT-registered, Jan-Dec
+ * fiscal year), reads SPAR address from `extension_data` as a fallback, and
+ * then delegates to `createCompanyFromOnboarding` so the provisioning path is
+ * identical to the manual wizard. On success it clears the one-time enrichment
+ * row — subsequent visits to /select-company will re-fetch from BankID.
+ */
+export async function createCompanyFromTicRole(params: {
+  teamId: string
+  orgNumber: string
+  legalName: string
+  legalEntityType: string
+  lookup: CompanyLookupResult | null
+}): Promise<{ companyId?: string; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  const entityType = mapEntityType(params.legalEntityType)
+  if (!entityType) {
+    return { error: 'Den här företagsformen måste sättas upp manuellt.' }
+  }
+
+  // SPAR address fallback if TIC lookup didn't include one.
+  const { data: enrichmentRow } = await supabase
+    .from('extension_data')
+    .select('value')
+    .eq('user_id', user.id)
+    .eq('extension_id', 'tic')
+    .eq('key', 'bankid_enrichment')
+    .maybeSingle()
+
+  const spar = (enrichmentRow?.value as { spar?: Record<string, string | undefined> } | null)?.spar
+  const sparStreet = spar?.Folkbokforingsadress_SvenskAdress_Utdelningsadress1
+  const sparPostal = spar?.Folkbokforingsadress_SvenskAdress_PostNr
+  const sparCity = spar?.Folkbokforingsadress_SvenskAdress_Postort
+
+  const addressStreet = params.lookup?.address?.street ?? sparStreet ?? null
+  const addressPostal = params.lookup?.address?.postalCode ?? sparPostal ?? null
+  const addressCity = params.lookup?.address?.city ?? sparCity ?? null
+
+  const fTax = params.lookup?.registration.fTax ?? false
+  const vatRegistered = params.lookup?.registration.vat ?? false
+
+  const settings: Record<string, unknown> = {
+    entity_type: entityType,
+    company_name: params.legalName,
+    org_number: params.orgNumber.replace(/[\s-]/g, ''),
+    f_skatt: fTax,
+    vat_registered: vatRegistered,
+    moms_period: vatRegistered ? 'quarterly' : null,
+    accounting_method: 'accrual',
+    fiscal_year_start_month: 1,
+    address_line1: addressStreet,
+    postal_code: addressPostal,
+    city: addressCity,
+  }
+
+  const periodResult = computeFiscalPeriod(settings)
+  if (periodResult.error) {
+    return { error: 'Kunde inte beräkna räkenskapsår.' }
+  }
+
+  const result = await createCompanyFromOnboarding({
+    teamId: params.teamId,
+    settings,
+    fiscalPeriod: {
+      startDate: periodResult.startStr,
+      endDate: periodResult.endStr,
+      name: periodResult.periodName,
+    },
+  })
+
+  if (result.error || !result.companyId) {
+    return { error: result.error ?? 'Kunde inte skapa företag. Försök igen.' }
+  }
+
+  // Enrichment row cleanup is handled inside createCompanyFromOnboarding so
+  // both the one-click and manual paths converge on the same behavior.
+
+  return { companyId: result.companyId }
 }

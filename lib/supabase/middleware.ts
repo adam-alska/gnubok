@@ -138,16 +138,29 @@ export async function updateSession(request: NextRequest) {
   // their account without being trapped on /onboarding forever.
   const isNoCompanyAllowed =
     pathname.startsWith('/onboarding') ||
+    pathname.startsWith('/select-company') ||
     pathname.startsWith('/settings/account') ||
     pathname.startsWith('/api/account/') ||
     pathname.startsWith('/api/company')
 
-  // No companies — redirect to onboarding, but allow the escape-hatch routes
+  // No companies — redirect to the picker if we have BankID enrichment for
+  // this user, otherwise the manual wizard. Either way, allow the escape-hatch
+  // routes to pass through.
   if (!companyId) {
     if (isNoCompanyAllowed) {
       return supabaseResponse
     }
-    return NextResponse.redirect(new URL('/onboarding', request.url))
+
+    const { data: enrichmentRow } = await supabase
+      .from('extension_data')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('extension_id', 'tic')
+      .eq('key', 'bankid_enrichment')
+      .maybeSingle()
+
+    const destination = enrichmentRow ? '/select-company' : '/onboarding'
+    return NextResponse.redirect(new URL(destination, request.url))
   }
 
   // Set company cookie on the response so downstream requests have it
