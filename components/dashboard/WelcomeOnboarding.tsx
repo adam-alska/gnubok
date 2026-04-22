@@ -48,9 +48,17 @@ interface WelcomeOnboardingProps {
   teamId: string
   skipWelcome?: boolean
   hasExistingCompanies?: boolean
+  /** Pre-fill Step 2 org_number when the picker routed here via ?org_number=. */
+  initialOrgNumber?: string
 }
 
-export default function WelcomeOnboarding({ firstName, teamId, skipWelcome, hasExistingCompanies }: WelcomeOnboardingProps) {
+export default function WelcomeOnboarding({
+  firstName,
+  teamId,
+  skipWelcome,
+  hasExistingCompanies,
+  initialOrgNumber,
+}: WelcomeOnboardingProps) {
   const router = useRouter()
   const { toast } = useToast()
   const supabase = createClient()
@@ -59,7 +67,9 @@ export default function WelcomeOnboarding({ firstName, teamId, skipWelcome, hasE
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
-  const [settings, setSettings] = useState<Partial<CompanySettings>>({})
+  const [settings, setSettings] = useState<Partial<CompanySettings>>(
+    initialOrgNumber ? { org_number: initialOrgNumber } : {},
+  )
   const ticEnabled = ENABLED_EXTENSION_IDS.has('tic')
   const [ticLookup, setTicLookup] = useState<CompanyLookupResult | null>(null)
 
@@ -109,7 +119,15 @@ export default function WelcomeOnboarding({ firstName, teamId, skipWelcome, hasE
   }, [supabase, router])
 
   const handleNext = async (stepData: Partial<CompanySettings>) => {
-    if (currentStep === 1 && stepData.entity_type && stepData.entity_type !== settings.entity_type) {
+    // Reset org_number/company_name only on a genuine change (user going back
+    // and picking a different entity type). First-time selection must not
+    // wipe a pre-fill (e.g. ?org_number= deep-link from /select-company).
+    if (
+      currentStep === 1 &&
+      stepData.entity_type &&
+      settings.entity_type &&
+      stepData.entity_type !== settings.entity_type
+    ) {
       stepData = { ...stepData, org_number: '', company_name: '' }
       setTicLookup(null)
     }
@@ -163,11 +181,27 @@ export default function WelcomeOnboarding({ firstName, teamId, skipWelcome, hasE
 
       if (result.error || !result.companyId) {
         logError('create company action failed', { error: result.error })
+        let title = 'Fel'
+        let description: string = result.error || 'Kunde inte skapa företag. Försök igen.'
+        let backToStep2 = false
+        if (result.error === 'org_number_exists') {
+          title = 'Företaget finns redan'
+          description = 'Det här företaget finns redan i gnubok. Be en befintlig administratör att bjuda in dig.'
+          backToStep2 = true
+        } else if (result.error === 'org_number_invalid') {
+          title = 'Ogiltigt organisationsnummer'
+          description = 'Kontrollera att du angett ett giltigt 10- eller 12-siffrigt organisationsnummer.'
+          backToStep2 = true
+        }
         toast({
-          title: 'Fel',
-          description: result.error || 'Kunde inte skapa företag. Försök igen.',
+          title,
+          description,
           variant: 'destructive',
         })
+        // Back user up to step 2 so they can correct the org number.
+        if (backToStep2) {
+          setCurrentStep(2)
+        }
         return
       }
 

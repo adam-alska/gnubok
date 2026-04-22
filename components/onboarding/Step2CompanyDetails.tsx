@@ -68,9 +68,42 @@ export default function Step2CompanyDetails({
   const [isLooking, setIsLooking] = useState(false)
   const [lookupError, setLookupError] = useState<string | null>(null)
   const [lookupDone, setLookupDone] = useState<CompanyLookupResult | null>(null)
+  const [orgNumberExists, setOrgNumberExists] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
+  const dupAbortRef = useRef<AbortController | null>(null)
 
   const orgNumber = watch('org_number')
+
+  // Debounced duplicate check against gnubok's own companies table. Runs in
+  // parallel with the TIC lookup — they don't conflict. On match, the submit
+  // button is disabled; the server action would also reject ('org_number_exists')
+  // but blocking client-side avoids a wasted roundtrip.
+  useEffect(() => {
+    if (!orgNumber || !ORG_NUMBER_REGEX.test(orgNumber)) {
+      setOrgNumberExists(false)
+      return
+    }
+    const timer = setTimeout(() => {
+      dupAbortRef.current?.abort()
+      const controller = new AbortController()
+      dupAbortRef.current = controller
+      fetch(`/api/company/check-org-number?org_number=${encodeURIComponent(orgNumber)}`, {
+        signal: controller.signal,
+      })
+        .then(async (res) => {
+          if (controller.signal.aborted || !res.ok) return
+          const { data } = await res.json()
+          setOrgNumberExists(!!data?.exists)
+        })
+        .catch(() => {
+          // Network failure is non-fatal — the server action will re-check.
+        })
+    }, 500)
+    return () => {
+      clearTimeout(timer)
+      dupAbortRef.current?.abort()
+    }
+  }, [orgNumber])
 
   useEffect(() => {
     if (!ticEnabled || !orgNumber || !ORG_NUMBER_REGEX.test(orgNumber)) {
@@ -201,6 +234,14 @@ export default function Step2CompanyDetails({
               {ticEnabled && lookupError && (
                 <p className="text-xs text-muted-foreground">{lookupError}</p>
               )}
+              {orgNumberExists && (
+                <div className="flex items-start gap-2 text-sm text-destructive">
+                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                  <span>
+                    Det här företaget finns redan i gnubok. Be en befintlig administratör att bjuda in dig.
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -262,7 +303,11 @@ export default function Step2CompanyDetails({
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Tillbaka
               </Button>
-              <Button type="submit" disabled={isSaving} className="w-full sm:w-auto">
+              <Button
+                type="submit"
+                disabled={isSaving || orgNumberExists}
+                className="w-full sm:w-auto"
+              >
                 {isSaving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
