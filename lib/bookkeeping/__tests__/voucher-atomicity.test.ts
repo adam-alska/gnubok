@@ -172,8 +172,8 @@ describe('createJournalEntry orphan draft cleanup', () => {
           return {
             select: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  in: vi.fn().mockResolvedValue({
+                in: vi.fn().mockReturnValue({
+                  eq: vi.fn().mockResolvedValue({
                     data: [
                       { account_number: '1930', id: 'acc-1930' },
                       { account_number: '1510', id: 'acc-1510' },
@@ -264,8 +264,8 @@ describe('createJournalEntry orphan draft cleanup', () => {
           return {
             select: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  in: vi.fn().mockResolvedValue({
+                in: vi.fn().mockReturnValue({
+                  eq: vi.fn().mockResolvedValue({
                     data: [
                       { account_number: '1930', id: 'acc-1930' },
                       { account_number: '1510', id: 'acc-1510' },

@@ -132,10 +132,20 @@ export async function POST(
           .eq('id', creditNote.id)
       }
     } catch (err) {
+      // Roll back the just-inserted credit note (items cascade-delete) on
+      // any JE failure. A creditfaktura row without a corresponding reversal
+      // JE would leave ingående moms overstated for the period — same
+      // momsdeklaration-integrity concern as the POST-route rollback.
+      await supabase.from('supplier_invoices').delete().eq('id', creditNote.id).eq('company_id', companyId)
+
       if (err instanceof AccountsNotInChartError) {
         return accountsNotInChartResponse(err)
       }
       console.error('Failed to create credit note journal entry:', err)
+      return NextResponse.json(
+        { error: 'Kunde inte bokföra kreditfakturan — försök igen eller ändra datum om perioden är låst.' },
+        { status: 500 }
+      )
     }
   }
 

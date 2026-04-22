@@ -27,6 +27,7 @@ import { uploadDocument } from '@/lib/core/documents/document-service'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { InvoicePDF } from '@/lib/invoices/pdf-template'
 import { createLogger } from '@/lib/logger'
+import { appendProcessingHistory } from '@/lib/processing-history/append'
 import type {
   Transaction,
   TransactionCategory,
@@ -43,6 +44,51 @@ import type {
 const log = createLogger('pending-operations/commit')
 
 ensureInitialized()
+
+/**
+ * Record a best-effort processing_history breadcrumb when the invoice's
+ * accrual journal entry couldn't be booked. The pending-operation itself
+ * still succeeds (invoice email delivered / status set), but the JE is
+ * missing — which in the accrual case means revenue (3001) and utgående
+ * moms (2611) are unposted for the period, understating the momsdeklaration.
+ *
+ * The event makes the gap visible and actionable: an operator or bokföring
+ * consultant can query processing_history for `InvoiceJournalEntrySkipped`
+ * and re-book the missing verifikation (via the activation dialog or
+ * manually) before the momsdeklaration is filed. Swallows its own errors
+ * to preserve the non-blocking contract with the caller.
+ */
+async function recordSkippedInvoiceJournalEntry(
+  invoiceId: string,
+  companyId: string,
+  userId: string,
+  operation: 'send_invoice' | 'mark_invoice_sent',
+  err: unknown
+): Promise<void> {
+  try {
+    const reasonCode = err instanceof AccountsNotInChartError
+      ? 'accounts_not_in_chart'
+      : 'journal_entry_error'
+    const accountNumbers = err instanceof AccountsNotInChartError ? err.accountNumbers : undefined
+    await appendProcessingHistory({
+      companyId,
+      correlationId: invoiceId,
+      aggregateType: 'System',
+      aggregateId: invoiceId,
+      eventType: 'InvoiceJournalEntrySkipped',
+      payload: {
+        invoice_id: invoiceId,
+        operation,
+        reason_code: reasonCode,
+        ...(accountNumbers ? { account_numbers: accountNumbers } : {}),
+      },
+      actor: { type: 'user', id: userId },
+      occurredAt: new Date(),
+    })
+  } catch (historyErr) {
+    log.warn('Failed to append InvoiceJournalEntrySkipped to processing_history', historyErr)
+  }
+}
 
 /**
  * Ensure a fiscal period exists for the given date, create one if needed.
@@ -582,8 +628,16 @@ async function commitSendInvoice(
         await supabase.from('invoices').update({ journal_entry_id: je.id }).eq('id', invoiceId)
       }
     } catch (err) {
-      if (err instanceof AccountsNotInChartError) throw err
-      /* non-blocking */
+      // Non-blocking: the invoice is already sent by this point and the user
+      // can retry the journal entry separately. Re-throwing here would mean
+      // the email has already gone out but the outer 400 would report
+      // failure — worst of both worlds.
+      //
+      // Record a processing_history breadcrumb so the missing verifikation
+      // surfaces in audit trails and the momsdeklaration gap is actionable
+      // rather than silent. TODO: wire ActivateAccountsDialog into this
+      // pending-op flow, then re-introduce blocking for ACCOUNTS_NOT_IN_CHART.
+      await recordSkippedInvoiceJournalEntry(invoiceId, companyId, userId, 'send_invoice', err)
     }
   }
 
@@ -653,8 +707,11 @@ async function commitMarkInvoiceSent(
         await supabase.from('invoices').update({ journal_entry_id: je.id }).eq('id', invoiceId)
       }
     } catch (err) {
-      if (err instanceof AccountsNotInChartError) throw err
-      /* non-blocking */
+      // Non-blocking: invoice is already marked as sent. Record a
+      // processing_history breadcrumb so the missing JE is visible in audit
+      // trails. TODO: wire ActivateAccountsDialog into this pending-op flow,
+      // then re-introduce blocking for ACCOUNTS_NOT_IN_CHART here.
+      await recordSkippedInvoiceJournalEntry(invoiceId, companyId, userId, 'mark_invoice_sent', err)
     }
   }
 

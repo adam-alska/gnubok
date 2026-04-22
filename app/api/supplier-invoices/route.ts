@@ -195,10 +195,21 @@ export async function POST(request: Request) {
           .eq('id', invoice.id)
       }
     } catch (err) {
+      // Roll back the just-inserted supplier invoice (+ items via ON DELETE
+      // CASCADE) on any JE failure so we never leave a supplier_invoices row
+      // that has no registration JE. Under accrual method an orphan row
+      // means leverantörsskuld (2440) and ingående moms (2641) go unposted,
+      // which silently understates the momsdeklaration for the period.
+      await supabase.from('supplier_invoices').delete().eq('id', invoice.id).eq('company_id', companyId)
+
       if (err instanceof AccountsNotInChartError) {
         return accountsNotInChartResponse(err)
       }
       console.error('Failed to create registration journal entry:', err)
+      return NextResponse.json(
+        { error: 'Kunde inte bokföra leverantörsfakturan — försök igen eller ändra datum om perioden är låst.' },
+        { status: 500 }
+      )
     }
   }
 

@@ -142,8 +142,8 @@ describe('createDraftEntry — cancelled status on line-insert failure', () => {
           return {
             select: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  in: vi.fn().mockResolvedValue({
+                in: vi.fn().mockReturnValue({
+                  eq: vi.fn().mockResolvedValue({
                     data: [{ account_number: '1930', id: 'acc-1' }, { account_number: '3001', id: 'acc-2' }],
                     error: null,
                   }),
@@ -196,8 +196,8 @@ describe('createDraftEntry — date/period cross-validation', () => {
           return {
             select: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  in: vi.fn().mockResolvedValue({
+                in: vi.fn().mockReturnValue({
+                  eq: vi.fn().mockResolvedValue({
                     data: [{ account_number: '1930', id: 'acc-1' }, { account_number: '3001', id: 'acc-2' }],
                     error: null,
                   }),

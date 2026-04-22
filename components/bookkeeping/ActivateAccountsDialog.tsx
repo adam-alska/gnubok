@@ -59,7 +59,9 @@ export function ActivateAccountsDialog({
 
   const knownRows = rows.filter((r) => r.known)
   const unknownRows = rows.filter((r) => !r.known)
-  const canConfirm = knownRows.length > 0 && !submitting
+  // Disable confirm when any entered number isn't a valid BAS account: activating
+  // only the knowns would leave the unknowns to fail again on retry.
+  const canConfirm = knownRows.length > 0 && unknownRows.length === 0 && !submitting
 
   async function handleConfirm() {
     setSubmitting(true)
