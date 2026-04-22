@@ -5,31 +5,8 @@ import { setActiveCompany } from '@/lib/company/context'
 import { revalidatePath } from 'next/cache'
 import { computeFiscalPeriod } from '@/lib/company/compute-fiscal-period'
 import { mapEntityType } from '@/lib/company-lookup/entity-type-map'
+import { normalizeOrgNumber } from '@/lib/company-lookup/normalize-org-number'
 import type { CompanyLookupResult } from '@/lib/company-lookup/types'
-
-/**
- * Normalize an org number to gnubok's canonical 10-digit storage form.
- *
- * Accepts hyphen/space-formatted input in either of the two shapes Swedish
- * users commonly type:
- *  - 10 digits (559999-1234 or 8001011234) — stored as-is
- *  - 12 digits (19800101-1234) — century prefix stripped
- *
- * Returns null for any other length or non-digit content. Storing malformed
- * values would corrupt SIE4 (#ORGNR) and SRU (INFO.SRU) exports downstream,
- * and break the duplicate-org guard, so we refuse at the boundary.
- *
- * 10-digit storage matches the rest of the codebase — see
- * `lib/skatteverket/format.ts` which converts 10→12 at export time by
- * prefixing with '16' (AB) or '19'/'20' (EF personnummer).
- */
-function normalizeOrgNumber(raw: string | null | undefined): string | null {
-  if (!raw) return null
-  const cleaned = raw.replace(/[\s-]/g, '')
-  if (/^\d{10}$/.test(cleaned)) return cleaned
-  if (/^\d{12}$/.test(cleaned)) return cleaned.substring(2)
-  return null
-}
 
 /**
  * Check whether an org number is already registered in any non-archived

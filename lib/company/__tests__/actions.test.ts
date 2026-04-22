@@ -119,7 +119,7 @@ describe('createCompanyFromTicRole', () => {
 
     const result = await createCompanyFromTicRole({
       teamId: 'team-1',
-      orgNumber: '5566778899',
+      orgNumber: '5560125790',
       legalName: 'Acme AB',
       legalEntityType: 'AB',
       lookup: null,
@@ -152,7 +152,7 @@ describe('createCompanyFromTicRole', () => {
 
     const result = await createCompanyFromTicRole({
       teamId: 'team-1',
-      orgNumber: '5566778899',
+      orgNumber: '5560125790',
       legalName: 'Acme AB',
       legalEntityType: 'AB',
       lookup: null,
@@ -194,7 +194,7 @@ describe('createCompanyFromTicRole', () => {
 
     const result = await createCompanyFromTicRole({
       teamId: 'team-1',
-      orgNumber: '5566778899',
+      orgNumber: '5560125790',
       legalName: 'Acme Konsult AB',
       legalEntityType: 'AB',
       lookup,
@@ -209,7 +209,7 @@ describe('createCompanyFromTicRole', () => {
     const settings = (settingsUpsert!.args[0] as Record<string, unknown>)
     expect(settings.entity_type).toBe('aktiebolag')
     expect(settings.company_name).toBe('Acme Konsult AB')
-    expect(settings.org_number).toBe('5566778899')
+    expect(settings.org_number).toBe('5560125790')
     expect(settings.f_skatt).toBe(true)
     expect(settings.vat_registered).toBe(true)
     expect(settings.moms_period).toBe('quarterly')
@@ -249,7 +249,7 @@ describe('createCompanyFromTicRole', () => {
 
     await createCompanyFromTicRole({
       teamId: 'team-1',
-      orgNumber: '8001011234',
+      orgNumber: '8001011231',
       legalName: 'Liten EF',
       legalEntityType: 'Enskild firma',
       lookup,
@@ -274,14 +274,14 @@ describe('createCompanyFromOnboarding — duplicate org_number guard', () => {
       },
     })
     mockCreateClient.mockResolvedValue(supabase as never)
-    mockServiceClientForOrgNumber('5566778899') // pretend this org is already taken
+    mockServiceClientForOrgNumber('5560125790') // pretend this org is already taken
 
     const result = await createCompanyFromOnboarding({
       teamId: 'team-1',
       settings: {
         entity_type: 'aktiebolag',
         company_name: 'Acme AB',
-        org_number: '5566778899',
+        org_number: '5560125790',
       },
       fiscalPeriod: {
         startDate: '2026-01-01',
@@ -307,7 +307,7 @@ describe('createCompanyFromOnboarding — duplicate org_number guard', () => {
       rpcResults: { create_company_with_owner: { data: 'x' } },
     })
     mockCreateClient.mockResolvedValue(supabase as never)
-    mockServiceClientForOrgNumber('5566778899')
+    mockServiceClientForOrgNumber('5560125790')
 
     const result = await createCompanyFromOnboarding({
       teamId: 'team-1',
@@ -334,7 +334,7 @@ describe('createCompanyFromOnboarding — duplicate org_number guard', () => {
     })
     mockCreateClient.mockResolvedValue(supabase as never)
     // The existing company is stored as the 10-digit canonical form.
-    mockServiceClientForOrgNumber('8001011234')
+    mockServiceClientForOrgNumber('8001011231')
 
     const result = await createCompanyFromOnboarding({
       teamId: 'team-1',
@@ -342,7 +342,7 @@ describe('createCompanyFromOnboarding — duplicate org_number guard', () => {
         entity_type: 'enskild_firma',
         company_name: 'Anna EF',
         // User types full 12-digit personnummer with century prefix.
-        org_number: '19800101-1234',
+        org_number: '19800101-1231',
       },
       fiscalPeriod: {
         startDate: '2026-01-01',
@@ -383,6 +383,36 @@ describe('createCompanyFromOnboarding — duplicate org_number guard', () => {
     expect(rpcCreate).toBeUndefined()
   })
 
+  it('rejects right-length org_numbers with invalid Luhn check digit', async () => {
+    const { supabase } = buildSupabase({
+      user: { id: 'user-1' },
+      rpcResults: { create_company_with_owner: { data: 'x' } },
+    })
+    mockCreateClient.mockResolvedValue(supabase as never)
+
+    const result = await createCompanyFromOnboarding({
+      teamId: 'team-1',
+      settings: {
+        entity_type: 'aktiebolag',
+        company_name: 'Fake AB',
+        // 10 digits but Luhn check digit is wrong (real Volvo is 5560125790;
+        // the trailing 1 is an intentional off-by-one). Skatteverket SRU
+        // validators and receiving SIE4 consumers would reject this, so we
+        // refuse at the boundary.
+        org_number: '5560125791',
+      },
+      fiscalPeriod: {
+        startDate: '2026-01-01',
+        endDate: '2026-12-31',
+        name: 'Räkenskapsår 2026',
+      },
+    })
+
+    expect(result.error).toBe('org_number_invalid')
+    const rpcCreate = supabase.rpc.mock.calls.find(([name]) => name === 'create_company_with_owner')
+    expect(rpcCreate).toBeUndefined()
+  })
+
   it('fails closed when the duplicate lookup errors out (does not silently allow duplicates)', async () => {
     const { supabase } = buildSupabase({
       user: { id: 'user-1' },
@@ -411,7 +441,7 @@ describe('createCompanyFromOnboarding — duplicate org_number guard', () => {
       settings: {
         entity_type: 'aktiebolag',
         company_name: 'Acme AB',
-        org_number: '5566778899',
+        org_number: '5560125790',
       },
       fiscalPeriod: {
         startDate: '2026-01-01',
@@ -447,7 +477,7 @@ describe('createCompanyFromTicRole — ceased companies', () => {
 
     const result = await createCompanyFromTicRole({
       teamId: 'team-1',
-      orgNumber: '5566778899',
+      orgNumber: '5560125790',
       legalName: 'Avregistrerat AB',
       legalEntityType: 'AB',
       lookup,
