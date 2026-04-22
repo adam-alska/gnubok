@@ -1,5 +1,10 @@
 import { VISMA_AUTH_URL, VISMA_TOKEN_URL, VISMA_REVOKE_URL } from './config';
 import type { OAuthConfig, TokenResponse } from '../types';
+import {
+  fetchWithTimeout,
+  OAUTH_TIMEOUT_MS,
+  OAUTH_REVOKE_TIMEOUT_MS,
+} from '@/lib/http/fetch-with-timeout';
 
 const DEFAULT_SCOPES = [
   'ea:api',
@@ -41,18 +46,22 @@ export async function exchangeVismaCode(
   config: OAuthConfig,
   code: string,
 ): Promise<TokenResponse> {
-  const response = await fetch(VISMA_TOKEN_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Authorization: basicAuthHeader(config),
+  const response = await fetchWithTimeout(
+    VISMA_TOKEN_URL,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: basicAuthHeader(config),
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: config.redirectUri,
+      }).toString(),
     },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: config.redirectUri,
-    }).toString(),
-  });
+    { timeoutMs: OAUTH_TIMEOUT_MS, description: 'Visma token exchange' },
+  );
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
@@ -66,17 +75,21 @@ export async function refreshVismaToken(
   config: OAuthConfig,
   refreshToken: string,
 ): Promise<TokenResponse> {
-  const response = await fetch(VISMA_TOKEN_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Authorization: basicAuthHeader(config),
+  const response = await fetchWithTimeout(
+    VISMA_TOKEN_URL,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: basicAuthHeader(config),
+      },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      }).toString(),
     },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: refreshToken,
-    }).toString(),
-  });
+    { timeoutMs: OAUTH_TIMEOUT_MS, description: 'Visma token refresh' },
+  );
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
@@ -90,17 +103,21 @@ export async function revokeVismaToken(
   config: OAuthConfig,
   refreshToken: string,
 ): Promise<boolean> {
-  const response = await fetch(VISMA_REVOKE_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Authorization: basicAuthHeader(config),
+  const response = await fetchWithTimeout(
+    VISMA_REVOKE_URL,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: basicAuthHeader(config),
+      },
+      body: new URLSearchParams({
+        token: refreshToken,
+        token_type_hint: 'refresh_token',
+      }).toString(),
     },
-    body: new URLSearchParams({
-      token: refreshToken,
-      token_type_hint: 'refresh_token',
-    }).toString(),
-  });
+    { timeoutMs: OAUTH_REVOKE_TIMEOUT_MS, description: 'Visma token revoke' },
+  );
 
   return response.ok;
 }

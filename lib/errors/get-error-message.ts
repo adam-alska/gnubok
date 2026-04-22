@@ -86,6 +86,10 @@ const ERROR_PATTERN_MAP: [RegExp, string | null][] = [
     /Entry date .+ is outside fiscal period/i,
     'Datumet ligger utanför det valda räkenskapsåret.',
   ],
+  [
+    /timed out after \d+m?s/i,
+    'Anslutningen mot tjänsten tog för lång tid. Försök igen.',
+  ],
 ]
 
 /**
