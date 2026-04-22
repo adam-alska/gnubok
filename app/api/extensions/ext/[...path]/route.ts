@@ -89,6 +89,21 @@ async function handleRequest(
     return NextResponse.json({ error: 'Route not found' }, { status: 404 })
   }
 
+  // Config sanity check: these flags are orthogonal and the combination is
+  // nonsensical. `skipAuth` already implies no company resolution, so adding
+  // `skipCompanyContext: true` is at best redundant — and if a maintainer
+  // intended "auth required, no company" but also wrote `skipAuth: true`,
+  // the auth requirement would be silently dropped (skipAuth fires first
+  // below). Fail loudly instead of masking the mistake.
+  if (matchedRoute.skipAuth && matchedRoute.skipCompanyContext) {
+    console.error('[extension-dispatcher] route misconfigured: skipAuth + skipCompanyContext are mutually exclusive', {
+      extensionId,
+      routePath,
+      method,
+    })
+    return NextResponse.json({ error: 'Route misconfigured' }, { status: 500 })
+  }
+
   // For skipAuth routes (e.g. OAuth callbacks from external providers),
   // skip user auth, toggle check, and AI consent — dispatch immediately
   if (matchedRoute.skipAuth) {
@@ -118,8 +133,6 @@ async function handleRequest(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const companyId = await requireCompanyId(supabase, user.id)
-
   // If path params were extracted, create a new Request with them as search params
   let handlerRequest = request
   if (Object.keys(extractedParams).length > 0) {
@@ -137,6 +150,15 @@ async function handleRequest(
       duplex: 'half',
     })
   }
+
+  // Routes that are authenticated but run before a company exists (TIC
+  // /lookup during onboarding, for example) opt out of company resolution.
+  // Dispatch without a context — handlers that opt in must not rely on ctx.
+  if (matchedRoute.skipCompanyContext) {
+    return matchedRoute.handler(handlerRequest)
+  }
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   // Build context and dispatch
   const ctx = createExtensionContext(supabase, user.id, companyId, extensionId)
