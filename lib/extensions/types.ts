@@ -68,6 +68,14 @@ export interface ApiRouteDefinition {
   path: string
   /** Skip auth check for this route (e.g. OAuth callbacks from external providers) */
   skipAuth?: boolean
+  /**
+   * Require auth but NOT a resolved company context. Use for routes that
+   * legitimately run during onboarding (before the user has a company) —
+   * e.g. TIC /lookup used by Step2CompanyDetails to fetch company info
+   * while the user types their org number. Handler is called without a
+   * ctx argument; handlers that opt in must tolerate a missing context.
+   */
+  skipCompanyContext?: boolean
   handler: (request: Request, ctx?: ExtensionContext) => Promise<Response>
 }
 

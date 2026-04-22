@@ -49,11 +49,21 @@ async function fetchAndStoreEnrichment(
       hasSecureUrl: !!enrichment.secureUrl,
     })
 
-    // Accept both fully and partially completed runs — if the tenant only has
-    // SPAR enabled (not CompanyRoles), we still want the address data.
-    const usable = (enrichment.status === 'Completed' || enrichment.status === 'PartiallyCompleted')
-      && enrichment.secureUrl
-    if (!usable) return
+    // Case-insensitive status comparison: TIC has been observed returning
+    // lowercase values ('completed', 'failed') in addition to the docs' canonical
+    // capitalized form. Accept both fully and partially completed runs — if the
+    // tenant only has SPAR enabled (not CompanyRoles) we still want the address.
+    const statusLower = String(enrichment.status ?? '').toLowerCase()
+    const isCompleted = statusLower === 'completed' || statusLower === 'partiallycompleted'
+    const usable = isCompleted && enrichment.secureUrl
+    if (!usable) {
+      // Log the full response shape (sans secureUrl — time-limited token)
+      // so we can diagnose why a real-user enrichment comes back non-usable.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { secureUrl: _omit, ...responseDiagnostic } = enrichment
+      log.warn('enrichment not usable — inspect response for diagnostic fields', responseDiagnostic)
+      return
+    }
 
     const enrichmentData = await fetchEnrichmentData(enrichment.secureUrl)
 
@@ -193,6 +203,10 @@ export const ticExtension: Extension = {
     {
       method: 'GET',
       path: '/lookup',
+      // Used during onboarding (Step2CompanyDetails debounced lookup + the
+      // BankID picker) — user is authenticated but does not yet have a
+      // company. Must not require a company context.
+      skipCompanyContext: true,
       handler: async (request: Request, ctx?) => {
         const log = ctx?.log ?? console
         const url = new URL(request.url)
@@ -305,6 +319,9 @@ export const ticExtension: Extension = {
     {
       method: 'GET',
       path: '/profile',
+      // Used during onboarding to render richer company profile details —
+      // user is authenticated but may not yet have a company. See /lookup.
+      skipCompanyContext: true,
       handler: async (request: Request, ctx?) => {
         const log = ctx?.log ?? console
         const url = new URL(request.url)

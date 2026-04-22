@@ -118,8 +118,6 @@ async function handleRequest(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const companyId = await requireCompanyId(supabase, user.id)
-
   // If path params were extracted, create a new Request with them as search params
   let handlerRequest = request
   if (Object.keys(extractedParams).length > 0) {
@@ -137,6 +135,15 @@ async function handleRequest(
       duplex: 'half',
     })
   }
+
+  // Routes that are authenticated but run before a company exists (TIC
+  // /lookup during onboarding, for example) opt out of company resolution.
+  // Dispatch without a context — handlers that opt in must not rely on ctx.
+  if (matchedRoute.skipCompanyContext) {
+    return matchedRoute.handler(handlerRequest)
+  }
+
+  const companyId = await requireCompanyId(supabase, user.id)
 
   // Build context and dispatch
   const ctx = createExtensionContext(supabase, user.id, companyId, extensionId)
