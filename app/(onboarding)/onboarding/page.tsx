@@ -4,7 +4,11 @@ import WelcomeOnboarding from '@/components/dashboard/WelcomeOnboarding'
 
 export const dynamic = 'force-dynamic'
 
-export default async function OnboardingPage() {
+export default async function OnboardingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ org_number?: string }>
+}) {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -42,5 +46,19 @@ export default async function OnboardingPage() {
 
   const firstName = profile?.full_name?.split(' ')[0] || null
 
-  return <WelcomeOnboarding firstName={firstName} teamId={teamId} skipWelcome hasExistingCompanies={hasCompanies} />
+  // The BankID picker routes here with ?org_number=… when TIC /lookup fails
+  // or the entity type isn't one-click-provisionable. Strip formatting so
+  // whatever Step2 displays matches what the rest of the flow will store.
+  const { org_number: rawOrgNumber } = await searchParams
+  const initialOrgNumber = rawOrgNumber ? rawOrgNumber.replace(/[\s-]/g, '') : undefined
+
+  return (
+    <WelcomeOnboarding
+      firstName={firstName}
+      teamId={teamId}
+      skipWelcome
+      hasExistingCompanies={hasCompanies}
+      initialOrgNumber={initialOrgNumber}
+    />
+  )
 }

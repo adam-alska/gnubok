@@ -1,11 +1,36 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { setActiveCompany } from '@/lib/company/context'
 import { revalidatePath } from 'next/cache'
 import { computeFiscalPeriod } from '@/lib/company/compute-fiscal-period'
 import { mapEntityType } from '@/lib/company-lookup/entity-type-map'
 import type { CompanyLookupResult } from '@/lib/company-lookup/types'
+
+/**
+ * Check whether an org number is already registered in any non-archived
+ * gnubok company. Uses the service role because RLS hides rows the caller
+ * isn't a member of — and "other users' duplicates" is exactly what we
+ * need to detect. Returns null if `orgNumber` is empty/nullish.
+ */
+async function findExistingCompanyByOrgNumber(
+  orgNumber: string | null | undefined,
+): Promise<{ id: string; name: string } | null> {
+  if (!orgNumber) return null
+  const cleaned = orgNumber.replace(/[\s-]/g, '')
+  if (!cleaned) return null
+
+  const service = createServiceClient()
+  const { data } = await service
+    .from('companies')
+    .select('id, name')
+    .eq('org_number', cleaned)
+    .is('archived_at', null)
+    .limit(1)
+    .maybeSingle()
+
+  return data ?? null
+}
 
 export async function switchCompany(companyId: string): Promise<{ error?: string }> {
   const supabase = await createClient()
@@ -60,6 +85,20 @@ export async function createCompanyFromOnboarding(params: {
 
   const companyName = (params.settings.company_name as string | undefined) || 'Mitt företag'
 
+  // Duplicate-org guard. We don't have a DB unique constraint on
+  // companies.org_number (can't add one safely without cleaning up any
+  // existing duplicates first), so enforce uniqueness at the application
+  // boundary. Must run before the create RPC so we don't leave a ghost
+  // company if the duplicate is detected mid-flow.
+  const rawOrgNumber = params.settings.org_number as string | undefined
+  const cleanedOrgNumber = rawOrgNumber ? rawOrgNumber.replace(/[\s-]/g, '') : ''
+  if (cleanedOrgNumber) {
+    const existing = await findExistingCompanyByOrgNumber(cleanedOrgNumber)
+    if (existing) {
+      return { error: 'org_number_exists' }
+    }
+  }
+
   // 1. Create company + owner membership atomically via RPC
   const { data: newCompanyId, error: companyError } = await supabase.rpc('create_company_with_owner', {
     p_name: companyName,
@@ -70,6 +109,16 @@ export async function createCompanyFromOnboarding(params: {
   if (companyError || !newCompanyId) {
     console.error('[createCompanyFromOnboarding] company creation failed', companyError)
     return { error: 'Kunde inte skapa företag. Försök igen.' }
+  }
+
+  // Mirror the cleaned org_number onto the companies row so future duplicate
+  // checks and cross-references are reliable (company_settings is upserted
+  // below but the companies row is authoritative for org_number now).
+  if (cleanedOrgNumber) {
+    await supabase
+      .from('companies')
+      .update({ org_number: cleanedOrgNumber })
+      .eq('id', newCompanyId)
   }
 
   // Helper: roll back the company if a subsequent step fails. Deletes in FK order.

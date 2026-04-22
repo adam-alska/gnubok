@@ -42,22 +42,45 @@ async function fetchAndStoreEnrichment(
 ): Promise<void> {
   try {
     const enrichment = await requestEnrichment(sessionId, ['SPAR', 'CompanyRoles'])
-    if (enrichment.status === 'Completed' && enrichment.secureUrl) {
-      const enrichmentData = await fetchEnrichmentData(enrichment.secureUrl)
-      log.info('enrichment success', {
-        hasSpar: !!enrichmentData.spar,
-        companyCount: enrichmentData.companyRoles?.length ?? 0,
-      })
+    log.info('enrichment request returned', {
+      status: enrichment.status,
+      requestedTypes: enrichment.requestedTypes,
+      completedTypes: enrichment.completedTypes,
+      hasSecureUrl: !!enrichment.secureUrl,
+    })
 
-      await supabase
-        .from('extension_data')
-        .upsert({
-          user_id: userId,
-          extension_id: 'tic',
-          key: 'bankid_enrichment',
-          value: enrichmentData,
-        }, { onConflict: 'user_id,extension_id,key' })
-    }
+    // Accept both fully and partially completed runs — if the tenant only has
+    // SPAR enabled (not CompanyRoles), we still want the address data.
+    const usable = (enrichment.status === 'Completed' || enrichment.status === 'PartiallyCompleted')
+      && enrichment.secureUrl
+    if (!usable) return
+
+    const enrichmentData = await fetchEnrichmentData(enrichment.secureUrl)
+
+    // Log a PII-free snapshot so we can debug the role filter in production.
+    // Raw personnummer/names are deliberately omitted.
+    const firstRole = enrichmentData.companyRoles?.[0]
+    log.info('enrichment data shape', {
+      hasSpar: !!enrichmentData.spar,
+      companyCount: enrichmentData.companyRoles?.length ?? 0,
+      firstRoleStatuses: firstRole
+        ? {
+            companyStatus: firstRole.companyStatus,
+            positionEndIsNull: firstRole.positionEnd === null,
+            positionTypes: firstRole.positionTypes,
+            legalEntityType: firstRole.legalEntityType,
+          }
+        : null,
+    })
+
+    await supabase
+      .from('extension_data')
+      .upsert({
+        user_id: userId,
+        extension_id: 'tic',
+        key: 'bankid_enrichment',
+        value: enrichmentData,
+      }, { onConflict: 'user_id,extension_id,key' })
   } catch (enrichError) {
     log.warn('enrichment failed (non-blocking)', enrichError)
   }
