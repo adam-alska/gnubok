@@ -146,17 +146,6 @@ export async function createCompanyFromOnboarding(params: {
     console.error('[createCompanyFromOnboarding] setActiveCompany failed', err)
   }
 
-  // 6. Consume the one-time BankID enrichment row (SPAR + CompanyRoles) now
-  // that a company has been successfully provisioned. Keeping it around would
-  // cause /select-company to re-offer companies the user has already set up.
-  // Non-fatal: if the row is missing or the delete fails, nothing breaks.
-  await supabase
-    .from('extension_data')
-    .delete()
-    .eq('user_id', user.id)
-    .eq('extension_id', 'tic')
-    .eq('key', 'bankid_enrichment')
-
   revalidatePath('/')
   return { companyId: newCompanyId }
 }
@@ -170,8 +159,14 @@ export async function createCompanyFromOnboarding(params: {
  * sensible defaults (accrual, quarterly moms for VAT-registered, Jan-Dec
  * fiscal year), reads SPAR address from `extension_data` as a fallback, and
  * then delegates to `createCompanyFromOnboarding` so the provisioning path is
- * identical to the manual wizard. On success it clears the one-time enrichment
- * row — subsequent visits to /select-company will re-fetch from BankID.
+ * identical to the manual wizard. On success it clears the enrichment row
+ * consumed by this path — the manual wizard leaves it intact so a returning
+ * BankID user can still reach `/select-company` and pick another directorship.
+ *
+ * Requires `lookup` to be non-null: if TIC `/lookup` is unreachable, the client
+ * must route to the manual wizard instead. Silently defaulting `vat_registered`
+ * to false for a momsregistrerat bolag would violate ML 17 kap (invoices
+ * without moms), so we refuse to guess.
  */
 export async function createCompanyFromTicRole(params: {
   teamId: string
@@ -192,10 +187,17 @@ export async function createCompanyFromTicRole(params: {
     return { error: 'Den här företagsformen måste sättas upp manuellt.' }
   }
 
-  // SPAR address fallback if TIC lookup didn't include one.
+  // If the TIC lookup failed we don't know the company's VAT/F-skatt status.
+  // Refuse to silently guess — the caller routes to the manual wizard so the
+  // user can confirm these fields themselves.
+  if (!params.lookup) {
+    return { error: 'lookup_missing' }
+  }
+
+  // SPAR address fallback if the TIC lookup didn't include one.
   const { data: enrichmentRow } = await supabase
     .from('extension_data')
-    .select('value')
+    .select('id, value')
     .eq('user_id', user.id)
     .eq('extension_id', 'tic')
     .eq('key', 'bankid_enrichment')
@@ -206,12 +208,23 @@ export async function createCompanyFromTicRole(params: {
   const sparPostal = spar?.Folkbokforingsadress_SvenskAdress_PostNr
   const sparCity = spar?.Folkbokforingsadress_SvenskAdress_Postort
 
-  const addressStreet = params.lookup?.address?.street ?? sparStreet ?? null
-  const addressPostal = params.lookup?.address?.postalCode ?? sparPostal ?? null
-  const addressCity = params.lookup?.address?.city ?? sparCity ?? null
+  const addressStreet = params.lookup.address?.street ?? sparStreet ?? null
+  const addressPostal = params.lookup.address?.postalCode ?? sparPostal ?? null
+  const addressCity = params.lookup.address?.city ?? sparCity ?? null
 
-  const fTax = params.lookup?.registration.fTax ?? false
-  const vatRegistered = params.lookup?.registration.vat ?? false
+  const fTax = params.lookup.registration.fTax
+  const vatRegistered = params.lookup.registration.vat
+
+  // moms_period: Skatteverket assigns the actual reporting period from
+  // annual beskattningsunderlag (≤1 MSEK → yearly, ≤40 MSEK → quarterly,
+  // >40 MSEK → monthly). TIC /lookup doesn't expose turnover, so we pick the
+  // middle-tier default. The user can change it in /settings/tax; the
+  // onboarding confirmation UI flags this as provisional.
+  const momsPeriod = vatRegistered ? 'quarterly' : null
+
+  // K1/förenklat bokslut (enskild firma ≤3 MSEK) defaults to kontantmetoden;
+  // aktiebolag must use bokföringsmässiga grunder under K2/K3.
+  const accountingMethod = entityType === 'enskild_firma' ? 'cash' : 'accrual'
 
   const settings: Record<string, unknown> = {
     entity_type: entityType,
@@ -219,8 +232,8 @@ export async function createCompanyFromTicRole(params: {
     org_number: params.orgNumber.replace(/[\s-]/g, ''),
     f_skatt: fTax,
     vat_registered: vatRegistered,
-    moms_period: vatRegistered ? 'quarterly' : null,
-    accounting_method: 'accrual',
+    moms_period: momsPeriod,
+    accounting_method: accountingMethod,
     fiscal_year_start_month: 1,
     address_line1: addressStreet,
     postal_code: addressPostal,
@@ -246,8 +259,13 @@ export async function createCompanyFromTicRole(params: {
     return { error: result.error ?? 'Kunde inte skapa företag. Försök igen.' }
   }
 
-  // Enrichment row cleanup is handled inside createCompanyFromOnboarding so
-  // both the one-click and manual paths converge on the same behavior.
+  // One-time use: drop the enrichment row now that the user has committed to
+  // a TIC-suggested company. The manual wizard intentionally does NOT do this
+  // so a user with multiple directorships can still reach /select-company
+  // afterwards and provision another one.
+  if (enrichmentRow?.id) {
+    await supabase.from('extension_data').delete().eq('id', enrichmentRow.id)
+  }
 
   return { companyId: result.companyId }
 }

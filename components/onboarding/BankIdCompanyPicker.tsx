@@ -114,9 +114,22 @@ export default function BankIdCompanyPicker({
         const json = await res.json()
         lookup = (json?.data as CompanyLookupResult | undefined) ?? null
       }
-      // Non-ok responses are non-fatal — we'll provision with just the role data.
     } catch {
-      // Network failure is non-fatal; we still have role name/org/entityType.
+      // Network/parse failure — fall through to the lookup-missing branch below.
+    }
+
+    // Without a lookup we don't know the company's VAT/F-skatt status.
+    // Defaulting those to false for a momsregistrerat bolag would silently
+    // create a company that issues invoices without moms — ML 17 kap violation.
+    // Route to the manual wizard with the known fields pre-filled instead.
+    if (!lookup) {
+      toast({
+        title: 'Kunde inte hämta företagsuppgifter',
+        description: 'Fyll i resterande uppgifter manuellt.',
+      })
+      setSetup({ kind: 'idle' })
+      router.push(`/onboarding?org_number=${encodeURIComponent(orgNumber)}`)
+      return
     }
 
     setSetup({ kind: 'creating', orgNumber, step: 'provision' })
@@ -129,6 +142,14 @@ export default function BankIdCompanyPicker({
         legalEntityType: role.legalEntityType,
         lookup,
       })
+
+      if (result.error === 'lookup_missing') {
+        // Extremely unlikely (we just verified lookup above) but if it happens,
+        // the same fallback applies.
+        setSetup({ kind: 'idle' })
+        router.push(`/onboarding?org_number=${encodeURIComponent(orgNumber)}`)
+        return
+      }
 
       if (result.error || !result.companyId) {
         toast({

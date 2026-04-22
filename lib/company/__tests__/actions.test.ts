@@ -115,6 +115,24 @@ describe('createCompanyFromTicRole', () => {
     expect(writes).toEqual([])
   })
 
+  it('refuses to guess when TIC lookup is missing (prevents silent ML 17 kap violation)', async () => {
+    const { supabase, calls } = buildSupabase({ user: { id: 'user-1' } })
+    mockCreateClient.mockResolvedValue(supabase as never)
+
+    const result = await createCompanyFromTicRole({
+      teamId: 'team-1',
+      orgNumber: '5566778899',
+      legalName: 'Acme AB',
+      legalEntityType: 'AB',
+      lookup: null,
+    })
+
+    expect(result.error).toBe('lookup_missing')
+    // Must not have provisioned anything with a guessed VAT status.
+    const writes = calls.filter((c) => ['insert', 'upsert', 'delete', 'update'].includes(c.method))
+    expect(writes).toEqual([])
+  })
+
   it('provisions with sensible defaults for a VAT-registered aktiebolag', async () => {
     const lookup: CompanyLookupResult = {
       companyName: 'Acme Konsult AB',
@@ -129,6 +147,13 @@ describe('createCompanyFromTicRole', () => {
 
     const { supabase, calls } = buildSupabase({
       user: { id: 'user-1' },
+      results: {
+        // Seed an enrichment row so the cleanup branch runs and the test
+        // can verify it fires.
+        extension_data: {
+          maybeSingle: { data: { id: 'enrichment-1', value: {} } },
+        },
+      },
       rpcResults: {
         create_company_with_owner: { data: 'new-company-id' },
         seed_chart_of_accounts: { data: null },
@@ -162,14 +187,15 @@ describe('createCompanyFromTicRole', () => {
     expect(settings.postal_code).toBe('11122')
     expect(settings.city).toBe('Stockholm')
 
-    // The enrichment row should be cleaned up post-creation.
+    // The enrichment row must be cleaned up by the one-click path so the
+    // picker doesn't re-offer this company on a return visit.
     const enrichmentDelete = calls.find(
       (c) => c.table === 'extension_data' && c.method === 'delete',
     )
     expect(enrichmentDelete).toBeDefined()
   })
 
-  it('sets moms_period to null when the company is not VAT-registered', async () => {
+  it('defaults enskild firma to kontantmetoden (K1), leaves moms_period null when non-VAT', async () => {
     const lookup: CompanyLookupResult = {
       companyName: 'Liten EF',
       isCeased: false,
@@ -203,5 +229,7 @@ describe('createCompanyFromTicRole', () => {
     expect(settings.entity_type).toBe('enskild_firma')
     expect(settings.vat_registered).toBe(false)
     expect(settings.moms_period).toBeNull()
+    // EF entities default to cash per K1/BFNAR 2013:2; AB must use accrual (K2/K3).
+    expect(settings.accounting_method).toBe('cash')
   })
 })
