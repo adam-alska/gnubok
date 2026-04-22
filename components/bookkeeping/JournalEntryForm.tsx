@@ -16,6 +16,11 @@ import DocumentUploadZone from '@/components/bookkeeping/DocumentUploadZone'
 import AccountCombobox from '@/components/bookkeeping/AccountCombobox'
 import BookingTemplatePicker from '@/components/bookkeeping/BookingTemplatePicker'
 import CreatePeriodDialog from '@/components/bookkeeping/CreatePeriodDialog'
+import { ActivateAccountsDialog } from '@/components/bookkeeping/ActivateAccountsDialog'
+import {
+  useSubmitWithAccountActivation,
+  throwOnStructuredError,
+} from '@/lib/hooks/use-submit-with-account-activation'
 import { getErrorMessage } from '@/lib/errors/get-error-message'
 import { formatCurrency } from '@/lib/utils'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
@@ -273,9 +278,9 @@ export default function JournalEntryForm({
     setShowReview(true)
   }
 
-  const handleConfirm = async () => {
-    setIsSubmitting(true)
-
+  // Inner submit: builds payload, POSTs, throws a structured error on failure
+  // (so the activation hook can intercept ACCOUNTS_NOT_IN_CHART).
+  const postJournalEntry = useCallback(async () => {
     let currencyMetaApplied = false
     const entryLines: CreateJournalEntryLineInput[] = lines
       .filter((l) => l.account_number && (l.debit_amount || l.credit_amount))
@@ -287,15 +292,11 @@ export default function JournalEntryForm({
           line_description: l.line_description || undefined,
         }
 
-        // Attach currency metadata from pre-populated data (e.g. transaction flow)
         if (l.currency) {
           base.currency = l.currency
           if (l.amount_in_currency != null) base.amount_in_currency = l.amount_in_currency
           if (l.exchange_rate != null) base.exchange_rate = l.exchange_rate
-        }
-        // Attach currency metadata from the entry-level currency selector (manual flow)
-        // Applied to the first bank/cash account (class 19xx) only
-        else if (isForeign && rate > 0 && l.account_number.startsWith('19') && !currencyMetaApplied) {
+        } else if (isForeign && rate > 0 && l.account_number.startsWith('19') && !currencyMetaApplied) {
           base.currency = entryCurrency
           base.amount_in_currency = computedForeignAmount
           base.exchange_rate = rate
@@ -306,7 +307,6 @@ export default function JournalEntryForm({
       })
 
     const url = submitUrl ?? '/api/bookkeeping/journal-entries'
-
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -321,17 +321,17 @@ export default function JournalEntryForm({
         lines: entryLines,
       }),
     })
+    return (await throwOnStructuredError(res)) as { data?: { id?: string; voucher_series?: string; voucher_number?: number }; journal_entry_id?: string }
+  }, [lines, isForeign, rate, entryCurrency, computedForeignAmount, submitUrl, selectedPeriod, entryDate, description, sourceType, sourceId, voucherSeries, notes])
 
-    const result = await res.json()
+  const { runSubmit, dialog: activationDialog, confirm: confirmActivation, cancel: cancelActivation } =
+    useSubmitWithAccountActivation(postJournalEntry)
 
-    if (result.error) {
-      toast({
-        title: 'Kunde inte skapa verifikation',
-        description: getErrorMessage(result, { context: 'journal_entry', statusCode: res.status }),
-        variant: 'destructive',
-      })
-    } else {
-      // Link uploaded documents to the new journal entry (non-blocking)
+  const handleConfirm = async () => {
+    setIsSubmitting(true)
+    try {
+      const result = await runSubmit()
+
       const journalEntryId = result.data?.id ?? result.journal_entry_id
       if (journalEntryId && uploadedFiles.length > 0) {
         const filesToLink = uploadedFiles.filter((f) => f.status === 'uploaded' && f.id)
@@ -361,7 +361,6 @@ export default function JournalEntryForm({
         description: `Verifikation ${result.data?.voucher_series ?? ''}${result.data?.voucher_number ?? ''} har skapats.`,
       })
       setShowReview(false)
-      // Reset form
       setDescription('')
       setNotes('')
       setUploadedFiles([])
@@ -373,9 +372,20 @@ export default function JournalEntryForm({
       if (journalEntryId) {
         onEntryCreated?.(journalEntryId)
       }
+    } catch (err) {
+      if (err instanceof Error && err.message === 'cancelled') {
+        // User dismissed the activation dialog — no toast needed
+      } else {
+        const anyErr = err as { body?: unknown; status?: number }
+        toast({
+          title: 'Kunde inte skapa verifikation',
+          description: getErrorMessage(anyErr.body ?? err, { context: 'journal_entry', statusCode: anyErr.status }),
+          variant: 'destructive',
+        })
+      }
+    } finally {
+      setIsSubmitting(false)
     }
-
-    setIsSubmitting(false)
   }
 
   const formContent = (
@@ -769,6 +779,13 @@ export default function JournalEntryForm({
           </div>
         )}
       </div>
+
+      <ActivateAccountsDialog
+        open={activationDialog.open}
+        accountNumbers={activationDialog.accountNumbers}
+        onConfirm={confirmActivation}
+        onCancel={cancelActivation}
+      />
 
       <ConfirmationDialog
         open={showReview}

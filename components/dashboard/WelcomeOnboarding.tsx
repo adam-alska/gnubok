@@ -6,10 +6,10 @@ import { createClient } from '@/lib/supabase/client'
 import { createCompanyFromOnboarding } from '@/lib/company/actions'
 import { computeFiscalPeriod } from '@/lib/company/compute-fiscal-period'
 import { useToast } from '@/components/ui/use-toast'
-import { Loader2, Building2, Plus } from 'lucide-react'
+import { Loader2, Building2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
-import type { CompanyLookupResult, EnrichmentCompanyRole } from '@/lib/company-lookup/types'
+import type { CompanyLookupResult } from '@/lib/company-lookup/types'
 import type { CompanySettings, EntityType, MomsPeriod } from '@/types'
 
 import Step1EntityType from '@/components/onboarding/Step1EntityType'
@@ -23,14 +23,6 @@ const STEP_INFO = [
   { title: 'F-skatt & räkenskapsår', subtitle: 'Ange din skatteregistrering och räkenskapsår.' },
   { title: 'Moms & bokföring', subtitle: 'Momsregistrering och bokföringsmetod.' },
 ]
-
-/** Map TIC legalEntityType to gnubok EntityType */
-function mapEntityType(ticType: string): EntityType | null {
-  const lower = ticType.toLowerCase()
-  if (lower === 'ab' || lower.includes('aktiebolag')) return 'aktiebolag'
-  if (lower === 'ef' || lower.includes('enskild firma') || lower.includes('enskild')) return 'enskild_firma'
-  return null
-}
 
 function translatePeriodError(msg: string): string {
   if (msg.includes('end must be after')) return 'Slutdatumet måste vara efter startdatumet.'
@@ -56,9 +48,17 @@ interface WelcomeOnboardingProps {
   teamId: string
   skipWelcome?: boolean
   hasExistingCompanies?: boolean
+  /** Pre-fill Step 2 org_number when the picker routed here via ?org_number=. */
+  initialOrgNumber?: string
 }
 
-export default function WelcomeOnboarding({ firstName, teamId, skipWelcome, hasExistingCompanies }: WelcomeOnboardingProps) {
+export default function WelcomeOnboarding({
+  firstName,
+  teamId,
+  skipWelcome,
+  hasExistingCompanies,
+  initialOrgNumber,
+}: WelcomeOnboardingProps) {
   const router = useRouter()
   const { toast } = useToast()
   const supabase = createClient()
@@ -67,20 +67,23 @@ export default function WelcomeOnboarding({ firstName, teamId, skipWelcome, hasE
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
-  const [settings, setSettings] = useState<Partial<CompanySettings>>({})
+  const [settings, setSettings] = useState<Partial<CompanySettings>>(
+    initialOrgNumber ? { org_number: initialOrgNumber } : {},
+  )
   const ticEnabled = ENABLED_EXTENSION_IDS.has('tic')
   const [ticLookup, setTicLookup] = useState<CompanyLookupResult | null>(null)
-  const [enrichmentCompanies, setEnrichmentCompanies] = useState<EnrichmentCompanyRole[]>([])
-  const [orgNumberLocked, setOrgNumberLocked] = useState(false)
 
   const totalSteps = 4
 
   const hour = new Date().getHours()
   const greeting = hour < 5 ? 'God natt' : hour < 10 ? 'Godmorgon' : hour < 14 ? 'Hej' : hour < 18 ? 'God eftermiddag' : 'God kväll'
 
-  // Load BankID enrichment data on mount
+  // Pre-fill the user's folkbokföringsadress from BankID/SPAR enrichment when
+  // available. The row is persisted (not consumed here) so /select-company and
+  // repeat /onboarding visits still see it; it's deleted only once a company
+  // is successfully created (see createCompanyFromOnboarding).
   useEffect(() => {
-    async function loadEnrichment() {
+    async function loadSparAddress() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         router.push('/login')
@@ -90,37 +93,20 @@ export default function WelcomeOnboarding({ firstName, teamId, skipWelcome, hasE
       try {
         const { data: enrichmentRow } = await supabase
           .from('extension_data')
-          .select('id, value')
+          .select('value')
           .eq('user_id', user.id)
           .eq('extension_id', 'tic')
           .eq('key', 'bankid_enrichment')
           .maybeSingle()
 
-        if (enrichmentRow?.value) {
-          const enrichment = enrichmentRow.value as { spar?: Record<string, string>; companyRoles?: EnrichmentCompanyRole[] }
-
-          const activeCompanies = (enrichment.companyRoles ?? []).filter(
-            (c: EnrichmentCompanyRole) => c.companyStatus === 'Aktivt' && c.positionEnd === null
-          )
-          if (activeCompanies.length > 0) {
-            setEnrichmentCompanies(activeCompanies)
-          }
-
-          if (enrichment.spar) {
-            const spar = enrichment.spar
-            setSettings((prev) => ({
-              ...prev,
-              address_line1: spar.Folkbokforingsadress_SvenskAdress_Utdelningsadress1 || prev.address_line1,
-              postal_code: spar.Folkbokforingsadress_SvenskAdress_PostNr || prev.postal_code,
-              city: spar.Folkbokforingsadress_SvenskAdress_Postort || prev.city,
-            }))
-          }
-
-          // Delete enrichment data (one-time use)
-          await supabase
-            .from('extension_data')
-            .delete()
-            .eq('id', enrichmentRow.id)
+        const spar = (enrichmentRow?.value as { spar?: Record<string, string> } | null)?.spar
+        if (spar) {
+          setSettings((prev) => ({
+            ...prev,
+            address_line1: spar.Folkbokforingsadress_SvenskAdress_Utdelningsadress1 || prev.address_line1,
+            postal_code: spar.Folkbokforingsadress_SvenskAdress_PostNr || prev.postal_code,
+            city: spar.Folkbokforingsadress_SvenskAdress_Postort || prev.city,
+          }))
         }
       } catch (err) {
         console.warn(LOG, 'enrichment loading failed (non-blocking)', err)
@@ -129,11 +115,19 @@ export default function WelcomeOnboarding({ firstName, teamId, skipWelcome, hasE
       setIsLoading(false)
     }
 
-    loadEnrichment()
+    loadSparAddress()
   }, [supabase, router])
 
   const handleNext = async (stepData: Partial<CompanySettings>) => {
-    if (currentStep === 1 && stepData.entity_type && stepData.entity_type !== settings.entity_type) {
+    // Reset org_number/company_name only on a genuine change (user going back
+    // and picking a different entity type). First-time selection must not
+    // wipe a pre-fill (e.g. ?org_number= deep-link from /select-company).
+    if (
+      currentStep === 1 &&
+      stepData.entity_type &&
+      settings.entity_type &&
+      stepData.entity_type !== settings.entity_type
+    ) {
       stepData = { ...stepData, org_number: '', company_name: '' }
       setTicLookup(null)
     }
@@ -187,11 +181,27 @@ export default function WelcomeOnboarding({ firstName, teamId, skipWelcome, hasE
 
       if (result.error || !result.companyId) {
         logError('create company action failed', { error: result.error })
+        let title = 'Fel'
+        let description: string = result.error || 'Kunde inte skapa företag. Försök igen.'
+        let backToStep2 = false
+        if (result.error === 'org_number_exists') {
+          title = 'Företaget finns redan'
+          description = 'Det här företaget finns redan i gnubok. Be en befintlig administratör att bjuda in dig.'
+          backToStep2 = true
+        } else if (result.error === 'org_number_invalid') {
+          title = 'Ogiltigt organisationsnummer'
+          description = 'Kontrollera att du angett ett giltigt 10- eller 12-siffrigt organisationsnummer.'
+          backToStep2 = true
+        }
         toast({
-          title: 'Fel',
-          description: result.error || 'Kunde inte skapa företag. Försök igen.',
+          title,
+          description,
           variant: 'destructive',
         })
+        // Back user up to step 2 so they can correct the org number.
+        if (backToStep2) {
+          setCurrentStep(2)
+        }
         return
       }
 
@@ -214,21 +224,6 @@ export default function WelcomeOnboarding({ firstName, teamId, skipWelcome, hasE
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1)
     }
-  }
-
-  /** Handle selecting a company from BankID enrichment */
-  const handleEnrichmentSelect = (company: EnrichmentCompanyRole) => {
-    const entityType = mapEntityType(company.legalEntityType)
-    if (!entityType) return
-
-    setSettings((prev) => ({
-      ...prev,
-      entity_type: entityType,
-      org_number: company.companyRegistrationNumber,
-      company_name: company.legalName,
-    }))
-    setOrgNumberLocked(true)
-    setEnrichmentCompanies([])
   }
 
   if (isLoading) {
@@ -324,35 +319,6 @@ export default function WelcomeOnboarding({ firstName, teamId, skipWelcome, hasE
           {/* Form content */}
           <div className="px-6 py-6">
             <div key={`step-${currentStep}`} className="animate-slide-up">
-              {currentStep === 1 && enrichmentCompanies.length > 0 && (
-                <div className="mb-6 space-y-3">
-                  <p className="text-sm font-medium">Vi hittade dessa företag kopplade till ditt BankID:</p>
-                  {enrichmentCompanies.map((company) => {
-                    const entityType = mapEntityType(company.legalEntityType)
-                    return (
-                      <button
-                        key={company.companyRegistrationNumber}
-                        onClick={() => handleEnrichmentSelect(company)}
-                        className="w-full rounded-lg border bg-card p-4 text-left transition-colors hover:border-primary/50 hover:bg-primary/[0.02]"
-                      >
-                        <p className="font-medium text-sm">{company.legalName}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {company.companyRegistrationNumber} · {entityType === 'aktiebolag' ? 'Aktiebolag' : entityType === 'enskild_firma' ? 'Enskild firma' : company.legalEntityType}
-                        </p>
-                      </button>
-                    )
-                  })}
-                  <div className="relative py-2">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-card px-2 text-muted-foreground">eller välj företagsform manuellt</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {currentStep === 1 && (
                 <Step1EntityType
                   initialData={{ entity_type: settings.entity_type as EntityType }}
@@ -377,7 +343,6 @@ export default function WelcomeOnboarding({ firstName, teamId, skipWelcome, hasE
                   onNext={(data) => handleNext(data)}
                   onBack={handleBack}
                   isSaving={isSaving}
-                  orgNumberLocked={orgNumberLocked}
                 />
               )}
 

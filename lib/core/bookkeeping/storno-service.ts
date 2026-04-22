@@ -6,6 +6,7 @@ import type {
   JournalEntryLine,
 } from '@/types'
 import { validateBalance, getNextVoucherNumber, getSwedishLocalDate } from '@/lib/bookkeeping/engine'
+import { AccountsNotInChartError } from '@/lib/bookkeeping/errors'
 
 /**
  * Storno Service - 3-step correction flow per Bokföringslagen
@@ -161,12 +162,13 @@ export async function correctEntry(
       original.voucher_series || 'A'
     )
 
-    // Resolve account IDs for corrected lines
+    // Resolve account IDs for corrected lines — only active rows count
     const accountNumbers = [...new Set(correctedLines.map((l) => l.account_number))]
     const { data: accounts } = await supabase
       .from('chart_of_accounts')
       .select('id, account_number')
       .eq('company_id', companyId)
+      .eq('is_active', true)
       .in('account_number', accountNumbers)
 
     const accountIdMap = new Map<string, string>()
@@ -177,9 +179,7 @@ export async function correctEntry(
     // Validate all account numbers resolved to IDs
     const missingAccounts = accountNumbers.filter(num => !accountIdMap.has(num))
     if (missingAccounts.length > 0) {
-      throw new Error(
-        `Account(s) not found in chart of accounts: ${missingAccounts.join(', ')}`
-      )
+      throw new AccountsNotInChartError(missingAccounts)
     }
 
     const { data: newEntry, error: correctedError } = await supabase
