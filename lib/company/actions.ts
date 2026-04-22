@@ -232,11 +232,11 @@ export async function createCompanyFromOnboarding(params: {
  * fetched from `/api/extensions/ext/tic/lookup`, plus the `EnrichmentCompanyRole`
  * minimums (org number, legal name, legal entity type). This action derives
  * sensible defaults (accrual, quarterly moms for VAT-registered, Jan-Dec
- * fiscal year), reads SPAR address from `extension_data` as a fallback, and
- * then delegates to `createCompanyFromOnboarding` so the provisioning path is
- * identical to the manual wizard. On success it clears the enrichment row
- * consumed by this path — the manual wizard leaves it intact so a returning
- * BankID user can still reach `/select-company` and pick another directorship.
+ * fiscal year) and delegates to `createCompanyFromOnboarding` so the
+ * provisioning path is identical to the manual wizard. On success it clears
+ * the enrichment row consumed by this path — the manual wizard leaves it
+ * intact so a returning BankID user can still reach `/select-company` and
+ * pick another directorship.
  *
  * Requires `lookup` to be non-null: if TIC `/lookup` is unreachable, the client
  * must route to the manual wizard instead. Silently defaulting `vat_registered`
@@ -277,23 +277,20 @@ export async function createCompanyFromTicRole(params: {
     return { error: 'company_ceased' }
   }
 
-  // SPAR address fallback if the TIC lookup didn't include one.
+  // Look up the enrichment row so we can delete it after successful
+  // provisioning (one-time use). We only need `id` here; the picker has
+  // already used the `companyRoles` field server-side to render the cards.
   const { data: enrichmentRow } = await supabase
     .from('extension_data')
-    .select('id, value')
+    .select('id')
     .eq('user_id', user.id)
     .eq('extension_id', 'tic')
     .eq('key', 'bankid_enrichment')
     .maybeSingle()
 
-  const spar = (enrichmentRow?.value as { spar?: Record<string, string | undefined> } | null)?.spar
-  const sparStreet = spar?.Folkbokforingsadress_SvenskAdress_Utdelningsadress1
-  const sparPostal = spar?.Folkbokforingsadress_SvenskAdress_PostNr
-  const sparCity = spar?.Folkbokforingsadress_SvenskAdress_Postort
-
-  const addressStreet = params.lookup.address?.street ?? sparStreet ?? null
-  const addressPostal = params.lookup.address?.postalCode ?? sparPostal ?? null
-  const addressCity = params.lookup.address?.city ?? sparCity ?? null
+  const addressStreet = params.lookup.address?.street ?? null
+  const addressPostal = params.lookup.address?.postalCode ?? null
+  const addressCity = params.lookup.address?.city ?? null
 
   const fTax = params.lookup.registration.fTax
   const vatRegistered = params.lookup.registration.vat
