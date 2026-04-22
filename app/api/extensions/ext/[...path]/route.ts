@@ -89,6 +89,21 @@ async function handleRequest(
     return NextResponse.json({ error: 'Route not found' }, { status: 404 })
   }
 
+  // Config sanity check: these flags are orthogonal and the combination is
+  // nonsensical. `skipAuth` already implies no company resolution, so adding
+  // `skipCompanyContext: true` is at best redundant — and if a maintainer
+  // intended "auth required, no company" but also wrote `skipAuth: true`,
+  // the auth requirement would be silently dropped (skipAuth fires first
+  // below). Fail loudly instead of masking the mistake.
+  if (matchedRoute.skipAuth && matchedRoute.skipCompanyContext) {
+    console.error('[extension-dispatcher] route misconfigured: skipAuth + skipCompanyContext are mutually exclusive', {
+      extensionId,
+      routePath,
+      method,
+    })
+    return NextResponse.json({ error: 'Route misconfigured' }, { status: 500 })
+  }
+
   // For skipAuth routes (e.g. OAuth callbacks from external providers),
   // skip user auth, toggle check, and AI consent — dispatch immediately
   if (matchedRoute.skipAuth) {

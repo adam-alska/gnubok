@@ -62,7 +62,14 @@ export interface RouteDefinition {
   label: string
 }
 
-/** An API route exposed by an extension */
+/**
+ * An API route exposed by an extension.
+ *
+ * Auth/context modes (mutually exclusive — combining throws at dispatch time):
+ *   - default: requires auth AND a resolved company; ctx is passed to the handler
+ *   - `skipAuth: true`: no auth, no ctx (e.g. OAuth callbacks)
+ *   - `skipCompanyContext: true`: auth required, no ctx (pre-onboarding routes)
+ */
 export interface ApiRouteDefinition {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
   path: string
@@ -74,6 +81,9 @@ export interface ApiRouteDefinition {
    * e.g. TIC /lookup used by Step2CompanyDetails to fetch company info
    * while the user types their org number. Handler is called without a
    * ctx argument; handlers that opt in must tolerate a missing context.
+   *
+   * Must NOT be combined with `skipAuth: true` — the dispatcher treats
+   * that as a misconfiguration and returns 500.
    */
   skipCompanyContext?: boolean
   handler: (request: Request, ctx?: ExtensionContext) => Promise<Response>
