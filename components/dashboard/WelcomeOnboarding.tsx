@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { createCompanyFromOnboarding } from '@/lib/company/actions'
 import { computeFiscalPeriod } from '@/lib/company/compute-fiscal-period'
 import { useToast } from '@/components/ui/use-toast'
-import { Loader2, Building2 } from 'lucide-react'
+import { Building2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ENABLED_EXTENSION_IDS } from '@/lib/extensions/_generated/enabled-extensions'
 import type { CompanyLookupResult } from '@/lib/company-lookup/types'
@@ -61,10 +60,8 @@ export default function WelcomeOnboarding({
 }: WelcomeOnboardingProps) {
   const router = useRouter()
   const { toast } = useToast()
-  const supabase = createClient()
 
   const [started, setStarted] = useState(skipWelcome ?? false)
-  const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
   const [settings, setSettings] = useState<Partial<CompanySettings>>(
@@ -77,46 +74,6 @@ export default function WelcomeOnboarding({
 
   const hour = new Date().getHours()
   const greeting = hour < 5 ? 'God natt' : hour < 10 ? 'Godmorgon' : hour < 14 ? 'Hej' : hour < 18 ? 'God eftermiddag' : 'God kväll'
-
-  // Pre-fill the user's folkbokföringsadress from BankID/SPAR enrichment when
-  // available. The row is persisted (not consumed here) so /select-company and
-  // repeat /onboarding visits still see it; it's deleted only once a company
-  // is successfully created (see createCompanyFromOnboarding).
-  useEffect(() => {
-    async function loadSparAddress() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
-
-      try {
-        const { data: enrichmentRow } = await supabase
-          .from('extension_data')
-          .select('value')
-          .eq('user_id', user.id)
-          .eq('extension_id', 'tic')
-          .eq('key', 'bankid_enrichment')
-          .maybeSingle()
-
-        const spar = (enrichmentRow?.value as { spar?: Record<string, string> } | null)?.spar
-        if (spar) {
-          setSettings((prev) => ({
-            ...prev,
-            address_line1: spar.Folkbokforingsadress_SvenskAdress_Utdelningsadress1 || prev.address_line1,
-            postal_code: spar.Folkbokforingsadress_SvenskAdress_PostNr || prev.postal_code,
-            city: spar.Folkbokforingsadress_SvenskAdress_Postort || prev.city,
-          }))
-        }
-      } catch (err) {
-        console.warn(LOG, 'enrichment loading failed (non-blocking)', err)
-      }
-
-      setIsLoading(false)
-    }
-
-    loadSparAddress()
-  }, [supabase, router])
 
   const handleNext = async (stepData: Partial<CompanySettings>) => {
     // Reset org_number/company_name only on a genuine change (user going back
@@ -224,14 +181,6 @@ export default function WelcomeOnboarding({
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1)
     }
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    )
   }
 
   const stepInfo = STEP_INFO[currentStep - 1]
