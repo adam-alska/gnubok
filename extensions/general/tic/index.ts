@@ -41,7 +41,19 @@ async function fetchAndStoreEnrichment(
   supabase: SupabaseClient,
 ): Promise<void> {
   try {
-    const enrichment = await requestEnrichment(sessionId, ['SPAR', 'CompanyRoles'])
+    // IMPORTANT: only request types that are actually enabled on the TIC
+    // tenant. Requesting an unknown/disabled type (e.g. 'SPAR', which TIC
+    // has renamed to 'Address' and which our tenant currently has off)
+    // makes TIC reject the whole enrichment with
+    // `error: 'Session not completed'` — a misleading error that took a
+    // round of debugging to trace. Verified via GET /api/v1/enrichment/types:
+    //   { type: 'CompanyRoles', enabled: true  }  ← we want this
+    //   { type: 'Address',      enabled: false }  ← formerly SPAR, off
+    //
+    // If 'Address' gets enabled later, add it here (and wire up the
+    // address pre-fill in WelcomeOnboarding and createCompanyFromTicRole
+    // — both already look for a `.spar` field that TIC may have renamed).
+    const enrichment = await requestEnrichment(sessionId, ['CompanyRoles'])
     log.info('enrichment request returned', {
       status: enrichment.status,
       requestedTypes: enrichment.requestedTypes,
@@ -51,8 +63,7 @@ async function fetchAndStoreEnrichment(
 
     // Case-insensitive status comparison: TIC has been observed returning
     // lowercase values ('completed', 'failed') in addition to the docs' canonical
-    // capitalized form. Accept both fully and partially completed runs — if the
-    // tenant only has SPAR enabled (not CompanyRoles) we still want the address.
+    // capitalized form. Accept both fully and partially completed runs.
     const statusLower = String(enrichment.status ?? '').toLowerCase()
     const isCompleted = statusLower === 'completed' || statusLower === 'partiallycompleted'
     const usable = isCompleted && enrichment.secureUrl
@@ -68,11 +79,12 @@ async function fetchAndStoreEnrichment(
       const errField = (enrichment as { error?: string }).error ?? ''
       let hint: string | undefined
       if (errField === 'Session not completed') {
-        // The session finished BankID auth but never went through the
-        // consent-to-enrich dialog. That dialog is shown automatically
-        // *only if* the tenant has SPAR/CompanyRoles enabled. Classic
-        // "enrichment not provisioned for this tenant" symptom.
-        hint = 'Likely cause: enrichment types not enabled for TIC tenant — contact support@tic.io to enable SPAR + CompanyRoles.'
+        // Two distinct causes produce this identical error:
+        //   1. We requested a type not enabled on the tenant (most common —
+        //      verify via GET /api/v1/enrichment/types)
+        //   2. The BankID session genuinely never went through the
+        //      consent-to-enrich dialog
+        hint = 'Likely cause: a requested enrichment type is not enabled on the TIC tenant. Run `curl -H "X-Api-Key: $KEY" https://id.tic.io/api/v1/enrichment/types` to verify which types have `enabled: true` and adjust the requestEnrichment call to match.'
       } else if (errField.toLowerCase().includes('not enabled')) {
         hint = 'Enrichment explicitly disabled on TIC tenant — contact support@tic.io.'
       } else if (errField.toLowerCase().includes('too old')) {
