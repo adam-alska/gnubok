@@ -30,10 +30,14 @@ import crypto from 'crypto'
 const log = createLogger('tic/bankid')
 
 /**
- * Request SPAR + CompanyRoles enrichment for a completed BankID session and
- * cache the result in `extension_data` so /select-company and the onboarding
- * wizard can pre-fill from it. Non-blocking: any failure is logged and
- * swallowed — BankID auth must still succeed even if enrichment is down.
+ * Request CompanyRoles enrichment for a completed BankID session and cache
+ * the result in `extension_data` so /select-company can pre-fill the picker.
+ * Non-blocking: any failure is logged and swallowed — BankID auth must still
+ * succeed even if enrichment is down.
+ *
+ * Only types currently enabled on the TIC tenant are requested — see the
+ * block comment inside the function. If Address (formerly SPAR) is enabled
+ * later, add it here to restore address pre-fill in the manual wizard.
  */
 async function fetchAndStoreEnrichment(
   sessionId: string,
@@ -98,10 +102,11 @@ async function fetchAndStoreEnrichment(
     const enrichmentData = await fetchEnrichmentData(enrichment.secureUrl)
 
     // Log a PII-free snapshot so we can debug the role filter in production.
-    // Raw personnummer/names are deliberately omitted.
+    // Raw personnummer/names are deliberately omitted. `spar`/`address` not
+    // logged — we don't request those types currently (see block comment
+    // on requestEnrichment above), so they'd always be absent.
     const firstRole = enrichmentData.companyRoles?.[0]
     log.info('enrichment data shape', {
-      hasSpar: !!enrichmentData.spar,
       companyCount: enrichmentData.companyRoles?.length ?? 0,
       firstRoleStatuses: firstRole
         ? {
@@ -763,7 +768,7 @@ export const ticExtension: Extension = {
             )
           }
 
-          // Enrichment (SPAR + CompanyRoles) — pre-fills /select-company picker.
+          // Enrichment (CompanyRoles) — pre-fills /select-company picker.
           await fetchAndStoreEnrichment(sessionId, userId, supabase)
 
           return NextResponse.json({
