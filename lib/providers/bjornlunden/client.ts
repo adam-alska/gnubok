@@ -2,6 +2,8 @@ import { TokenBucketRateLimiter } from '../rate-limiter';
 import { withRetry } from '../retry';
 import { BL_BASE_URL, BL_RATE_LIMIT } from './config';
 
+const FETCH_TIMEOUT_MS = 15_000;
+
 export class BjornLundenApiError extends Error {
   constructor(
     message: string,
@@ -13,7 +15,12 @@ export class BjornLundenApiError extends Error {
   }
 }
 
+function isTimeoutError(error: unknown): boolean {
+  return error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
+}
+
 function isRetryableError(error: unknown): boolean {
+  if (isTimeoutError(error)) return true;
   if (error instanceof BjornLundenApiError) {
     if (error.statusCode === 401 || error.statusCode === 403 || error.statusCode === 404) {
       return false;
@@ -50,6 +57,7 @@ export class BjornLundenClient {
             'User-Key': userKey,
             Accept: 'application/json',
           },
+          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         });
 
         if (!response.ok) {

@@ -2,6 +2,8 @@ import { TokenBucketRateLimiter } from '../rate-limiter';
 import { withRetry } from '../retry';
 import { FORTNOX_BASE_URL, FORTNOX_RATE_LIMIT } from './config';
 
+const FETCH_TIMEOUT_MS = 15_000;
+
 export class FortnoxApiError extends Error {
   constructor(
     message: string,
@@ -14,7 +16,12 @@ export class FortnoxApiError extends Error {
   }
 }
 
+function isTimeoutError(error: unknown): boolean {
+  return error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
+}
+
 function isRetryableError(error: unknown): boolean {
+  if (isTimeoutError(error)) return true;
   if (error instanceof FortnoxApiError) {
     if (error.statusCode === 401 || error.statusCode === 403 || error.statusCode === 404) {
       return false;
@@ -44,6 +51,7 @@ export class FortnoxClient {
             Accept: 'application/json',
             'Content-Type': 'application/json',
           },
+          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         });
 
         if (!response.ok) {
@@ -87,6 +95,7 @@ export class FortnoxClient {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
+          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         });
 
         if (!response.ok) {
