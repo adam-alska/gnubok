@@ -61,7 +61,25 @@ async function fetchAndStoreEnrichment(
       // so we can diagnose why a real-user enrichment comes back non-usable.
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { secureUrl: _omit, ...responseDiagnostic } = enrichment
-      log.warn('enrichment not usable — inspect response for diagnostic fields', responseDiagnostic)
+
+      // Interpret common failure shapes into actionable hints so developers
+      // don't have to re-trace this every time. TIC returns these as body
+      // fields with HTTP 200, not as errors — see TIC_AUTH.md §enrichment.
+      const errField = (enrichment as { error?: string }).error ?? ''
+      let hint: string | undefined
+      if (errField === 'Session not completed') {
+        // The session finished BankID auth but never went through the
+        // consent-to-enrich dialog. That dialog is shown automatically
+        // *only if* the tenant has SPAR/CompanyRoles enabled. Classic
+        // "enrichment not provisioned for this tenant" symptom.
+        hint = 'Likely cause: enrichment types not enabled for TIC tenant — contact support@tic.io to enable SPAR + CompanyRoles.'
+      } else if (errField.toLowerCase().includes('not enabled')) {
+        hint = 'Enrichment explicitly disabled on TIC tenant — contact support@tic.io.'
+      } else if (errField.toLowerCase().includes('too old')) {
+        hint = '>30 min between auth completion and enrichment call — check for slow server-side work between /bankid/complete and fetchAndStoreEnrichment.'
+      }
+
+      log.warn('enrichment not usable', { ...responseDiagnostic, hint })
       return
     }
 
