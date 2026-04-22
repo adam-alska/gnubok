@@ -151,6 +151,16 @@ export default function BankIdCompanyPicker({
         return
       }
 
+      if (result.error === 'org_number_exists') {
+        toast({
+          title: 'Företaget finns redan',
+          description: 'Be en befintlig administratör att bjuda in dig.',
+          variant: 'destructive',
+        })
+        setSetup({ kind: 'idle' })
+        return
+      }
+
       if (result.error || !result.companyId) {
         toast({
           title: 'Kunde inte skapa företag',
