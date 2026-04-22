@@ -218,12 +218,16 @@ export async function createCompanyFromTicRole(params: {
   // moms_period: Skatteverket assigns the actual reporting period from
   // annual beskattningsunderlag (≤1 MSEK → yearly, ≤40 MSEK → quarterly,
   // >40 MSEK → monthly). TIC /lookup doesn't expose turnover, so we pick the
-  // middle-tier default. The user can change it in /settings/tax; the
-  // onboarding confirmation UI flags this as provisional.
+  // middle-tier default. The user must verify it matches their Skatteverket
+  // assignment in /settings/tax — a mismatch causes late-filing penalties
+  // under SFL.
   const momsPeriod = vatRegistered ? 'quarterly' : null
 
-  // K1/förenklat bokslut (enskild firma ≤3 MSEK) defaults to kontantmetoden;
-  // aktiebolag must use bokföringsmässiga grunder under K2/K3.
+  // EF ≤3 MSEK may use kontantmetoden under K1/BFNAR 2013:2; above that
+  // threshold, BFNAR 2017:3 requires bokföringsmässiga grunder. We default
+  // to cash because the vast majority of EF users are small; users above
+  // the threshold can switch in /settings/bookkeeping. Aktiebolag must use
+  // accrual under K2/K3.
   const accountingMethod = entityType === 'enskild_firma' ? 'cash' : 'accrual'
 
   const settings: Record<string, unknown> = {
