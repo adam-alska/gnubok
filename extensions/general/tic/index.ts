@@ -30,10 +30,14 @@ import crypto from 'crypto'
 const log = createLogger('tic/bankid')
 
 /**
- * Request SPAR + CompanyRoles enrichment for a completed BankID session and
- * cache the result in `extension_data` so /select-company and the onboarding
- * wizard can pre-fill from it. Non-blocking: any failure is logged and
- * swallowed — BankID auth must still succeed even if enrichment is down.
+ * Request CompanyRoles enrichment for a completed BankID session and cache
+ * the result in `extension_data` so /select-company can pre-fill the picker.
+ * Non-blocking: any failure is logged and swallowed — BankID auth must still
+ * succeed even if enrichment is down.
+ *
+ * Only types currently enabled on the TIC tenant are requested — see the
+ * block comment inside the function. If Address (formerly SPAR) is enabled
+ * later, add it here to restore address pre-fill in the manual wizard.
  */
 async function fetchAndStoreEnrichment(
   sessionId: string,
@@ -41,7 +45,19 @@ async function fetchAndStoreEnrichment(
   supabase: SupabaseClient,
 ): Promise<void> {
   try {
-    const enrichment = await requestEnrichment(sessionId, ['SPAR', 'CompanyRoles'])
+    // IMPORTANT: only request types that are actually enabled on the TIC
+    // tenant. Requesting an unknown/disabled type (e.g. 'SPAR', which TIC
+    // has renamed to 'Address' and which our tenant currently has off)
+    // makes TIC reject the whole enrichment with
+    // `error: 'Session not completed'` — a misleading error that took a
+    // round of debugging to trace. Verified via GET /api/v1/enrichment/types:
+    //   { type: 'CompanyRoles', enabled: true  }  ← we want this
+    //   { type: 'Address',      enabled: false }  ← formerly SPAR, off
+    //
+    // If 'Address' gets enabled later, add it here (and wire up the
+    // address pre-fill in WelcomeOnboarding and createCompanyFromTicRole
+    // — both already look for a `.spar` field that TIC may have renamed).
+    const enrichment = await requestEnrichment(sessionId, ['CompanyRoles'])
     log.info('enrichment request returned', {
       status: enrichment.status,
       requestedTypes: enrichment.requestedTypes,
@@ -51,8 +67,7 @@ async function fetchAndStoreEnrichment(
 
     // Case-insensitive status comparison: TIC has been observed returning
     // lowercase values ('completed', 'failed') in addition to the docs' canonical
-    // capitalized form. Accept both fully and partially completed runs — if the
-    // tenant only has SPAR enabled (not CompanyRoles) we still want the address.
+    // capitalized form. Accept both fully and partially completed runs.
     const statusLower = String(enrichment.status ?? '').toLowerCase()
     const isCompleted = statusLower === 'completed' || statusLower === 'partiallycompleted'
     const usable = isCompleted && enrichment.secureUrl
@@ -61,17 +76,37 @@ async function fetchAndStoreEnrichment(
       // so we can diagnose why a real-user enrichment comes back non-usable.
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { secureUrl: _omit, ...responseDiagnostic } = enrichment
-      log.warn('enrichment not usable — inspect response for diagnostic fields', responseDiagnostic)
+
+      // Interpret common failure shapes into actionable hints so developers
+      // don't have to re-trace this every time. TIC returns these as body
+      // fields with HTTP 200, not as errors — see TIC_AUTH.md §enrichment.
+      const errField = (enrichment as { error?: string }).error ?? ''
+      let hint: string | undefined
+      if (errField === 'Session not completed') {
+        // Two distinct causes produce this identical error:
+        //   1. We requested a type not enabled on the tenant (most common —
+        //      verify via GET /api/v1/enrichment/types)
+        //   2. The BankID session genuinely never went through the
+        //      consent-to-enrich dialog
+        hint = 'Likely cause: a requested enrichment type is not enabled on the TIC tenant. Run `curl -H "X-Api-Key: $KEY" https://id.tic.io/api/v1/enrichment/types` to verify which types have `enabled: true` and adjust the requestEnrichment call to match.'
+      } else if (errField.toLowerCase().includes('not enabled')) {
+        hint = 'Enrichment explicitly disabled on TIC tenant — contact support@tic.io.'
+      } else if (errField.toLowerCase().includes('too old')) {
+        hint = '>30 min between auth completion and enrichment call — check for slow server-side work between /bankid/complete and fetchAndStoreEnrichment.'
+      }
+
+      log.warn('enrichment not usable', { ...responseDiagnostic, hint })
       return
     }
 
     const enrichmentData = await fetchEnrichmentData(enrichment.secureUrl)
 
     // Log a PII-free snapshot so we can debug the role filter in production.
-    // Raw personnummer/names are deliberately omitted.
+    // Raw personnummer/names are deliberately omitted. `spar`/`address` not
+    // logged — we don't request those types currently (see block comment
+    // on requestEnrichment above), so they'd always be absent.
     const firstRole = enrichmentData.companyRoles?.[0]
     log.info('enrichment data shape', {
-      hasSpar: !!enrichmentData.spar,
       companyCount: enrichmentData.companyRoles?.length ?? 0,
       firstRoleStatuses: firstRole
         ? {
@@ -733,7 +768,7 @@ export const ticExtension: Extension = {
             )
           }
 
-          // Enrichment (SPAR + CompanyRoles) — pre-fills /select-company picker.
+          // Enrichment (CompanyRoles) — pre-fills /select-company picker.
           await fetchAndStoreEnrichment(sessionId, userId, supabase)
 
           return NextResponse.json({
