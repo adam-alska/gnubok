@@ -6,7 +6,7 @@ gnubok is a Swedish-focused accounting SaaS for sole traders (enskild firma) and
 
 **Tech stack**: Next.js 16.1.5 (App Router), React 19.2.3, TypeScript 5 (strict), Zod 4, Supabase (PostgreSQL + RLS + email/password + TOTP MFA auth), Tailwind CSS 4 + shadcn/ui, Vercel hosting, Docker (self-hosted).
 
-**Integrations**: Enable Banking (PSD2), TIC Identity (company lookup), Anthropic SDK, OpenAI (embeddings), Resend (email), Sentry (error tracking), Svix (webhooks), web-push (notifications), JSZip (archive export), sharp (image processing), Framer Motion (animations).
+**Integrations**: Enable Banking (PSD2), TIC Identity (company lookup), Anthropic SDK, AWS Bedrock (`@aws-sdk/client-bedrock-runtime` for inbox smart-match), OpenAI (embeddings), Resend (email), Sentry (error tracking), Svix (webhooks), web-push (notifications), Upstash Redis + Ratelimit, Google Drive (cloud backup via OAuth), JSZip (archive export), sharp (image processing), Framer Motion (animations), Recharts (charts), PDF.js (`pdfjs-dist`), `@react-pdf/renderer` (invoice PDFs), xlsx, fuse.js (fuzzy search), ics (iCal feeds).
 
 **Path alias**: `@/*` maps to the project root. **Language**: All code, comments, and commit messages in English. **License**: AGPL-3.0-or-later.
 
@@ -30,11 +30,11 @@ npm run setup:extensions # Regenerate extension registry from extensions.config.
 - **Multi-tenant model**: `companies` table owns all business data. `company_members` links users to companies with roles (owner/admin/member/viewer). `teams` group companies for consultants. Company context resolved via cookie (`gnubok-company-id`) in middleware (`lib/supabase/middleware.ts`).
 - **All journal entry creation** routes through `lib/bookkeeping/engine.ts`. Lifecycle: `createDraftEntry()` → `commitEntry()` (atomic voucher assignment via `commit_journal_entry` DB RPC). Convenience: `createJournalEntry()` does both. Reversal via `reverseEntry()`. Correction via `correctEntry()` in `lib/core/bookkeeping/storno-service.ts`.
 - **API routes** that emit events must call `ensureInitialized()` (from `lib/init.ts`) at module level. This loads extensions, wires event handlers, and registers the supplier invoice handler + event log handler.
-- **Event bus** (`lib/events/bus.ts`) is a module-level singleton. Handlers run via `Promise.allSettled` — failing handlers never crash the emitter. 30+ event types defined in `lib/events/types.ts`. The event log handler persists actionable events to `event_log` table for external automation.
+- **Event bus** (`lib/events/bus.ts`) is a module-level singleton. Handlers run via `Promise.allSettled` — failing handlers never crash the emitter. 36 event types defined in `lib/events/types.ts`. The event log handler persists actionable events to `event_log` table for external automation.
 - **Supabase clients**: browser (`lib/supabase/client.ts`), server with cookies (`createClient()` from `server.ts`), service role (`createServiceClient()`), cookieless service role for API key auth (`createServiceClientNoCookies()` from `lib/auth/api-keys.ts`). Pagination helper: `fetchAllRows()` in `lib/supabase/fetch-all.ts`.
-- **Extension system**: Opt-in via `extensions.config.json`. Core builds and runs with zero extensions. Currently enabled: `enable-banking`, `email`, `arcim-migration`, `tic`, `mcp-server`.
-- **Core reports** (in `lib/reports/`, not extensions): balance sheet, income statement, trial balance, general ledger, AR/supplier ledger, AR/supplier reconciliation, bank reconciliation status, VAT declaration, journal register, monthly breakdown, continuity check, opening balances, KPI, NE-bilaga, INK2 declaration, SIE export, full archive export.
-- **Types**: All shared types in `types/index.ts` (~2,200 lines, single source of truth). Import via `import type { T } from '@/types'`. Event types live in `lib/events/types.ts`. Extension types in `lib/extensions/types.ts`.
+- **Extension system**: Opt-in via `extensions.config.json`. Core builds and runs with zero extensions. Currently enabled: `enable-banking`, `email`, `arcim-migration`, `tic`, `mcp-server`, `cloud-backup`.
+- **Core reports** (in `lib/reports/`, not extensions): balance sheet, income statement, trial balance, general ledger, AR/supplier ledger, AR/supplier reconciliation, VAT declaration, journal register, monthly breakdown, continuity check, opening balances, KPI (+ definitions), NE-bilaga, INK2 declaration, SIE export, full archive export, salary journal, vacation liability, avgifter basis (employer contributions).
+- **Types**: All shared types in `types/index.ts` (~2,570 lines, single source of truth). Import via `import type { T } from '@/types'`. Event types live in `lib/events/types.ts`. Extension types in `lib/extensions/types.ts`.
 - **Error messages**: `lib/errors/get-error-message.ts` maps technical errors to Swedish user messages (Zod → Postgres → HTTP → context fallback).
 
 ---
@@ -167,13 +167,13 @@ Extensions are opt-in plugins in `extensions/general/<name>/`, controlled by `ex
 | `arcim-migration` | Legacy ARCIM system data migration | Yes |
 | `tic` | TIC Identity company lookup (org number → name, VAT, address) | Yes |
 | `mcp-server` | MCP server for Claude Desktop/Code | Yes |
-| `receipt-ocr` | AI receipt scanning and extraction | No |
-| `ai-categorization` | AI transaction categorization | No |
-| `ai-chat` | AI assistant for bookkeeping questions | No |
-| `push-notifications` | Web push notifications for events | No |
+| `cloud-backup` | Google Drive backup of SIE + receipts + processing history | Yes |
+| `inbox-smart-match` | AWS Bedrock AI matching of inbox receipts to bank transactions | No |
 | `invoice-inbox` | Email-based invoice document processing | No |
+| `push-notifications` | Web push notifications for events | No |
 | `calendar` | Payment calendar with iCal feed | No |
 | `skatteverket` | Skatteverket VAT declaration submission | No |
+| `example-logger` | Reference implementation — logs events to console (not registered by default) | No |
 
 ### Extension Architecture
 
@@ -195,7 +195,7 @@ Extensions are opt-in plugins in `extensions/general/<name>/`, controlled by `ex
 
 gnubok exposes its bookkeeping engine as an MCP (Model Context Protocol) server, letting users do bookkeeping through Claude Desktop, Claude Code, or any MCP-compatible client.
 
-**MCP extension** (`extensions/general/mcp-server/`): 26 tools — transactions, categorization, customers, suppliers, invoices, supplier invoices, accounts, fiscal periods, trial balance, general ledger, balance sheet, income statement, AR/supplier ledger, reconciliation, VAT report, KPI report, receipt matching, invoice payments/sending. JSON-RPC 2.0 protocol implemented directly (no SDK dependency). Endpoint: `/api/extensions/ext/mcp-server/mcp`.
+**MCP extension** (`extensions/general/mcp-server/`): 35 tools — transactions, categorization, customers, suppliers, invoices, supplier invoices, accounts, fiscal periods, trial balance, general ledger, balance sheet, income statement, AR/supplier ledger, reconciliation, VAT report, KPI report, receipt matching, invoice payments/sending, inbox items, employees + salary runs (list/get/create/calculate), salary journal, AGI generation, document upload. JSON-RPC 2.0 protocol implemented directly (no SDK dependency). Endpoint: `/api/extensions/ext/mcp-server/mcp`.
 
 **API key infrastructure** (`lib/auth/api-keys.ts`, `api_keys` table): SHA-256 hashed keys with `gnubok_sk_` prefix. Scoped permissions mapped via `TOOL_SCOPE_MAP`. Rate limited at 100 RPM via atomic DB RPC (`validate_and_increment_api_key`). `createServiceClientNoCookies()` creates a Supabase service client without cookies for API key auth — all queries filter by `company_id` (defense in depth).
 
@@ -246,20 +246,24 @@ export async function POST(request: Request) {
 
 | Directory | Purpose |
 |-----------|---------|
-| `bookkeeping/` | Engine, entry generators, mapping, templates, BAS data |
+| `bookkeeping/` | Engine, entry generators, mapping, templates, BAS data, template library + embeddings |
 | `core/` | Period service, year-end, storno, tax codes, audit, documents |
-| `events/` | Event bus singleton, 30+ event types, event log handler |
-| `auth/` | API keys, require-auth, MFA, OAuth codes, invite tokens, cron auth |
+| `events/` | Event bus singleton, 36 event types, event log handler |
+| `auth/` | API keys, require-auth, require-write, MFA, OAuth codes, invite tokens, cron auth, BankID |
 | `supabase/` | Browser/server/service clients, middleware, fetch-all pagination |
 | `api/` | Zod validation (`validateBody`/`validateQuery`), schemas |
-| `reports/` | 17 report generators (financial statements, ledgers, tax, exports) |
+| `reports/` | 20 report generators (financial statements, ledgers, tax, exports, salary journal, vacation liability, avgifter basis) |
 | `invoices/` | Invoice/supplier matching, payment match log, reminders, VAT rules, PDF template |
 | `transactions/` | Multi-source ingestion (`ingest.ts`), AI category suggestions |
-| `import/` | SIE parser/import, account mapper |
+| `import/` | SIE parser/import, bank file import, opening balance, account mapper |
 | `documents/` | Document matcher, receipt matcher, batch matching |
 | `extensions/` | Registry, loader, context factory, types, generated files |
 | `email/` | Service interface (noop default), Resend provider, templates (invite, invoice, reminder, consent) |
-| `company/` | Company context resolution, CRUD actions |
+| `company/` | Company context resolution, CRUD actions, fiscal period computation |
+| `company-lookup/` | Shared types for org-number → company info lookups |
+| `providers/` | Third-party accounting provider adapters (Fortnox, Bokio, Briox, BL/Björn Lundén, Visma) with OAuth, rate limiting, retry, consent resolution |
+| `salary/` | Payroll calculation engine, tax tables, absence/benefits/traktamente, AGI, KU, PDF payslips, löneväxling, personnummer, payment, salary entries, transaction matcher |
+| `processing-history/` | Processing-history append helper for audit/inbox timelines |
 | `reconciliation/` | Bank statement reconciliation |
 | `tax/` | Tax calculator, deadline config/generator, expense warnings, Swedish holidays |
 | `vat/` | VIES client, EU countries, MOMS box mapping |
@@ -269,9 +273,9 @@ export async function POST(request: Request) {
 | `bankgiro/` | Luhn checksum validation |
 | `calendar/` | ICS generator, calendar utilities |
 | `errors/` | Swedish error message mapping (Zod → Postgres → HTTP → fallback) |
-| `hooks/` | React hooks (e.g., `use-unsaved-changes`) |
-| `settings/` | Settings utilities |
+| `hooks/` | React hooks (e.g., `use-unsaved-changes`, `use-can-write`) |
 | `logger.ts` | Structured logger with module prefixes, env-aware filtering |
+| `support.ts` | Server-side support recipient email (used by `/api/support/contact`) |
 | `utils.ts` | `cn()`, `formatCurrency()`, `formatDate()`, `formatOrgNumber()` |
 
 ---
@@ -296,14 +300,16 @@ export async function POST(request: Request) {
 | `/expenses`, `/expenses/new`, `/expenses/[id]` | Expense tracking |
 | `/receipts`, `/receipts/scan` | Receipt management |
 | `/bookkeeping`, `/bookkeeping/[id]`, `/bookkeeping/year-end` | Journal entries, chart of accounts, year-end |
+| `/salary`, `/salary/employees`, `/salary/runs` | Payroll: employees, salary runs, AGI, KU |
 | `/reports` | Financial reports |
 | `/import` | SIE and bank file import |
 | `/kpi` | KPI metrics + monthly trend chart |
 | `/deadlines` | Tax & business deadlines |
 | `/pending` | Pending operations queue |
+| `/help` | In-app help/support page |
 | `/extensions`, `/extensions/[sector]/[extension]` | Extension marketplace |
 | `/e/[sector]/[slug]` | Extension workspace |
-| `/settings/*` | Company, invoicing, bookkeeping, tax, team, banking, templates, account, API settings |
+| `/settings/*` | Company, invoicing, bookkeeping, tax, team, banking, templates, salary, backup, account, API settings |
 | `/dpa`, `/privacy` | Legal pages |
 | `/invoice-action/[token]` | Public invoice payment link |
 | `/sandbox` | Test environment |
@@ -316,21 +322,28 @@ export async function POST(request: Request) {
 - `/api/transactions/*` — Categorize, uncategorize, describe, book, match-invoice, match-supplier-invoice, batch operations, AI suggestions
 - `/api/customers/*`, `/api/suppliers/*` — CRUD
 - `/api/documents/*` — CRUD, versions, link, verify, match-sweep, verify cron
-- `/api/reports/*` — 16 report endpoints (general-ledger, trial-balance, balance-sheet, income-statement, journal-register, ar-ledger, supplier-ledger, vat-declaration, sie-export, ink2, ne-bilaga, kpi, audit-trail, continuity-check, monthly-breakdown, full-archive)
+- `/api/reports/*` — 19 report endpoints (general-ledger, trial-balance, balance-sheet, income-statement, journal-register, ar-ledger, supplier-ledger, vat-declaration, sie-export, ink2, ne-bilaga, kpi, audit-trail, continuity-check, monthly-breakdown, full-archive, salary-journal, vacation-liability, avgifter-basis)
+- `/api/salary/*` — Employees, payroll-config, tax-tables, KU, salary runs (CRUD + calculate)
 - `/api/import/*` — Bank file (parse/execute), SIE (parse/execute/mappings/create-accounts)
 - `/api/reconciliation/bank/*` — Link, unlink, run, status, unmatched-entries
-- `/api/settings/*` — Company settings, API keys, logo upload, counterparty templates
-- `/api/company/members/*` — List, CRUD, invite
+- `/api/settings/*` — Company settings, API keys, logo upload, counterparty templates, booking templates
+- `/api/company/*` — Current, members (list/CRUD/invite), `[id]`
 - `/api/team/*` — Accept, invite, members
 - `/api/deadlines/*`, `/api/tax-deadlines/*` — Deadline CRUD and crons
 - `/api/pending-operations/*` — Queue, commit, reject
 - `/api/events/*` — Event log and cleanup cron
+- `/api/documents/*` — CRUD, counts, match-sweep, verify cron
 - `/api/calendar/feed/[token]` — iCal subscription feed
 - `/api/mcp-oauth/*` — Register, authorize, token
+- `/api/support/contact` — Support contact form submission
+- `/api/account/delete` — User account deletion
+- `/api/audit-trail/*` — Audit trail queries
+- `/api/log` — Client-side log ingestion
 - `/api/health` — Health check
 - `/api/vat/validate` — VIES VAT validation
+- `/api/currency/rate` — Riksbanken exchange rate lookup
 - `/api/sandbox/*` — Seed, cleanup cron
-- `/api/extensions/ext/[...path]` — Dynamic extension API routes
+- `/api/extensions/ext/[...path]` — Dynamic extension API routes (plus top-level `/api/extensions/enable-banking/*`, `/api/extensions/cloud-backup/*`, `/api/extensions/push-notifications/*`)
 
 ---
 
@@ -346,9 +359,9 @@ export async function POST(request: Request) {
 
 ## Database & Migrations
 
-**Location**: `supabase/migrations/` — 93 files. Early migrations use sequential numbering (`20240101000001`–`20240101000038`), later ones use real timestamps.
+**Location**: `supabase/migrations/` — 118 files. Early migrations use sequential numbering (`20240101000001`–`20240101000038`), later ones use real timestamps.
 
-### Key Tables (~47)
+### Key Tables (~60)
 
 **Multi-tenant**: `companies`, `company_members`, `company_invitations`, `teams`, `team_members`, `team_invitations`, `user_preferences`, `profiles`
 
@@ -362,17 +375,23 @@ export async function POST(request: Request) {
 
 **Documents**: `document_attachments` (WORM), `receipts`, `receipt_line_items`
 
-**Settings & Config**: `company_settings`, `mapping_rules`, `categorization_templates`, `extension_data`
+**Settings & Config**: `company_settings`, `mapping_rules`, `categorization_templates`, `booking_template_library`, `extension_data`
 
 **Dimensions**: `cost_centers`, `projects`
 
-**Tax & Deadlines**: `tax_rates`, `deadlines`, `calendar_feeds`, `skatteverket_tokens`
+**Tax & Deadlines**: `tax_rates`, `tax_table_rates`, `deadlines`, `calendar_feeds`, `skatteverket_tokens`
 
-**API & Auth**: `api_keys` (with scopes), `oauth_used_codes`
+**API & Auth**: `api_keys` (with scopes), `oauth_used_codes`, `bankid_identities`
 
-**Audit & Ops**: `audit_log` (immutable), `event_log` (30-day TTL), `pending_operations`, `ai_usage_tracking`
+**Audit & Ops**: `audit_log` (immutable), `event_log` (30-day TTL), `pending_operations`, `processing_history` (+ `processing_event_types`), `ai_usage_tracking`, `voucher_gap_explanations`, `automation_webhooks`
 
-**Other**: `salary_payments`, `sandbox_users`
+**Inbox & Migration**: `invoice_inbox_items`, `company_inboxes`, `email_connections`
+
+**Salary**: `employees`, `salary_runs`, `salary_run_employees`, `salary_line_items`, `salary_payroll_config`, `agi_declarations`
+
+**Third-party providers**: `provider_consents`, `provider_consent_tokens`, `provider_otc`
+
+**Other**: `sandbox_users`
 
 ### Key RPC Functions
 
@@ -414,11 +433,14 @@ export async function POST(request: Request) {
 
 ## Skills, Git & CI
 
-**Skills**: Always use `/frontend-design` for new UI. Use `vercel:deploy` for deployment. Use `/supabase-migration` for new migrations. Use `/erp-api-route` for new API routes. Use `/create-extension` for new extensions. Use `/swedish-bookkeeping` for accounting domain questions.
+**Skills**: Always use `/frontend-design` for new UI. Use `vercel:deploy` for deployment. Use `/supabase-migration` for new migrations. Use `/erp-api-route` for new API routes. Use `/create-extension` for new extensions. Use the Swedish domain skills (`swedish-sie-import-export`, `swedish-accounting-compliance`, `swedish-vat`, `swedish-invoice-compliance`, `swedish-payroll`, `swedish-year-end-closing`, `swedish-financial-reporting`, `swedish-sru-filing`, `swedish-asset-accounting`, `swedish-project-accounting`, `swedish-tax-planning`) for accounting domain questions.
 
 **Git**: Conventional commits (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`). Atomic commits, branch from `main`.
 
-**CI** (`.github/workflows/core-build.yml`): Resets extensions to empty, runs build + test, verifies no core code imports from `@/extensions/` directly.
+**CI**:
+- `.github/workflows/core-build.yml` — resets extensions to empty, runs build + test, verifies no core code imports from `@/extensions/` directly.
+- `.github/workflows/swedish-compliance-review.yml` — Swedish accounting compliance review on PRs touching bookkeeping/reports/tax logic.
+- `.github/workflows/docker-publish.yml` — pushes images to GHCR on main.
 
 **Docker** (`.github/workflows/docker-publish.yml`): Pushes to GHCR (`erp-mafia/erp-base`) on main push. 4-stage Dockerfile (base → deps → builder → runner) with Node 22 Alpine. Runtime env placeholder replacement via `docker-entrypoint.sh`. Docker Compose with app + supercronic cron service.
 
@@ -436,9 +458,10 @@ Cron jobs defined in `vercel.json`:
 | `0 8 * * *` | `/api/invoices/reminders/cron` | Send invoice reminders |
 | `0 0 2 1 *` | `/api/tax-deadlines/cron` | Generate tax deadlines |
 | `0 5 * * *` | `/api/extensions/enable-banking/sync/cron` | Bank transaction sync |
-| `0 3 * * 0` | `/api/documents/verify/cron` | Document integrity verification |
+| `0 3 * * *` | `/api/documents/verify/cron` | Document integrity verification (daily) |
 | `0 4 * * *` | `/api/sandbox/cleanup/cron` | Sandbox user cleanup |
 | `0 2 * * *` | `/api/events/cleanup/cron` | Event log cleanup (30-day TTL) |
+| `0 * * * *` | `/api/extensions/cloud-backup/auto-sync/cron` | Hourly cloud backup auto-sync |
 
 ### Docker (Self-Hosted)
 

@@ -142,8 +142,10 @@ export default function AccountCombobox({ value, accounts, onChange }: AccountCo
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
     setSearch(newValue)
-    // Only emit valid account numbers to parent
-    if (/^\d{4}$/.test(newValue) && accounts.some(a => a.account_number === newValue)) {
+    // Emit any 4-digit numeric value to the parent. Unknown BAS numbers are
+    // accepted optimistically — the submit-time ActivateAccountsDialog lets
+    // the user activate missing accounts without leaving the form.
+    if (/^\d{4}$/.test(newValue)) {
       onChange(newValue)
     }
     if (!isOpen) {
@@ -156,9 +158,12 @@ export default function AccountCombobox({ value, accounts, onChange }: AccountCo
   }
 
   const handleBlur = () => {
-    // Small delay to allow dropdown click to fire first
+    // Small delay to allow dropdown click to fire first. Keep any 4-digit
+    // numeric value even if it's not in the currently-active chart — the
+    // submit handler will prompt to activate it.
     setTimeout(() => {
-      if (!accounts.some(a => a.account_number === search)) {
+      const isFourDigit = /^\d{4}$/.test(search)
+      if (!isFourDigit && !accounts.some(a => a.account_number === search)) {
         setSearch(value)
       }
     }, 150)
@@ -223,9 +228,15 @@ export default function AccountCombobox({ value, accounts, onChange }: AccountCo
           <p className="text-sm text-muted-foreground">
             Hittade inget konto som matchar.
           </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Kontot kan behöva aktiveras i din kontoplan.
-          </p>
+          {/^\d{4}$/.test(search.trim()) ? (
+            <p className="text-xs text-muted-foreground mt-1">
+              Om det är ett giltigt BAS-konto aktiveras det när du bokför.
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground mt-1">
+              Kontot kan behöva aktiveras i din kontoplan.
+            </p>
+          )}
         </div>
       )}
     </div>

@@ -199,6 +199,18 @@ export function getErrorMessage(
   if (typeof error === 'object' && error !== null) {
     const obj = error as Record<string, unknown>
 
+    // Structured application error: { error: { code, message, ... } }
+    if (typeof obj.error === 'object' && obj.error !== null) {
+      const structured = obj.error as { code?: unknown; message?: unknown; account_numbers?: unknown }
+      if (structured.code === 'ACCOUNTS_NOT_IN_CHART' && Array.isArray(structured.account_numbers)) {
+        const numbers = structured.account_numbers as string[]
+        return `Följande konton behöver aktiveras: ${numbers.join(', ')}`
+      }
+      if (typeof structured.message === 'string' && structured.message.trim()) {
+        return structured.message
+      }
+    }
+
     // Try Zod validation errors
     const zodMessage = tryParseZodErrors(obj)
     if (zodMessage) return zodMessage

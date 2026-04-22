@@ -4,6 +4,7 @@ import { ensureInitialized } from '@/lib/init'
 import { requireCompanyId } from '@/lib/company/context'
 import { requireWritePermission } from '@/lib/auth/require-write'
 import { reverseEntry } from '@/lib/bookkeeping/engine'
+import { AccountsNotInChartError, accountsNotInChartResponse } from '@/lib/bookkeeping/errors'
 
 ensureInitialized()
 
@@ -61,6 +62,9 @@ export async function POST(
     try {
       await reverseEntry(supabase, companyId, user.id, entryId)
     } catch (err) {
+      if (err instanceof AccountsNotInChartError) {
+        return accountsNotInChartResponse(err)
+      }
       // Entry may already be reversed — continue
       const msg = err instanceof Error ? err.message : ''
       if (!msg.includes('already reversed')) {

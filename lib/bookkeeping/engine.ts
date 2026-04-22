@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { eventBus } from '@/lib/events'
+import { AccountsNotInChartError } from '@/lib/bookkeeping/errors'
 import type {
   CreateJournalEntryInput,
   CreateJournalEntryLineInput,
@@ -54,20 +55,36 @@ export async function getNextVoucherNumber(
 }
 
 /**
- * Resolve account IDs from account numbers for a company
+ * Resolve account IDs from account numbers for a company.
+ *
+ * By default only active accounts are returned — inactive / never-added
+ * accounts surface as "missing" so callers throw AccountsNotInChartError.
+ *
+ * Pass `{ includeInactive: true }` for reversals: the accounts on an already-
+ * committed entry were legitimately active at commit time, and BFL 5 kap 5§
+ * requires storno to be possible even if a user has since deactivated one of
+ * those accounts. Blocking the reversal would leave the original entry
+ * uncorrected with no audit trail.
  */
 async function resolveAccountIds(
   supabase: SupabaseClient,
   companyId: string,
-  lines: CreateJournalEntryLineInput[]
+  lines: CreateJournalEntryLineInput[],
+  options: { includeInactive?: boolean } = {}
 ): Promise<Map<string, string>> {
   const accountNumbers = [...new Set(lines.map((l) => l.account_number))]
 
-  const { data: accounts, error } = await supabase
+  let query = supabase
     .from('chart_of_accounts')
     .select('id, account_number')
     .eq('company_id', companyId)
     .in('account_number', accountNumbers)
+
+  if (!options.includeInactive) {
+    query = query.eq('is_active', true)
+  }
+
+  const { data: accounts, error } = await query
 
   if (error) {
     throw new Error(`Failed to resolve account IDs: ${error.message}`)
@@ -178,9 +195,7 @@ export async function createDraftEntry(
   const allAccountNumbers = [...new Set(input.lines.map(l => l.account_number))]
   const missingAccounts = allAccountNumbers.filter(num => !accountIdMap.has(num))
   if (missingAccounts.length > 0) {
-    throw new Error(
-      `Account(s) not found in chart of accounts: ${missingAccounts.join(', ')}`
-    )
+    throw new AccountsNotInChartError(missingAccounts)
   }
 
   // Insert journal entry header as draft (voucher_number = 0, will be assigned on commit)
@@ -382,16 +397,17 @@ export async function reverseEntry(
     original.voucher_series || 'A'
   )
 
-  // Resolve account IDs
-  const accountIdMap = await resolveAccountIds(supabase, companyId, reversedLines)
+  // Resolve account IDs — include inactive rows. The accounts on the
+  // original committed entry were active at commit time; if the user has
+  // since toggled one off, the storno must still be allowed to go through
+  // (BFL 5 kap 5§). Only a truly missing chart row (rare: would require
+  // the row to have been deleted) still throws AccountsNotInChartError.
+  const accountIdMap = await resolveAccountIds(supabase, companyId, reversedLines, { includeInactive: true })
 
-  // Validate all account numbers resolved to IDs
   const reversalAccountNumbers = [...new Set(reversedLines.map(l => l.account_number))]
   const missingReversalAccounts = reversalAccountNumbers.filter(num => !accountIdMap.has(num))
   if (missingReversalAccounts.length > 0) {
-    throw new Error(
-      `Account(s) not found in chart of accounts: ${missingReversalAccounts.join(', ')}`
-    )
+    throw new AccountsNotInChartError(missingReversalAccounts)
   }
 
   // Create reversal entry with reverses_id link

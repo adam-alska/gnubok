@@ -5,6 +5,7 @@ import {
   createInvoiceCashEntry,
 } from '@/lib/bookkeeping/invoice-entries'
 import { reverseEntry } from '@/lib/bookkeeping/engine'
+import { AccountsNotInChartError, accountsNotInChartResponse } from '@/lib/bookkeeping/errors'
 import { validateBody } from '@/lib/api/validate'
 import { MatchInvoiceSchema } from '@/lib/api/schemas'
 import { logMatchEvent } from '@/lib/invoices/match-log'
@@ -121,6 +122,9 @@ export async function POST(
         newState: { journal_entry_id: null },
       })
     } catch (err) {
+      if (err instanceof AccountsNotInChartError) {
+        return accountsNotInChartResponse(err)
+      }
       console.error('Failed to storno conflicting journal entry:', err)
       return NextResponse.json(
         { error: 'Failed to reverse conflicting journal entry' },
@@ -200,6 +204,9 @@ export async function POST(
       journalEntryId = journalEntry?.id ?? null
     }
   } catch (err) {
+    if (err instanceof AccountsNotInChartError) {
+      return accountsNotInChartResponse(err)
+    }
     console.error('Failed to create payment journal entry:', err)
     journalEntryError = err instanceof Error ? err.message : 'Unknown error'
     // Continue - we still want to update the invoice and transaction
