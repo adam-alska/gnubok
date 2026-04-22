@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { eventBus } from '@/lib/events'
 import { ensureInitialized } from '@/lib/init'
 import { createSupplierCreditNoteEntry } from '@/lib/bookkeeping/supplier-invoice-entries'
+import { AccountsNotInChartError, accountsNotInChartResponse } from '@/lib/bookkeeping/errors'
 import { requireCompanyId } from '@/lib/company/context'
 import { requireWritePermission } from '@/lib/auth/require-write'
 import type { SupplierInvoice, SupplierInvoiceItem, AccountingMethod } from '@/types'
@@ -131,6 +132,9 @@ export async function POST(
           .eq('id', creditNote.id)
       }
     } catch (err) {
+      if (err instanceof AccountsNotInChartError) {
+        return accountsNotInChartResponse(err)
+      }
       console.error('Failed to create credit note journal entry:', err)
     }
   }

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { eventBus } from '@/lib/events'
+import { AccountsNotInChartError } from '@/lib/bookkeeping/errors'
 import type {
   CreateJournalEntryInput,
   CreateJournalEntryLineInput,
@@ -54,7 +55,9 @@ export async function getNextVoucherNumber(
 }
 
 /**
- * Resolve account IDs from account numbers for a company
+ * Resolve account IDs from account numbers for a company.
+ * Only returns accounts that are currently active — inactive / never-added
+ * accounts surface as "missing" so callers throw AccountsNotInChartError.
  */
 async function resolveAccountIds(
   supabase: SupabaseClient,
@@ -67,6 +70,7 @@ async function resolveAccountIds(
     .from('chart_of_accounts')
     .select('id, account_number')
     .eq('company_id', companyId)
+    .eq('is_active', true)
     .in('account_number', accountNumbers)
 
   if (error) {
@@ -178,9 +182,7 @@ export async function createDraftEntry(
   const allAccountNumbers = [...new Set(input.lines.map(l => l.account_number))]
   const missingAccounts = allAccountNumbers.filter(num => !accountIdMap.has(num))
   if (missingAccounts.length > 0) {
-    throw new Error(
-      `Account(s) not found in chart of accounts: ${missingAccounts.join(', ')}`
-    )
+    throw new AccountsNotInChartError(missingAccounts)
   }
 
   // Insert journal entry header as draft (voucher_number = 0, will be assigned on commit)
@@ -389,9 +391,7 @@ export async function reverseEntry(
   const reversalAccountNumbers = [...new Set(reversedLines.map(l => l.account_number))]
   const missingReversalAccounts = reversalAccountNumbers.filter(num => !accountIdMap.has(num))
   if (missingReversalAccounts.length > 0) {
-    throw new Error(
-      `Account(s) not found in chart of accounts: ${missingReversalAccounts.join(', ')}`
-    )
+    throw new AccountsNotInChartError(missingReversalAccounts)
   }
 
   // Create reversal entry with reverses_id link

@@ -16,6 +16,7 @@ import {
   createInvoiceJournalEntry,
 } from '@/lib/bookkeeping/invoice-entries'
 import { reverseEntry } from '@/lib/bookkeeping/engine'
+import { AccountsNotInChartError, accountsNotInChartResponse } from '@/lib/bookkeeping/errors'
 import { getEmailService } from '@/lib/email/service'
 import {
   generateInvoiceEmailHtml,
@@ -173,6 +174,7 @@ async function commitCategorizeTransaction(
       journalEntryId = journalEntry.id
     }
   } catch (err) {
+    if (err instanceof AccountsNotInChartError) throw err
     log.error('Failed to create journal entry:', err)
     return { error: err instanceof Error ? err.message : 'Failed to create journal entry', status: 500 }
   }
@@ -579,7 +581,10 @@ async function commitSendInvoice(
         createdJournalEntryId = je.id
         await supabase.from('invoices').update({ journal_entry_id: je.id }).eq('id', invoiceId)
       }
-    } catch { /* non-blocking */ }
+    } catch (err) {
+      if (err instanceof AccountsNotInChartError) throw err
+      /* non-blocking */
+    }
   }
 
   if (isRealInvoice) {
@@ -647,7 +652,10 @@ async function commitMarkInvoiceSent(
         journalEntryId = je.id
         await supabase.from('invoices').update({ journal_entry_id: je.id }).eq('id', invoiceId)
       }
-    } catch { /* non-blocking */ }
+    } catch (err) {
+      if (err instanceof AccountsNotInChartError) throw err
+      /* non-blocking */
+    }
   }
 
   return { data: { status: 'sent', journal_entry_id: journalEntryId } }
@@ -722,6 +730,7 @@ async function commitMatchTransactionInvoice(
       journalEntryId = je?.id ?? null
     }
   } catch (err) {
+    if (err instanceof AccountsNotInChartError) throw err
     log.error('Failed to create match journal entry:', err)
   }
 
@@ -822,30 +831,37 @@ export async function POST(
   // Execute based on operation type
   let result: { data?: Record<string, unknown>; error?: string; status?: number }
 
-  switch (pendingOp.operation_type) {
-    case 'categorize_transaction':
-      result = await commitCategorizeTransaction(supabase, user.id, companyId, pendingOp.params)
-      break
-    case 'create_customer':
-      result = await commitCreateCustomer(supabase, user.id, companyId, pendingOp.params)
-      break
-    case 'create_invoice':
-      result = await commitCreateInvoice(supabase, user.id, companyId, pendingOp.params)
-      break
-    case 'mark_invoice_paid':
-      result = await commitMarkInvoicePaid(supabase, user.id, companyId, pendingOp.params)
-      break
-    case 'send_invoice':
-      result = await commitSendInvoice(supabase, user.id, companyId, pendingOp.params, user.email)
-      break
-    case 'mark_invoice_sent':
-      result = await commitMarkInvoiceSent(supabase, user.id, companyId, pendingOp.params)
-      break
-    case 'match_transaction_invoice':
-      result = await commitMatchTransactionInvoice(supabase, user.id, companyId, pendingOp.params)
-      break
-    default:
-      return NextResponse.json({ error: 'Unknown operation type' }, { status: 400 })
+  try {
+    switch (pendingOp.operation_type) {
+      case 'categorize_transaction':
+        result = await commitCategorizeTransaction(supabase, user.id, companyId, pendingOp.params)
+        break
+      case 'create_customer':
+        result = await commitCreateCustomer(supabase, user.id, companyId, pendingOp.params)
+        break
+      case 'create_invoice':
+        result = await commitCreateInvoice(supabase, user.id, companyId, pendingOp.params)
+        break
+      case 'mark_invoice_paid':
+        result = await commitMarkInvoicePaid(supabase, user.id, companyId, pendingOp.params)
+        break
+      case 'send_invoice':
+        result = await commitSendInvoice(supabase, user.id, companyId, pendingOp.params, user.email)
+        break
+      case 'mark_invoice_sent':
+        result = await commitMarkInvoiceSent(supabase, user.id, companyId, pendingOp.params)
+        break
+      case 'match_transaction_invoice':
+        result = await commitMatchTransactionInvoice(supabase, user.id, companyId, pendingOp.params)
+        break
+      default:
+        return NextResponse.json({ error: 'Unknown operation type' }, { status: 400 })
+    }
+  } catch (err) {
+    if (err instanceof AccountsNotInChartError) {
+      return accountsNotInChartResponse(err)
+    }
+    throw err
   }
 
   if (result.error) {

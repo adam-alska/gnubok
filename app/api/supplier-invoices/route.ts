@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { eventBus } from '@/lib/events'
 import { createSupplierInvoiceRegistrationEntry } from '@/lib/bookkeeping/supplier-invoice-entries'
+import { AccountsNotInChartError, accountsNotInChartResponse } from '@/lib/bookkeeping/errors'
 import { ensureInitialized } from '@/lib/init'
 import { validateBody } from '@/lib/api/validate'
 import { CreateSupplierInvoiceSchema } from '@/lib/api/schemas'
@@ -194,6 +195,9 @@ export async function POST(request: Request) {
           .eq('id', invoice.id)
       }
     } catch (err) {
+      if (err instanceof AccountsNotInChartError) {
+        return accountsNotInChartResponse(err)
+      }
       console.error('Failed to create registration journal entry:', err)
     }
   }
