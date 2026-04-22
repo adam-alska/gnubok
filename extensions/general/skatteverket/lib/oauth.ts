@@ -1,4 +1,9 @@
 import type { SkatteverketTokens } from '../types'
+import {
+  fetchWithTimeout,
+  OAUTH_TIMEOUT_MS,
+  SKATTEVERKET_EXCHANGE_TIMEOUT_MS,
+} from '@/lib/http/fetch-with-timeout'
 
 /**
  * Skatteverket OAuth2 helpers for the `per` (BankID) flow.
@@ -68,11 +73,18 @@ export async function exchangeCodeForTokens(
     code,
   })
 
-  const response = await fetch(`${base}/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-    body: body.toString(),
-  })
+  const response = await fetchWithTimeout(
+    `${base}/token`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: body.toString(),
+    },
+    {
+      timeoutMs: SKATTEVERKET_EXCHANGE_TIMEOUT_MS,
+      description: 'Skatteverket token exchange',
+    },
+  )
 
   if (!response.ok) {
     const text = await response.text()
@@ -110,11 +122,18 @@ export async function refreshAccessToken(
     refresh_token: refreshToken,
   })
 
-  const response = await fetch(`${base}/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-    body: body.toString(),
-  })
+  const response = await fetchWithTimeout(
+    `${base}/token`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: body.toString(),
+    },
+    {
+      timeoutMs: OAUTH_TIMEOUT_MS,
+      description: 'Skatteverket token refresh',
+    },
+  )
 
   if (!response.ok) {
     const text = await response.text()

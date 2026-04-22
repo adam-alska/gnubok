@@ -1,6 +1,9 @@
 import { TokenBucketRateLimiter } from '../rate-limiter';
 import { withRetry } from '../retry';
 import { VISMA_BASE_URL, VISMA_RATE_LIMIT } from './config';
+import { isTimeoutError } from '@/lib/http/fetch-with-timeout';
+
+const FETCH_TIMEOUT_MS = 15_000;
 
 export class VismaApiError extends Error {
   constructor(
@@ -14,6 +17,7 @@ export class VismaApiError extends Error {
 }
 
 function isRetryableError(error: unknown): boolean {
+  if (isTimeoutError(error)) return true;
   if (error instanceof VismaApiError) {
     if (error.statusCode === 401 || error.statusCode === 403 || error.statusCode === 404) {
       return false;
@@ -48,6 +52,7 @@ export class VismaClient {
             Accept: 'application/json',
             'Content-Type': 'application/json',
           },
+          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         });
 
         if (!response.ok) {

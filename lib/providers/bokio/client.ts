@@ -2,8 +2,11 @@ import { TokenBucketRateLimiter } from '../rate-limiter';
 import { withRetry } from '../retry';
 import { BOKIO_BASE_URL, BOKIO_RATE_LIMIT } from './config';
 import { createLogger } from '@/lib/logger';
+import { isTimeoutError } from '@/lib/http/fetch-with-timeout';
 
 const log = createLogger('bokio-client');
+
+const FETCH_TIMEOUT_MS = 15_000;
 
 export class BokioApiError extends Error {
   constructor(
@@ -17,6 +20,7 @@ export class BokioApiError extends Error {
 }
 
 function isRetryableError(error: unknown): boolean {
+  if (isTimeoutError(error)) return true;
   if (error instanceof BokioApiError) {
     if (error.statusCode === 401 || error.statusCode === 403 || error.statusCode === 404) {
       return false;
@@ -53,6 +57,7 @@ export class BokioClient {
             Authorization: `Bearer ${accessToken}`,
             Accept: 'application/json',
           },
+          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         });
 
         if (!response.ok) {

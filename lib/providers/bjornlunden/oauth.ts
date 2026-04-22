@@ -1,4 +1,8 @@
 import type { TokenResponse } from '../types';
+import {
+  fetchWithTimeout,
+  OAUTH_TIMEOUT_MS,
+} from '@/lib/http/fetch-with-timeout';
 
 const BL_AUTH_URL = 'https://apigateway.blinfo.se/auth/oauth/v2/token';
 
@@ -6,17 +10,21 @@ export async function fetchBjornLundenToken(
   clientId: string,
   clientSecret: string,
 ): Promise<TokenResponse> {
-  const response = await fetch(BL_AUTH_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
+  const response = await fetchWithTimeout(
+    BL_AUTH_URL,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: clientId,
+        client_secret: clientSecret,
+      }).toString(),
     },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: clientId,
-      client_secret: clientSecret,
-    }).toString(),
-  });
+    { timeoutMs: OAUTH_TIMEOUT_MS, description: 'Björn Lundén token request' },
+  );
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');

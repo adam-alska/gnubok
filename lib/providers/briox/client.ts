@@ -1,6 +1,9 @@
 import { TokenBucketRateLimiter } from '../rate-limiter';
 import { withRetry } from '../retry';
 import { BRIOX_BASE_URL, BRIOX_RATE_LIMIT } from './config';
+import { isTimeoutError } from '@/lib/http/fetch-with-timeout';
+
+const FETCH_TIMEOUT_MS = 15_000;
 
 export class BrioxApiError extends Error {
   constructor(
@@ -14,6 +17,7 @@ export class BrioxApiError extends Error {
 }
 
 function isRetryableError(error: unknown): boolean {
+  if (isTimeoutError(error)) return true;
   if (error instanceof BrioxApiError) {
     if (error.statusCode === 401 || error.statusCode === 403 || error.statusCode === 404) {
       return false;
@@ -53,6 +57,7 @@ export class BrioxClient {
             Accept: 'application/json',
             'Content-Type': 'application/json',
           },
+          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         });
 
         if (!response.ok) {

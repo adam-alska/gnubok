@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import type { Extension, ExtensionContext } from '@/lib/extensions/types'
 import { NextResponse } from 'next/server'
+import { TimeoutError } from '@/lib/http/fetch-with-timeout'
 import { buildAuthorizeUrl, exchangeCodeForTokens } from './lib/oauth'
 import { storeTokens, getTokens, deleteTokens } from './lib/token-store'
 import { skvRequest, SkatteverketAuthError } from './lib/api-client'
@@ -162,10 +163,15 @@ export const skatteverketExtension: Extension = {
           )
         } catch (err) {
           console.error('[skatteverket] Token exchange failed:', err)
+          // BankID auth codes expire after 5 minutes. Surface timeouts distinctly
+          // so the user retries quickly instead of exhausting the code window.
+          const message = err instanceof TimeoutError
+            ? 'Tidsgränsen mot Skatteverket överskreds — försök igen med BankID'
+            : err instanceof Error
+              ? err.message
+              : 'Token exchange misslyckades'
           return NextResponse.redirect(
-            `${appUrl}/reports?tab=vat-declaration&skv_error=${encodeURIComponent(
-              err instanceof Error ? err.message : 'Token exchange misslyckades'
-            )}`
+            `${appUrl}/reports?tab=vat-declaration&skv_error=${encodeURIComponent(message)}`
           )
         }
       },

@@ -1,5 +1,9 @@
 import { BRIOX_TOKEN_URL, BRIOX_REFRESH_URL } from './config';
 import type { TokenResponse } from '../types';
+import {
+  fetchWithTimeout,
+  OAUTH_TIMEOUT_MS,
+} from '@/lib/http/fetch-with-timeout';
 
 interface BrioxTokenData {
   access_token: string;
@@ -29,12 +33,16 @@ export async function exchangeBrioxCode(
 ): Promise<TokenResponse> {
   const url = `${BRIOX_TOKEN_URL}?clientid=${encodeURIComponent(clientId)}&token=${encodeURIComponent(applicationToken)}`;
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+  const response = await fetchWithTimeout(
+    url,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
     },
-  });
+    { timeoutMs: OAUTH_TIMEOUT_MS, description: 'Briox token exchange' },
+  );
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
@@ -51,12 +59,16 @@ export async function refreshBrioxToken(
 ): Promise<TokenResponse> {
   const url = `${BRIOX_REFRESH_URL}?refreshtoken=${encodeURIComponent(refreshToken)}&token=${encodeURIComponent(refreshToken)}`;
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+  const response = await fetchWithTimeout(
+    url,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
     },
-  });
+    { timeoutMs: OAUTH_TIMEOUT_MS, description: 'Briox token refresh' },
+  );
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
