@@ -11,6 +11,13 @@ export class TimeoutError extends Error {
   readonly name = 'TimeoutError'
 }
 
+export function isTimeoutError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === 'TimeoutError' || error.name === 'AbortError')
+  )
+}
+
 export const OAUTH_TIMEOUT_MS = 10_000
 export const OAUTH_REVOKE_TIMEOUT_MS = 5_000
 export const SKATTEVERKET_EXCHANGE_TIMEOUT_MS = 8_000

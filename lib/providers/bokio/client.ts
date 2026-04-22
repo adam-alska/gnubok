@@ -2,6 +2,7 @@ import { TokenBucketRateLimiter } from '../rate-limiter';
 import { withRetry } from '../retry';
 import { BOKIO_BASE_URL, BOKIO_RATE_LIMIT } from './config';
 import { createLogger } from '@/lib/logger';
+import { isTimeoutError } from '@/lib/http/fetch-with-timeout';
 
 const log = createLogger('bokio-client');
 
@@ -16,10 +17,6 @@ export class BokioApiError extends Error {
     super(message);
     this.name = 'BokioApiError';
   }
-}
-
-function isTimeoutError(error: unknown): boolean {
-  return error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
 }
 
 function isRetryableError(error: unknown): boolean {

@@ -1,6 +1,7 @@
 import { TokenBucketRateLimiter } from '../rate-limiter';
 import { withRetry } from '../retry';
 import { BL_BASE_URL, BL_RATE_LIMIT } from './config';
+import { isTimeoutError } from '@/lib/http/fetch-with-timeout';
 
 const FETCH_TIMEOUT_MS = 15_000;
 
@@ -13,10 +14,6 @@ export class BjornLundenApiError extends Error {
     super(message);
     this.name = 'BjornLundenApiError';
   }
-}
-
-function isTimeoutError(error: unknown): boolean {
-  return error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
 }
 
 function isRetryableError(error: unknown): boolean {
