@@ -108,11 +108,19 @@ export default async function SelectCompanyPage() {
   // "Currently a director" = no position end date. We deliberately do NOT
   // also require companyStatus === 'Aktivt': real TIC payloads have been
   // observed with other values (locale/tenant variants), and filtering too
-  // strictly silently hides the user's real directorships. Ceased or
-  // struck-off companies will still render but the TIC /lookup step will
-  // show them as `isCeased` and block provisioning at that point.
+  // strictly silently hides the user's real directorships.
+  //
+  // Ceased/struck-off companies would still render here, but two later
+  // guards block provisioning:
+  //   1. BankIdCompanyPicker calls TIC /lookup before provisioning and
+  //      short-circuits with a toast when isCeased=true.
+  //   2. createCompanyFromTicRole refuses to provision when lookup.isCeased.
+  // Both guards are required — don't remove one without removing both.
+  //
+  // Loose `== null` on purpose: TIC payloads have been observed returning
+  // `undefined` for open-ended positions, which `=== null` would miss.
   const activeRoles = (enrichmentValue?.companyRoles ?? []).filter(
-    (r) => r.positionEnd === null,
+    (r) => r.positionEnd == null,
   )
 
   // Drop TIC roles that already appear in the user's gnubok memberships —

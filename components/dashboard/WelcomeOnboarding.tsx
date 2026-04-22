@@ -181,16 +181,25 @@ export default function WelcomeOnboarding({
 
       if (result.error || !result.companyId) {
         logError('create company action failed', { error: result.error })
-        const description = result.error === 'org_number_exists'
-          ? 'Det här företaget finns redan i gnubok. Be en befintlig administratör att bjuda in dig.'
-          : result.error || 'Kunde inte skapa företag. Försök igen.'
+        let title = 'Fel'
+        let description: string = result.error || 'Kunde inte skapa företag. Försök igen.'
+        let backToStep2 = false
+        if (result.error === 'org_number_exists') {
+          title = 'Företaget finns redan'
+          description = 'Det här företaget finns redan i gnubok. Be en befintlig administratör att bjuda in dig.'
+          backToStep2 = true
+        } else if (result.error === 'org_number_invalid') {
+          title = 'Ogiltigt organisationsnummer'
+          description = 'Kontrollera att du angett ett giltigt 10- eller 12-siffrigt organisationsnummer.'
+          backToStep2 = true
+        }
         toast({
-          title: result.error === 'org_number_exists' ? 'Företaget finns redan' : 'Fel',
+          title,
           description,
           variant: 'destructive',
         })
         // Back user up to step 2 so they can correct the org number.
-        if (result.error === 'org_number_exists') {
+        if (backToStep2) {
           setCurrentStep(2)
         }
         return

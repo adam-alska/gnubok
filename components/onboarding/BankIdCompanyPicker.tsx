@@ -132,6 +132,18 @@ export default function BankIdCompanyPicker({
       return
     }
 
+    // Block provisioning for companies that are avregistrerade/likviderade.
+    // Under BFL 2 kap, bokföringsskyldighet ends when a company is struck off.
+    if (lookup.isCeased) {
+      toast({
+        title: 'Företaget är avregistrerat',
+        description: 'Det går inte att sätta upp bokföring för ett avregistrerat företag.',
+        variant: 'destructive',
+      })
+      setSetup({ kind: 'idle' })
+      return
+    }
+
     setSetup({ kind: 'creating', orgNumber, step: 'provision' })
 
     startTransition(async () => {
@@ -158,6 +170,30 @@ export default function BankIdCompanyPicker({
           variant: 'destructive',
         })
         setSetup({ kind: 'idle' })
+        return
+      }
+
+      if (result.error === 'company_ceased') {
+        // Belt-and-suspenders: we already check lookup.isCeased client-side
+        // above, but the server-side guard catches any race where TIC's
+        // cached result differs between the two calls.
+        toast({
+          title: 'Företaget är avregistrerat',
+          description: 'Det går inte att sätta upp bokföring för ett avregistrerat företag.',
+          variant: 'destructive',
+        })
+        setSetup({ kind: 'idle' })
+        return
+      }
+
+      if (result.error === 'org_number_invalid') {
+        toast({
+          title: 'Ogiltigt organisationsnummer',
+          description: 'Fortsätt med manuell uppsättning.',
+          variant: 'destructive',
+        })
+        setSetup({ kind: 'idle' })
+        router.push(`/onboarding?org_number=${encodeURIComponent(orgNumber)}`)
         return
       }
 

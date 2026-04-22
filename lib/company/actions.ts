@@ -8,26 +8,55 @@ import { mapEntityType } from '@/lib/company-lookup/entity-type-map'
 import type { CompanyLookupResult } from '@/lib/company-lookup/types'
 
 /**
+ * Normalize an org number to gnubok's canonical 10-digit storage form.
+ *
+ * Accepts hyphen/space-formatted input in either of the two shapes Swedish
+ * users commonly type:
+ *  - 10 digits (559999-1234 or 8001011234) — stored as-is
+ *  - 12 digits (19800101-1234) — century prefix stripped
+ *
+ * Returns null for any other length or non-digit content. Storing malformed
+ * values would corrupt SIE4 (#ORGNR) and SRU (INFO.SRU) exports downstream,
+ * and break the duplicate-org guard, so we refuse at the boundary.
+ *
+ * 10-digit storage matches the rest of the codebase — see
+ * `lib/skatteverket/format.ts` which converts 10→12 at export time by
+ * prefixing with '16' (AB) or '19'/'20' (EF personnummer).
+ */
+function normalizeOrgNumber(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  const cleaned = raw.replace(/[\s-]/g, '')
+  if (/^\d{10}$/.test(cleaned)) return cleaned
+  if (/^\d{12}$/.test(cleaned)) return cleaned.substring(2)
+  return null
+}
+
+/**
  * Check whether an org number is already registered in any non-archived
  * gnubok company. Uses the service role because RLS hides rows the caller
  * isn't a member of — and "other users' duplicates" is exactly what we
- * need to detect. Returns null if `orgNumber` is empty/nullish.
+ * need to detect. Returns null when `orgNumber` is empty/malformed. Throws
+ * if the underlying query fails — callers must not silently treat that as
+ * "no duplicate," or the whole guard gets bypassed on transient DB errors.
  */
 async function findExistingCompanyByOrgNumber(
   orgNumber: string | null | undefined,
 ): Promise<{ id: string; name: string } | null> {
-  if (!orgNumber) return null
-  const cleaned = orgNumber.replace(/[\s-]/g, '')
+  const cleaned = normalizeOrgNumber(orgNumber)
   if (!cleaned) return null
 
   const service = createServiceClient()
-  const { data } = await service
+  const { data, error } = await service
     .from('companies')
     .select('id, name')
     .eq('org_number', cleaned)
     .is('archived_at', null)
     .limit(1)
     .maybeSingle()
+
+  if (error) {
+    throw new Error(`Duplicate-org lookup failed: ${error.message}`)
+  }
 
   return data ?? null
 }
@@ -90,12 +119,26 @@ export async function createCompanyFromOnboarding(params: {
   // existing duplicates first), so enforce uniqueness at the application
   // boundary. Must run before the create RPC so we don't leave a ghost
   // company if the duplicate is detected mid-flow.
+  //
+  // normalizeOrgNumber returns null for malformed input — we refuse rather
+  // than storing a value that would break SIE/SRU exports later.
   const rawOrgNumber = params.settings.org_number as string | undefined
-  const cleanedOrgNumber = rawOrgNumber ? rawOrgNumber.replace(/[\s-]/g, '') : ''
+  const cleanedOrgNumber = normalizeOrgNumber(rawOrgNumber)
+  if (rawOrgNumber && rawOrgNumber.trim() && !cleanedOrgNumber) {
+    return { error: 'org_number_invalid' }
+  }
   if (cleanedOrgNumber) {
-    const existing = await findExistingCompanyByOrgNumber(cleanedOrgNumber)
-    if (existing) {
-      return { error: 'org_number_exists' }
+    try {
+      const existing = await findExistingCompanyByOrgNumber(cleanedOrgNumber)
+      if (existing) {
+        return { error: 'org_number_exists' }
+      }
+    } catch (err) {
+      // Guard must fail closed: if we can't confirm uniqueness, don't create
+      // a company. A silent pass-through would let transient DB errors
+      // through as duplicates (exactly the bug Greptile flagged).
+      console.error('[createCompanyFromOnboarding] duplicate-org lookup failed', err)
+      return { error: 'Kunde inte verifiera organisationsnummer. Försök igen.' }
     }
   }
 
@@ -111,16 +154,6 @@ export async function createCompanyFromOnboarding(params: {
     return { error: 'Kunde inte skapa företag. Försök igen.' }
   }
 
-  // Mirror the cleaned org_number onto the companies row so future duplicate
-  // checks and cross-references are reliable (company_settings is upserted
-  // below but the companies row is authoritative for org_number now).
-  if (cleanedOrgNumber) {
-    await supabase
-      .from('companies')
-      .update({ org_number: cleanedOrgNumber })
-      .eq('id', newCompanyId)
-  }
-
   // Helper: roll back the company if a subsequent step fails. Deletes in FK order.
   const rollback = async (reason: string, err: unknown) => {
     console.error(`[createCompanyFromOnboarding] rolling back ${newCompanyId}: ${reason}`, err)
@@ -129,6 +162,22 @@ export async function createCompanyFromOnboarding(params: {
     await supabase.from('chart_of_accounts').delete().eq('company_id', newCompanyId)
     await supabase.from('company_members').delete().eq('company_id', newCompanyId)
     await supabase.from('companies').delete().eq('id', newCompanyId)
+  }
+
+  // Mirror the normalized org_number onto the companies row so future
+  // duplicate checks and cross-references are reliable. MUST be error-checked
+  // and rolled back on failure — otherwise the freshly-created company would
+  // exist without an org_number and the duplicate guard would never match it
+  // for any future user (the very guard this code is enforcing).
+  if (cleanedOrgNumber) {
+    const { error: orgUpdateError } = await supabase
+      .from('companies')
+      .update({ org_number: cleanedOrgNumber })
+      .eq('id', newCompanyId)
+    if (orgUpdateError) {
+      await rollback('org_number update failed', orgUpdateError)
+      return { error: 'Kunde inte spara organisationsnummer. Försök igen.' }
+    }
   }
 
   // 2. Seed chart of accounts
@@ -241,6 +290,14 @@ export async function createCompanyFromTicRole(params: {
   // user can confirm these fields themselves.
   if (!params.lookup) {
     return { error: 'lookup_missing' }
+  }
+
+  // Ceased/struck-off companies must not be provisioned. Under BFL 2 kap,
+  // bokföringsskyldighet ends when a company is avregistrerad; creating a
+  // new gnubok accounting entity for a non-existent legal entity would let
+  // users file momsdeklarationer or årsredovisning for it.
+  if (params.lookup.isCeased) {
+    return { error: 'company_ceased' }
   }
 
   // SPAR address fallback if the TIC lookup didn't include one.
