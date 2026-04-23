@@ -28,32 +28,27 @@ if [ -n "$placeholders_found" ]; then
 fi
 
 # Replace build-time placeholder sentinels with runtime env vars.
-# This allows a single pre-built image to work with any Supabase project.
-# Client-side bundles:
-if [ -d /app/.next/static ]; then
-  find /app/.next/static -name '*.js' -exec sed -i \
+# When built with real values (e.g. via Coolify build args), sentinels
+# won't be present and sed is a no-op. Errors are non-fatal since the
+# nextjs user may not have write access to all files.
+replace_sentinels() {
+  find "$1" -name '*.js' -exec sed -i \
     -e "s|__NEXT_PUBLIC_SUPABASE_URL__|${NEXT_PUBLIC_SUPABASE_URL}|g" \
     -e "s|__NEXT_PUBLIC_SUPABASE_ANON_KEY__|${NEXT_PUBLIC_SUPABASE_ANON_KEY}|g" \
     -e "s|__NEXT_PUBLIC_APP_URL__|${NEXT_PUBLIC_APP_URL}|g" \
     -e "s|__NEXT_PUBLIC_VAPID_PUBLIC_KEY__|${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}|g" \
     -e "s|__NEXT_PUBLIC_SELF_HOSTED__|${NEXT_PUBLIC_SELF_HOSTED:-true}|g" \
     -e "s|__NEXT_PUBLIC_REQUIRE_MFA__|${NEXT_PUBLIC_REQUIRE_MFA:-false}|g" \
-    {} +
-fi
+    {} + 2>/dev/null || true
+}
 
-# Server-side bundles (Next.js inlines NEXT_PUBLIC_* at build time here too):
-if [ -d /app/.next/server ]; then
-  find /app/.next/server -name '*.js' -exec sed -i \
-    -e "s|__NEXT_PUBLIC_SUPABASE_URL__|${NEXT_PUBLIC_SUPABASE_URL}|g" \
-    -e "s|__NEXT_PUBLIC_SUPABASE_ANON_KEY__|${NEXT_PUBLIC_SUPABASE_ANON_KEY}|g" \
-    -e "s|__NEXT_PUBLIC_APP_URL__|${NEXT_PUBLIC_APP_URL}|g" \
-    -e "s|__NEXT_PUBLIC_VAPID_PUBLIC_KEY__|${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}|g" \
-    -e "s|__NEXT_PUBLIC_SELF_HOSTED__|${NEXT_PUBLIC_SELF_HOSTED:-true}|g" \
-    -e "s|__NEXT_PUBLIC_REQUIRE_MFA__|${NEXT_PUBLIC_REQUIRE_MFA:-false}|g" \
-    {} +
-fi
+# Client-side bundles
+[ -d /app/.next/static ] && replace_sentinels /app/.next/static
 
-# Also replace in the standalone server.js entry point:
+# Server-side bundles
+[ -d /app/.next/server ] && replace_sentinels /app/.next/server
+
+# Standalone entry point
 if [ -f /app/server.js ]; then
   sed -i \
     -e "s|__NEXT_PUBLIC_SUPABASE_URL__|${NEXT_PUBLIC_SUPABASE_URL}|g" \
@@ -62,7 +57,7 @@ if [ -f /app/server.js ]; then
     -e "s|__NEXT_PUBLIC_VAPID_PUBLIC_KEY__|${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}|g" \
     -e "s|__NEXT_PUBLIC_SELF_HOSTED__|${NEXT_PUBLIC_SELF_HOSTED:-true}|g" \
     -e "s|__NEXT_PUBLIC_REQUIRE_MFA__|${NEXT_PUBLIC_REQUIRE_MFA:-false}|g" \
-    /app/server.js
+    /app/server.js 2>/dev/null || true
 fi
 
 exec "$@"
