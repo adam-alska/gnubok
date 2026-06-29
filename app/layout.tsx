@@ -103,6 +103,7 @@ export default async function RootLayout({
           </ThemeProvider>
         </NextIntlClientProvider>
         <SpeedInsights />
+        <Script src="/pointer-events-polyfill.js" strategy="beforeInteractive" />
         <Script src="/sw-register.js" strategy="afterInteractive" />
       </body>
     </html>
