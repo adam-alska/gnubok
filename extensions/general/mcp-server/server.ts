@@ -4588,6 +4588,7 @@ export const tools: McpTool[] = [
           description: 'Filter by invoice status',
         },
         limit: { type: 'number', description: 'Max results (default 50, max 100)' },
+        offset: { type: 'integer', minimum: 0, description: 'Number of results to skip for pagination (default 0)' },
       },
     },
     outputSchema: paginatedSchema('invoices', { type: 'object' }),
@@ -4599,6 +4600,7 @@ export const tools: McpTool[] = [
     },
     async execute(args, companyId, userId, supabase) {
       const limit = Math.min(Math.max(1, Number(args.limit) || 50), 100)
+      const offset = Math.max(0, Math.floor(Number(args.offset) || 0))
       const status = args.status as string | undefined
 
       let query = supabase
@@ -4612,11 +4614,13 @@ export const tools: McpTool[] = [
 
       const { data, error, count } = await query
         .order('invoice_date', { ascending: false })
-        .limit(limit)
+        .order('id', { ascending: false })
+        .range(offset, offset + limit)
 
       if (error) throw new Error(`Database error: ${error.message}`)
 
-      const invoices = (data ?? []).map((inv: Record<string, unknown>) => ({
+      const rows = data ?? []
+      const invoices = rows.slice(0, limit).map((inv: Record<string, unknown>) => ({
         id: inv.id,
         invoice_number: inv.invoice_number,
         status: inv.status,
@@ -4629,10 +4633,17 @@ export const tools: McpTool[] = [
         default_dimensions: inv.default_dimensions ?? {},
       }))
 
+      const hasMore = count == null
+        ? rows.length > limit
+        : offset + invoices.length < count
+      const total = count ?? offset + invoices.length + (hasMore ? 1 : 0)
+
       return {
         invoices,
         count: invoices.length,
-        total_count: count ?? invoices.length,
+        total_count: total,
+        has_more: hasMore,
+        ...(hasMore ? { next_offset: offset + invoices.length } : {}),
       }
     },
   },
@@ -15007,6 +15018,7 @@ export const tools: McpTool[] = [
           description: 'Filter by schedule status',
         },
         limit: { type: 'number', description: 'Max results (default 50, max 100)' },
+        offset: { type: 'integer', minimum: 0, description: 'Number of results to skip for pagination (default 0)' },
       },
     },
     outputSchema: paginatedSchema('schedules', {
@@ -15057,6 +15069,7 @@ export const tools: McpTool[] = [
     catalogVisibility: 'search',
     async execute(args, companyId, userId, supabase) {
       const limit = Math.min(Math.max(1, Number(args.limit) || 50), 100)
+      const offset = Math.max(0, Math.floor(Number(args.offset) || 0))
       const status = args.status as string | undefined
 
       let query = supabase
@@ -15073,11 +15086,13 @@ export const tools: McpTool[] = [
 
       const { data, error, count } = await query
         .order('created_at', { ascending: false })
-        .limit(limit)
+        .order('id', { ascending: false })
+        .range(offset, offset + limit)
 
       if (error) throw new Error(`Database error: ${error.message}`)
 
-      const schedules = (data ?? []).map((row: Record<string, unknown>) => {
+      const rows = data ?? []
+      const schedules = rows.slice(0, limit).map((row: Record<string, unknown>) => {
         const items = ((row.items as Array<Record<string, unknown>>) ?? [])
           .slice()
           .sort((a, b) => Number(a.sort_order) - Number(b.sort_order))
@@ -15113,10 +15128,17 @@ export const tools: McpTool[] = [
         }
       })
 
+      const hasMore = count == null
+        ? rows.length > limit
+        : offset + schedules.length < count
+      const total = count ?? offset + schedules.length + (hasMore ? 1 : 0)
+
       return {
         schedules,
         count: schedules.length,
-        total_count: count ?? schedules.length,
+        total_count: total,
+        has_more: hasMore,
+        ...(hasMore ? { next_offset: offset + schedules.length } : {}),
       }
     },
   },

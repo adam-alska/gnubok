@@ -729,3 +729,9 @@ One line per decision: `[YYYY-MM-DD] <decision>: <why>`. Appended by agents and 
 
 [2026-08-01] Cloud Backup OAuth redirect URIs resolve from NEXT_PUBLIC_APP_URL, with request origin only as a self-hosted fallback: Google and Dropbox require pre-registered callbacks, so deriving them from an old alias or preview host can reject the flow before consent; one resolver keeps authorization, exchange, revoke, and sync origins consistent.
 [2026-08-01] Do not claim a fixed Supabase Docker revision: Accounted does not maintain a tested Supabase stack pin, so the self-hosting guide requires one complete immutable upstream tag or commit instead of naming an unverified version.
+
+[2026-08-01] gnubok_list_invoices and gnubok_list_recurring_schedules use the same offset, has_more, and next_offset contract as the other paginated MCP tools, with id as a descending tie-break after the existing business-date order. Returning has_more without an offset left rows beyond the first 100 unreachable, while the secondary order prevents equal invoice dates or creation timestamps from reshuffling between page requests.
+
+[2026-08-01] MCP page offsets are declared as non-negative integers and defensively floored before PostgREST range calls: fractional offsets cannot name a stable row boundary and can produce invalid range bounds when execution bypasses schema validation.
+
+[2026-08-01] Paginated MCP invoice tools fetch one lookahead row and use it when Supabase omits the exact count: returning a conservative next_offset avoids falsely declaring the current page terminal and silently truncating callers, while exact-count responses and page sizes remain unchanged.
