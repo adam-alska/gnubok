@@ -43,6 +43,9 @@ ENV NEXT_PUBLIC_REQUIRE_MFA=__NEXT_PUBLIC_REQUIRE_MFA__
 ENV NEXT_PUBLIC_BRANDING_APP_NAME=__NEXT_PUBLIC_BRANDING_APP_NAME__
 
 ENV NEXT_TELEMETRY_DISABLED=1
+# Next.js production build needs more heap than the Node default on this
+# codebase (observed OOM at 2GB on the Coolify builder).
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 
 RUN npm run build
 
